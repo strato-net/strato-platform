@@ -1,10 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
--- <<<<<<< HEAD
-
--- =======
--- {-# LANGUAGE RecordWildCards #-} 
--- >>>>>>> origin/develop
+{-# LANGUAGE LambdaCase        #-}
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
   ) where
@@ -27,21 +23,6 @@ data R = R
   { codeCollection :: CodeCollection
   , contract :: Maybe Contract
   }
--- =======
--- 
--- import           Data.Map as M
--- import           Data.Functor.Compose
--- import           Data.Maybe (fromMaybe)
-
--- import           SolidVM.Model.CodeCollection
--- import           SolidVM.Solidity.Parse.UnParser
-
--- --import           Blockchain.SolidVM.Exception
-
--- data R = R
---   { codeCollection :: CodeCollection
--- >>>>>>> origin/develop
---   }
 
 
 detector ::  CodeCollection -> CodeCollection
@@ -86,16 +67,16 @@ functionHelper :: CodeCollection
                -> Maybe Contract
                -> Func
                -> Func
-functionHelper cc mc f = 
+functionHelper cc mc f =
   case _funcContents f of
     Nothing -> f
-    Just stmts -> 
-      if ((Just True) ==)  $ M.null <$>  (_userDefined <$> mc) 
+    Just stmts ->
+      if ((Just True) ==)  $ M.null <$>  (_userDefined <$> mc)
         then  let r = R cc mc
               in f{ _funcContents = Just $ runReader (optimizeStatements stmts) r }
         else  let r = R cc mc
               in functionHelperForUserDefined f{ _funcContents = Just $ runReader (optimizeStatements stmts) r }
-    
+
 
 functionHelperForUserDefined ::  Func -> Func
 functionHelperForUserDefined f = f{ _funcArgs =  tForm  $ _funcArgs f, _funcVals =  tForm  $ _funcVals f   }
@@ -106,44 +87,6 @@ functionHelperForUserDefined f = f{ _funcArgs =  tForm  $ _funcArgs f, _funcVals
       (xxxx, _ )-> (xxxx, (IndexedType z y));
       )
 
--- =======
--- detector cc = (over (contracts . mapped) (contractHelper cc))
---           $ over (flFuncs . mapped) (functionHelper cc)
---           $ over (flConstants . mapped) (constDeclHelper cc) cc 
-
--- contractHelper :: CodeCollection 
---                -> Contract
---                -> Contract
--- contractHelper cc = (constructor . _Just %~ (functionHelper cc) )
---                . over (storageDefs . mapped) (varDeclHelper cc)
---                . over (functions . mapped) (functionHelper cc)
---                . over (constants . mapped) (constDeclHelper cc) 
-  
-
--- varDeclHelper :: CodeCollection
---               -> VariableDecl
---               -> VariableDecl
--- varDeclHelper cc v = v{ _varInitialVal = run <$> _varInitialVal v }
---   where run e = let r = R (cc)
---           in runReader (optimizeExpression e) r
-
--- constDeclHelper :: CodeCollection
---                 -> ConstantDecl
---                 -> ConstantDecl
--- constDeclHelper cc v = v{ _constInitialVal = run $ _constInitialVal v }
---   where run e = let r = R (cc)
-
---                  in runReader (optimizeExpression e) r
-
--- functionHelper :: CodeCollection
---                -> Func
---                -> Func
--- functionHelper cc f = case _funcContents f of
---   Nothing -> f
---   Just stmts ->
---     let r = R (cc)
---      in f{ _funcContents = Just $ runReader (optimizeStatements stmts) r }
--- >>>>>>> origin/develop
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $  []
@@ -209,8 +152,8 @@ getVariableByName name = do
   case mc of
     Just c -> do
       cc <- asks codeCollection
-      pure $ (_constInitialVal <$> M.lookup name (_constants c)) 
-                    <|> join (_varInitialVal <$>  M.lookup name (_storageDefs c)) 
+      pure $ (_constInitialVal <$> M.lookup name (_constants c))
+                    <|> join (_varInitialVal <$>  M.lookup name (_storageDefs c))
                     <|>  (_constInitialVal <$> M.lookup name  (_flConstants cc))
                     -- TODO
                     -- <|> () <$> M.lookup name (_enums c))
@@ -224,7 +167,7 @@ getVariableByName name = do
 
 optimizeExpression :: Expression -> Reader R Expression
 optimizeExpression (Binary x "+" a b) = do
-  a' <- optimizeExpression a 
+  a' <- optimizeExpression a
   b' <- optimizeExpression b
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
@@ -257,51 +200,37 @@ optimizeExpression (Binary x "%" a b) = do
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args) = do
   mc <- asks contract
-  case mc of
-    Just c -> do
-      let arg = case args of OrderedArgs es ->  es;  _ -> [];
-      if M.member nam (_userDefined  c) &&   length arg == 1
-        then do
-          optimizeExpression $ head arg
-        else pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
-    Nothing -> do
-      pure $ (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
-
+  case mc  of
+    Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args
+    Just c -> case args of
+        OrderedArgs [x] | M.member nam (_userDefined  c) -> optimizeExpression x
+        _ -> pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args) = do
   mc <- asks contract
   case mc of
-    Just c -> do
-      let arg = case args of OrderedArgs es ->  es;  _ -> [];
-      if M.member nam (_userDefined  c) &&   length arg == 1
-        then do
-          case head arg of
-            (Variable _ name) -> do
-              mExpr  <- getVariableByName name
-              case mExpr of
-                Just expr -> optimizeExpression expr
-                _ -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
-            _ -> optimizeExpression $ head arg
-        else pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
+    Just c -> case args  of
+            OrderedArgs [x] | M.member nam (_userDefined  c)  -> optimizeExpression x
+            _ ->  pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
 
--- optimizeExpression (Variable x name ) = do
---   var <- getVariableByName name
---   case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
+optimizeExpression (Variable x name ) = do
+  var <- getVariableByName name
+  case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
 
 optimizeExpression (MemberAccess loc base fieldName) = do
-  case base of 
+  case base of
     (FunctionCall spot (Variable _ "type") (OrderedArgs [(Variable _ nam)])) -> do --Note type is a special reserved function
         cc <- asks codeCollection
         if (M.member nam (_contracts cc) )
-        then case fieldName of 
+        then case fieldName of
           "name" -> pure $ (StringLiteral spot nam)
           --"int"  -> pure $ ()--To Implement for another ticket
-          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contrct -> (StringLiteral spot (unparseContract  contrct));  _ ->  (MemberAccess loc base fieldName); 
+          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contrct -> (StringLiteral spot (unparseContract  contrct));  _ ->  (MemberAccess loc base fieldName);
           "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
-          _ -> pure $ (MemberAccess loc base fieldName) 
+          _ -> pure $ (MemberAccess loc base fieldName)
         else  pure $ (MemberAccess loc base fieldName)
-    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName) 
+    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName)
     _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
 
 
@@ -395,7 +324,7 @@ optimizeExpression (MemberAccess loc base fieldName) = do
 --     _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
 
 
-      
+
 -- optimizeExpression (FunctionCall x expr args) = do
 --   e <- optimizeExpression expr
 --   a <- case args of

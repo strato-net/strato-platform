@@ -1338,8 +1338,8 @@ contract C {
   string endofunctor3 = type(A).runtimeCode;
 } |]  in length anns `shouldBe` 0
   
-  it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
-    let anns = runTypechecker [r|
+    it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
+      let anns = runTypechecker [r|
 contract A {
   int endofunctor1   = type(A).name;
   int endofunctor2   = type(A).creationCode;
