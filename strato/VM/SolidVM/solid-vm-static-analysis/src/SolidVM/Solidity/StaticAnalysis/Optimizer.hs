@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase        #-}
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
   ) where
