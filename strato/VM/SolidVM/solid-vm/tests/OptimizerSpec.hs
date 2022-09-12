@@ -27,7 +27,7 @@ runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack 
 
 runTest :: CodeCollection -> IO ()
 runTest f = case f of 
-    (CodeCollection _ _ _ _ _ _) -> return ()
+    (CodeCollection _ _ _ _ _ _ _) -> return ()
     
 varDeclHelper :: CodeCollection -> [VariableDeclF (SourceAnnotation ())] 
 varDeclHelper cc = cc  ^.. contracts . folded . storageDefs .folded

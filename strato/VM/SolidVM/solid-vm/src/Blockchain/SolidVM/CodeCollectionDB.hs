@@ -85,7 +85,7 @@ compileSourceNoInheritance initCodeMap = do
             vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas' <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas' <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas' <$> sourceUnits) then "svm3.0" else ""))
       
 
-        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False) 
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False) sourceUnits
      
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
@@ -132,6 +132,9 @@ compileSourceNoInheritance initCodeMap = do
                   $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
                                     (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
 
+      -- listCombine :: (String, String) -> [(String,Strong)] -> Either ParseTypeCheckOrSolidVMError [(String,String)]
+      -- listComnine a as = 
+
       throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
       throwDuplicate (name, sUnit) cc = case sUnit of 
         Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
@@ -141,7 +144,7 @@ compileSourceNoInheritance initCodeMap = do
         FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
         FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a)
         --not map type
-        Prag (n,v)                -> (pragmas) $ throwDuplicate' (name, (n,v)) (cc ^. pragmas) --
+        Prag a                -> fmap (\cList -> cc & pragmas .~ cList) $ pure (a : (cc ^. pragmas))
         FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
         FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
         FLER z -> parseError  "FLER non Error should be impossible"  (show z)
@@ -161,20 +164,6 @@ compileSourceNoInheritance initCodeMap = do
               pure $ M.insert fname (fdec{_funcOverload = _funcOverload fdec ++ [func]}) m
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors, allPragmas) = sUnitSorter allSUnits
-  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
-  deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
-  pure $ CodeCollection {
-    _contracts = deduplicatedContracts,
-    _flFuncs = deduplicatedFreeFunctions,
-    _flConstants = M.fromList allConstants,
-    _flEnums = M.fromList allEnums,
-    _flStructs = M.fromList allStructs,
-    _flErrors = M.fromList allCustomErrors,
-    _pragmas =  allPragmas
-    
-  }
-
   theCC <- sUnitSorter allSUnits
   pure $ theCC
 
