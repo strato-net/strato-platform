@@ -241,7 +241,7 @@ tooManyCooks expected got = throw $ TooManyCooks expected got
 generalMetaProgrammingError :: (Show v) => String -> v -> a
 generalMetaProgrammingError = toThrower GeneralMetaProgrammingError
 
-noPayload :: (show v) => String -> v -> a 
+noPayload :: (Show v) => String -> v -> a 
 noPayload = toThrower NoPayload
 
 oldForeignPragmaError :: (Show v) => String -> v -> a

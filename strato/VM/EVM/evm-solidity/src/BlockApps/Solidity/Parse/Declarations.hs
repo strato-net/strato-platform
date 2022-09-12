@@ -99,7 +99,7 @@ data Declaration =
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
- :: SolidityParser (String, Declaration)
+solidityDeclaration :: SolidityParser (String, Declaration)
 solidityDeclaration =
   structDeclaration <|>
   enumDeclaration <|>

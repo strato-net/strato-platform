@@ -15,6 +15,7 @@ module SolidVM.Model.CodeCollection (
   flStructs,
   flEnums,
   flErrors,
+  CodeType(..),
   
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
@@ -49,7 +50,6 @@ import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
-
 data CodeCollectionF a =
   CodeCollection {
     _contracts :: Map SolidString (ContractF a),
@@ -70,10 +70,10 @@ makeLenses ''CodeCollectionF
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
--- This type is used in the call member functions and dictates the methods in which a the call works
-newtype CodeType =  ContractF 
-                  | FuncF
-                  | StatmentF  
+-- This type is used in the call member functions and dictates the methods in which the call works
+data CodeType a = ContractCode (ContractF a)
+               | FunctionCode (FuncF a)
+               | StatementCode (StatementF a)
   deriving (Show, Generic, NFData, Functor)
 
 
