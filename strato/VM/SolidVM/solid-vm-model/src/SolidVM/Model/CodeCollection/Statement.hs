@@ -1,7 +1,10 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
+
 module SolidVM.Model.CodeCollection.Statement
   ( StatementF(..)
   , extractStatement
@@ -35,6 +38,7 @@ import Control.DeepSeq
 import Test.QuickCheck
 import Control.Monad
 
+-- Changes to this structure should also have changes in the Unparser :)
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
   | WhileStatement (ExpressionF a) [StatementF a] a
@@ -53,7 +57,7 @@ data StatementF a =
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
   | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
-  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON, Foldable, Traversable)
 
 
 extractStatement :: StatementF a -> a
@@ -87,7 +91,7 @@ data VarDefEntryF a = BlankEntry
                                   , _vardefLocation :: Maybe Location
                                   , vardefName :: SolidString
                                   , vardefContext :: a
-                                  } deriving (Show, Eq, Generic, Generic1, NFData, Functor)
+                                  } deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 type VarDefEntry = Positioned VarDefEntryF
 
@@ -108,7 +112,7 @@ getVarDefContext BlankEntry = Nothing
 
 data SimpleStatementF a =
   VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
-  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Generic1, NFData, Functor)
+  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 type SimpleStatement = Positioned SimpleStatementF
 
@@ -143,7 +147,7 @@ data ExpressionF a =
   | Variable a SolidString 
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
   | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
-  deriving (Show, Eq, Generic, Generic1, NFData, Functor)
+  deriving (Show, Eq, Generic, Generic1, NFData, Functor, Foldable, Traversable)
 
 
 extractExpression :: ExpressionF a -> a
@@ -170,7 +174,8 @@ type Expression = Positioned ExpressionF
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] deriving (Show, Eq, Generic, NFData,Functor) --Or String
+data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
+                  deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
 instance Arbitrary Expression  where -- I think I can turn this signature into an a
    arbitrary = 

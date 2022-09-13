@@ -56,7 +56,6 @@ import qualified Data.Set                             as S
 import           Data.Source
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
---import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -117,10 +116,13 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType)
-
+--import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType, unparseContract)
+import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
+
+
+ 
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -571,7 +573,7 @@ argsToValsModifiers ctract md args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval32 orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
+          let strTypes = M.mapKeys (T.unpack) $ CC._modifierArgs md
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
@@ -583,7 +585,7 @@ argsToValsModifiers ctract md args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
+          let strTypes = M.mapKeys (T.unpack) $ CC._modifierArgs md
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
@@ -592,7 +594,7 @@ argsToValsModifiers ctract md args =
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
-                     . map snd $ M.toList $ CC.modifierArgs md
+                     . map snd $ M.toList $ CC._modifierArgs md
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval t x = case x of
@@ -662,7 +664,7 @@ argsToVals ctract fn args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval32 orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
@@ -674,7 +676,7 @@ argsToVals ctract fn args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
@@ -683,7 +685,7 @@ argsToVals ctract fn args =
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
-                     . map snd $ CC.funcArgs fn
+                     . map snd $ CC._funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval t x = do
@@ -776,8 +778,7 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
-
-callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
@@ -1314,7 +1315,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ CC.eventLogs ev) then 
+      if (length exptups) /= (length $ CC._eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
@@ -1330,7 +1331,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                     _                                                    -> pure "")
 
         -- pair up field names with values one-by-one (no type checking tho, lol)
-        let pairs = zip (map (T.unpack . fst) $ CC.eventLogs ev) expStrs
+        let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
         
         liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
               " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
@@ -1537,6 +1538,12 @@ expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
 expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
+expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.OrderedArgs [CC.Variable _ name])) "runTimeCode") = do
+  (_, cc) <- getCurrentCodeCollection
+  return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
+    Just contract -> unparseContract  contract;
+    _ -> getRunTimeCodeError "Failed to get contract runtime code " x
+
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
@@ -1575,14 +1582,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "msg", "data") -> do contract' <- getCurrentContract
                                              functionName <- getCurrentFunctionName
                                              callInfo <- getCurrentCallInfo
-                                             let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                             let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
                                                  localVars = localVariables callInfo
                                              argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
                                              argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
                                              return . Constant . SString $ "("++argsToStr++")"
       (SBuiltinVariable "msg", "sig") -> do functionName <- getCurrentFunctionName
                                             contract' <- getCurrentContract
-                                            let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                            let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
                                                 argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
                                                 argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
                                                 calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
@@ -1948,6 +1955,7 @@ expToVar' (CC.FunctionCall _ e args) = do
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
     where 
+      regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
       regularFunctionCall mSCI = do 
         var <- case mSCI of
           Just sci -> sci
@@ -1996,9 +2004,9 @@ expToVar' (CC.FunctionCall _ e args) = do
               else do
                 -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
                 res <- do
-                  if (CC.funcIsFree func)
+                  if (CC._funcIsFree func)
                     then do
-                      matchingOverload <- findM testMatch $ CC.funcOverload func
+                      matchingOverload <- findM testMatch $ CC._funcOverload func
                       doesFunctionMatch <- testMatch func
                       if (doesFunctionMatch)
                         then runTheCall address contract' funcName hsh cc func argVals ro True
@@ -2006,14 +2014,14 @@ expToVar' (CC.FunctionCall _ e args) = do
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
                           Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
                     else do
-                      matchingOverload <- findM testMatch $ CC.funcOverload func
+                      matchingOverload <- findM testMatch $ CC._funcOverload func
                       doesFunctionMatch <- testMatch func
                       if (doesFunctionMatch)
                         then runTheCall address contract' funcName hsh cc func argVals ro False
                         else case matchingOverload of
                                 Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
                                               Just ff -> do
-                                                matchingFreeOverload <- findM testMatch $ CC.funcOverload ff
+                                                matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
                                                 doesFreeFunctionMatch <- testMatch ff
                                                 if (doesFreeFunctionMatch)
                                                   then runTheCall address contract' funcName hsh cc ff argVals ro True
@@ -2028,7 +2036,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               testMatch tf = do
                 let argMapping = mapArgs tf
                 doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC.funcArgs tf)) 
+                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
                        && ((length argMapping) == (argCount))
                        && (all (== True) doArgsMatch)
               testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
@@ -2058,10 +2066,10 @@ expToVar' (CC.FunctionCall _ e args) = do
               mapArgs theFunc = case argVals of
                 OrderedVals vs -> let argMeta = 
                                         map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                        $ CC.funcArgs theFunc
+                                        $ CC._funcArgs theFunc
                                   in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
                 NamedVals ns ->
-                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunc
+                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
                       typeAndVal = M.merge (M.dropMissing)
                                           (M.dropMissing)
                                           (M.zipWithMatched $ \_k t v -> (t, v))
@@ -2126,6 +2134,94 @@ expToVar' (CC.FunctionCall _ e args) = do
                   _ -> return False
               _ -> return False
             return . Constant $ SBool success
+
+          Constant (SContractItem address' "code") -> do
+            --Prevent stateroot mismatches as the other .code member is was introduced earlier and this is an extension
+            cntrct <- getCurrentContract
+            if (CC._vmVersion cntrct /= "svm3.3") then do
+              typeError "illegal member access: svm3.3+ required to use advance .code member" ("parsed as " ++ show address' ++ ".code")
+            else do
+              --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
+              from <- getCurrentAccount
+              -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
+              --If address' chainId is unset then we set to the current chainId
+                -- Get the code at the address
+              cid <- case (address' ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  --Assume that the chainId is the same as the from chainId when it is unset 
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> return Nothing
+                    Just cid2 -> return $ Just cid2
+                MainChain -> return Nothing
+                ExplicitChain cid -> return $ Just cid
+              let toAccount = namedAccountToAccount cid address'
+              --check that the from and to are on the same chain`
+              isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+              unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+              -- Collect a potential item to search
+              searchTerms <- case argVals of
+                  -- catch only the SStrings
+                  OrderedVals [SString arguments] -> pure $ Just arguments
+                  -- Throw an error if too many arguments are passed
+                  OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
+                  --If nothing was given or something else, then just return the entire code
+                  _ -> pure $ Nothing    
+              --get only the contract containing the sweet succulent ContractF definition
+              (contract, _, _) <- getCodeAndCollection toAccount
+              --filter out any foreign contracts that are not the correct pragma
+              when (contract ^. CC.vmVersion /= "svm3.3") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
+              let codeSnippets :: [String]
+                  codeSnippets = 
+                    case (fromMaybe "" searchTerms) of 
+                      --Unparse just the contract
+                      "" -> [unparseContract contract]
+                      term ->
+                      --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
+                        -- Check for and get the different parts of the contract
+                        let contrString = 
+                              case ((contract ^. CC.contractName) == term) of
+                                True -> Just $ unparseContract contract
+                                False -> Nothing
+
+                            constString =   
+                              case ((contract ^. CC.constants) M.!? term) of 
+                                Just constF -> Just $ unparseConstant (term, constF)
+                                Nothing -> Nothing                          
+
+                            storjString = 
+                              case ((contract ^. CC.storageDefs) M.!? term) of
+                                Just storjF -> Just $ unparseVar (term, storjF)
+                                Nothing -> Nothing                           
+
+                            enumString = 
+                              case ((contract ^. CC.enums) M.!? term) of
+                                Just enumF -> Just $ unparseEnum (term, fst enumF)
+                                Nothing -> Nothing                             
+
+                            structString = 
+                              case ((contract ^. CC.structs) M.!? term) of
+                                Just structF -> Just $ unparseStruct (term, structF) 
+                                Nothing -> Nothing
+
+                            eventString = 
+                              case ((contract ^. CC.events) M.!? term) of 
+                                Just eventF -> Just $ unparseEvent (term, eventF)
+                                Nothing -> Nothing                             
+
+                            funcString = 
+                              case ((contract ^. CC.functions) M.!? term) of 
+                                Just funcF -> Just $ unparseFunc (term, funcF)
+                                Nothing -> Nothing
+
+                            modString = 
+                              case ((contract ^. CC.modifiers) M.!? term) of
+                                Just modF -> Just $ unparseModifier (term, modF)
+                                Nothing -> Nothing
+                            
+                        --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                        in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
+              pure . Constant $ SString ( unlines codeSnippets)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
@@ -2279,6 +2375,7 @@ evaluateAccountMember a _ "codehash" = do
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+--Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do 
   -- Get the code at the address
   cid <- case (a ^. namedAccountChainId) of 
@@ -2331,6 +2428,11 @@ evaluateAccountMember a _ "chainId" = do
                 Just cid -> return $ Constant $ SInteger $ fromIntegral cid
             MainChain ->  return $ Constant $ SInteger 0 
             ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
+-- evaluateAccountMember a _ "addressknown" = do
+--   contract' <- getCurrentContract
+--   if (CC._vmVersion contract' /= "svm3.2" && CC._vmVersion contract' /= "svm3.3")
+--     then typeError "illegal member access: svm3.2+ required to use .addressknown member" ("parsed as " ++ show a ++ ".addressknown")
+--     else pure (a ^. namedAccountAddress)
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
@@ -2857,7 +2959,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.CC.contracts . at contractName'
-      argPairs = fromMaybe [] . fmap CC.funcArgs $ contract' ^. CC.constructor
+      argPairs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, fromMaybe "" n), i) |
@@ -2891,7 +2993,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
         let argTypes =
               M.fromList
               $ map (\(k, v) -> (fromMaybe "" $ k, v))
-              $ maybe einval CC.funcArgs $ contract' ^. CC.constructor
+              $ maybe einval CC._funcArgs $ contract' ^. CC.constructor
               
             typeAndVal =
               M.merge
@@ -2923,7 +3025,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
              . fromMaybe []
-             $ M.lookup parent =<< (fmap CC.funcConstructorCalls $ contract'^.CC.constructor)
+             $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract'^.CC.constructor)
     runTheConstructors from to hsh cc parent args
 
 
@@ -2934,7 +3036,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           then do
             --argVals <- forM argExps evaluate
             --_ <- call' address contract' theFunction argVals
-            let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+            let theModifierNames =  map fst $ (CC._funcModifiers theFunction) 
             !theModifiers' <- forM theModifierNames $ \name -> do
               case M.lookup name (contract'^.CC.modifiers) of
                 Just theModifier -> do
@@ -2943,11 +3045,11 @@ runTheConstructors from to hsh cc contractName' argExps = do
                 Nothing -> do
                   if name `elem` contract'^.CC.parents then return Nothing else (if (svm3_2 || svm3_3) then (missingField "modifier not found" name) else return Nothing)
             let theModifiers = catMaybes theModifiers'
-            !commands <- case CC.funcContents theFunction of
+            !commands <- case CC._funcContents theFunction of
               Nothing -> missingField "contract constructor has been declared but not defined" contractName'
               Just cms -> pure cms
           -- let modifierArgs = map CC.modifierArgs theModifiers
-            let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+            let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
             let isNotModExec = \case
                   CC.ModifierExecutor _ -> False
                   _ -> True
@@ -2958,7 +3060,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
             _ <- runStatements' rhs
             return ()
           else do
-            let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+            let theModifierNames =  map fst $ (CC._funcModifiers theFunction) 
             !_ <- forM theModifierNames $ \name -> do
               case M.lookup name (contract'^.CC.modifiers) of
                 Just _ -> do
@@ -2966,11 +3068,19 @@ runTheConstructors from to hsh cc contractName' argExps = do
                   unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
                 Nothing -> do
                   return Nothing
-            commands <- case CC.funcContents theFunction of
+            commands <- case CC._funcContents theFunction of
               Nothing -> missingField "contract constructor has been declared but not defined" contractName'
               Just cms -> pure cms
             _ <- pushSender from $ runStatements commands
             return ()
+        -- --argVals <- forM argExps evaluate
+        -- --_ <- call' address contract' theFunction argVals
+        -- commands <- case CC._funcContents theFunction of
+        --   Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+        --   Just cms -> pure cms
+
+        -- _ <- pushSender from $ runStatements commands
+        -- return ()
 
       Nothing -> return ()
 
@@ -3008,8 +3118,8 @@ runTheCall :: MonadSM m
            -> Bool
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
-  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
-      theModifierNames = map fst $ (CC.funcModifiers theFunction) 
+  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
+      theModifierNames = map fst $ (CC._funcModifiers theFunction) 
       svm3_3 = CC._vmVersion contract' == "svm3.3"
 
   if (CC._vmVersion contract' /= "svm3.3")
@@ -3021,10 +3131,10 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       let args = case argVals of
             OrderedVals vs -> let argMeta = 
                                     map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC.funcArgs theFunction
+                                    $ CC._funcArgs theFunction
                               in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
             NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
                   typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                       (M.mapMissing (curry $ invalidArguments "extra argument"))
                                       (M.zipWithMatched $ \_k t v -> (t, v))
@@ -3050,7 +3160,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
       addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro False -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
-      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
+      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
       val <- runStatements commands
       let findNamedReturns = do
             case returns of
@@ -3090,10 +3200,10 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       let args = case argVals of
             OrderedVals vs -> let argMeta = 
                                     map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC.funcArgs theFunction
+                                    $ CC._funcArgs theFunction
                               in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
             NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
                   typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                       (M.mapMissing (curry $ invalidArguments "extra argument"))
                                       (M.zipWithMatched $ \_k t v -> (t, v))
@@ -3116,14 +3226,14 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       matchedArgvals <- forM theModifiers $ \modi -> do
         let margList = CC.OrderedArgs 
                 . fromMaybe []
-                $ M.lookup (T.unpack (CC.modifierSelector modi)) $ M.fromList $ CC.funcModifiers theFunction
+                $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
         margVals <- argsToValsModifiers contract' modi margList
         case margVals of
           OrderedVals vs -> do
-            let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC.modifierArgs modi
+            let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC._modifierArgs modi
             return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
           NamedVals ns -> do
-            let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC.modifierArgs modi
+            let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC._modifierArgs modi
                 typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                     (M.mapMissing (curry $ invalidArguments "extra argument"))
                                     (M.zipWithMatched $ \_k t v -> (t, v))
@@ -3153,8 +3263,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
       -- theCallInfo <- getCurrentCallInfo
       -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
-      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
-      let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
+      let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
       let isNotModExec = \case
                   CC.ModifierExecutor _ -> False
                   _ -> True
@@ -3189,10 +3299,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       popCallInfo
 
       return val'
-
-
-
-
 
 logAssigningVariable :: MonadSM m => Value -> m ()
 logAssigningVariable v = do
@@ -3450,8 +3556,23 @@ solidityExceptionHandler catchBlockMap ex = do
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
       return res
+    (FailedToAttainRunTimCode s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 getRunTimeCodeError
+      return res
+    (TooManyResultsError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
+      return res
+    (TooManyCooks s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
+      return res
     (UserDefinedError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
+      return res
+    (InvalidChain s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 27 invalidChain
+      return res
+    (GeneralMetaProgrammingError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 28 generalMetaProgrammingError
       return res
     _ -> error "unhandled solid exception" (show ex)
 
@@ -3590,6 +3711,30 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
+    (TooManyResultsError s1 s2) -> 
+      case M.lookup "TooManyResultsError" catchBlockMap of
+        Nothing -> tooManyResultsError s1 s2
+        Just (_, block) -> do
+          res <- runStatements block
+          return res
+    (TooManyCooks s1 s2) ->
+      case M.lookup "TooManyCooks" catchBlockMap of
+        Nothing -> tooManyCooks s1 s2
+        Just (_, block) -> do
+          res <- runStatements block
+          return res
+    (GeneralMetaProgrammingError s1 s2) ->
+      case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
+        Nothing -> generalMetaProgrammingError s1 s2
+        Just (_, block) -> do
+          res <- runStatements block
+          return res
+    (InvalidChain s1 s2) ->
+      case M.lookup "InvalidChain" catchBlockMap of
+        Nothing -> invalidChain s1 s2
+        Just (_, block) -> do
+          res <- runStatements block
+          return res
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
@@ -3614,3 +3759,68 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
       
     _ -> error "unhandled solid exception" (show ex)
 
+-- --If given a list, apply a given function to only the first element of the list.
+-- mapOnFirst :: (a -> a) -> [a] -> [a]
+-- mapOnFirst _ [] = []
+-- mapOnFirst f (x:xs) = f x : xs
+
+-- --If given a list, apply a given function to only the last item in the list
+-- mapOnLast :: forall a. (a -> a) -> [a] -> [a]
+-- mapOnLast f = foldr step []
+--   where step :: a -> [a] -> [a]
+--         step x [] = [f x]
+--         step x xs = x : xs
+
+-- --If given a SourceAnnotation get the position of (startLine, startColumn, endLine, endColumn)
+-- getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
+-- getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
+--                                       sa ^. sourceAnnotationStart ^. sourcePositionColumn,
+--                                       sa ^. sourceAnnotationEnd ^. sourcePositionLine,
+--                                       sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
+
+-- --If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
+-- trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
+-- trimCodeCollection cc sa = final
+--   where (startLine, startColumn, endLine, endColumn) = sa
+--         bandwidth = drop (startLine - 1) (take endLine (lines cc))
+--         trimBack = mapOnLast (take endColumn) bandwidth 
+--         trimmedUp = mapOnFirst (drop $ startColumn - 1) trimBack
+--         body = unlines trimmedUp
+--         numOpen = countElem '{' body
+--         numClosed = countElem '}' body
+--         enclosed = if (numOpen > numClosed) then 
+--           body ++ replicate (numOpen - numClosed) '}'
+--           else body
+--         final = if (numOpen == 0) then
+--           enclosed
+--           else 
+--             finalCut 
+--             where 
+--               goodCut = fst $ splitLast '}' enclosed
+--               numClosedFinal = countElem '}' goodCut
+--               finalCut = if (numClosedFinal == numOpen) then
+--                 goodCut ++ "\n"
+--                 else
+--                   goodCut ++ replicate (numOpen - numClosedFinal) '}' ++ "\n"
+
+-- splitLast :: Char -> String -> (String, String)
+-- splitLast char str = let n = findIndex (==char) (reverse str) in
+--                 case n of
+--                   Nothing -> (str, [])
+--                   Just m  -> splitAt (length str - m -1) str
+
+-- countElem :: Eq a => a -> [a] -> Int
+-- countElem i = length . filter (i==)
+
+
+
+-- makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
+-- makeSourceAnnotation (startLine, startColumn, endLine, endColumn) =
+--   let start = SourcePosition startLine startColumn
+--       end = SourcePosition endLine endColumn 
+--   in SourceAnnotation
+--     {
+--       start,
+--       end
+--     }
+  

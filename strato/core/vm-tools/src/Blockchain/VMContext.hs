@@ -253,6 +253,7 @@ type VMBase m = ( MonadIO m
 withCurrentBlockHash :: ( MonadLogger m
                         , Mod.Modifiable MemDBs m
                         , Mod.Modifiable CurrentBlockHash m
+                        , Mod.Modifiable CertRoot m
                         , HasMemAddressStateDB m
                         , (Maybe Word256 `A.Alters` MP.StateRoot) m
                         , (MP.StateRoot `A.Alters` MP.NodeData) m
@@ -260,6 +261,7 @@ withCurrentBlockHash :: ( MonadLogger m
                         , (N.NibbleString `A.Alters` N.NibbleString) m
                         , HasMemRawStorageDB m
                         , (RawStorageKey `A.Alters` RawStorageValue) m
+                        , HasMemCertDB m
                         )
                      => Keccak256 -> m a -> m a
 withCurrentBlockHash bh f = do
@@ -268,6 +270,7 @@ withCurrentBlockHash bh f = do
   a <- f
   flushMemStorageDB
   flushMemAddressStateDB
+  flushMemCertDB bh
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a

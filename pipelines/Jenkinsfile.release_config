@@ -1,0 +1,184 @@
+withCredentials([
+        usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+        usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID'),
+        usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID')
+]) {
+  NODE_DATA = [
+        BEANSTALK_LOADTEST_BATCH_SIZE: 25,
+        BEANSTALK_LOADTEST_BATCH_COUNT: 5,
+        MONITOR: [
+            DEVNET_SYNC_HEALTH_URL: 'https://multinode101.ci.blockapps.net/health',
+            LOAD_TEST_HEALTH_URL: 'https://multinode305.ci.blockapps.net/health'
+        ],
+        NODE1: [
+            NUMBER: "1",
+            HOST: "multinode101.ci.blockapps.net",
+            IP: "3.81.197.53",
+            PORT: 8080,
+            BOOTNODE_IP: "18.235.213.241",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Tech Provider" // Default for bootnode
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE2: [
+            NUMBER: "2",
+            HOST: "multinode102.ci.blockapps.net",
+            IP: "18.235.213.241",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Tech Provider"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE3: [
+            NUMBER: "3",
+            HOST: "multinode103.ci.blockapps.net",
+            IP: "3.209.126.162",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Compliance Manager"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]          
+      ],
+      NODE4: [
+            NUMBER: "4",
+            HOST: "multinode104.ci.blockapps.net",
+            IP: "34.237.166.201",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Compliance Manager"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE5: [
+            NUMBER: "5",
+            HOST: "multinode301.ci.blockapps.net",
+            IP: "3.95.216.65",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Dealer"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE6: [
+            NUMBER: "6",
+            HOST: "multinode302.ci.blockapps.net",
+            IP: "54.226.159.165",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Processor"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE7: [
+            NUMBER: "7",
+            HOST: "multinode303.ci.blockapps.net",
+            IP: "52.23.161.240",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Grower"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ],
+      NODE8: [
+            NUMBER: "8",
+            HOST: "multinode304.ci.blockapps.net",
+            IP: "18.213.3.139",
+            PORT: 8080,
+            BOOTNODE_IP: "3.81.197.53",
+            OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+            OAUTH_CLIENT_ID: "dev",
+            OAUTH_CLIENT_SECRET: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+            BEANSTALK: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET}",
+                ROLE: "Dealer Service Account"
+            ],
+            TRACE_HARVEST: [
+                OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/.well-known/openid-configuration",
+                OAUTH_CLIENT_ID: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID}",
+                OAUTH_CLIENT_SECRET: "${TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET}"
+            ]
+      ]
+  ]
+}
+
+return this
