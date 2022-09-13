@@ -58,6 +58,8 @@ import           UnliftIO
 
 
 
+import  BlockApps.XabiHelper
+
 import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Tables
@@ -75,9 +77,17 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Source.Map
 
+--import BlockApps.Bloc22.Server.Contracts
+
+--import           BlockApps.SolidVMStorageDecoder
+
+--import          SQLM
+--import           Blockchain.SolidVM.Exception
+--import Blockchain.SolidVM.CodeCollectionDB
 import           Control.Monad.Composable.BlocSQL
 import           SQLM
-
+import           Debug.Trace
+--import   qualified        BlockApps.Solidity.Parse.File as SolidVmParser     (solidityFile)
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 contractBySourceHash
@@ -200,7 +210,7 @@ getContractDetailsByCodeHash codePtr = do
         detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
         case Map.lookup name detailsMap of
             Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-            Just d -> pure d
+            Just d -> pure $ trace ("can I get a print heere2 ") (d)
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
@@ -222,7 +232,7 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+  let shouldCompile = Don't Compile--if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
   now' <- liftIO $ getTime Monotonic
@@ -241,7 +251,7 @@ getContractDetailsForContract theVM src mContract = do
                    then sourceToContractDetails shouldCompile src
                    else return Map.empty
       liftIO $ Cache.insert srcCache cacheKey details
-      pure details
+      pure $ trace ("Can I get A print here") (details)
   case mContract of
     Nothing ->
       case Map.toList idsAndDetails of
@@ -266,12 +276,13 @@ sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocSQL m
                            )
                         => Should Compile -> SourceMap -> m (Map Text ContractDetails)
-sourceToContractDetails shouldCompile sourceList =
-  let createContractDetails =
-        case shouldCompile of
-          Do Compile -> compileContract
-          Don't Compile -> createMetadataNoCompile
-   in createContractDetails sourceList
+sourceToContractDetails shouldCompile sourceList = do
+  let createContractDetails = 
+       case shouldCompile of
+                  Do Compile ->  createMetadataNoCompile--(compileContract)--Maybe Change this code around so it doesn't say Don't Compile anymore- to solidVM
+                  Don't Compile ->  compileContract--
+                  --_ -> createMetadataNoCompile
+          in createContractDetails sourceList
 
 compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
@@ -279,10 +290,14 @@ compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    )
                 => SourceMap -> m (Map Text ContractDetails)
 compileContract sourceList = do
-  let source = sourceBlob sourceList
-      eVerXabis = parseXabi "-" $ Text.unpack source
+  -- printOUtv <- case (1+2) == 3 of 
+  --   True  ->  blocError . UserError . Text.pack $ "asd"
+  --   False ->  blocError . UserError . Text.pack $ "asd12312"
+  let source =sourceBlob sourceList -- sourceBlob :: SourceMap -> Text
+      eVerXabis = Right $ hideFucn2 "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
       encodedSrc = serializeSourceMap sourceList
       srcHash = hash (Text.encodeUtf8 encodedSrc)
+  --when (True) (internalError "really bigg dsdfdsfs" source)
   (ver, xabis) <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
     Right (v, xs) -> return (v, Map.fromList xs)
@@ -312,7 +327,7 @@ compileContract sourceList = do
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
 
-  pure $ Map.fromList details
+  pure $ trace ("CAN I PRINT HERE???!!" ) (Map.fromList details)
 
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
@@ -321,10 +336,13 @@ createMetadataNoCompile :: ( MonadIO m
                            )
                         => SourceMap -> m (Map Text ContractDetails)
 createMetadataNoCompile sourceList = do
+  --List of things to try
+    --Finding some Text to Xabi function from SolidVm code base?
+
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
-      eVerXabis = parseXabi "-" $ Text.unpack source
-      srcHash = hash (Text.encodeUtf8 encodedSrc)
+      eVerXabis = parseXabi  "-" $ Text.unpack source -- So this says SOLIDVm only? ParseXabi ::  ->Either String (SolcVersion, [(Text, Xabi)])
+      srcHash = hash (Text.encodeUtf8 encodedSrc)      --so I can either  
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs

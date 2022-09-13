@@ -11,6 +11,8 @@ dependencies:
   - containers
   - evm-solidity
   - text
+  - solid-vm-parser
+  - parsec
 
 library:
   source-dirs: src/
