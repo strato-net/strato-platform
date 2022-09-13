@@ -6324,7 +6324,7 @@ contract qq {
 
   it "error when reading from contract state in a pure function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6335,7 +6335,7 @@ contract qq {
 
   it "error when writing to contract state from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6351,7 +6351,7 @@ contract qq {
 
   it "error when using assembly code from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6685,7 +6685,7 @@ contract B {
 
   it "can detect duplicate declarations" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   function f(){
     uint x = 9;
@@ -6721,11 +6721,25 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
+  it "View functions enforced in 3.4" $ (runTest $
+    runBS [r|
+pragma solidvm 3.4;
+
+contract qq {
+    uint x = 10;
+    function f(uint a, uint b) public view returns (uint) {
+        x = 5;
+        return a * (b + 42);
+    }
+    constructor () {
+      f(1,2);
+    }
+}
+|]) `shouldThrow` anyTypeError
 
   it "can get code from other contracts using type function" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
-
+pragma solidvm 3.4;
 contract qq {
   string  bb = type(qq).creationCode;
   string  dd = type(C).name;

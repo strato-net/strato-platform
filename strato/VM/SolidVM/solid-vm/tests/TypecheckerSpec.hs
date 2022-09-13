@@ -886,10 +886,10 @@ contract C {
       in length anns `shouldBe` 0
 
 
-  describe "pure and view modifier for solidvm 3.3" $ do
+  describe "pure and view modifier for solidvm 3.4" $ do
     it "can write pure and view functions" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -903,7 +903,7 @@ contract A {
        in length anns `shouldBe` 0
     it "error when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -914,7 +914,7 @@ contract A {
        in length anns `shouldBe` 1
     it "error when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -930,7 +930,7 @@ contract A {
        in length anns `shouldBe` 2
     it "error when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -995,7 +995,7 @@ contract C is A, B {
        in length anns `shouldBe` 0
     it "error when referencing a state variable from a non-inherited contract" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 7;
 }

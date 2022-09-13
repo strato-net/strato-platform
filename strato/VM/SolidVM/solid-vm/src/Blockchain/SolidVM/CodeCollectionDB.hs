@@ -168,16 +168,15 @@ compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
   case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
-    Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
-             | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
-             | typeCheck && hasSvm3_4 cc -> O.detector <$> typeCheckDetectorSvm3_3 cc
+    Right cc | typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) -> typeCheckDetector cc
+             | typeCheck && hasSvm3_4 cc -> O.detector <$> typeCheckDetectorSvm3_4 cc
              | otherwise                 -> Right cc
     Left x -> Left x
     where
-      typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
+      typeCheckDetector ecc = case TypeChecker.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
-      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
+      typeCheckDetectorSvm3_4 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 

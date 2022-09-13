@@ -2206,7 +2206,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               --get only the contract containing the sweet succulent ContractF definition
               (contract, _, _) <- getCodeAndCollection toAccount
               --filter out any foreign contracts that are not the correct pragma
-              when (contract ^. CC.vmVersion /= "svm3.3" && contract ^. CC.vmVersion /= "svm3.4") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
+              when (contract ^. CC.vmVersion /= "svm3.4") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
               let codeSnippets :: [String]
                   codeSnippets = 
                     case (fromMaybe "" searchTerms) of 
