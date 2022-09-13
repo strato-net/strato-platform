@@ -1565,7 +1565,7 @@ expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.Order
       return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
         Just contract -> unparseContract  contract;
         _ -> getRunTimeCodeError "Failed to get contract runtime code " x
-    else unknownFunction "Contract `type` function is not supported below pragma solidvm 3.4"
+    else unknownFunction "Contract `type` function is not supported below pragma solidvm 3.4" x
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
