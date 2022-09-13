@@ -50,6 +50,11 @@ import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
 
+
+-- import           Control.Monad.State.Class              (modify')
+-- import           Control.DeepSeq                        (force)        
+
+
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
@@ -75,6 +80,7 @@ import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Event
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
+-- import           Blockchain.SolidVM.CodeCollectionDB     as CCDB
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
@@ -102,6 +108,9 @@ import qualified Text.Colors                             as CL
 import           Text.Format
 import           Text.ShortDescription
 import           Text.Tools
+
+import           System.Mem                          (performMajorGC)
+
 
 instance (Monad m, Mod.Accessible a m) => Mod.Accessible a (ConduitT i o m) where
   access = lift . Mod.access
@@ -142,7 +151,10 @@ addBlocks unfiltered = do
   unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
   bbi <- getContextBestBlockInfo
   $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
+--
   $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
+  blockCount <- newIORef (0 :: Integer)
+
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
@@ -151,12 +163,16 @@ addBlocks unfiltered = do
                                              (show . blockDataNumber . obBlockData $ firstBlock))
       didReplaceBest   <- newIORef False
       ranPrivateTxs    <- newIORef M.empty
+      
       replacedBest     <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
       srLog <- fmap DL.toList . flip State.execStateT DL.empty $ forM_ filtered $ \block -> do
         let blockNo = blockDataNumber $! obBlockData block
             txCount = length $! obReceiptTransactions block
         timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
           lift $ addBlock block
+          modifyIORef' blockCount (+1)
+          readIORef blockCount >>= \bc -> when ((bc /=  0)  &&  (bc `mod` 1000 == 0)) $ do
+            liftIO $ performMajorGC
           (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
           when didReplaceThisTime $ do
             writeIORef didReplaceBest True
@@ -239,6 +255,10 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
         Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
+    -- modify' force
+
+    -- Mod.modify_ (Mod.Proxy @ContextState) $! (pure . force)
+    -- Mod.modify_ (Mod.Proxy @MemDBs)       $! (pure . force)
     lift $ P.incCounter vmBlocksMined
     lift $ P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
@@ -251,10 +271,11 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
           $ filter (isAnchored . otAnchorChain) transactions
   -- TODO: Run the checks Bagger does reject invalid transactions for private chains
   addTransactions bd txs
-
+  -- liftIO $ writeIORef CCDB.unsafeCodeMapIORef M.empty
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   lift $ timeit "flushMemCertDB" (Just vmBlockInsertionMined) $ flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
+   
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 => BlockData
@@ -318,6 +339,11 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 
+-- {-# NOINLINE unsafeCodeMapIORef #-}
+-- unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
+-- unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
+
+
 addTransaction :: (VMBase m, MonadMonitor m)
                => Maybe Word256
                -> Bool
@@ -362,7 +388,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
 
     lift $ incrementNonce tAcct
     
-     
     success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall

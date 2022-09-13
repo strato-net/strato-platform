@@ -5,6 +5,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns #-}
 module Blockchain.SolidVM.CodeCollectionDB
   ( ParseTypeCheckOrSolidVMError(..)
   , HasCodeCollectionDB
@@ -15,6 +16,7 @@ module Blockchain.SolidVM.CodeCollectionDB
   , compileSourceWithAnnotations
   , codeCollectionFromSource
   , codeCollectionFromHash
+  -- , unsafeCodeMapIORef
   ) where
 
 import           Control.Exception
@@ -22,13 +24,14 @@ import           Control.Monad                        ((<=<))
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Change.Alter           as A
 import           Control.Lens                         hiding (assign, from, to, bimap, Context)
+
 import qualified Data.Aeson                           as Aeson
 import           Data.Bifunctor                       (bimap, first)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Foldable                        (foldrM)
 import           Data.Map                             (Map)
-import qualified Data.Map                             as M
+import qualified Data.Map.Strict                             as M
 import           Data.Maybe                           (catMaybes)
 import           Data.Source
 import qualified Data.Text                            as T
@@ -41,6 +44,9 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
+import           Control.DeepSeq                      (force)
+
+
 
 import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.CodeCollectionTools
@@ -54,6 +60,12 @@ import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions    
 import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
 import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
+-- import           System.Mem                          (performMajorGC) --performMinorGC
+
+
+-- import           Data.IORef
+-- import           System.IO.Unsafe
+
 type HasCodeCollectionDB m = (Keccak256 `A.Alters` CodeCollection) m
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
@@ -61,6 +73,20 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
 data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def
+
+
+
+
+-- {-# NOINLINE unsafeCodeMapIORef #-}
+-- unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
+-- unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
+
+
+-- {-# NOINLINE unsafeCacheSizeIORef #-}
+-- unsafeCacheSizeIORef :: IORef (Map Keccak256 CodeCollection)
+-- unsafeCacheSizeIORef = unsafePerformIO $ newIORef M.empty
+
+
 
 withAnnotations :: (a -> Either ParseTypeCheckOrSolidVMError b) -> a -> Either [SourceAnnotation T.Text] b
 withAnnotations f = first unwind . f
@@ -135,7 +161,7 @@ compileSourceNoInheritance initCodeMap = do
 
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
   theCC <- sUnitSorter allSUnits
-  pure $ theCC
+  pure $ force theCC
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
@@ -189,6 +215,7 @@ codeCollectionFromSource typeCheck initCode = do
       hsh = hash canonicalInitCode
   A.lookup (A.Proxy @CodeCollection) hsh >>= \case
     Just cc -> do
+      -- liftIO $ performMajorGC
       recordCacheEvent CacheHit
       return (hsh, cc)
     Nothing -> do
@@ -200,6 +227,7 @@ codeCollectionFromSource typeCheck initCode = do
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
                  Left (SVMEx (s, _)) -> throw s
                  Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
+      -- liftIO $ performMajorGC
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash :: ( MonadIO m
@@ -212,19 +240,182 @@ codeCollectionFromHash :: ( MonadIO m
 codeCollectionFromHash typeCheck hsh = A.lookup (A.Proxy @CodeCollection) hsh >>= \case
     Just cc -> do
       recordCacheEvent CacheHit
+      -- liftIO $ performMajorGC
       return cc
     Nothing -> do
       recordCacheEvent CacheMiss
       mCode <- getCode hsh
+      -- liftIO $ performMajorGC
       case mCode of
         Just (_, initCode) -> do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
           let ecc = compileSource typeCheck initMap
-          case ecc of
-            Right a -> a <$ A.insert (A.Proxy @CodeCollection) hsh a
-            Left (PEx p) -> parseError "codeCollectionFromHash" p
-            Left (SVMEx (s, _)) -> throw s
-            Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
+              !theCC = case ecc of
+                  Right a -> a 
+                  Left (PEx p) -> parseError "codeCollectionFromHash" p
+                  Left (SVMEx (s, _)) -> throw s
+                  Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
+          A.insert (A.Proxy @CodeCollection) hsh theCC
+          -- liftIO $ performMajorGC
+          return theCC
         Nothing -> internalError "unknown code hash" hsh
+
+
+
+-- | A Function that takes a CodeCollection and returns a list of errors
+
+
+
+
+
+-- codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
+-- codeCollectionFromSource typeCheck initCode = do
+--   let initList = case Aeson.decode $ BL.fromStrict initCode of
+--         Just l -> l
+--         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+--           Just m -> M.toList m
+--           Nothing -> [(T.empty, decodeUtf8 initCode)] -- for backwards compatibility
+--       initMap = M.fromList initList
+--       canonicalInitCode = case initList of
+--         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
+--         _ -> BL.toStrict $ Aeson.encode initList
+--       hsh = hash canonicalInitCode
+--   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+--   case M.lookup hsh codeMap of
+--     Just cc -> do
+--       recordCacheEvent CacheHit
+--       return (hsh, cc)
+--     Nothing -> do
+--       recordCacheEvent StorageWrite
+--       hsh' <- addCode SolidVM canonicalInitCode
+--       let ecc = compileSource typeCheck initMap
+--           cc = case ecc of
+--                  Right a -> a
+--                  Left (PEx p) -> parseError "codeCollectionFromSource" p
+--                  Left (SVMEx (s, _)) -> throw s
+--                  Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
+--       let codeMap' = M.insert hsh cc codeMap
+--       recordCacheSize $ M.size codeMap'
+--       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--       return $ assert (hsh == hsh') (hsh, cc)
+
+-- codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Bool -> Keccak256 -> m CodeCollection
+-- codeCollectionFromHash typeCheck hsh = do
+--   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+--   case M.lookup hsh codeMap of
+--     Just cc -> do
+--       recordCacheEvent CacheHit
+--       return cc
+--     Nothing -> do
+--       recordCacheEvent CacheMiss
+--       mCode <- getCode hsh
+--       case mCode of
+--         Just (_, initCode) -> do
+--           let initMap = case Aeson.decode $ BL.fromStrict initCode of
+--                   Just l -> M.fromList l
+--                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+--           let ecc = compileSource typeCheck initMap
+--               cc = case ecc of
+--                      Right a -> a
+--                      Left (PEx p) -> parseError "codeCollectionFromHash" p
+--                      Left (SVMEx (s, _)) -> throw s
+--                      Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
+--               codeMap' = M.insert hsh cc codeMap
+--           recordCacheSize $ M.size codeMap'
+--           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--           return cc
+--         Nothing -> internalError "unknown code hash" hsh
+
+
+
+-- codeCollectionFromSource :: ( MonadIO m
+--                             , HasCodeDB m
+--                             , HasCodeCollectionDB m
+--                             )
+--                          => Bool
+--                          -> B.ByteString
+--                          -> m (Keccak256, CodeCollection)
+-- codeCollectionFromSource typeCheck initCode = do
+--   let initList = case Aeson.decode $ BL.fromStrict initCode of
+--         Just l -> l
+--         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+--           Just m -> M.toList m
+--           Nothing -> [(T.empty, decodeUtf8 initCode)] -- for backwards compatibility
+--       initMap = M.fromList initList
+--       canonicalInitCode = case initList of
+--         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
+--         _ -> BL.toStrict $ Aeson.encode initList
+--       hsh = hash canonicalInitCode
+--   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+--   case M.lookup hsh codeMap of
+--     Just cc1 -> do
+--       recordCacheEvent CacheHit
+--       pure (hsh, cc1)
+--     Nothing -> do
+--       !mCC <- A.lookup (A.Proxy @CodeCollection) hsh
+--       case mCC of
+--         Just cc2 -> do
+--           recordCacheEvent CacheHit
+--           let codeMap' = M.insert hsh cc2 codeMap
+--           recordCacheSize $ M.size codeMap'
+--           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--           return (hsh, cc2)
+--         Nothing -> do
+--           recordCacheEvent StorageWrite
+--           hsh' <- addCode SolidVM canonicalInitCode
+--           let ecc = compileSource typeCheck initMap
+--           !cc3 <- case ecc of
+--                       Right a -> a <$ A.insert (A.Proxy @CodeCollection) hsh' a
+--                       Left (PEx p) -> parseError "codeCollectionFromSource" p
+--                       Left (SVMEx (s, _)) -> throw s
+--                       Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
+--           A.insert (A.Proxy @CodeCollection) hsh cc3
+--           let codeMap' = M.insert hsh cc3 codeMap
+--           recordCacheSize $ M.size codeMap'
+--           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--           return $ assert (hsh == hsh') (hsh, cc3)
+
+-- codeCollectionFromHash :: ( MonadIO m
+--                           , HasCodeDB m
+--                           , HasCodeCollectionDB m
+--                           )
+--                        => Bool
+--                        -> Keccak256
+--                        -> m CodeCollection
+-- codeCollectionFromHash typeCheck hsh = do 
+--   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+--   case M.lookup hsh codeMap of
+--     Just cc1 -> do
+--       recordCacheEvent CacheHit
+--       pure cc1
+--     Nothing -> do
+--       !mCC <- A.lookup (A.Proxy @CodeCollection) hsh
+--       case mCC of
+--         Just cc2 -> do
+--           recordCacheEvent CacheHit
+--           let codeMap' = M.insert hsh cc2 codeMap
+--           recordCacheSize $ M.size codeMap'
+--           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--           return cc2
+--         Nothing -> do
+--           recordCacheEvent CacheMiss
+--           mCode <- getCode hsh
+--           case mCode of
+--             Just (_, initCode) -> do
+--               let initMap = case Aeson.decode $ BL.fromStrict initCode of
+--                       Just l -> M.fromList l
+--                       Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+--               let ecc = compileSource typeCheck initMap
+--                   !theCC = case ecc of
+--                       Right a -> a 
+--                       Left (PEx p) -> parseError "codeCollectionFromHash" p
+--                       Left (SVMEx (s, _)) -> throw s
+--                       Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
+--               A.insert (A.Proxy @CodeCollection) hsh theCC
+--               let codeMap' = M.insert hsh theCC codeMap
+--               recordCacheSize $ M.size codeMap'
+--               liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+--               return theCC
+--             Nothing -> internalError "unknown code hash" hsh

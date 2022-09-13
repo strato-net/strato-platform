@@ -4,6 +4,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE StrictData #-}
+
 
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
@@ -31,7 +33,7 @@ import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
 import Data.Binary
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import qualified Data.Map as M
 import Data.Source
 import Data.Traversable (for)

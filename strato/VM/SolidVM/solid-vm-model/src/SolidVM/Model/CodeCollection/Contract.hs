@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE StrictData #-}
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -25,7 +26,7 @@ import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
 import Data.Binary
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import Data.Source
 import GHC.Generics
 

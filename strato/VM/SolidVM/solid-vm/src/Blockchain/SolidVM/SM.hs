@@ -11,7 +11,8 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
-
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Blockchain.SolidVM.SM (
   CallInfo(..),
@@ -60,6 +61,8 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
+import           Control.DeepSeq                      (force)
+
 import           Data.Bifunctor (first)
 import qualified Data.Binary as Binary
 import           Data.ByteString (ByteString)
@@ -67,6 +70,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8  as UTF8
+
 import           Data.Traversable (for)
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
@@ -260,15 +264,19 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
+
+
 instance (Keccak256 `A.Alters` DBCodeCollection) m => (Keccak256 `A.Alters` CC.CodeCollection) (SM m) where
   lookup _ k = use (codeCollections . at k) >>= \case
     Just cc -> pure $ Just cc
     Nothing -> do
       mcc <- lift $ A.lookup (A.Proxy @DBCodeCollection) k
-      pure $ Binary.decode . BL.fromStrict . unDBCodeCollection <$> mcc
+      let myFunc (force -> !arg) = id arg
+      let !x = myFunc $ Binary.decode . BL.fromStrict . unDBCodeCollection <$> mcc 
+      pure x
   insert _ k v = do
     codeCollections . at k ?= v
-    lift . A.insert (A.Proxy @DBCodeCollection) k . DBCodeCollection . BL.toStrict $ Binary.encode v
+    lift . A.insert (A.Proxy @DBCodeCollection) k . DBCodeCollection . BL.toStrict $! Binary.encode v
   delete _ k = do
     codeCollections . at k .= Nothing
     lift $ A.delete (A.Proxy @DBCodeCollection) k

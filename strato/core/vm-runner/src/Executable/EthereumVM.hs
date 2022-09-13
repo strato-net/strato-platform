@@ -42,6 +42,9 @@ import           Prometheus
 import           Text.Printf
 import           Util                                  hiding (intercalate)
 
+import           System.Mem                           (performMajorGC)
+
+
 import           Blockapps.Crossmon
 import           BlockApps.Logging
 import           Blockchain.BlockChain
@@ -109,6 +112,7 @@ ethereumVM d = void . execContextM d $ do
     Mod.put Proxy $ CertRoot cpCR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
+    -- (liftIO $ performMajorGC) -- force a GC to clean up the genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     forever $ loopTimeit "one full loop" $ do
@@ -121,10 +125,12 @@ ethereumVM d = void . execContextM d $ do
 
         let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         outBatch <- runConduit $ yield vmInEventBatch
-                              .| handleVmEvents flags_useSyncMode
-                              .| fold (flip insertOutBatch) newOutBatch
-        
+                              .| (handleVmEvents flags_useSyncMode) 
+                              .| ((liftIO $ performMajorGC) >> (fold (flip insertOutBatch) newOutBatch))
+
+-- .| (fuseUpstream (handleVmEvents flags_useSyncMode) ((liftIO $ performMajorGC) >> return ()))
         loopTimeit "compactContextM" $ compactContextM
+        -- liftIO $ performMajorGC --
         sendOutEvents outBatch
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
@@ -179,6 +185,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
       Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
+    -- liftIO $ performMajorGC
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
