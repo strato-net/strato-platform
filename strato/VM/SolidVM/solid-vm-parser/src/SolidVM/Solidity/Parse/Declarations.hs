@@ -60,13 +60,13 @@ type SourceUnit = Positioned SourceUnitF
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
+  pragmaVersion' <- getPragmaVersion
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     contractName' <- fmap stringToLabel identifier
     --Throw an error if 'account' is used.
-    pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
     modifyState(\s -> s { contractName = (labelToString contractName') })
     baseConstrs <- option [] $ do
@@ -79,7 +79,7 @@ solidityContract = do
   declarations <-
     braces (many $ solidityDeclaration False)
 
-  let allFunctions = Map.fromListWith parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  let allFunctions = Map.fromListWith (parseOverloads pragmaVersion') [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations ]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
@@ -107,15 +107,17 @@ solidityContract = do
         map (Text.pack . fst) baseConstrs
       )
   where
-    parseOverloads :: SolidVM.Func -> SolidVM.Func -> SolidVM.Func
-    parseOverloads new old = do
-      let oldParamTypes = fmap snd $ SolidVM._funcArgs old
-          newParamTypes = fmap snd $ SolidVM._funcArgs new
-          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
-      if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
-        then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
-        else
-          old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
+    parseOverloads :: String -> SolidVM.Func -> SolidVM.Func -> SolidVM.Func
+    parseOverloads pragmaVersion' new old = do
+      if (pragmaVersion' /= "3.4") 
+        then duplicateDefinition "Function overloading is not supported below pragma solidvm 3.4" $ SolidVM._funcContext new
+        else do let oldParamTypes = fmap snd $ SolidVM._funcArgs old
+                    newParamTypes = fmap snd $ SolidVM._funcArgs new
+                    overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
+                if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+                  then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
+                  else
+                    old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
 
 --  where -- constants = byMutability True (repeat 0)
@@ -142,6 +144,8 @@ solidityContract = do
 -- | Parses a free function
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
+  pragmaVersion' <- getPragmaVersion
+  when (pragmaVersion' /= "3.4") $ fail "Free functions/File level functions are not supported below pragma solidvm 3.4" 
   (fname, (FuncDeclaration a)) <- functionDeclaration True
   when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
   return $ FLFunc fname $ SolidVM.Func 
@@ -210,6 +214,8 @@ structDeclaration = do
 
 solidityFLStruct :: SolidityParser SourceUnit
 solidityFLStruct = do
+  pragmaVersion' <- getPragmaVersion
+  when (pragmaVersion' /= "3.4") $ fail "File level structs are not supported below pragma solidvm 3.4" 
   ~(a, (structName, structFields)) <- withPosition $ do
     reserved "struct"
     structName <- identifier
@@ -230,6 +236,8 @@ solidityFLStruct = do
 
 solidityFLEnum :: SolidityParser SourceUnit
 solidityFLEnum = do
+  pragmaVersion' <- getPragmaVersion
+  when (pragmaVersion' /= "3.4") $ fail "File level enums are not supported below pragma solidvm 3.4" 
   ~(a, (enumName, enumFields)) <- withPosition $ do
     reserved "enum"
     enumName <- identifier
@@ -248,25 +256,23 @@ solidityFLEnum = do
 solidityFLError :: SolidityParser SourceUnit
 solidityFLError = do
   pragmaVersion' <- getPragmaVersion
-  if pragmaVersion' == "3.4"
-    then do
-      ~(a, (errorName, errorArgs)) <- withPosition $ do
-        reserved "error"
-        errorName <- identifier
-        when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-        errorArgs <- parens $ commaSep $ do
-          partType <- simpleTypeExpression
-          partName <- identifier
-          return (Text.pack partName, partType)
-        semi
-        pure (errorName, errorArgs)
-      return $ FLError (Text.pack errorName) (SolidVM.Error {
-          SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
-              zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
-        , SolidVM.bytes = 0
-        , SolidVM.context = a
-      })
-    else fail "Custom error types are not supported below pragma solidvm 3.4"
+  when (pragmaVersion' /= "3.4") $ fail "File level custom errors are not supported below pragma solidvm 3.4" 
+  ~(a, (errorName, errorArgs)) <- withPosition $ do
+    reserved "error"
+    errorName <- identifier
+    when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+    errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+    semi
+    pure (errorName, errorArgs)
+  return $ FLError (Text.pack errorName) (SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+          zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = a
+  })
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
@@ -329,29 +335,26 @@ public keywords =
 solidityFLConstant :: SolidityParser SourceUnit
 solidityFLConstant = do
   pragmaVersion' <- getPragmaVersion
-  if pragmaVersion' == "3.4"
-    then do
-      start <- getSourcePosition
-      variableType <- simpleTypeExpression
-      -- We have to remember which variables are "public", because they
-      -- generate accessor functions
-      keywords <- many stateVariableKeyword
-      let isConstant = KConstant `elem` keywords
-      isPublic <- public keywords
-      -- check to see if the "account" variable is being used
-      variableName <- identifier
-      when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
-      value <- optionMaybe $ do
-        reservedOp "="
-        expression
-      end <- getSourcePosition
-      semi
-      let ctx = SourceAnnotation start end ()
-
-      if isConstant
-        then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-        else fail "only constants can be declared in the top level"
-    else fail "File level constants are not supported below pragma solidvm 3.4"
+  when (pragmaVersion' /= "3.4") $ fail "File level constants are not supported below pragma solidvm 3.4" 
+  start <- getSourcePosition
+  variableType <- simpleTypeExpression
+  -- We have to remember which variables are "public", because they
+  -- generate accessor functions
+  keywords <- many stateVariableKeyword
+  let isConstant = KConstant `elem` keywords
+  isPublic <- public keywords
+  -- check to see if the "account" variable is being used
+  variableName <- identifier
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
+  value <- optionMaybe $ do
+    reservedOp "="
+    expression
+  end <- getSourcePosition
+  semi
+  let ctx = SourceAnnotation start end ()
+  if isConstant
+    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else fail "only constants can be declared in the top level"
 
 
 
@@ -380,33 +383,31 @@ simpleVariableDeclaration = do
   let ctx = SourceAnnotation start end ()
   let isImmutable  = KImmutable  `elem` keywords
   let isConstant   = KConstant  `elem` keywords
+  when (isImmutable && pragmaVersion' /= "3.4") $ fail "Immutable variables are not supported below pragma solidvm 3.4"
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
-    --else return $ trace ("WHAT IS SIMPLE DEC DECLARING AS " ++ (show variableType)) (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do
   pragmaVersion' <- getPragmaVersion
-  if pragmaVersion' == "3.4"
-    then do
-      start <- getSourcePosition
-      reserved "error"
-      errorName <- identifier
-      when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-      errorArgs <- parens $ commaSep $ do
-          partType <- simpleTypeExpression
-          partName <- identifier
-          return (Text.pack partName, partType)
-      end <- getSourcePosition
-      semi
-      return (errorName, ErrorDeclaration SolidVM.Error {
-          SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
-              zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
-        , SolidVM.bytes = 0
-        , SolidVM.context = SourceAnnotation start end ()
-      })
-    else fail "Custom error types are not supported below pragma solidvm 3.4"
+  when (pragmaVersion' /= "3.4") $ fail "Custom errors are not supported below pragma solidvm 3.4" 
+  start <- getSourcePosition
+  reserved "error"
+  errorName <- identifier
+  when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+  errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+  end <- getSourcePosition
+  semi
+  return (errorName, ErrorDeclaration SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+          zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = SourceAnnotation start end ()
+  })
 
 -- | Parses a function definition.
 --

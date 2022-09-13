@@ -5399,7 +5399,7 @@ contract qq {
 
   it "an assign an immutable" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint t1a = 2022;
   uint immutable t1x = 2022;
@@ -5410,7 +5410,7 @@ contract qq {
 
   it "can assign an already declared, but unassigned immutable in a constructor" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint immutable t2a;
   uint t2x = 2022;
@@ -5567,7 +5567,7 @@ contract qq {
 
   it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5593,7 +5593,7 @@ contract qq{
 
   it "allows overloading functions with same number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   string myString = "";
@@ -5644,7 +5644,7 @@ contract qq{
 
   it "can use randomly ordered named argument function calls with overloading" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   bool myStatus;
@@ -5670,7 +5670,7 @@ contract qq{
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5798,7 +5798,7 @@ contract qq {
 
   it "can use free functions, free functions can access this" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -5823,7 +5823,7 @@ contract qq{
 
   it "free functions cannot access state variables" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum() {
   myNum = 4;
@@ -5838,7 +5838,7 @@ contract qq{
 
   it "free functions cannot access internal functions of contracts" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function callInternal() {
   setNum(4);
@@ -5856,7 +5856,7 @@ contract qq{
 
   it "contracts will prioritize contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum(uint x) returns (uint s) {
   s = x + 2;
@@ -5876,7 +5876,7 @@ contract qq{
 
   it "contracts will prioritize overloaded contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum(uint x, uint y) returns (uint s) {
   s = x + y + 2;
@@ -5901,7 +5901,7 @@ contract qq{
 
   it "can overload free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -5965,7 +5965,7 @@ contract qq{
 
   it "can declare enums at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 enum Color { red, green, blue }
 contract A {
     function value() public returns (uint) {
@@ -5989,7 +5989,7 @@ contract qq {
 
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 struct Point {
   uint x;

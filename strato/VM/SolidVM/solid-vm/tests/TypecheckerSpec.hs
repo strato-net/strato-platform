@@ -691,7 +691,7 @@ contract A {
 
   it "cannot assign an immutable a new value inside a function" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract A {
   unint immutable g =2;
   uint public x = 75;
@@ -703,7 +703,7 @@ contract A {
     in length anns `shouldBe` 2
   it "cannot incrument an immutable already assigned within the constructor" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d=22;
@@ -733,7 +733,7 @@ contract A {
   
   it "can assign a value to a declared unassigned immutable within the constructor" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d;
@@ -745,7 +745,7 @@ contract qq {
     in length anns `shouldBe` 0
   it "cannot assign an immutable a value after already assinged on contract level" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d = 22;
@@ -829,7 +829,7 @@ contract A {
 
   it "can use an immutable within a function" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint c = 2022;
   uint immutable public x =c;
