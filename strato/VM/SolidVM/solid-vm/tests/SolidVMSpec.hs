@@ -5220,7 +5220,7 @@ contract qq {
 
   it "return default value for index not present-In-Memory Check" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
 
   bool x;

@@ -1781,20 +1781,32 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
                                 case theMap M.!? theIndex of
                                   Just v -> return v
                                   Nothing -> do
-                                    let theType =   typeOf theIndex
-                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
-                                    let typeNum = theType `elemIndex` typeArray
-                                    case typeNum of
-                                      Just 0 -> return $ Constant $ SString ""
-                                      Just 1 -> return $ Constant $ SInteger 0
-                                      Just 2 -> return $ Constant $ SBool False
-                                      Just 3 -> do
-                                        case theIndex of
-                                          (SInteger _) -> return $ Constant $ SInteger 0
-                                          (SString _) -> return $ Constant $ SString ""
-                                          (SBool _) -> return $ Constant $ SBool False
-                                          _ -> internalError "Type of Mapping not allowed" (show theType)
-                                      _ -> internalError "Type of Mapping not found" (show theType)
+                                    cntract <- getCurrentContract
+                                    if (CC._vmVersion cntract == "svm3.4")
+                                      then do
+                                        let theType =   typeOf theIndex
+                                        let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
+                                        let typeNum = theType `elemIndex` typeArray
+                                        case typeNum of
+                                          Just 0 -> return $ Constant $ SString ""
+                                          Just 1 -> return $ Constant $ SInteger 0
+                                          Just 2 -> return $ Constant $ SBool False
+                                          Just 3 -> do
+                                            case theIndex of
+                                              (SInteger _) -> return $ Constant $ SInteger 0
+                                              (SString _) -> return $ Constant $ SString ""
+                                              (SBool _) -> return $ Constant $ SBool False
+                                              _ -> internalError "Type of Mapping not allowed" (show theType)
+                                          _ -> internalError "Type of Mapping not found" (show theType)
+                                      else do
+                                        let theType =   typeOf theIndex
+                                        let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool))]
+                                        let typeNum = theType `elemIndex` typeArray
+                                        case typeNum of
+                                          Just 0 -> return $ Constant $ SString ""
+                                          Just 1 -> return $ Constant $ SInteger 0
+                                          Just 2 -> return $ Constant $ SBool False
+                                          _ -> internalError "Type of Mapping not found" (show theType)
 
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
@@ -2909,48 +2921,41 @@ certificateMap maybeCert cntrct =
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
-          certMap cert sub  = if (CC._vmVersion cntrct == "svm3.3" || CC._vmVersion cntrct == "svm3.4")
-                              then M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                              , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
-                                              , (SString "organization", Constant . SString $ subOrg sub)
-                                              , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
-                                              , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
-                                              , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
-                                              , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
-                                              , (SString "certString", Constant . SString $ cert)
-                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
-                                              , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
-                                              ]
-                              else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                              , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
-                                              , (SString "organization", Constant . SString $ subOrg sub)
-                                              , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
-                                              , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
-                                              , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
-                                              , (SString "certString", Constant . SString $ cert)
-                                              , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
-                                              ]
-          emptyCertMap = if (CC._vmVersion cntrct == "svm3.3" || CC._vmVersion cntrct == "svm3.4")
-                          then M.fromList [ (SString "commonName", Constant . SString $ "")
-                                          , (SString "country", Constant . SString $ "")
-                                          , (SString "organization", Constant . SString $ "")
-                                          , (SString "group", Constant . SString $ "")
-                                          , (SString "organizationalUnit", Constant . SString $ "")
-                                          , (SString "publicKey", Constant . SString $ "")
-                                          , (SString "userAddress", Constant . SString $ "")
-                                          , (SString "certString", Constant . SString $ "")
-                                          , (SString "expirationDate", Constant . SString $ "")
-                                          , (SString "parent", Constant . SString $ "")
-                                          ]
-                          else M.fromList [ (SString "commonName", Constant . SString $ "")
-                                          , (SString "country", Constant . SString $ "")
-                                          , (SString "organization", Constant . SString $ "")
-                                          , (SString "group", Constant . SString $ "")
-                                          , (SString "publicKey", Constant . SString $ "")
-                                          , (SString "userAddress", Constant . SString $ "")
-                                          , (SString "certString", Constant . SString $ "")
-                                          , (SString "parent", Constant . SString $ "")
-                                          ]
+          pragmaVersion = CC._vmVersion cntrct
+          nonEmptyFields cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                               , (SString "organization", Constant . SString $ subOrg sub)
+                                               , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
+                                               , (SString "certString", Constant . SString $ cert)
+                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+                                               ]
+          emptyFields = M.fromList [ (SString "commonName", Constant . SString $ "")
+                                   , (SString "country", Constant . SString $ "")
+                                   , (SString "organization", Constant . SString $ "")
+                                   , (SString "group", Constant . SString $ "")
+                                   , (SString "publicKey", Constant . SString $ "")
+                                   , (SString "userAddress", Constant . SString $ "")
+                                   , (SString "certString", Constant . SString $ "")
+                                   , (SString "parent", Constant . SString $ "")
+                                   ]
+          certMap cert sub  = case pragmaVersion of
+                                "svm3.3" -> M.insert (SString "organizationalUnit") (Constant . SString $ fromMaybe "" $ subUnit sub) $ nonEmptyFields cert sub
+                                "svm3.4" -> 
+                                    let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub) 
+                                                                    , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert ) 
+                                                                    ]
+                                    in M.union fieldsToUpdate $ nonEmptyFields cert sub
+                                _ -> nonEmptyFields cert sub
+          emptyCertMap = case pragmaVersion of
+                            "svm3.3" -> M.insert (SString "organizationalUnit") (Constant . SString $ "") $ emptyFields
+                            "svm3.4" -> 
+                                let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ "") 
+                                                                , (SString "expirationDate", Constant . SString $ "") 
+                                                                ]
+                                in M.union fieldsToUpdate $ emptyFields
+                            _ -> emptyFields
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
                                         , SVMType.key = SVMType.String Nothing
                                       , SVMType.value = SVMType.String Nothing }
