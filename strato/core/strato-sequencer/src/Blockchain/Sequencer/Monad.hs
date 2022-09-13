@@ -54,6 +54,7 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , chainInfoRegistry
   , orgNameChainsRegistry
   , getChainsDB
   , getTransactionsDB
@@ -133,6 +134,7 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
   , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
   , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
@@ -470,6 +472,7 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
+            , _chainInfoRegistry   = M.empty
             , _orgNameChainsRegistry = M.empty
             , _x509certRegistry    = M.empty
             , _getChainsDB         = emptyGetChainsDB

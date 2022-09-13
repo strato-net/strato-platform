@@ -279,6 +279,10 @@ instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadTest m) wher
   insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
   delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
 
+instance MonadIO m => (Word256 `A.Alters` ChainInfo) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . chainInfoRegistry
+  insert = genericTestInsert $ sequencerContext . chainInfoRegistry
+  delete = genericTestDelete $ sequencerContext . chainInfoRegistry
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -384,6 +388,7 @@ newSequencerContext bc = do
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
+      , _chainInfoRegistry   = M.empty
       , _orgNameChainsRegistry  = M.empty
       , _x509certRegistry    = M.empty
       , _getChainsDB         = emptyGetChainsDB
@@ -723,11 +728,11 @@ spec = do
 
         shouldAccept :: AuthorizationMode -> (String, String) -> IO ()
         shouldAccept mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember' mode p $ ChainMembers chainMembers)
+          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) Nothing (OrgNameChains Set.empty))
 
         shouldReject :: AuthorizationMode -> (String, String) -> IO ()
         shouldReject mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember' mode p $ ChainMembers chainMembers)
+          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) Nothing (OrgNameChains Set.empty))
 
     describe "IPOnly" $ do
       it "should reject the wrong ip" $ IPOnly `shouldReject` (key1, ip4)
@@ -761,8 +766,8 @@ spec = do
       let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
           run :: IO((Maybe (Maybe SomeException), TestContext),(Maybe (Maybe SomeException), TestContext))
           run = runConnectionWith runForTwoSeconds connection
-          insertServerCert = A.insert (A.Proxy @X509CertInfoState) serverUserAddress (X509CertInfoState serverUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" "sales")
-          insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" "sales")
+          insertServerCert = A.insert (A.Proxy @X509CertInfoState) serverUserAddress (X509CertInfoState serverUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
+          insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
           setChainInfoMap = A.insert (A.Proxy @ChainInfo) (0x1234 :: Address) (ChainInfo{chainInfo=UnsignedChainInfo{chainLabel="ola", accountInfo=[], codeInfo=[], members=M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server, parentChain=Nothing, creationBlock=undefined, chainNonce=0, chainMetadata=M.empty} , chainSignature=Nothing})
           setChainMembers = A.insert (A.Proxy @ChainMembers) (0x1234 :: Address) (ChainMembers $ M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server)
           setOrgNameChains = A.insert (A.Proxy @OrgNameChains) (OrgName "dunder mifflin", OrgUnit (Just "sales")) (OrgNameChains $ Set.singleton 0x1234)
@@ -771,7 +776,7 @@ spec = do
           postTx = threadDelay 500000 >> newChain >> setChainInfoMap >> insertServerCert >> insertClientCert >> threadDelay 500000 >> postIENewChainOrgName
           --postTx = threadDelay 500000 >> insertClientCert
 
-      ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
+      ((_, serverCtx), (_, clientCtx)) <- fst $ concurrently run postTx
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [ci | IEGenesis (IngestGenesis _ (_, ci)) <- _unseqEvents clientCtx]
-      clientTxs `shouldBe` [_]
+      clientTxs `shouldBe` []
