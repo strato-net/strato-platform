@@ -864,8 +864,9 @@ superPayload functionType address input = do
                 Decl.FuncDeclaration fun -> pure $ CC.FunctionCode fun
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
             --Throw error when multiple contracts are added, if multiple contracts are desired then make multiple calls
-            Right cc -> case cc ^. CC.contracts of
-              [as] -> pure $ CC.ContractCode as
+            Right cc -> case M.toList (cc ^. CC.contracts) of
+              [] -> generalMetaProgrammingError "No contract uploaded for the delegatecall" payload
+              [(_,a)] -> pure $ CC.ContractCode a
               as -> generalMetaProgrammingError "multiple contracts uploaded" (show as)
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
   pure (code, args)
