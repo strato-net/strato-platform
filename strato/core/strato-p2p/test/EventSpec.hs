@@ -33,7 +33,6 @@ import           Data.Default
 import           Data.Foldable                         (for_, toList, traverse_)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (fromJust, fromMaybe, isJust)
 import qualified Data.NibbleString                     as N
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
@@ -290,6 +289,16 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
+instance (Keccak256 `A.Alters` OutputBlock) m => (Keccak256 `A.Alters` OutputBlock) (MonadP2PTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
+instance ((OrgName, OrgUnit) `A.Alters` Word256) m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadP2PTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
   put p k = lift $ Mod.put p k
@@ -318,6 +327,12 @@ instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (Mon
 
 instance A.Selectable Keccak256 (Private (Word256, OutputTx)) m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
+
+instance A.Selectable (OrgName, OrgUnit) OrgNameChains m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadP2PTest m) where
+  select p org = lift $ A.select p org
+
+instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
+  select p addr = lift $ A.select p addr
 
 instance (Monad m, Mod.Accessible GenesisBlockHash m) => Mod.Accessible GenesisBlockHash (MonadP2PTest m) where
   access p = lift $ Mod.access p
@@ -373,10 +388,6 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . blockHashRegistry
   delete = genericTestDelete $ sequencerContext . blockHashRegistry
 
-instance (Keccak256 `A.Alters` OutputBlock) m => (Keccak256 `A.Alters` OutputBlock) (MonadP2PTest m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
 
 instance MonadIO m => (Keccak256 `A.Alters` EmittedBlock) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . emittedBlockRegistry
@@ -1594,31 +1605,100 @@ contract B {
       it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
 
   describe "End to end sync" $ do
-    it "renamed" $ do
-      let unseqSink = (unseqEvents %=) . (++)
-      server <- createPeer unseqSink "server" "1.2.3.4"
-      client <- createPeer unseqSink "client" "5.6.7.8"  -- enode://5.6.7.8:84924028758903278342928494398423847342
+    it "adds member through X509" $ do
+        let unseqSink = (unseqEvents %=) . (++)
+        privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+        let validators' = makeValidators privKeys
+        peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+          [ ("node1", "1.2.3.4")
+          , ("node2", "5.6.7.8")
+          , ("node3", "9.10.11.12")
+          ]
+        connections <- traverse (uncurry createConnection)
+          [ (peers !! 0, peers !! 1)
+          , (peers !! 0, peers !! 2)
+          , (peers !! 1, peers !! 2)
+          ]
+        let runForThreeSeconds = void . timeout 3000000
+            src = [r|
+                  pragma solidvm 3.2;
+                  contract A {
+                    event OrgAdded(string name, string unit);
+                    function addOrg(string _name, string _unit) {
+                      emit OrgAdded(_name, _unit);
+                    }
+                  }
+                  |]
+            contractName = "A"
+            enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+            enode2 = "enode://abcd@5.6.7.8:30303"
+            chainInfo' = ChainInfo
+              UnsignedChainInfo { chainLabel     = "My test chain!"
+                                , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+                                                  , NonContract (validators' !! 0) 1000000000000000000000
+                                                  ]
+                                , codeInfo       = [CodeInfo "" src $ Just contractName]
+                                , members        = M.singleton (validators' !! 0) enode1
+                                , parentChain    = Nothing
+                                , creationBlock  = zeroHash
+                                , chainNonce     = 123456789
+                                , chainMetadata  = M.singleton "VM" "SolidVM"
+                                }
+              Nothing
+            chainId = keccak256ToWord256 $ rlpHash chainInfo'
+        ts <- liftIO getCurrentMicrotime
+        let args = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> ",\"" <> T.pack enode2 <> "\")"
+            utx' = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Just $ ChainId chainId
+              }
+            tx'' = mkSignedTx (privKeys !! 0) utx'
+            txMd = M.fromList [("funcName","addOrg"),("args",args)]
+            tx' = tx''{transactionMetadata = M.union txMd <$> transactionMetadata tx''}
+            ietx = IETx ts $ IngestTx Origin.API tx'
+            routine = do
+              threadDelay 500000
+              flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
+              threadDelay 500000
+              flip postEvent (peers !! 0) $ UnseqEvent ietx
+              for_ peers $ postEvent (TimerFire 0)
 
-      let serverUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey server
-          clientUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey client
+        runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
+        ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+        ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
+    -- it "Check if peer is member by X509" $ do
+    --   let unseqSink = (unseqEvents %=) . (++)
+    --   serverPKey <- newPrivateKey
+    --   clientPKey <- newPrivateKey
+    --   let validatorAddresses = makeValidators [serverPKey, clientPKey]
+    --   server <- createPeer serverPKey validatorAddresses unseqSink "server" "1.2.3.4"
+    --   client <- createPeer clientPKey validatorAddresses unseqSink "client" "5.6.7.8"
 
-      let validatorAddresses = makeValidators [server, client]
-      connection <- createConnection server client
+    --   let serverUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey server
+    --       clientUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey client
 
-      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
-          run :: IO((Maybe (Maybe SomeException), TestContext),(Maybe (Maybe SomeException), TestContext))
-          run = runConnectionWith runForTwoSeconds connection
-          insertServerCert = A.insert (A.Proxy @X509CertInfoState) serverUserAddress (X509CertInfoState serverUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
-          insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
-          setChainInfoMap = A.insert (A.Proxy @ChainInfo) (0x1234 :: Address) (ChainInfo{chainInfo=UnsignedChainInfo{chainLabel="ola", accountInfo=[], codeInfo=[], members=M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server, parentChain=Nothing, creationBlock=undefined, chainNonce=0, chainMetadata=M.empty} , chainSignature=Nothing})
-          setChainMembers = A.insert (A.Proxy @ChainMembers) (0x1234 :: Address) (ChainMembers $ M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server)
-          setOrgNameChains = A.insert (A.Proxy @OrgNameChains) (OrgName "dunder mifflin", OrgUnit (Just "sales")) (OrgNameChains $ Set.singleton 0x1234)
-          newChain = atomically (writeTMChan (_p2pPeerSeqSource server) (P2pNewChainMember 0x1234 serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server))
-          postIENewChainOrgName = atomically (writeTQueue (_p2pPeerUnseqSource server) $ UnseqEvent $ IENewChainOrgName 0x1234 ("dunder mifflin",Just "sales"))
-          postTx = threadDelay 500000 >> newChain >> setChainInfoMap >> insertServerCert >> insertClientCert >> threadDelay 500000 >> postIENewChainOrgName
-          --postTx = threadDelay 500000 >> insertClientCert
+    --   connection <- createConnection server client
 
-      ((_, serverCtx), (_, clientCtx)) <- fst $ concurrently run postTx
-      _unseqEvents serverCtx `shouldBe` []
-      let clientTxs = [ci | IEGenesis (IngestGenesis _ (_, ci)) <- _unseqEvents clientCtx]
-      clientTxs `shouldBe` []
+    --   let runForTwoSeconds = timeout 2000000
+    --       run = runForTwoSeconds $ runConnection connection
+    --       insertServerCert = A.insert (A.Proxy @X509CertInfoState) serverUserAddress (X509CertInfoState serverUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
+    --       insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" (Just "sales"))
+    --       setChainInfoMap = A.insert (A.Proxy @ChainInfo) (0x1234 :: Address) (ChainInfo{chainInfo=UnsignedChainInfo{chainLabel="ola", accountInfo=[], codeInfo=[], members=M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server, parentChain=Nothing, creationBlock=undefined, chainNonce=0, chainMetadata=M.empty} , chainSignature=Nothing})
+    --       setChainMembers = A.insert (A.Proxy @ChainMembers) (0x1234 :: Address) (ChainMembers $ M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server)
+    --       setOrgNameChains = A.insert (A.Proxy @OrgNameChains) (OrgName "dunder mifflin", OrgUnit (Just "sales")) (OrgNameChains $ Set.singleton 0x1234)
+    --       newChain = atomically (writeTMChan (_p2pPeerSeqSource server) (P2pNewChainMember 0x1234 serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server))
+    --       postIENewChainOrgName = atomically (writeTQueue (_p2pPeerUnseqSource server) $ UnseqEvent $ IENewChainOrgName 0x1234 ("dunder mifflin",Just "sales"))
+    --       postTx = threadDelay 500000 >> newChain >> setChainInfoMap >> insertServerCert >> insertClientCert >> threadDelay 500000 >> postIENewChainOrgName
+    --       --postTx = threadDelay 500000 >> insertClientCert
+    --   concurrently_ run postTx
+    --   serverCtx <- readTVarIO $ server ^. p2pTestContext
+    --   clientCtx <- readTVarIO $ client ^. p2pTestContext
+
+    --   _unseqEvents serverCtx `shouldBe` []
+    --   let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
+    --   clientTxs `shouldBe` []
