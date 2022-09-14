@@ -715,6 +715,7 @@ contract qq {
     in length anns `shouldBe` 1
   it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external payable {
   }
@@ -723,6 +724,7 @@ contract A {
     in length anns `shouldBe` 0
   it "can throw exception when receive() function has arguments" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive(uint i) external payable {
     uint x = i;
@@ -756,6 +758,7 @@ contract qq {
     in length anns `shouldBe` 1
   it "can throw exception when receive() function has return values" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external payable returns (uint) {
     uint x = 5;
@@ -767,6 +770,7 @@ contract A {
 
   it "can throw exception when receive() function is not external" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() internal payable {
   }
@@ -776,6 +780,7 @@ contract A {
 
   it "can throw exception when receive() function is not payable" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external {
   }
@@ -800,6 +805,7 @@ contract qq {
 
   it "can throw exception when receive() function is decalred with function keyword" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   function receive() external payable {
   }
