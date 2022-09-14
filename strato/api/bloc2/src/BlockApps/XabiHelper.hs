@@ -91,10 +91,9 @@ tFormFunc SolidF.Func{..} = EVMXabi.Func {
                           Just SolidF.Public      -> Just EVMXabi.Public
                           Just SolidF.Internal    -> Just EVMXabi.Internal
                           Just SolidF.External    -> Just EVMXabi.External -- Maybe Visibility
-  , funcModifiers =  case _funcModifiers of
-                          Nothing -> Nothing; 
-                          Just [] -> Nothing; --Not 100% if this is a correct translastion
-                          Just contents -> Just $ T.pack $ foldl (++) "" (map SolidUnparse.unparseExpression contents); -- Maybe [String]
+  , funcModifiers =  case _funcModifiers of 
+                          [] -> Nothing --Not 100% if this is a correct translastion
+                          contents -> Just $ map (\(_, [e])->  SolidUnparse.unparseExpression e  ) contents -- Maybe [String]
   }
 
 
