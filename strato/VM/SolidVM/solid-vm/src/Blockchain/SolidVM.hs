@@ -803,13 +803,28 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
 genericDelegateCallWrapper from to input isRcc = do
   -- TODO: ensure both contracts have the same pragma version
-  (codetype, args) <- superPayload input
+  (codetype, args) <- superPayload "delegatecall" from input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
+  -- Get the codehash of the piece of code if the item is a contract
+  --   cid <- case (a ^. namedAccountChainId) of 
+  --   UnspecifiedChain -> do
+  --     cid1 <- view accountChainId <$> getCurrentAccount
+  --     case cid1 of
+  --       Nothing -> return Nothing
+  --       Just cid2 -> return $ Just cid2
+  --   MainChain -> return Nothing
+  --   ExplicitChain cid -> return $ Just cid
+  -- let realAccount = namedAccountToAccount cid a
+  -- -- Retreive and resolve the codehash
+  -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  -- resolvedCodeHash <- resolveCodePtr cid codeHash'
   -- Determine which route to call based on the code type
   result <- case codetype of
-    CC.ContractCode c -> runTheConstructors c
+    -- runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
+    -- runTheConstructors from to hsh cc contractName' argExps = do
+    CC.ContractCode c -> runTheConstructors from to (to ^. accountCodeHash) c (to ^. accountContractName) args
     CC.FunctionCode f -> runTheCall f
     CC.StatementCode s -> runStatement s
   -- TODO
@@ -818,27 +833,26 @@ genericDelegateCallWrapper from to input isRcc = do
     Just _ -> return True
   pure $ (correctlyRan, result)
 
--- Split a list of ValList items return a tuple, first item is the first item, the second item is a list of the rest of the items
-payloadBreakup :: ValList -> (Value, ValList)  
-
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: String -> Address -> ValList -> (CC.CodeType a, CC.ArgList)
+superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType a, Maybe [Value])
 superPayload functionType address input = do
-  (payload, args) <- case argVals of
+  (payload, args) <- case input of
     -- Case when just a single argument is supplied
-    OrderedVals [SString arguments] -> (Just arguments, Nothing)
+    OrderedVals [SString arguments] -> pure (arguments, Nothing)
     -- Case of a payload and arguments supplied
-    OrderedVals as | length as > 1 -> (Just (head as), Just (tail as))
+    OrderedVals as | length as > 1 -> case head as of
+      SString ass -> pure (ass, Just (tail as))
+      _ -> generalMetaProgrammingError "First argument must be a string" (show as)
     -- Case of nothing being supplied to the function
     _ -> pure $ noPayload functionType (show address)
 
--- -- Note that compileSourceWithAnnotations calls compileSource which calls the optimizer.detector
--- runOptimizer :: String -> CodeCollection
--- runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
---             Left _ -> internalError "Compilation Error" ()
---             Right cc -> cc
--- First try to parse the input as a contract
+  -- let a = Just huge1; b = Just huge2; c = Just huge3;
+  -- case (a, b, c) of
+  --   (Just a, _, _) | a > 4 = here is my
+  --   (_, Just b, _) -> here is mh b 
+  --   (Just a, Just b, Just c) -> print (a, b, c)
+  --   _ -> print "Nothing"
   code <- case compileSourceWithAnnotations True (M.fromList [("",T.pack payload)]) of
             --Try parsing as a function if that didn't work
             Left _ -> case runParser functionDeclaration "" "" payload of
@@ -849,7 +863,10 @@ superPayload functionType address input = do
               Right (_, f)  -> case f of
                 Decl.FuncDeclaration fun -> pure $ CC.FunctionCode fun
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
-            Right cc -> pure $ CC.ContractCode (cc ^. contracts)
+            --Throw error when multiple contracts are added, if multiple contracts are desired then make multiple calls
+            Right cc -> case cc ^. CC.contracts of
+              [as] -> pure $ CC.ContractCode as
+              as -> generalMetaProgrammingError "multiple contracts uploaded" (show as)
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
   pure (code, args)
 
@@ -2300,7 +2317,22 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           -- Isolate the payload and the inputted arguments, send to the actual delegatecaller function
           Constant (SContractItem address' "delegatecall") -> do
-            return . Constant . SBool $ genericDelegateCallWrapper address' getCurrentAccount argVals False
+            from <- getCurrentAccount
+            cid <- case (address' ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  --Assume that the chainId is the same as the from chainId when it is unset 
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> return Nothing
+                    Just cid2 -> return $ Just cid2
+                MainChain -> return Nothing
+                ExplicitChain cid -> return $ Just cid
+            let toAccount = namedAccountToAccount cid address'
+              --check that the from and to are on the same chain`
+            isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+            unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+            (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals False
+            return . Constant . (SBool didItWork, result) 
           
           -- Constant (SContractItem address' "staticcall")
           --   (payload, argumentList) <- superPayload argVals
