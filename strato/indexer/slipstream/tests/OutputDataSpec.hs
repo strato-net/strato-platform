@@ -611,6 +611,7 @@ createDummyContract v =
       _contractName=undefined,
       _parents=undefined,
       _constants=undefined,
+      _userDefined=undefined,
       _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
       _enums=undefined,
       _structs=undefined,

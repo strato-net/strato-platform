@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE MultiWayIf            #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
@@ -55,6 +56,7 @@ import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1     (importPublicKey)
 import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Blockchain.Strato.Model.Account
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
@@ -221,75 +223,76 @@ removeChainMember cId address = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
-registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
-registerCertificate userAddr x509CertInfoState = do
+registerCertificate :: Account -> Address -> X509CertInfoState -> Redis (Either Reply Status)
+registerCertificate contractAddress userAddr x509CertInfoState = do
     status <- getInitializeCertificateRegistry
-    let maybeParent = getParentUserAddress $ certificate x509CertInfoState
-    certInfoState' <- case maybeParent of
-        Just parentAddr -> do
-            mCertInfoState <- getCertificate parentAddr
+    parent <- (\ma -> maybe (pure Nothing) getCertificate ma) (getParentUserAddress $ certificate x509CertInfoState)
+
+    let parentIsValid = maybe False isValid parent
+        crInitialized = isJust status
+        rightContract = Just contractAddress == status || isNothing status
+
+    case parent of
+        -- The CertificateRegistry is not initialized and there is not parent certificate
+        Nothing | not crInitialized -> 
+            fmap txToEither . multiExec $ insertNewX509
+
+        -- The CertificateRegistry is not initialized and there is a parent certificate
+        Just p  | not crInitialized -> 
+            fmap txToEither . multiExec $ updateParent p >> insertNewX509
+
+        -- The CertificateRegistry is initialized, this event it emitted from the right contract,
+        -- and the parent certificate is valid
+        Just p  | crInitialized && rightContract && parentIsValid -> 
+            fmap txToEither . multiExec $ updateParent p >> insertNewX509
+
+        -- We can not register this certificate
+        _ -> 
+            pure . Left . SingleLine $ "registerCertificate - invalid contractAddress, contract is not CertificateRegistry"
+    where
+        insertNewX509 = set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
+        updateParent p@X509CertInfoState{..} = set (inNamespace X509Certificates $ toKey userAddress) (toValue p{children=userAddr:children})
+        txToEither = \case
+            TxSuccess _ -> Right Ok 
+            TxAborted -> Left . SingleLine $ "registerCertificate - Aborted registering cert"
+            TxError e -> Left . SingleLine $ "registerCertificate - Error registering cert " <> S8.pack e
+
+revokeCertificate :: Account -> Address -> Redis (Either Reply Status)
+revokeCertificate contractAddress userAddress = do
+    status <- getInitializeCertificateRegistry
+    if Just contractAddress == status || isNothing status
+        then do
+            mCertInfoState <- getCertificate userAddress
             case mCertInfoState of
-                Nothing -> pure Nothing
-                Just certInfoState -> pure $ Just certInfoState
-        Nothing -> pure Nothing
-
-    let parentCertIsValid = fmap isValid certInfoState'
-        parentIsValid = fromMaybe False parentCertIsValid
-
-    if not status || (status && parentIsValid)
-        then do
-            res <- multiExec $ set (inNamespace X509Certificates userAddr) (toValue x509CertInfoState)
-            _ <- case res of
-                TxSuccess _ -> pure $ Right Ok
-                TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
-                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
-
-            case certInfoState' of
-                Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
+                Nothing ->  pure . Left $ SingleLine (S8.pack "revokeCertificate - userAddress invalid")
                 Just certInfoState -> do
-                    let newChildren = userAddr : children certInfoState
-                    let newParentInfoState = certInfoState{children  = newChildren}
-                    let parentAddr = userAddress certInfoState
-                    res' <- multiExec $ set (inNamespace X509Certificates parentAddr) (toValue newParentInfoState)
-                    case res' of
-                        TxSuccess _ -> pure $ Right Ok
-                        TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
-                        TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
-        else pure . Left $ SingleLine (S8.pack "registerCertificate - Parent not valid")
+                    let newInfoState = certInfoState{isValid  = False}
+                    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
+                    case res of
+                        TxSuccess _ -> do
+                                res2 <- mapM (revokeCertificate contractAddress) (children certInfoState)
+                                pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
+                        TxAborted -> pure . Left $ SingleLine (S8.pack "revokeCertificate - Aborted revoking cert")
+                        TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertificate - Error revoking cert" <> e)
+        else pure . Left $ SingleLine (S8.pack "revokeCertificate - invalid contractAddress, contract is not CertificateRegistry")
 
-
-revokeCertificate :: Address -> Redis (Either Reply Status)
-revokeCertificate userAddress = do
-    mCertInfoState <- getCertificate userAddress
-    case mCertInfoState of
-        Nothing ->  pure . Left $ SingleLine (S8.pack "registerCertificate - userAddress invalid")
-        Just certInfoState -> do
-            let newInfoState = certInfoState{isValid  = False}
-            res <- multiExec $ set (inNamespace X509Certificates userAddress) (toValue newInfoState)
-            case res of
-                TxSuccess _ -> do
-                        res2 <- mapM revokeCertificate (children certInfoState)
-                        pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
-                TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted revoking cert")
-                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error revoking cert" <> e)
-
-initializeCertificateRegistry :: Redis (Either Reply Status)
-initializeCertificateRegistry = do
+initializeCertificateRegistry :: Account -> Redis (Either Reply Status)
+initializeCertificateRegistry contractAddress = do
     status <- getInitializeCertificateRegistry
-    if not status
+    if isNothing status
         then do
-            res <- multiExec $ set (inNamespace X509Initialized ("initialized" :: S8.ByteString)) (toValue True)
+            res <- multiExec $ set (inNamespace X509Initialized ("initialized" :: S8.ByteString)) (toValue contractAddress)
             case res of
                 TxSuccess _ -> pure $ Right Ok
                 TxAborted -> pure . Left $ SingleLine (S8.pack "initializeCertificateRegistry - Aborted initializing certificate")
                 TxError e -> pure . Left $ SingleLine (S8.pack $ "initializeCertificateRegistry - Error initializing certificate" <> e)
         else pure . Left $ SingleLine (S8.pack "initializeCertificateRegistry - Aborted already initialized")
 
-getInitializeCertificateRegistry :: Redis Bool
+getInitializeCertificateRegistry :: Redis (Maybe Account)
 getInitializeCertificateRegistry = getInNamespace X509Initialized ("initialized" :: S8.ByteString) >>= \case
-        Left _          -> return False
-        Right Nothing   -> return False
-        Right (Just state) -> return (fromValue state)
+        Left _          -> return Nothing
+        Right Nothing   -> return Nothing
+        Right (Just state) -> return (Just $ fromValue state)
 
 
 getCertificate :: Address -> Redis (Maybe X509CertInfoState)

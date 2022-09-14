@@ -32,6 +32,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
+--import Debug.Trace
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -85,6 +86,7 @@ showType (SVMType.Address _) = "address"
 showType (SVMType.Account _) = "account"
 showType (SVMType.UnknownLabel s _) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> labelToText n
+showType (SVMType.UserDefined _ a) = showType a 
 showType (SVMType.Enum _ n _) = "enum " <> labelToText n
 showType (SVMType.Error _ n) = "error " <> labelToText n
 showType (SVMType.Array t l) = T.concat
@@ -245,8 +247,8 @@ intType' = Static (SVMType.Int Nothing Nothing)
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
 
--- bytesType' :: SourceAnnotation Text -> Type'
--- bytesType' = Static (SVMType.Bytes Nothing Nothing)
+bytesType' :: SourceAnnotation Text -> Type'
+bytesType' = Static (SVMType.Bytes Nothing Nothing)
 
 boolType' :: SourceAnnotation Text -> Type'
 boolType' = Static SVMType.Bool
@@ -505,6 +507,20 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
+typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b)  = if alias1 == alias2 
+  then typecheckStatic a b
+  else Left $ "Type mismatch Test1: "
+                            <> showType (SVMType.UserDefined alias1 a)
+                            <> " and "
+                            <> showType (SVMType.UserDefined alias2 b)
+                            <> " do not match."
+typecheckStatic (SVMType.UserDefined a c) b  = Left $ "Type mismatch Test1: "
+                            <> showType (SVMType.UserDefined a c)
+                            <> " and "
+                            <> showType b
+                            <> " do not match."
+
+typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch"
 typecheckStatic theType (SVMType.Bytes _ _) = Right theType
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
@@ -837,6 +853,7 @@ stringArgs x = Sum $ stringType' x :|
                    , accountType' x
                    , intType' x
                    , boolType' x
+--                   , userDefinedType' x
                    ]
 
 addressArgs :: SourceAnnotation Text -> Type'
@@ -979,7 +996,41 @@ getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block" Nothing) ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super" Nothing) ctx
-getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
+getVarType' name ctx = do
+  c <- asks contract
+  let varDefy =  M.lookup name (_storageDefs c)
+  case varDefy of
+    Just _ -> do
+      case  varType <$> varDefy   of
+        Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
+        _ -> getVarTypeByName' (stringToLabel name) ctx
+    Nothing -> do
+      let ls = filter (userDefinedHelper name )  [ varType x | x <- (M.elems (_storageDefs c)) ] 
+      if  length ls > 0
+        then do
+          let ls2 = head (filter (userDefinedHelper name . varType )  [  x | x <- (M.elems (_storageDefs c)) ])
+          case varInitialVal ls2 of
+            Just _ -> pure $ (Static (head ls)  ctx)
+            _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
+      else do
+        getVarTypeByName' (stringToLabel name) ctx
+
+
+userDefinedHelper :: String -> Type  -> Bool
+userDefinedHelper nam (SVMType.UserDefined a _)  = if a == nam then True else False
+userDefinedHelper _ _ = False
+
+
+userTypeHelper' :: Maybe String -> SVMType.Type
+userTypeHelper' (Just "bool")   =  SVMType.Bool
+userTypeHelper' (Just "string") =  SVMType.String $ Just True
+userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing)
+userTypeHelper' (Just "bytes")  =  (SVMType.Bytes (Just True) Nothing)
+userTypeHelper' (Just "byte")   =  (SVMType.Bytes Nothing $ Just 1) 
+userTypeHelper' _               =  SVMType.Bool  --TODO fix this
+
+
 
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
@@ -1002,6 +1053,7 @@ getVarTypeByName' name ctx = do
                  <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
                  <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
       case mVarDecl of
+        --Just ( (SVMType.UserDefined _ _), ctx') -> pure $ Static (SVMType.Bool) ctx'
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
           [ Function (Static e ctx') (Static e ctx') ctx' [] []
@@ -1192,6 +1244,8 @@ checkIfImmuteOperationValid (Variable y a)  = do
       else tcExpr (Variable y a)
 checkIfImmuteOperationValid a = tcExpr a
 
+
+
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
   sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
@@ -1276,6 +1330,61 @@ tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
+
+tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
+  c <- asks contract
+  if M.member nam (_userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
+    then do
+      case args of
+        OrderedArgs es -> do
+          let check = case  M.lookup nam (_userDefined c)  of
+                Just "int" ->  intType' x ~>  tcExpr (head es)
+                Just "string" -> stringType' x ~>  tcExpr (head es)
+                Just "bool" -> boolType' x ~>  tcExpr  (head es)
+                Just "bytes" -> bytesType' x ~>  tcExpr  (head es)
+                _ ->  pure . bottom $ "type not supported for user defined types" <$ x 
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          check !>  (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
+        _ ->  pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
+      else do 
+        e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
+        a <- case args of
+          OrderedArgs es -> productType' x <$> traverse tcExpr es
+          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+        case args of
+          NamedArgs es -> apply e a $ Just (fst <$> es)
+          _ -> apply e a Nothing
+
+tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
+  c <- asks contract
+  if (M.member nam $ _userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False)
+    then do
+      case args of
+        OrderedArgs es -> do
+          expressionResult <- tcExpr (head es)
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          let check  =  (case expressionResult of 
+                (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
+                  then case actual of 
+                    (SVMType.Int  _ _) ->  pure $ (intType' x)
+                    (SVMType.String  _) -> pure $ (stringType' x)
+                    SVMType.Bool -> pure $ (boolType' x) 
+                    (SVMType.Bytes _ _ ) -> pure $ (bytesType' x)
+
+                    _ ->  pure . bottom $ "Not supported for casting such type to user defined type" <$ x
+                  else pure . bottom $ "Wrong User defined type" <$ x
+                _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x)
+          check !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
+        _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+    else do  --Case of no user defines
+      e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
+      a <- case args of
+         OrderedArgs es -> productType' x <$> traverse tcExpr es
+         NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+      case args of
+        NamedArgs es -> apply e a $ Just (fst <$> es)
+        _ -> apply e a Nothing
+
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
