@@ -113,6 +113,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
+import           SolidVM.Solidity.Parse.Declarations  as Decl
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 --import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType, unparseContract)
@@ -799,13 +800,13 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 --   let payload = makePayload input
 
 --Very similar to the call function except this runs in the context of the local contract
-genericDelegateCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Bool, Maybe Value)
+genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
 genericDelegateCallWrapper from to input isRcc = do
   -- TODO: ensure both contracts have the same pragma version
   (codetype, args) <- superPayload input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
-  unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+  unless (isRelated) $ inaccessibleChain (show from) (show to)
   -- Determine which route to call based on the code type
   result <- case codetype of
     CC.ContractCode c -> runTheConstructors c
@@ -816,10 +817,13 @@ genericDelegateCallWrapper from to input isRcc = do
     Nothing -> return False
     Just _ -> return True
   pure $ (correctlyRan, result)
-  
+
+-- Split a list of ValList items return a tuple, first item is the first item, the second item is a list of the rest of the items
+payloadBreakup :: ValList -> (Value, ValList)  
+
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: String -> Address -> CC.ArgList -> (CC.CodeType a, CC.ArgList)
+superPayload :: String -> Address -> ValList -> (CC.CodeType a, CC.ArgList)
 superPayload functionType address input = do
   (payload, args) <- case argVals of
     -- Case when just a single argument is supplied
@@ -837,20 +841,17 @@ superPayload functionType address input = do
 -- First try to parse the input as a contract
   code <- case compileSourceWithAnnotations True (M.fromList [("",T.pack payload)]) of
             --Try parsing as a function if that didn't work
-            Left _ -> runParser functionDeclaration "" "" input
-            Right cc -> cc
+            Left _ -> case runParser functionDeclaration "" "" payload of
+              --If it can't be a function then try parsing as a statement
+              Left _ -> case runParser statement "" "" payload of
+                Left _ -> generalMetaProgrammingError "parsing" payload
+                Right s -> pure $ CC.StatementCode s
+              Right (_, f)  -> case f of
+                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode fun
+                _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
+            Right cc -> pure $ CC.ContractCode (cc ^. contracts)
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
-  code <- case code of
-    CC.CodeCollection c -> return c ^. contracts
-    _ -> return code
-
-  load <- case (code) of
-    Left err -> case (fnc) of
-      Left err -> case (sta) of
-        Left err -> 
-        Right s -> pure $ (CC.StatementCode s, args)
-      Right f -> pure $ (CC.FunctionCode f, args)
-    Right cc -> pure $ (CC.ContractCode cc, args)
+  pure (code, args)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2299,8 +2300,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           -- Isolate the payload and the inputted arguments, send to the actual delegatecaller function
           Constant (SContractItem address' "delegatecall") -> do
-            (payload, argumentList) <- superPayload argVals
-            return . Constant . SBool $ genericDelegateCallWrapper address' payload argVals
+            return . Constant . SBool $ genericDelegateCallWrapper address' getCurrentAccount argVals False
           
           -- Constant (SContractItem address' "staticcall")
           --   (payload, argumentList) <- superPayload argVals
