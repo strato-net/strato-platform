@@ -9,33 +9,29 @@ module BlockApps.XabiHelper
   ) where
 
 
+import           Data.Int                                  (Int32)
+import qualified Data.Map                                  as M
+import qualified Data.Text                                 as T
+import           Text.Parsec                               hiding (parse)
 
-import qualified Data.Map as M
-import qualified Data.Text as T
+
+import qualified BlockApps.Solidity.Parse.ParserTypes      as EVMParseT (SolcVersion(..)) 
+import           SolidVM.Solidity.Parse.ParserTypes        hiding (SolidityValue)
+
+import qualified BlockApps.Solidity.Xabi                   as EVMXabi  
+import qualified SolidVM.Solidity.Xabi                     as SVMXabi
+
+import qualified SolidVM.Model.Type                        as SolidType
+import qualified BlockApps.Solidity.Xabi.Type              as XabiType
 
 
-import qualified BlockApps.Solidity.Parse.ParserTypes as EVMParseT (SolcVersion(..)) 
-
-import qualified SolidVM.Solidity.Parse.UnParser        as  SolidUnparse 
-
-import           Text.Parsec                          hiding (parse)
-
-import qualified BlockApps.Solidity.Xabi                 as EVMXabi  
-import qualified BlockApps.Solidity.Xabi.Type            as XabiType
--- BlockApps.Solidity.Type
-import qualified SolidVM.Model.Type                      as SolidType
-import qualified SolidVM.Model.CodeCollection.VarDef     as CCVarfDef
-import qualified SolidVM.Model.CodeCollection.Function   as SolidF
-import qualified SolidVM.Solidity.Xabi                   as SVMXabi
-
---import           Data.Int                  (Int32)
+import qualified SolidVM.Model.CodeCollection.VarDef       as CCVarfDef
+import qualified SolidVM.Model.CodeCollection.Function     as SolidF
+import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVarDec
 
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Parse.ParserTypes hiding (SolidityValue)
-
-
-
+import qualified SolidVM.Solidity.Parse.UnParser           as  SolidUnparse 
 import           SolidVM.Model.SolidString
 
 
@@ -47,30 +43,36 @@ import           SolidVM.Model.SolidString
 hideFucn :: SourceName -> SourceCode ->   [(T.Text, EVMXabi.Xabi)]
 hideFucn x y = do
   File parsedFile <- case runParser solidityFile (ParserState "" "" M.empty) x y of Left _ -> []; Right xx-> [xx];
-
   --parsedFile1 <- --either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) x y
-  --parsedFile <- hlepr
   [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile]
   --[(name, xabi) |  NamedXabi name (xabi, parents') <- parsedFile]
 
 hideFucn2 ::  SourceName -> SourceCode -> (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
 hideFucn2 x  y= (EVMParseT.ZeroPointFour, (hideFucn x y))
 
+
+
 transFormXabi :: SVMXabi.Xabi -> EVMXabi.Xabi 
 transFormXabi SVMXabi.Xabi{..} =  
   EVMXabi.Xabi { xabiFuncs =  M.fromList [ (T.pack ss,  tFormFunc f) |(ss, f)<- (M.toList _xabiFuncs)]--M.singleton (T.pack "Test") 
-             , xabiConstr = Nothing
-             , xabiVars = M.empty
-             , xabiTypes = M.empty
-             , xabiModifiers = M.empty
-             , xabiEvents = M.empty
-             , xabiKind = EVMXabi.ContractKind
-             , xabiUsing = M.empty
+             --Clean this up case _xabiConstr of M.empty -> Nothing;  
+             , xabiConstr = case M.toList _xabiConstr of --Shouldn't _xabiConstr always be a size of 1?
+                            [] -> Nothing
+                            [(_, f)] -> Just $ tFormFunc f
+                            _ -> Just $ tFormFunc $ snd $ head $ M.toList _xabiConstr --I don't think this should ever run
+              --Map SolidString (VariableDeclF a) -> Map Text Xabi.VarType
+             , xabiVars = M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)] --TODO
+             , xabiTypes = M.empty --TODO
+             , xabiModifiers = M.empty --TODO
+             , xabiEvents = M.empty --TODO
+             , xabiKind = EVMXabi.ContractKind --TODO
+             , xabiUsing = M.empty --TODO
            }
 
 
-
---Transforming SolidFuncs to Xabi Funcs
+----------------------------------
+--Transforming SolidFuncs to Xabi Funcs Section
+----------------------------------
 tFormFunc :: SolidF.Func -> EVMXabi.Func
 tFormFunc SolidF.Func{..} = EVMXabi.Func {      
   funcArgs   = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcArgs)]      --Map Text Xabi.IndexedType
@@ -99,6 +101,32 @@ tFormFunc SolidF.Func{..} = EVMXabi.Func {
 
 
 
+----------------------------------
+----VarDecl -> Vartype Section
+----------------------------------
+tFormVarDeclToVartype :: SolidVarDec.VariableDecl -> XabiType.VarType
+tFormVarDeclToVartype    SolidVarDec.VariableDecl{..} = XabiType.VarType { 
+  varTypeAtBytes        = 0 ::Int32 --TODO change this      -- :: Int32
+  , varTypePublic       = Just _varIsPublic        -- :: Maybe Bool
+  , varTypeConstant     = Nothing   -- :: Maybe String
+  , varTypeInitialValue =   case _varInitialVal of 
+                          Nothing -> Nothing --Not 100% if this is a correct translastion
+                          Just contents -> Just $  SolidUnparse.unparseExpression contents -- Maybe [String]-- :: Maybe String
+  , varTypeType         = tFormTypeToType _varType        -- :: Type
+  }
+-- data VariableDeclF a = VariableDecl
+--   { _varType       :: SVMType.Type
+--   , _varIsPublic   :: Bool
+--   , _varInitialVal :: Maybe (ExpressionF a)
+--   , _varContext    :: a
+--   , _isImmutable   :: Bool
+--   } 
+
+
+
+----------------------------------
+--General Helper Function Section
+----------------------------------
 tformMaybeSoldStringToText :: Maybe SolidString -> T.Text
 tformMaybeSoldStringToText x = case x of 
   Just st -> T.pack st
@@ -107,6 +135,8 @@ tformMaybeSoldStringToText x = case x of
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
 tFormIndexedType (CCVarfDef.IndexedType x y) = XabiType.IndexedType x (tFormTypeToType y)
 
+
+--TODO fill this out......
 tFormTypeToType :: SolidType.Type -> XabiType.Type
 tFormTypeToType = \case 
   (SolidType.Int maybeBool maybeBytes) ->  (XabiType.Int maybeBool maybeBytes)  -- Int {signed::Maybe Bool, bytes::Maybe Int32} ->
@@ -125,10 +155,6 @@ tFormTypeToType = \case
   -- | Array { entry:: Type, length :: Maybe Word }
   -- | Contract {typedef::SolidString}
   -- | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
-
-
-
-
 
 
 
