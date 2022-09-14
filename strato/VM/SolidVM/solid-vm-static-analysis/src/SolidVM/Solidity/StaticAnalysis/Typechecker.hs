@@ -743,7 +743,7 @@ functionHelper :: Annotated CodeCollectionF
                -> Type'
 functionHelper cc c funcName f@Func{..} = case _funcContents of
   Nothing -> Function (Product [] _funcContext) (Product [] _funcContext) _funcContext [] []
-  Just stmts -> do
+  Just stmts ->
     if funcName == "receive"
       then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
         ([], [], Just Payable, Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
