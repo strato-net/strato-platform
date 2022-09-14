@@ -289,12 +289,6 @@ unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
 
-
-
--- unparseContract :: ContractF a -> String
--- --Use a many statement to go through the list items contained in the ContractF. Making sure everything is able to touched
--- unparseContract = 
-
 unparseVarDefEntry :: VarDefEntryF a -> String
 unparseVarDefEntry BlankEntry = ""
 unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =

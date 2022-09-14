@@ -804,7 +804,7 @@ genericDelegateCallWrapper from to input isRcc = do
   -- TODO: ensure both contracts have the same pragma version
   (codetype, args) <- superPayload input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
-  isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+  isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
   -- Determine which route to call based on the code type
   result <- case codetype of
@@ -819,7 +819,7 @@ genericDelegateCallWrapper from to input isRcc = do
   
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: String -> Address -> CC.ArgList -> (CC.CodeType, CC.ArgList)
+superPayload :: String -> Address -> CC.ArgList -> (CC.CodeType a, CC.ArgList)
 superPayload functionType address input = do
   (payload, args) <- case argVals of
     -- Case when just a single argument is supplied
@@ -828,28 +828,29 @@ superPayload functionType address input = do
     OrderedVals as | length as > 1 -> (Just (head as), Just (tail as))
     -- Case of nothing being supplied to the function
     _ -> pure $ noPayload functionType (show address)
-  
-  -- Convert given string to a CodeCollection
-  let contractParsed = runParser solidityContract input
-      functionParsed = runParser functionDeclaration input
-      statementParsed = runParser statement input
-      -- Remove all of the parsers that didn't work 
-      ct = catMaybes [contractParsed, functionParsed, statementParsed]
-  case ct of 
-    Nothing -> generalMetaProgrammingError "delegatecall" input
-    Just codetype -> (codetype, args)
 
+-- -- Note that compileSourceWithAnnotations calls compileSource which calls the optimizer.detector
+-- runOptimizer :: String -> CodeCollection
+-- runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
+--             Left _ -> internalError "Compilation Error" ()
+--             Right cc -> cc
+-- First try to parse the input as a contract
+  code <- case compileSourceWithAnnotations True (M.fromList [("",T.pack payload)]) of
+            --Try parsing as a function if that didn't work
+            Left _ -> runParser functionDeclaration "" "" input
+            Right cc -> cc
+  --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
+  code <- case code of
+    CC.CodeCollection c -> return c ^. contracts
+    _ -> return code
 
--- string payload = <address>.code("myFunc");
--- <address>.delegatecall(payload, <arguments>); ====> bool
--- ----insert below-----
--- function myFunc (uint a, uint b) returns (uint) {
---   return a + b;
--- }
--- ----insert above-----
--- myFunc(arg1, arg2)
-
-
+  load <- case (code) of
+    Left err -> case (fnc) of
+      Left err -> case (sta) of
+        Left err -> 
+        Right s -> pure $ (CC.StatementCode s, args)
+      Right f -> pure $ (CC.FunctionCode f, args)
+    Right cc -> pure $ (CC.ContractCode cc, args)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
