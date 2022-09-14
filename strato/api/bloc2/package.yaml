@@ -13,6 +13,8 @@ dependencies:
   - text
   - solid-vm-parser
   - parsec
+  - solid-vm-model
+
 
 library:
   source-dirs: src/
