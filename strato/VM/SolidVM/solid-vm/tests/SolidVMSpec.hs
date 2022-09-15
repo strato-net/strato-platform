@@ -6812,22 +6812,6 @@ contract Test {
   function randomFunc(uint x) public returns (uint){
     return myNum + x;
   }
-  fit "can run an overloaded foreign function using .code and .delegatecall" . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|
-pragma solidvm 3.3;
-contract Test {
-  uint myNum = 26;
-  bool myStatus;
-  string myString = "butts";
-
-  function addToNum(uint x, uint y) {
-    myNum += x + y;
-  }
-
-  function randomFunc(uint x) public returns (uint){
-    return myNum + x;
-  }
 
   function addToNum(uint x, bool y) {
     myNum += x;
