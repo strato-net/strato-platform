@@ -57,7 +57,7 @@ import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
-import qualified Data.Vector as V
+import qualified Data.Vector                          as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
@@ -830,42 +830,36 @@ genericDelegateCallWrapper from to input isRcc = do
     -- n=name of function; f=actual function that wants to be run
     CC.FunctionCode (n, f) -> runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s
-  -- TODO
-  correctlyRan <- case result of 
-    Nothing -> return False
-    Just _ -> return True
-  pure $ (correctlyRan, result)
+  case result of 
+    Nothing -> pure (True, result)
+    Just _ -> pure (False, result)
+
+--Get only a string from a Value
+getOnlyStrings :: Value -> String
+getOnlyStrings (SString s) = s
+getOnlyStrings _ = error "Input was not a string"
 
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
 superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType a, ValList)
 superPayload functionType address input = do
   (payload, args) <- case input of
-    -- Case when just a single argument is supplied
-    OrderedVals [SString firstInput] -> pure (firstInput, Nothing)
-    -- Case of a payload and arguments supplied
-    OrderedVals as | length as > 1 -> case head as of
-      SString ass -> pure (ass, Just (tail as))
-      _ -> generalMetaProgrammingError "Please fix your input, for delegate call, first argument was invalid" (show as)
-    -- Case of nothing being supplied to the function
-    _ -> pure $ noPayload functionType (show address)
+    OrderedVals o -> case (length o) of
+      0 -> noPayload functionType (show address)
+      1 -> return (SString $ getOnlyStrings $ head o, OrderedVals [])
+      _ -> return (SString $ getOnlyStrings $ head o, OrderedVals $ tail o)
+    _ -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" "metaprogramming") input
 
-  -- let a = Just huge1; b = Just huge2; c = Just huge3;
-  -- case (a, b, c) of
-  --   (Just a, _, _) | a > 4 = here is my
-  --   (_, Just b, _) -> here is mh b 
-  --   (Just a, Just b, Just c) -> print (a, b, c)
-  --   _ -> print "Nothing"
-  code <- case runParser (functionDeclaration False) "" "" payload of
+  code <- case runParser (functionDeclaration False) "" "" (show payload) of
               --If it can't be a function then try parsing as a statement
-              Left _ -> case runParser statement "" "" payload of
+              Left _ -> case runParser statement "" "" (show payload) of
                 Left _ -> generalMetaProgrammingError "parsing" payload
                 Right s -> pure $ CC.StatementCode s
               Right (funcName, actualFunction)  -> case actualFunction of
-                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode (funcName, actualFunction)
+                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
-  pure (code a, args)
+  pure (code, args)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2329,7 +2323,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
             (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals False
-            return . Constant . (SBool didItWork, result) 
+            return . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
           
           -- Constant (SContractItem address' "staticcall")
           --   (payload, argumentList) <- superPayload argVals
@@ -3231,7 +3225,7 @@ runTheCall :: MonadSM m
            -> CC.CodeCollection
            -> CC.Func
            -> ValList
-           -> Bool --ro = readOnly (took me a while to figure that out)
+           -> Bool --ro = readOnly function
            -> Bool --ff = is free function
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
