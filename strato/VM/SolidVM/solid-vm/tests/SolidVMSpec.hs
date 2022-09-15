@@ -6788,7 +6788,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    codeInt = account(this).delegatecall("randomFunc", 13);
+    codeInt = account(this).delegatecall("addToNum", 13, 14);
   }
 }|]
     runBS codeSnippet
@@ -6807,10 +6807,6 @@ contract Test {
 
   function addToNum(uint x, uint y) {
     myNum += x + y;
-  }
-
-  function randomFunc(uint x) public returns (uint){
-    return myNum + x;
   }
 
   function addToNum(uint x, bool y) {
@@ -6832,32 +6828,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    codeInt = account(t).delegatecall("randomFunc", 13);
-  }
-}|]
-    runBS codeSnippet
-    getFields ["codeInt"] `shouldReturn`
-      [BInteger 39 ]
-
-  function addToNum(uint x, bool y) {
-    myNum += x;
-    myStatus = y;
-  }
-
-  function addToNum(uint x, string z) {
-    myNum += x;
-    myString = z;
-  }
-}
-
-pragma solidvm 3.3;
-contract qq{
-  string codeTest;
-  int codeInt;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code("addToNum");
-    codeInt = account(t).delegatecall("randomFunc", 13);
+    codeInt = account(t).delegatecall("addToNum", 13, 14);
   }
 }|]
     runBS codeSnippet
@@ -6865,7 +6836,7 @@ contract qq{
       [BInteger 39 ]
 
   fit "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
-        codeSnippet :: String
+    let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
@@ -6893,7 +6864,7 @@ contract qq{
       [ BInteger 26 ]
 
   fit "can run a foreign function using .code and .delegatecall, without an argument" . runTest $ do
-        codeSnippet :: String
+    let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
@@ -6921,7 +6892,7 @@ contract qq{
       [ BInteger 13 ]
 
   fit "can run a statement using .delegatecall" . runTest $ do
-        codeSnippet :: String
+    let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
