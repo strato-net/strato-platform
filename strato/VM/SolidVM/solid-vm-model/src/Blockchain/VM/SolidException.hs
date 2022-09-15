@@ -41,6 +41,7 @@ module Blockchain.VM.SolidException
   , noPayload
   , oldForeignPragmaError
   , userDefinedError
+  , namedValsNotAccepted
   ) where
 
 import Control.DeepSeq
@@ -88,6 +89,7 @@ data SolidException = TypeError String String
                     | NoPayload String String 
                     | OldForeignPragmaError String String
                     | UserDefinedError String String
+                    | NamedValsNotAccepted String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -132,6 +134,7 @@ showSolidException (GeneralMetaProgrammingError a b) = printf "There was a probl
 showSolidException (NoPayload a b) = printf "There was no payload given to the function '%s' for address the %s" a b
 showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
 showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
+showSolidException (NamedValsNotAccepted a b) = printf "The function '%s' does not accept named values, but was given the following: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -249,3 +252,6 @@ oldForeignPragmaError = toThrower OldForeignPragmaError
 
 userDefinedError :: (Show v) => String -> v -> a
 userDefinedError = toThrower UserDefinedError
+
+namedValsNotAccepted :: (Show v) => String -> v -> a
+namedValsNotAccepted = toThrower NamedValsNotAccepted
