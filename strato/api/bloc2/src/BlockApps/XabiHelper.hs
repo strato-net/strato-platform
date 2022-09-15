@@ -9,6 +9,7 @@ module BlockApps.XabiHelper
   ) where
 
 
+
 import           Data.Int                                  (Int32)
 import qualified Data.Map                                  as M
 import qualified Data.Text                                 as T
@@ -23,7 +24,7 @@ import qualified SolidVM.Solidity.Xabi                     as SVMXabi
 
 import qualified SolidVM.Model.Type                        as SolidType
 import qualified BlockApps.Solidity.Xabi.Type              as XabiType
-
+import qualified BlockApps.Solidity.Xabi.Def               as XabiDef
 
 import qualified SolidVM.Model.CodeCollection.VarDef       as CCVarfDef
 import qualified SolidVM.Model.CodeCollection.Function     as SolidF
@@ -33,20 +34,21 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import qualified SolidVM.Solidity.Parse.UnParser           as  SolidUnparse 
 import           SolidVM.Model.SolidString
-
+import qualified SolidVM.Model.CodeCollection.Def          as SolidDef 
 
 
 --import qualified Data.Binary.Builder as M
 
 
 --An Expeirment by Garrett
+--TODO change names
 hideFucn :: SourceName -> SourceCode ->   [(T.Text, EVMXabi.Xabi)]
 hideFucn x y = do
   File parsedFile <- case runParser solidityFile (ParserState "" "" M.empty) x y of Left _ -> []; Right xx-> [xx];
   --parsedFile1 <- --either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) x y
   [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile]
   --[(name, xabi) |  NamedXabi name (xabi, parents') <- parsedFile]
-
+--TODO change name
 hideFucn2 ::  SourceName -> SourceCode -> (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
 hideFucn2 x  y= (EVMParseT.ZeroPointFour, (hideFucn x y))
 
@@ -61,8 +63,9 @@ transFormXabi SVMXabi.Xabi{..} =
                             [(_, f)] -> Just $ tFormFunc f
                             _ -> Just $ tFormFunc $ snd $ head $ M.toList _xabiConstr --I don't think this should ever run
               --Map SolidString (VariableDeclF a) -> Map Text Xabi.VarType
-             , xabiVars = M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)] --TODO
-             , xabiTypes = M.empty --TODO
+             , xabiVars = M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)]
+             -- Map SolidString SolidVM.Def -> (xabiTypes:: Map Text Xabi.Def)
+             , xabiTypes = M.fromList  [ (t, def) |(t, Just def) <- [ (T.pack ss,  tFormDef f) | (ss, f) <- (M.toList _xabiTypes)]]
              , xabiModifiers = M.empty --TODO
              , xabiEvents = M.empty --TODO
              , xabiKind = EVMXabi.ContractKind --TODO
@@ -122,6 +125,30 @@ tFormVarDeclToVartype    SolidVarDec.VariableDecl{..} = XabiType.VarType {
 --   , _isImmutable   :: Bool
 --   } 
 
+
+
+----------------------------------
+----SolidVM.Def -> Vartype Section
+----------------------------------
+
+tFormDef :: SolidDef.Def -> Maybe XabiDef.Def
+tFormDef (SolidDef.Enum nam byte _)      = Just $ (XabiDef.Enum (map T.pack nam) byte)
+tFormDef (SolidDef.Struct fields byte _) = Just $ (XabiDef.Struct  (map (\(x, y)-> (T.pack x,  tFormFieldType y) ) fields)  byte)
+tFormDef (SolidDef.Contract bytes _)     = Just $ XabiDef.Contract bytes
+tFormDef      _                          = Nothing
+--  Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
+
+-- data DefF a = Enum { names::[SolidString], bytes::Word, context :: a}
+--             | Error { params :: [(SolidString, SolidVM.IndexedType)], bytes::Word, context :: a }
+--             | Struct { fields::[(SolidString, SolidVM.FieldType)], bytes::Word, context :: a}
+--             | Contract { bytes::Word, context :: a}
+
+
+tFormFieldType :: CCVarfDef.FieldType -> XabiType.FieldType
+tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToType typ)
+
+-- data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
+--                deriving (Eq, Show, Generic,NFData)
 
 
 ----------------------------------
