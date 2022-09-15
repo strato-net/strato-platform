@@ -427,7 +427,7 @@ postContractsXabi PostXabiRequest{..} =
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .
-            ("contract compilation for xabi failed: " <>) $ Text.pack msg
+            (("Garrett was here") <>) $ Text.pack msg
         Right xs -> return . PostXabiResponse $ xs
 
 

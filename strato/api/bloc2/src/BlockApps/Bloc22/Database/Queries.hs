@@ -67,7 +67,7 @@ import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
-import           BlockApps.Solidity.Parse.Parser
+--import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
@@ -289,11 +289,8 @@ compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    )
                 => SourceMap -> m (Map Text ContractDetails)
 compileContract sourceList = do
-  -- printOUtv <- case (1+2) == 3 of 
-  --   True  ->  blocError . UserError . Text.pack $ "asd"
-  --   False ->  blocError . UserError . Text.pack $ "asd12312"
   let source =sourceBlob sourceList -- sourceBlob :: SourceMap -> Text
-      eVerXabis = Right $ hideFucn2 "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
+      eVerXabis = parseSolidXabi "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
       encodedSrc = serializeSourceMap sourceList
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   --when (True) (internalError "really bigg dsdfdsfs" source)
@@ -340,7 +337,7 @@ createMetadataNoCompile sourceList = do
 
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
-      eVerXabis = parseXabi  "-" $ Text.unpack source -- So this says SOLIDVm only? ParseXabi ::  ->Either String (SolcVersion, [(Text, Xabi)])
+      eVerXabis = parseSolidXabi  "-" $ Text.unpack source -- So this says SOLIDVm only? ParseXabi ::  ->Either String (SolcVersion, [(Text, Xabi)])
       srcHash = hash (Text.encodeUtf8 encodedSrc)      --so I can either  
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err

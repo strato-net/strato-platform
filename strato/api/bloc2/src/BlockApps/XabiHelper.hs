@@ -3,11 +3,11 @@
 
 
 module BlockApps.XabiHelper
-  ( hideFucn
-  , hideFucn2
+  ( parseSolidXabi
+  --, hideFucn2
   , transFormXabi
   ) where
-
+import           BlockApps.Solidity.Parse.Parser
 
 
 import           Data.Int                                  (Int32)
@@ -17,7 +17,7 @@ import           Text.Parsec                               hiding (parse)
 
 
 import qualified BlockApps.Solidity.Parse.ParserTypes      as EVMParseT (SolcVersion(..)) 
-import           SolidVM.Solidity.Parse.ParserTypes        hiding (SolidityValue)
+import           SolidVM.Solidity.Parse.ParserTypes        as SolidParseT
 
 import qualified BlockApps.Solidity.Xabi                   as EVMXabi  
 import qualified SolidVM.Solidity.Xabi                     as SVMXabi
@@ -36,21 +36,29 @@ import qualified SolidVM.Solidity.Parse.UnParser           as  SolidUnparse
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.CodeCollection.Def          as SolidDef 
 
-
+import Debug.Trace
 --import qualified Data.Binary.Builder as M
 
 
 --An Expeirment by Garrett
 --TODO change names
-hideFucn :: SourceName -> SourceCode ->   [(T.Text, EVMXabi.Xabi)]
-hideFucn x y = do
-  File parsedFile <- case runParser solidityFile (ParserState "" "" M.empty) x y of Left _ -> []; Right xx-> [xx];
+parseSolidXabi :: SourceName -> SourceCode ->  Either String  (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )--[(T.Text, EVMXabi.Xabi)]
+parseSolidXabi x y = do
+  fi@(File parsedFile) <-  showError $ runParser solidityFile (ParserState "" "" M.empty) x y --of Left _ -> []; Right xx-> [xx];
   --parsedFile1 <- --either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) x y
-  [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile]
+  let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile] 
+  let associatedEVMVersion = trace "In parseSolidXabi helper" (case decideVersion fi of
+            SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour 
+            SolidParseT.ZeroPointFive -> EVMParseT.ZeroPointFive)
+  return $! (associatedEVMVersion, nameXabi)
+
+   
+
+
   --[(name, xabi) |  NamedXabi name (xabi, parents') <- parsedFile]
 --TODO change name
-hideFucn2 ::  SourceName -> SourceCode -> (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
-hideFucn2 x  y= (EVMParseT.ZeroPointFour, (hideFucn x y))
+-- hideFucn2 ::  SourceName -> SourceCode -> (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
+-- hideFucn2 x  y= (EVMParseT.ZeroPointFour, (hideFucn x y))
 
 
 
