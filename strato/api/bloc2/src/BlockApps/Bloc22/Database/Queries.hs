@@ -232,7 +232,7 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
-  let shouldCompile = Don't Compile--if theVM == "EVM" then Do Compile else Don't Compile
+  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
   now' <- liftIO $ getTime Monotonic
@@ -276,13 +276,12 @@ sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocSQL m
                            )
                         => Should Compile -> SourceMap -> m (Map Text ContractDetails)
-sourceToContractDetails shouldCompile sourceList = do
-  let createContractDetails = 
-       case shouldCompile of
-                  Do Compile ->  createMetadataNoCompile--(compileContract)--Maybe Change this code around so it doesn't say Don't Compile anymore- to solidVM
-                  Don't Compile ->  compileContract--
-                  --_ -> createMetadataNoCompile
-          in createContractDetails sourceList
+sourceToContractDetails shouldCompile sourceList =
+  let createContractDetails =
+        case shouldCompile of
+          Do Compile -> compileContract
+          Don't Compile -> createMetadataNoCompile
+   in createContractDetails sourceList
 
 compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
