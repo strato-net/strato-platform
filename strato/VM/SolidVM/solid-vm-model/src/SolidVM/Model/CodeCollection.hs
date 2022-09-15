@@ -71,10 +71,10 @@ makeLenses ''CodeCollectionF
 type SolidEither = Either (Positioned ((,) SolidException))
 
 -- This type is used in the call member functions and dictates the methods in which the call works
-data CodeType a = ContractCode (ContractF a)
-               | FunctionCode (FuncF a)
+data CodeType a = FunctionCode (SolidString, FuncF a)
                | StatementCode (StatementF a)
   deriving (Show, Generic, NFData, Functor)
+
 
 
 getParents :: CodeCollection -> Contract -> SolidEither [Contract]

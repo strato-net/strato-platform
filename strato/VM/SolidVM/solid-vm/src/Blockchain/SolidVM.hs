@@ -821,11 +821,14 @@ genericDelegateCallWrapper from to input isRcc = do
   -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
   -- resolvedCodeHash <- resolveCodePtr cid codeHash'
   -- Determine which route to call based on the code type
+  -- getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
+-- getCodeAndCollection address' = do
+  (toContract, toHsh, toCC) <- getCodeAndCollection to
   result <- case codetype of
     -- runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
     -- runTheConstructors from to hsh cc contractName' argExps = do
-    CC.ContractCode c -> runTheConstructors from to (to ^. accountCodeHash) c (to ^. accountContractName) args
-    CC.FunctionCode f -> runTheCall f
+    -- n=name of function; f=actual function that wants to be run
+    CC.FunctionCode (n, f) -> runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s
   -- TODO
   correctlyRan <- case result of 
@@ -835,15 +838,15 @@ genericDelegateCallWrapper from to input isRcc = do
 
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType a, Maybe [Value])
+superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType a, ValList)
 superPayload functionType address input = do
   (payload, args) <- case input of
     -- Case when just a single argument is supplied
-    OrderedVals [SString arguments] -> pure (arguments, Nothing)
+    OrderedVals [SString firstInput] -> pure (firstInput, Nothing)
     -- Case of a payload and arguments supplied
     OrderedVals as | length as > 1 -> case head as of
       SString ass -> pure (ass, Just (tail as))
-      _ -> generalMetaProgrammingError "First argument must be a string" (show as)
+      _ -> generalMetaProgrammingError "Please fix your input, for delegate call, first argument was invalid" (show as)
     -- Case of nothing being supplied to the function
     _ -> pure $ noPayload functionType (show address)
 
@@ -853,23 +856,16 @@ superPayload functionType address input = do
   --   (_, Just b, _) -> here is mh b 
   --   (Just a, Just b, Just c) -> print (a, b, c)
   --   _ -> print "Nothing"
-  code <- case compileSourceWithAnnotations True (M.fromList [("",T.pack payload)]) of
-            --Try parsing as a function if that didn't work
-            Left _ -> case runParser functionDeclaration "" "" payload of
+  code <- case runParser (functionDeclaration False) "" "" payload of
               --If it can't be a function then try parsing as a statement
               Left _ -> case runParser statement "" "" payload of
                 Left _ -> generalMetaProgrammingError "parsing" payload
                 Right s -> pure $ CC.StatementCode s
-              Right (_, f)  -> case f of
-                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode fun
+              Right (funcName, actualFunction)  -> case actualFunction of
+                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode (funcName, actualFunction)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
-            --Throw error when multiple contracts are added, if multiple contracts are desired then make multiple calls
-            Right cc -> case M.toList (cc ^. CC.contracts) of
-              [] -> generalMetaProgrammingError "No contract uploaded for the delegatecall" payload
-              [(_,a)] -> pure $ CC.ContractCode a
-              as -> generalMetaProgrammingError "multiple contracts uploaded" (show as)
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
-  pure (code, args)
+  pure (code a, args)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -3104,6 +3100,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   zipped <-
     case argVals of
       OrderedVals vals ->
+        -- t=type, n=name, v=value
         forM (zip argTypeNames vals) $ \((t, n), v) -> do
           let correctedVal = coerceType contract' t v
           var <- createVar correctedVal
@@ -3234,8 +3231,8 @@ runTheCall :: MonadSM m
            -> CC.CodeCollection
            -> CC.Func
            -> ValList
-           -> Bool
-           -> Bool
+           -> Bool --ro = readOnly (took me a while to figure that out)
+           -> Bool --ff = is free function
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
