@@ -6785,10 +6785,11 @@ contract qq{
   string codeTest;
   int codeInt;
   int myNum = 13;
+  bool status;
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    codeInt = account(this).delegatecall("addToNum", 13, 14);
+    (status, codeInt) = address(this).delegatecall(codeTest, 13, 14);
   }
 }|]
     runBS codeSnippet
@@ -6829,7 +6830,7 @@ contract qq {
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    (doesItWork, codeInt) = account(t).delegatecall("addToNum", 13, 14);
+    (doesItWork, codeInt) = account(t).delegatecall(codeTest, 13, 14);
   }
 }|]
     runBS codeSnippet
@@ -6854,10 +6855,11 @@ pragma solidvm 3.3;
 contract qq{
   string codeTest;
   int functionTest;
+  bool status;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"), 13);
+    codeTest = account(t).code("randomFunc");
+    (status, functionTest) = account(this).delegatecall(codeTest, 13);
   }
 }|]
     runBS codeSnippet
@@ -6884,8 +6886,8 @@ contract qq{
   int functionTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"));
+    codeTest = account(t).code("randomFunc");
+    functionTest = address(this).delegatecall(codeTest);
   }
 }|]
     runBS codeSnippet
@@ -6912,8 +6914,8 @@ contract qq{
   int functionTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"));
+    codeTest = account(t).code("randomFunc");
+    functionTest = address(this).delegatecall(codeTest);
   }
 }|]
     runBS codeSnippet
