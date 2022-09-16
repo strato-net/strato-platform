@@ -232,7 +232,8 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+  let theVM1 = trace ("DO I GET HERE Get Contract Dedtails " ++ (show $ Text.unpack theVM)) theVM
+  let shouldCompile = if theVM1 == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
   now' <- liftIO $ getTime Monotonic

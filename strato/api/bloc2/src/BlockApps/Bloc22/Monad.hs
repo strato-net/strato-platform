@@ -29,6 +29,7 @@ module BlockApps.Bloc22.Monad (
   blocStrato,
   blocModify,
   blocModify1,
+  --blocModifyG,
   blocQueryMaybe,
   BlocEnv(..)
   ) where
@@ -119,6 +120,13 @@ blocModify modify = do
   logInfoCS callStack "Updating the database"
   BlocSQLEnv pool <- access Proxy
   liftIO $ withResource pool (liftIO . modify)
+
+
+-- blocModifyG :: (HasCallStack, MonadIO m, MonadLogger m) =>
+--               --String -> 
+--               (Connection -> IO x) -> m x
+-- blocModifyG x = do
+--   logInfoCS callStack $ "Updating the database" -- ++ (T.pack x)
 
 blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
                (Connection -> IO [x]) -> m x
