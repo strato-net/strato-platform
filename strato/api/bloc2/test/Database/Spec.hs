@@ -11,7 +11,7 @@ import qualified Data.Map.Strict as M
 import Text.Parsec
 import Text.Printf
 
-import  BlockApps.XabiHelper
+import BlockApps.Bloc22.XabiHelper
 import Debug.Trace
 
 import BlockApps.Bloc22.Database.Solc

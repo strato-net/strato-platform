@@ -30,7 +30,7 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
-import           BlockApps.Solidity.Parse.Parser (parseXabi)
+--import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
@@ -54,6 +54,8 @@ import           Handlers.AccountInfo
 import           Handlers.Storage
 import qualified MaybeNamed
 import           SQLM
+import Debug.Trace 
+import  BlockApps.Bloc22.XabiHelper
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
@@ -292,8 +294,7 @@ getContractsDetails :: ( MonadUnliftIO m
                        , HasBlocEnv m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId =
-  completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
+getContractsDetails contractAddress chainId = trace ("WE ARE HERE GETcontrACTdETAILS") (completeContractDetailXabi <$> getContractsDetails' contractAddress chainId)
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
@@ -402,9 +403,9 @@ postContractsCompile :: ( MonadIO m
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      let shouldCompile = case Text.toLower <$> postcompilerequestVm of
+      let shouldCompile = trace ("POSTCOMILEREQUEST " ) (case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
-            _ -> Do Compile
+            _ -> Don't Compile)--- GOING ROGUE
       idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ details -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
@@ -414,8 +415,8 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
           Right _ -> do
             let ptr = contractdetailsCodeHash details
             case ptr of
-              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
-              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
+              EVMCode hsh ->  return $ PostCompileResponse (contractdetailsName details) hsh
+              SolidVMCode _ _ ->  throwIO . AnError $ "Garrett sourceToContractDetails somehow returned CodeAtAccount" -- return $ PostCompileResponse (Text.pack name) hsh
               CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
               
 postContractsXabi :: MonadIO m =>
@@ -423,7 +424,7 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> parseXabi "src" (Text.unpack postxabirequestSrc)
+         partialXabis <- Map.fromList . snd <$> parseSolidXabi "src" (Text.unpack postxabirequestSrc)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .

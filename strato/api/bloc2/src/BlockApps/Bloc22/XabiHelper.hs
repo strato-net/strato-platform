@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase          #-}
 
 
-module BlockApps.XabiHelper
+module BlockApps.Bloc22.XabiHelper
   ( parseSolidXabi
   --, hideFucn2
   , transFormXabi
