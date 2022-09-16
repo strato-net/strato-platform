@@ -248,6 +248,9 @@ intType' = Static (SVMType.Int Nothing Nothing)
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
 
+-- callType' :: SourceAnnotation Text -> Type'
+-- callType' = Product [(Static (SVMType.String Nothing)), Bottom]
+
 bytesType' :: SourceAnnotation Text -> Type'
 bytesType' = Static (SVMType.Bytes Nothing Nothing)
 
@@ -619,7 +622,12 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                ]
 -- typecheckMember (MultiVariate (SVMType.Account _) x) "delegatecall" = pure $ Product [Static (SVMType.Bool) x, Static (SVMType.String False) x ] x
 typecheckMember (Static (SVMType.Account _) x) "delegatecall" = 
-  pure $ Function (MultiVariate (stringType' x) x) (Product [Static (SVMType.Bool) x, Static (SVMType.String Nothing) x ] x) x [] []
+  pure $ Function 
+    --Allow the first argument to be a string, and the next arguments can be any type
+    (MultiVariate (topType' x) x) 
+    --Return a tuple of a bool and anything
+    (Product [Static (SVMType.Bool) x, topType' x ] x) 
+    x [] []
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -638,9 +646,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
   pure . Sum $ (Static (SVMType.String Nothing) x)
             :| [Function (Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ])
                          (Static (SVMType.String Nothing) x)
-                         x
-                         []
-                         []
+                         x [] []
                ]
               -- | MultiVariate { multiVariateType :: (TypeF' a)
               --                , multiVariateContext :: a
@@ -651,8 +657,13 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
               -- | Static { staticType :: Type
               --          , staticContext :: a
               --          }
-typecheckMember (Static (SVMType.Contract _) x) "delegatecall" =
-  pure $ Function (MultiVariate (stringType' x) x) (Product [Static (SVMType.Bool) x, Static (SVMType.String Nothing) x ] x) x [] []
+typecheckMember (Static (SVMType.Contract _) x) "delegatecall" = 
+  pure $ Function 
+    --Allow the first argument to be a string, and the next arguments can be any type
+    (MultiVariate (topType' x) x) 
+    --Return a tuple of a bool and anything
+    (Product [Static (SVMType.Bool) x, topType' x ] x) 
+    x [] []
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
