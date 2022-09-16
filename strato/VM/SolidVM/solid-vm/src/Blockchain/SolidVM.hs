@@ -806,8 +806,8 @@ genericDelegateCallWrapper from to input = do
     CC.FunctionCode (n, f) -> runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s
   case result of 
-    Nothing -> pure (True, result)
-    Just _ -> pure (False, result)
+    Nothing -> pure (False, result)
+    Just _ -> pure (True, result)
 
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
