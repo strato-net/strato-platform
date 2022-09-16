@@ -279,7 +279,7 @@ sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
 sourceToContractDetails shouldCompile sourceList =
   let createContractDetails =
         case shouldCompile of
-          Do Compile -> compileContract
+          Do Compile    -> compileContract
           Don't Compile -> createMetadataNoCompile
    in createContractDetails sourceList
 
@@ -355,7 +355,7 @@ createMetadataNoCompile sourceList = do
         }
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
-  pure details
+  pure $ trace ("CAN I PRINT HERE???!!" ) details
 
 instance DefaultFromField PGBytea Address where
   defaultFromField = fromPGSFromField
