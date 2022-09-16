@@ -2283,6 +2283,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           -- Isolate the payload and the inputted arguments, send to the actual delegatecaller function
           Constant (SContractItem address' "delegatecall") -> do
+            --TODO: Add most of this checking to a separate function to reduce verbosity
             from <- getCurrentAccount
             cid <- case (address' ^. namedAccountChainId) of 
                 UnspecifiedChain -> do
@@ -2487,6 +2488,23 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
+-- evaluateAccountMember a True "delegatecall" = do
+--   from <- getCurrentAccount
+--   cid <- case (a ^. namedAccountChainId) of 
+--       UnspecifiedChain -> do
+--         --Assume that the chainId is the same as the from chainId when it is unset 
+--         cid1 <- view accountChainId <$> getCurrentAccount
+--         case cid1 of
+--           Nothing -> return Nothing
+--           Just cid2 -> return $ Just cid2
+--       MainChain -> return Nothing
+--       ExplicitChain cid -> return $ Just cid
+--   let toAccount = namedAccountToAccount cid a
+--     --check that the from and to are on the same chain`
+--   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+--   unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+--   (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals
+--   return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
 evaluateAccountMember a _ "balance" = do 
   cid <- case (a ^. namedAccountChainId) of 
     UnspecifiedChain -> do
