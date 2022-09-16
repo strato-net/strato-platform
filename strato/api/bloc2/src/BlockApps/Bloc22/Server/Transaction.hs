@@ -114,6 +114,8 @@ import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 import           SQLM
 
+import Debug.Trace
+
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
   TxParams (txparamsGasLimit inner <|> txparamsGasLimit outer)
@@ -281,7 +283,8 @@ postBlocTransaction' :: ( MonadLogger m
                      -> Bool
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
-postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mUserName1 chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  let mUserName = trace ("Garret Was here, in postBlocTransction'") (mUserName1)
   checkIsSynced
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
   case mUserName of

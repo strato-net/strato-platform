@@ -324,7 +324,7 @@ compileContract sourceList = do
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
 
-  pure $ trace ("CAN I PRINT HERE???!!" ) (Map.fromList details)
+  pure $ trace ("CAN I PRINT HERE???!!EVM" ) (Map.fromList details)
 
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
@@ -356,7 +356,7 @@ createMetadataNoCompile sourceList = do
         }
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
-  pure $ trace ("CAN I PRINT HERE???!!" ) details
+  pure $ trace ("CAN I PRINT HERE???!!SOLIDVM" ) details
 
 instance DefaultFromField PGBytea Address where
   defaultFromField = fromPGSFromField
