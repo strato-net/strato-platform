@@ -295,8 +295,9 @@ compileContract sourceList = do
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   --when (True) (internalError "really bigg dsdfdsfs" source)
   (ver, xabis) <- case eVerXabis of
-    Left err -> blocError . UserError $ ((Text.pack $ err ++ "Do I error here"))
-    Right (v, xs) -> return (v, Map.fromList xs)
+    Left err -> blocError . UserError $ ((Text.pack $ err ++ "GARRETT Do I error here"))
+    Right (_, _) -> blocError . UserError $ (Text.pack $ " GARRETT I should never be getting here  ERROR HERE?") --return (v, Map.fromList xs)
+    -- Right (v, xs) -> blocError . UserError $ (Text.pack $ " GARRETT I should never be getting here  ERROR HERE?") --return (v, Map.fromList xs)
   eabiBins <- fromJSON <$> compileSolc ver source
   abiBins <- case eabiBins of
     Error err -> blocError . UserError . Text.pack $ err
