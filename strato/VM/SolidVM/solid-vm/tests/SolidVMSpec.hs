@@ -6806,29 +6806,30 @@ contract Test {
   string myString = "butts";
 
   function addToNum(uint x, uint y) {
-    myNum += x + y;
+    myNum = myNum + x + y;
   }
 
   function addToNum(uint x, bool y) {
-    myNum += x;
+    myNum = myNum + x;
     myStatus = y;
   }
 
   function addToNum(uint x, string z) {
-    myNum += x;
+    myNum = myNum + x;
     myString = z;
   }
 }
 
 pragma solidvm 3.3;
-contract qq{
+contract qq {
   string codeTest;
   int codeInt;
   int myNum = 13;
+  bool doesItWork;
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    codeInt = account(t).delegatecall("addToNum", 13, 14);
+    (doesItWork, codeInt) = account(t).delegatecall("addToNum", 13, 14);
   }
 }|]
     runBS codeSnippet
@@ -6856,7 +6857,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"), 13)
+    functionTest = account(this).delegatecall(account(t).code("addToNum"), 13);
   }
 }|]
     runBS codeSnippet
@@ -6884,7 +6885,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"))
+    functionTest = account(this).delegatecall(account(t).code("addToNum"));
   }
 }|]
     runBS codeSnippet
@@ -6912,7 +6913,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    functionTest = account(this).delegatecall(account(t).code("addToNum"))
+    functionTest = account(this).delegatecall(account(t).code("addToNum"));
   }
 }|]
     runBS codeSnippet
