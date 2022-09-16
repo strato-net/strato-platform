@@ -155,7 +155,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
     fromLeft (error "webserver completed") <$>
-      race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
+      race (runNoLoggingT (runSequencerM cfg False mCtx (boot >> m)))
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def

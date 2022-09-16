@@ -36,6 +36,7 @@ defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of adm
 defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node's address as an admin account"
 defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
 defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "The Vault-Wrapper URL"
+defineFlag "isDisableValidator" (False :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 defineFlag "seq_max_events_per_iter" (500 :: Int) "How many elements to wait for in each sequencer iteration"
@@ -67,6 +68,7 @@ exportFlagsAsMetrics = do
   set "isAdmin" $ show flags_isAdmin
   set "isRootNode" $ show flags_isRootNode
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
+  set "isDisableValidator" $ show flags_isDisableValidator 
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
   set "seq_max_us_per_iter" $ show flags_seq_max_us_per_iter

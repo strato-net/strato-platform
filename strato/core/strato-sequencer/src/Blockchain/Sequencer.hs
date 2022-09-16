@@ -24,6 +24,8 @@ import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
+
+-- import           Control.Monad.State                       (put)
 import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
@@ -150,6 +152,18 @@ oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (
 oneSequencerIter src = timeAction seqLoopTiming $ do
   (src', events) <- readEventsInBufferedWindow src
   BatchSeqEvent{..} <- runSequencerBatch events
+  let myFunc [] = []
+      myFunc ((UnseqEvent (IEDisableValidator b)) : xs) = b : (myFunc xs)
+      myFunc (_:xs) = myFunc xs
+
+  let getBool (ValidatorRestriction b) = b
+  mapM_ ((Mod.put (Proxy @ValidatorRestriction)) . (ValidatorRestriction)) $ myFunc events  
+  let logF = logFF "sequencer/events"
+  disValSeqContext <- (Mod.get (Proxy @ValidatorRestriction))
+  logF . printf "disable validator value = %s" $ show (getBool disValSeqContext)
+  -- $logDebugS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
+  -- $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
+
   chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
   txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
   let chainIdsList = toList chainIds
@@ -598,12 +612,13 @@ transformGenesis chains = forM_ chains $ \ig -> do
 splitEvents :: ( MonadLogger m
                , MonadMonitor m
                , MonadBlockstanbul m
+              --  , MonadSequencer m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
                )
             => [IngestEvent]
-            -> ConduitT a SeqEvent m ()
+            -> ConduitT a SeqEvent m () -- splitWith iEventType es) --> (IET, [IE]) ()IET, IE)
 splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
   let num = length events
       record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
@@ -629,6 +644,23 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETForcedConfigChange -> do
       record "inevent_type_forced_config_change" "ForcedConfigChanges"
       blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
+    IETDisableValidator  -> do
+      record "inevent_type_disable_validator" "DisableValidator"
+      
+      
+
+      -- blockstanbulSend 
+
+      -- Monad m => (a-> m b) -> [a] -> m [b]
+      -- Monad m => (a-> m b) -> [a] -> m ()
+
+      --      mapM_ (puts . (\vr -> sc & isDisableValidator .~ vr) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool))) events
+  
+      -- mapM_ (Mod.put (Proxy @ValidatorRestriction)) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool)) events
+      blockstanbulSend $ map (\(IEDisableValidator theBool) -> ForcedValidatorChange theBool) events
+
+      -- logFF IETDisableValidator 
+      -- logFF _isDisableValidator
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

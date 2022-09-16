@@ -22,6 +22,7 @@ module Blockchain.Sequencer.Monad
   , HasNamespace(..)
   , BlockPeriod(..)
   , RoundPeriod(..)
+  , ValidatorRestriction(..)
   , isInNamespace
   , fromNamespace
   , lookupInLDB
@@ -51,6 +52,7 @@ module Blockchain.Sequencer.Monad
   , dbeRegistry
   , blockHashRegistry
   , emittedBlockRegistry
+  , isDisableValidator
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
@@ -118,6 +120,9 @@ import qualified Strato.Strato23.Client                    as VC
 
 
 
+newtype ValidatorRestriction = ValidatorRestriction Bool
+
+
 data Modification a = Modification a | Deletion
 
 data SequencerContext = SequencerContext
@@ -135,6 +140,7 @@ data SequencerContext = SequencerContext
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
+  , _isDisableValidator  :: ValidatorRestriction
   }
 makeLenses ''SequencerContext
 
@@ -358,6 +364,10 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
+instance Mod.Modifiable (ValidatorRestriction) SequencerM where
+  get _ = use isDisableValidator
+  put _ = modify' . (.~) isDisableValidator
+
 instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
   put _ = modify' . (.~) ldbBatchOps
@@ -401,7 +411,7 @@ testPriv = fromMaybe (error "could not import private key") (importPrivateKey (L
 
 instance HasVault SequencerM where
   sign mesg = do
-    mVc <- asks vaultClient    
+    mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
@@ -414,12 +424,12 @@ waitOnVault action = do
   $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
   res <- action
   case res of
-    Left err -> do 
+    Left err -> do
       $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
-    Right val -> do 
-      $logInfoS "HasVault" "Got a signature from vault" 
+    Right val -> do
+      $logInfoS "HasVault" "Got a signature from vault"
       return val
 
 initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)
@@ -435,8 +445,8 @@ prunePrivacyDBs = do
   where prune = setTo M.empty
         setTo s r = modify' $ r .~ s
 
-runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM c mbc m = do
+runSequencerM :: SequencerConfig -> Bool -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM c disableValidator mbc m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     a <- runResourceT . flip runReaderT c $ do
         dbCS     <- asks depBlockDBCacheSize
@@ -445,6 +455,7 @@ runSequencerM c mbc m = do
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         loopCh <- atomically newTMChan
         latestRound <- liftIO $ newIORef 0
+
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize
@@ -460,6 +471,7 @@ runSequencerM c mbc m = do
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
+            , _isDisableValidator  = ValidatorRestriction disableValidator
             }
     return $ fst a
 
@@ -522,7 +534,13 @@ flushLdbBatchOps = do
   incCounter seqLdbBatchWrites
   setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
+  let getBool (ValidatorRestriction b) = b
+  disValSeqContext <- (Mod.get (Mod.Proxy @ValidatorRestriction))
+  $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
   clearLdbBatchOps
+
+-- flipDisableValidator :: Mod.Modifiable Bool m => Bool -> m ()
+-- flipDisableValidator disVal = Mod.put (Mod.Proxy @ Bool) 
 
 addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
 addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->

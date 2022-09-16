@@ -187,8 +187,60 @@ nextRound nt = do
                                               (uses validators S.toList)
                                               (uses authSenders M.keys)
 
+-- disableValidatorsCheckpoint :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
+-- disableValidatorsCheckpoint = do
+--   -- val <- uses validators S.toList
+--   -- vot <- use voted
+--   -- validators .= []
+--   -- $logInfoS "blockstanbul/voting" . T.pack $
+--   --                "nextRound: voted map" ++ show vot
+--   valNew <- use validators
+--   $logInfoS "blockstanbul/voting" . T.pack $
+--                  "nextRound: validators updated" ++ show valNew
+--   -- case nt of
+--   --   Sequence s -> view . sequence .= s
+--   --   Round r -> do
+--   --     view . round .= nextRound: voted map
+--   --     yieldR $ ResetTimer r
+--   use view >>= recordView
+--   vals <- use validators
+--   thisR <- use $ view . round
+--   epocheck <- use $ view . sequence
+--   -- when (epocheck `mod` 10000 == 0) $ do
+--   --     voted .= M.empty
+--   --     $logInfoS "blockstanbul/voting" . T.pack $
+--   --       "nextRound: voted map reset to empty with epocheck = " ++ show epocheck
+--   when (S.null vals) . liftIO $
+--     die "All participants voted out, consensus is stuck."
+--   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
+--   proposer .= leader
+--   proposal .= Nothing
+--   self <- use selfAddr
+--   when (leader == self) $ do
+--     lock <- use blockLock
+--     case lock of
+--       Nothing -> yieldR MakeBlockCommand
+--       Just lb -> do
+--         v <- use view
+--         msg <- signMessage (Preprepare v lb)
+--         yieldR msg 
+--   prepared .= M.empty
+--   committed .= M.empty
+--   roundChanged %= M.dropWhileAntitone (<= thisR)
+
+--   hasPreprepared .= False
+--   hasCommitted .= False
+--   hasPrepared .= False
+--   pendingRound .= Nothing
+--   yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
+--                                               (use voted)
+--                                               (S.empty S.toList)
+--                                               (uses authSenders M.keys)
+
+
 eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
+  $logInfoS "David Nallapu1" . T.pack $ "Running David Nallapu: Create David Nallapu"
   debugShowCtx
   authz <- lift $ isAuthorized ev
   recordAuthResult authz
@@ -198,6 +250,13 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       NewBeneficiary{} -> yieldR . VoteResponse $ HA.Rejected reason
       _ -> return ()
    AuthSuccess -> case ev of
+    ForcedValidatorChange _ -> do
+      -- $logWarnLS "blockstanbul/David Nallapu" cc
+      -- disableValidatorsCheckpoint
+      -- $logInfoS "David Nallapu22222222222" . T.pack $ "Running David Nallapu: Create David Nallapu"
+      return ()
+
+
     ForcedConfigChange cc -> do
       $logWarnLS "blockstanbul/config_change" cc
       case cc of
@@ -444,6 +503,8 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    PreviousBlock{} -> inc "previous_block"
    NewBeneficiary{} -> inc "new_beneficiary"
    ForcedConfigChange{} -> inc "forced_config_change"
+   ForcedValidatorChange{} -> inc "forced_validator_change"
+   
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
 recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter

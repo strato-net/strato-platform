@@ -116,6 +116,9 @@ instance Arbitrary WireMessage where
 instance Arbitrary ForcedConfigChange where
   arbitrary = genericArbitrary
 
+-- instance Arbitrary ForcedValidatorChange where
+--   arbitrary = genericArbitrar
+
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
@@ -133,6 +136,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
+             | ForcedValidatorChange Bool
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -144,6 +148,7 @@ instance Format InEvent where
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
+  format (ForcedValidatorChange theBool) =  "ForcedValidatorChange " ++ show theBool
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -197,6 +202,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
+    ForcedValidatorChange theBool -> CL.blue "FORCED_VALIDATOR_CHANGED" ++ show theBool
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do

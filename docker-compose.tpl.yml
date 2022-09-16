@@ -112,6 +112,7 @@ services:
     - debugFail=${debugFail}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
+    - isDisableValidator=${isDisableValidator:-false}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}

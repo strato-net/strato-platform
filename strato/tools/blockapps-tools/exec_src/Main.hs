@@ -69,7 +69,7 @@ data Options = State{root::String, db::String}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
-             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}  
              | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              | AskForTxs
              | RSVP {chainId :: Word256, memberId :: String, address::Address}
@@ -88,6 +88,7 @@ data Options = State{root::String, db::String}
              | CompressRoundChanges { infilename :: String, outfilename :: String }
              | GetPrivacy { registry :: String, key :: String }
              | PutPrivacy { registry :: String, key :: String , value :: String }
+             | DisableValidator { disVal :: Bool } 
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -300,6 +301,11 @@ addTxsFromFileOptions = record AddTxsFromFile { fileName = error "unused fileNam
              [ fileName := error "addtxsfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
              ]
 
+disableValidatorOptions :: Annotate Ann
+disableValidatorOptions = record DisableValidator{disVal = undefined} 
+                        [ disVal := error "disVal" += typ "BOOL" += argPos 0
+                        ]
+
 saveKafkaOptions :: Annotate Ann
 saveKafkaOptions = record SaveKafka { filename = error "unused filename", topic = error "unused topic"}
                  [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
@@ -382,6 +388,7 @@ options = modes_ [blockGoOptions
                 , addBlocksFromFileOptions
                 , addGenesisFromFileOptions
                 , addTxsFromFileOptions
+                , disableValidatorOptions
                 , saveKafkaOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
@@ -424,6 +431,7 @@ run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingB
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
+run DisableValidator{..}       = disableValidator disVal
 run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp

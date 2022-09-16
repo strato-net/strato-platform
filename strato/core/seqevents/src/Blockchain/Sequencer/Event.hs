@@ -112,6 +112,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
+                 | IEDisableValidator Bool
                  deriving (Eq, Show, GHCG.Generic, Data)
 
 data IngestEventType = IETTransaction
@@ -120,6 +121,7 @@ data IngestEventType = IETTransaction
                      | IETNewChainMember
                      | IETBlockstanbul
                      | IETForcedConfigChange
+                     | IETDisableValidator
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -130,6 +132,7 @@ iEventType = \case
   IENewChainMember{}     -> IETNewChainMember
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
+  IEDisableValidator{}   -> IETDisableValidator
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -138,6 +141,7 @@ instance Format IngestEvent where
   format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
+  format (IEDisableValidator o) = show o
 
 type Timestamp = Microtime
 

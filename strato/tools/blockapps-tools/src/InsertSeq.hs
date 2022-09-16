@@ -19,6 +19,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
+import Network.Kafka.Protocol as KP
 
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
@@ -28,6 +29,15 @@ insertSeq iev = do
     writeUnseqEvents [iev]
   mapM_ print resps
 
+disableValidator :: Bool -> IO ()
+disableValidator disVal = do
+  printf "Disable Validator Flag = %s \n" $ show disVal
+  let msg = IEDisableValidator disVal
+  print msg
+  resp <- runKafkaConfigured (KP.KString "disable-validator-flag") $ do
+    writeUnseqEvents [msg]
+  print resp
+  exitSuccess
 addTx :: String -> IO ()
 addTx tx' = do
   rtx <- either (die . printf "failed raw tx decoding: %s") (return . rtPrimeToRt) . eitherDecodeStrict . C8.pack $ tx'
@@ -79,3 +89,5 @@ addTxsFromFile fileName = do
         writeUnseqEvents $
           map (IETx t . IngestTx (TXO.PeerString "")) bs
       mapM_ print resps
+  
+
