@@ -807,10 +807,10 @@ genericDelegateCallWrapper from to input = do
       matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
       doesFunctionMatch <- (testMatch argCount args) f
       if (doesFunctionMatch)
-        then runTheCall to toContract n toHsh toCC f args True True
+        then runTheCall to toContract n toHsh toCC f args False True
         else case matchingOverload of
-          Nothing -> runTheCall to toContract n toHsh toCC f args True True
-          Just mo -> runTheCall to toContract n toHsh toCC mo args True True
+          Nothing -> runTheCall to toContract n toHsh toCC f args False True
+          Just mo -> runTheCall to toContract n toHsh toCC mo args False True
 
       -- runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s

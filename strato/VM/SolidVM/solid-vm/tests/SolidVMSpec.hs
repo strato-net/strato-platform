@@ -6797,28 +6797,68 @@ contract qq{
     getFields ["status", "codeInt"] `shouldReturn`
       [BBool True, BInteger 39 ]
 
+  fit "can run an overloaded function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract qq {
+  int a;
+  int b;
+  int c;
+
+  function addToNum(int x, int y) returns (int) {
+    return x + y;
+  }
+
+  function addToNum(uint x, bool g) returns (int){
+    if (g) {
+      return 1 + x;
+    } else {
+      return x;
+    }
+  }
+
+  function addToNum(uint x, string z) returns (int){
+    if (z == "butts") {
+      return 69 + x;
+    } else {
+      return x;
+    }
+  }
+  constructor () {
+    a = addToNum(13, 14);
+    b = addToNum(13, true);
+    c = addToNum(13, "butts");
+  }
+}
+|]
+    runBS codeSnippet
+    getFields ["a", "b", "c"] `shouldReturn`
+      [ BInteger 27, BInteger 14, BInteger 82 ]
 
   fit "can run an overloaded foreign function using .code and .delegatecall, using a foreign variable." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
-  uint myNum = 26;
-  bool myStatus;
-  string myString = "butts";
-
-  function addToNum(uint x, uint y) {
-    myNum = myNum + x + y;
+  function addToNum(int x, int y) returns (int) {
+    return x + y;
   }
 
-  function addToNum(uint x, bool y) {
-    myNum = myNum + x;
-    myStatus = y;
+  function addToNum(uint x, bool g) returns (int){
+    if (g) {
+      return 1 + x;
+    } else {
+      return x;
+    }
   }
 
-  function addToNum(uint x, string z) {
-    myNum = myNum + x;
-    myString = z;
+  function addToNum(uint x, string z) returns (int){
+    if (z == "butts") {
+      return 69 + x;
+    } else {
+      return x;
+    }
   }
 }
 
@@ -6826,7 +6866,7 @@ pragma solidvm 3.3;
 contract qq {
   string codeTest;
   int codeInt;
-  int myNum = 13;
+  int public myNum = 13;
   bool doesItWork;
   constructor() public {
     Test t = new Test();
