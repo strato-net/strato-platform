@@ -617,6 +617,9 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                          []
                          []
                ]
+-- typecheckMember (MultiVariate (SVMType.Account _) x) "delegatecall" = pure $ Product [Static (SVMType.Bool) x, Static (SVMType.String False) x ] x
+typecheckMember (Static (SVMType.Account _) x) "delegatecall" = 
+  pure $ Function (MultiVariate (stringType' x) x) (Product [Static (SVMType.Bool) x, Static (SVMType.String Nothing) x ] x) x [] []
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -639,8 +642,17 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
                          []
                          []
                ]
--- Sum $ (Product [] x) :| [(Static (SVMType.Bytes Nothing Nothing) x), (Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x)]
--- typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
+              -- | MultiVariate { multiVariateType :: (TypeF' a)
+              --                , multiVariateContext :: a
+              --                }
+              -- | Product { productTypes :: [TypeF' a]
+              --           , productContext :: a
+              --           }
+              -- | Static { staticType :: Type
+              --          , staticContext :: a
+              --          }
+typecheckMember (Static (SVMType.Contract _) x) "delegatecall" =
+  pure $ Function (MultiVariate (stringType' x) x) (Product [Static (SVMType.Bool) x, Static (SVMType.String Nothing) x ] x) x [] []
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
