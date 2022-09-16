@@ -67,7 +67,7 @@ import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
---import           BlockApps.Solidity.Parse.Parser
+import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
@@ -290,12 +290,12 @@ compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                 => SourceMap -> m (Map Text ContractDetails)
 compileContract sourceList = do
   let source =sourceBlob sourceList -- sourceBlob :: SourceMap -> Text
-      eVerXabis = parseSolidXabi "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
+      eVerXabis = parseXabi "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
       encodedSrc = serializeSourceMap sourceList
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   --when (True) (internalError "really bigg dsdfdsfs" source)
   (ver, xabis) <- case eVerXabis of
-    Left err -> blocError . UserError . Text.pack $ err
+    Left err -> blocError . UserError $ ((Text.pack $ err ++ "Do I error here"))
     Right (v, xs) -> return (v, Map.fromList xs)
   eabiBins <- fromJSON <$> compileSolc ver source
   abiBins <- case eabiBins of
@@ -340,7 +340,7 @@ createMetadataNoCompile sourceList = do
       eVerXabis = parseSolidXabi  "-" $ Text.unpack source -- So this says SOLIDVm only? ParseXabi ::  ->Either String (SolcVersion, [(Text, Xabi)])
       srcHash = hash (Text.encodeUtf8 encodedSrc)      --so I can either  
   xabis <- case eVerXabis of
-    Left err -> blocError . UserError . Text.pack $ err
+    Left err -> blocError . UserError $ (Text.pack $ err ++" NY ERROR HERE?")
     Right (_, xs) -> return $ Map.fromList xs
   let contracts = xabis
       details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->

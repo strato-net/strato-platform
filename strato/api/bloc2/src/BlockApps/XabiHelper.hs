@@ -31,10 +31,11 @@ import qualified SolidVM.Model.CodeCollection.Function     as SolidF
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVarDec
 
 import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File
+import           SolidVM.Solidity.Parse.File               as SParse
 import qualified SolidVM.Solidity.Parse.UnParser           as  SolidUnparse 
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.CodeCollection.Def          as SolidDef 
+
 
 import Debug.Trace
 --import qualified Data.Binary.Builder as M
@@ -42,11 +43,13 @@ import Debug.Trace
 
 --An Expeirment by Garrett
 --TODO change names
-parseSolidXabi :: SourceName -> SourceCode ->  Either String  (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )--[(T.Text, EVMXabi.Xabi)]
+parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )--[(T.Text, EVMXabi.Xabi)]
 parseSolidXabi x y = do
-  fi@(File parsedFile) <-  showError $ runParser solidityFile (ParserState "" "" M.empty) x y --of Left _ -> []; Right xx-> [xx];
+  fi@(File parsedFile) <-  showError $ runParser SParse.solidityFile (ParserState "" "" M.empty) x y --of Left _ -> []; Right xx-> [xx];
   --parsedFile1 <- --either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) x y
   let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile] 
+
+
   let associatedEVMVersion = trace "In parseSolidXabi helper" (case decideVersion fi of
             SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour 
             SolidParseT.ZeroPointFive -> EVMParseT.ZeroPointFive)
