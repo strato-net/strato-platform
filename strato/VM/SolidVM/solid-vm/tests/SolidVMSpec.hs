@@ -6838,7 +6838,7 @@ contract qq {
     getFields ["doesItWork", "codeInt"] `shouldReturn`
       [ BBool True, BInteger 53 ]
 
-  fit "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
+  it "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6867,7 +6867,7 @@ contract qq{
     getFields ["functionTest", "status"] `shouldReturn`
       [ BInteger 26, BBool True ]
 
-  fit "can run a foreign function using .code and .delegatecall, without an argument" . runTest $ do
+  it "can run a foreign function using .code and .delegatecall, without an argument" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6896,7 +6896,7 @@ contract qq{
     getFields ["status", "functionTest"] `shouldReturn`
       [ BBool True, BInteger 13]
 
-  fit "can run a statement using .delegatecall" . runTest $ do
+  it "can run a statement using .delegatecall" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;

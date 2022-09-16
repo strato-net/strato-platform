@@ -794,7 +794,7 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> m (Bool, Maybe Value)
 genericDelegateCallWrapper from to input = do
   -- TODO: ensure both contracts have the same pragma version
-  (codetype, args) <- superPayload "delegatecall" from input
+  (codetype, args, argCount) <- superPayload "delegatecall" from input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
@@ -803,7 +803,16 @@ genericDelegateCallWrapper from to input = do
     -- runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
     -- runTheConstructors from to hsh cc contractName' argExps = do
     -- n=name of function; f=actual function that wants to be run
-    CC.FunctionCode (n, f) -> runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
+    CC.FunctionCode (n, f) -> do
+      matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
+      doesFunctionMatch <- (testMatch argCount args) f
+      if (doesFunctionMatch)
+        then runTheCall to toContract n toHsh toCC f args True True
+        else case matchingOverload of
+          Nothing -> runTheCall to toContract n toHsh toCC f args True True
+          Just mo -> runTheCall to toContract n toHsh toCC mo args True True
+
+      -- runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s
   case result of 
     Nothing -> pure (False, result)
@@ -811,17 +820,17 @@ genericDelegateCallWrapper from to input = do
 
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType (SourceAnnotation ()), ValList)
+superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType (SourceAnnotation ()), ValList, Int)
 superPayload functionType address input = do
-  (payload, args) <- case input of
+  (payload, args, argCount) <- case input of
     OrderedVals o -> case (length o) of
       0 -> noPayload functionType (show address)
       1 -> return (case head o of
         SString s -> s
-        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals [])
+        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals [], 0)
       _ -> return (case head o of
         SString s -> s
-        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals $ tail o)
+        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals $ tail o, length $ tail o)
     _ -> namedValsNotAccepted functionType (show input)
 
   code <- case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" payload of
@@ -834,7 +843,55 @@ superPayload functionType address input = do
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
   liftIO $ print ("\n_+++++++++++++++++++++++++++++++++_\n" ++ (show code) ++ "\n_+++++++++++++++++++++++++++++++++_\n")
-  pure (code, args)
+  pure (code, args, argCount)
+
+testMatch :: MonadSM m => Int -> ValList -> CC.Func -> m Bool
+testMatch argCount argVals tf = do
+  let argMapping = mapArgs tf argVals
+  doArgsMatch <- mapM testNameAndTypes argMapping
+  pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
+          && ((length argMapping) == (argCount))
+          && (all (== True) doArgsMatch)
+testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+testNameAndTypes (_, (t, v)) = 
+  -- These cases might not be all inclusive of all valid combinations.
+  case (v, t) of
+    (SInteger _, SVMType.Int _ _) -> pure $ True
+    (SString _, SVMType.String _) -> pure $ True
+    (SString _, SVMType.Bytes _ _) -> pure $ True
+    (SBool _, SVMType.Bool) -> pure $ True
+    (SAccount _ _, SVMType.Address _) -> pure $ True
+    (SAccount _ _, SVMType.Account _) -> pure $ True
+    (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+    (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+    (SArray x _, SVMType.Array y _) -> pure $ x == y
+    (SReference addressedPath, _) -> do
+      refType <- getXabiValueType addressedPath
+      if (refType == t)
+        then pure $ True
+        else 
+          case (refType, t) of
+            (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+            (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+            _ -> pure $ False
+    _ -> pure $ False
+mapArgs :: CC.FuncF a -> ValList -> [(String, (SVMType.Type, Value))]
+mapArgs theFunc argVals = case argVals of
+  OrderedVals vs -> let argMeta = 
+                          map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                          $ CC._funcArgs theFunc
+                    in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+  NamedVals ns ->
+    let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
+        typeAndVal = M.merge (M.dropMissing)
+                            (M.dropMissing)
+                            (M.zipWithMatched $ \_k t v -> (t, v))
+                            strTypes
+                            $ M.fromList ns
+        sortedArgs = map snd . sortWith fst
+                  . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                  $ M.toList typeAndVal
+    in sortedArgs
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2064,23 +2121,23 @@ expToVar' (CC.FunctionCall _ e args) = do
                 res <- do
                   if (CC._funcIsFree func)
                     then do
-                      matchingOverload <- findM testMatch $ CC._funcOverload func
-                      doesFunctionMatch <- testMatch func
+                      matchingOverload <- findM (testMatch argCount argVals) $ func ^. CC.funcOverload
+                      doesFunctionMatch <- (testMatch argCount argVals) func
                       if (doesFunctionMatch)
                         then runTheCall address contract' funcName hsh cc func argVals ro True
                         else case matchingOverload of
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
                           Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
                     else do
-                      matchingOverload <- findM testMatch $ CC._funcOverload func
-                      doesFunctionMatch <- testMatch func
+                      matchingOverload <- findM (testMatch argCount argVals) $ func ^. CC.funcOverload 
+                      doesFunctionMatch <- (testMatch argCount argVals) $ func
                       if (doesFunctionMatch)
                         then runTheCall address contract' funcName hsh cc func argVals ro False
                         else case matchingOverload of
                                 Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
                                               Just ff -> do
-                                                matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
-                                                doesFreeFunctionMatch <- testMatch ff
+                                                matchingFreeOverload <- findM (testMatch argCount argVals) $ ff ^. CC.funcOverload
+                                                doesFreeFunctionMatch <- (testMatch argCount argVals) ff
                                                 if (doesFreeFunctionMatch)
                                                   then runTheCall address contract' funcName hsh cc ff argVals ro True
                                                   else case matchingFreeOverload of
@@ -2089,54 +2146,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                                               Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
                                 Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
                 return . Constant . fromMaybe SNULL $ res
-            where
-              testMatch :: MonadSM m => CC.Func -> m Bool
-              testMatch tf = do
-                let argMapping = mapArgs tf
-                doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
-                       && ((length argMapping) == (argCount))
-                       && (all (== True) doArgsMatch)
-              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-              testNameAndTypes (_, (t, v)) = 
-                -- These cases might not be all inclusive of all valid combinations.
-                case (v, t) of
-                  (SInteger _, SVMType.Int _ _) -> pure $ True
-                  (SString _, SVMType.String _) -> pure $ True
-                  (SString _, SVMType.Bytes _ _) -> pure $ True
-                  (SBool _, SVMType.Bool) -> pure $ True
-                  (SAccount _ _, SVMType.Address _) -> pure $ True
-                  (SAccount _ _, SVMType.Account _) -> pure $ True
-                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                  (SArray x _, SVMType.Array y _) -> pure $ x == y
-                  (SReference addressedPath, _) -> do
-                    refType <- getXabiValueType addressedPath
-                    if (refType == t)
-                      then pure $ True
-                      else 
-                        case (refType, t) of
-                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
-                          _ -> pure $ False
-                  _ -> pure $ False
-              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-              mapArgs theFunc = case argVals of
-                OrderedVals vs -> let argMeta = 
-                                        map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                        $ CC._funcArgs theFunc
-                                  in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-                NamedVals ns ->
-                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-                      typeAndVal = M.merge (M.dropMissing)
-                                          (M.dropMissing)
-                                          (M.zipWithMatched $ \_k t v -> (t, v))
-                                          strTypes
-                                          $ M.fromList ns
-                      sortedArgs = map snd . sortWith fst
-                                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                                $ M.toList typeAndVal
-                  in sortedArgs
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
