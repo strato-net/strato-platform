@@ -809,11 +809,6 @@ genericDelegateCallWrapper from to input = do
     Nothing -> pure (True, result)
     Just _ -> pure (False, result)
 
---Get only a string from a Value
-getOnlyStrings :: Value -> String
-getOnlyStrings (SString s) = s
-getOnlyStrings _ = error "Input was not a string"
-
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
 superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType (SourceAnnotation ()), ValList)
@@ -821,19 +816,24 @@ superPayload functionType address input = do
   (payload, args) <- case input of
     OrderedVals o -> case (length o) of
       0 -> noPayload functionType (show address)
-      1 -> return (SString $ getOnlyStrings $ head o, OrderedVals [])
-      _ -> return (SString $ getOnlyStrings $ head o, OrderedVals $ tail o)
+      1 -> return (case head o of
+        SString s -> s
+        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals [])
+      _ -> return (case head o of
+        SString s -> s
+        _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals $ tail o)
     _ -> namedValsNotAccepted functionType (show input)
 
-  code <- case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" (show payload) of
+  code <- case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" payload of
               --If it can't be a function then try parsing as a statement
-              Left _ -> case runParser statement (ParserState "" "" M.empty) "" (show payload) of
+              Left _ -> case runParser statement (ParserState "" "" M.empty) "" payload of
                 Left _ -> generalMetaProgrammingError "parsing" payload
                 Right s -> pure $ CC.StatementCode s
               Right (funcName, actualFunction)  -> case actualFunction of
                 Decl.FuncDeclaration fun -> pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
+  liftIO $ print ("\n_+++++++++++++++++++++++++++++++++_\n" ++ (show code) ++ "\n_+++++++++++++++++++++++++++++++++_\n")
   pure (code, args)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)

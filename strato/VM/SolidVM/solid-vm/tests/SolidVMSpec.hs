@@ -6794,8 +6794,8 @@ contract qq{
   }
 }|]
     runBS codeSnippet
-    getFields ["codeInt"] `shouldReturn`
-      [BInteger 39 ]
+    getFields ["status", "codeInt"] `shouldReturn`
+      [BBool True, BInteger 39 ]
 
 
   fit "can run an overloaded foreign function using .code and .delegatecall, using a foreign variable." . runTest $ do
@@ -6835,8 +6835,8 @@ contract qq {
   }
 }|]
     runBS codeSnippet
-    getFields ["codeInt"] `shouldReturn`
-      [BInteger 39 ]
+    getFields ["doesItWork", "codeInt"] `shouldReturn`
+      [ BBool True, BInteger 53 ]
 
   fit "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
     let codeSnippet :: String
@@ -6864,8 +6864,8 @@ contract qq{
   }
 }|]
     runBS codeSnippet
-    getFields ["codeTest"] `shouldReturn`
-      [ BInteger 26 ]
+    getFields ["functionTest", "status"] `shouldReturn`
+      [ BInteger 26, BBool True ]
 
   fit "can run a foreign function using .code and .delegatecall, without an argument" . runTest $ do
     let codeSnippet :: String
@@ -6893,8 +6893,8 @@ contract qq{
   }
 }|]
     runBS codeSnippet
-    getFields ["codeTest"] `shouldReturn`
-      [ BInteger 13 ]
+    getFields ["status", "functionTest"] `shouldReturn`
+      [ BBool True, BInteger 13]
 
   fit "can run a statement using .delegatecall" . runTest $ do
     let codeSnippet :: String
@@ -6922,5 +6922,5 @@ contract qq{
   }
 }|]
     runBS codeSnippet
-    getFields ["codeTest"] `shouldReturn`
-      [ BInteger 13 ]
+    getFields ["functionTest", "status"] `shouldReturn`
+      [ BInteger 13 , BBool True]
