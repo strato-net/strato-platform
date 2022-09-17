@@ -405,7 +405,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
     compileOneContract PostCompileRequest{..} = do
       let shouldCompile = trace ("POSTCOMILEREQUEST " ) (case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
-            _ -> Don't Compile)--- GOING ROGUE
+            _ -> Do Compile)--- GOING ROGUE
       idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ details -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
@@ -416,7 +416,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
             let ptr = contractdetailsCodeHash details
             case ptr of
               EVMCode hsh ->  return $ PostCompileResponse (contractdetailsName details) hsh
-              SolidVMCode _ _ ->  throwIO . AnError $ "Garrett sourceToContractDetails somehow returned CodeAtAccount" -- return $ PostCompileResponse (Text.pack name) hsh
+              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
               CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
               
 postContractsXabi :: MonadIO m =>

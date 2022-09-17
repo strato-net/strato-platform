@@ -77,7 +77,8 @@ transFormXabi SVMXabi.Xabi{..} =
              , xabiVars = M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)]
              -- Map SolidString SolidVM.Def -> (xabiTypes:: Map Text Xabi.Def)
              , xabiTypes = M.fromList  [ (t, def) |(t, Just def) <- [ (T.pack ss,  tFormDef f) | (ss, f) <- (M.toList _xabiTypes)]]
-             , xabiModifiers = M.empty --TODO
+             -- Map SolidString (ModifierF a) -> xabiModifiers :: Map Text Modifier
+             , xabiModifiers = M.fromList   [ (T.pack ss,  tFormModifer m) | (ss, m) <- (M.toList _xabiModifiers)]
              , xabiEvents = M.empty --TODO
              , xabiKind = EVMXabi.ContractKind --TODO
              , xabiUsing = M.empty --TODO
@@ -160,6 +161,40 @@ tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToTy
 
 -- data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
 --                deriving (Eq, Show, Generic,NFData)
+
+
+----------------------------------
+----SolidVM.ModifierF -> Modifier Section
+----------------------------------
+tFormModifer :: SolidF.Modifier -> EVMXabi.Modifier
+tFormModifer SolidF.Modifier{..} = EVMXabi.Modifier{
+    modifierArgs       = M.fromList [ (a, tFormIndexedType b) |(a, b)<- (M.toList _modifierArgs)] -- :: Map Text Xabi.IndexedType
+    , modifierSelector = _modifierSelector 
+    , modifierVals     = M.empty -- :: Map Text Xabi.IndexedType __TODO!!!!
+    , modifierContents = case _modifierContents of 
+                            Nothing         -> Nothing
+                            Just contents   -> Just $ T.pack $ foldl (++) "" $ map SolidUnparse.unparseStatement   contents
+                             
+
+}
+
+--XABI
+-- data Modifier = Modifier
+--   { modifierArgs     :: Map Text Xabi.IndexedType
+--   , modifierSelector :: Text
+--   , modifierVals     :: Map Text Xabi.IndexedType
+--   , modifierContents :: Maybe Text
+--   } deriving (Eq,Show,Generic,NFData)
+
+
+--SOLIDVM
+-- data ModifierF a = Modifier
+--   { _modifierArgs     :: Map Text SolidVM.IndexedType
+--   , _modifierSelector :: Text
+--   , _modifierContents :: Maybe [StatementF a]
+--   , _modifierContext  :: a
+--   } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
+
 
 
 ----------------------------------

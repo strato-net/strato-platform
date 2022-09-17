@@ -58,7 +58,7 @@ import           UnliftIO
 
 
 
-import  BlockApps.Bloc22.XabiHelper
+
 
 import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
@@ -66,6 +66,7 @@ import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
+import           BlockApps.Bloc22.XabiHelper--
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -77,13 +78,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Source.Map
 
---import BlockApps.Bloc22.Server.Contracts
-
---import           BlockApps.SolidVMStorageDecoder
-
---import          SQLM
---import           Blockchain.SolidVM.Exception
---import Blockchain.SolidVM.CodeCollectionDB
 import           Control.Monad.Composable.BlocSQL
 import           SQLM
 import           Debug.Trace
@@ -210,7 +204,7 @@ getContractDetailsByCodeHash codePtr = do
         detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
         case Map.lookup name detailsMap of
             Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-            Just d -> pure $ trace ("can I get a print heere2 ") (d)
+            Just d -> pure d
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
@@ -233,7 +227,7 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
   --let theVM1 = trace ("DO I GET HERE Get Contract Dedtails " ++ (show $ Text.unpack theVM)) theVM
-  let shouldCompile = Don't Compile  --if theVM1 == "EVM" then  else Don't Compile
+  let shouldCompile = if theVM == "EVM" then  Compile  else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
   now' <- liftIO $ getTime Monotonic
