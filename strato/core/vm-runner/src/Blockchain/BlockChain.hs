@@ -313,7 +313,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     case result of
         Right execResult ->
           let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3")]
-              findInvalidPragmas pragma = if pragma `elem` supportedPragmas then id else (pragma:)
+              findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
                  then do
