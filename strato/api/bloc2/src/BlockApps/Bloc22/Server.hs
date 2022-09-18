@@ -23,6 +23,7 @@ import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.TransactionResult
 import           BlockApps.Bloc22.Server.Users
+import           BlockApps.Bloc22.Server.X509
 import           BlockApps.Solidity.Xabi
 
 import Control.Monad.Change.Alter
@@ -55,6 +56,7 @@ bloc :: ( MonadIO m
      => ServerT BlocAPI m
 bloc = return gitInfo
   :<|> postUsersFill
+  :<|> createCertificate
   :<|> getContracts
   :<|> postContractsBatchStates
   :<|> getContractsData
