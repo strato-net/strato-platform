@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module BlockApps.Bloc22.Server.Contracts where
-
+import           Control.Applicative ((<|>))
 import           Control.Arrow
 import           Control.Monad                   (join)
 import qualified Control.Monad.Change.Alter      as A
@@ -21,16 +21,16 @@ import qualified Data.Text                       as Text
 import           Data.Traversable
 import           Numeric
 import           UnliftIO
---import BlockApps.XabiHelper
 import           Blockchain.SolidVM.Model
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
+import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
---import           BlockApps.Solidity.Parse.Parser (parseXabi)
+import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
@@ -54,8 +54,6 @@ import           Handlers.AccountInfo
 import           Handlers.Storage
 import qualified MaybeNamed
 import           SQLM
-import Debug.Trace 
-import  BlockApps.Bloc22.XabiHelper
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
@@ -294,7 +292,7 @@ getContractsDetails :: ( MonadUnliftIO m
                        , HasBlocEnv m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId = trace ("WE HERE GETcontrACTdETAILS") (completeContractDetailXabi <$> getContractsDetails' contractAddress chainId)
+getContractsDetails contractAddress chainId = completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
@@ -415,7 +413,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
           Right _ -> do
             let ptr = contractdetailsCodeHash details
             case ptr of
-              EVMCode hsh ->  return $ PostCompileResponse (contractdetailsName details) hsh
+              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
               SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
               CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
               
@@ -424,11 +422,11 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> parseSolidXabi "src" (Text.unpack postxabirequestSrc)
+         partialXabis <- Map.fromList . snd <$> ( (parseSolidXabi "src" (Text.unpack postxabirequestSrc)) <|> (parseXabi "src" (Text.unpack postxabirequestSrc)))
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .
-            (("Garrett was here") <>) $ Text.pack msg
+            ("contract compilation for xabi failed: " <>) $ Text.pack msg
         Right xs -> return . PostXabiResponse $ xs
 
 

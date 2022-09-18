@@ -58,15 +58,13 @@ import           UnliftIO
 
 
 
-
-
 import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Bloc22.XabiHelper--
+import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -80,8 +78,7 @@ import           Data.Source.Map
 
 import           Control.Monad.Composable.BlocSQL
 import           SQLM
-import           Debug.Trace
---import   qualified        BlockApps.Solidity.Parse.File as SolidVmParser     (solidityFile)
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 contractBySourceHash
@@ -226,7 +223,6 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
-  --let theVM1 = trace ("DO I GET HERE Get Contract Dedtails " ++ (show $ Text.unpack theVM)) theVM
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
@@ -246,7 +242,7 @@ getContractDetailsForContract theVM src mContract = do
                    then sourceToContractDetails shouldCompile src
                    else return Map.empty
       liftIO $ Cache.insert srcCache cacheKey details
-      pure $ trace ("Can I get A print here") (details)
+      pure details
   case mContract of
     Nothing ->
       case Map.toList idsAndDetails of
@@ -284,15 +280,13 @@ compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    )
                 => SourceMap -> m (Map Text ContractDetails)
 compileContract sourceList = do
-  let source =sourceBlob sourceList -- sourceBlob :: SourceMap -> Text
-      eVerXabis = parseXabi "-" $ Text.unpack source  -- parseXabi :: FileName -> String -> Either String (SolcVersion, [(Text, Xabi)])
+  let source =sourceBlob sourceList
+      eVerXabis = parseXabi "-" $ Text.unpack source
       encodedSrc = serializeSourceMap sourceList
       srcHash = hash (Text.encodeUtf8 encodedSrc)
-  --when (True) (internalError "really bigg dsdfdsfs" source)
   (ver, xabis) <- case eVerXabis of
-    Left err -> blocError . UserError $ ((Text.pack $ err ++ "GARRETT Do I error here"))
-    Right (_, _) -> blocError . UserError $ (Text.pack $ " GARRETT I should never be getting here  ERROR HERE?") --return (v, Map.fromList xs)
-    -- Right (v, xs) -> blocError . UserError $ (Text.pack $ " GARRETT I should never be getting here  ERROR HERE?") --return (v, Map.fromList xs)
+    Left err -> blocError . UserError . Text.pack $ err
+    Right (v, xs) -> return (v, Map.fromList xs)
   eabiBins <- fromJSON <$> compileSolc ver source
   abiBins <- case eabiBins of
     Error err -> blocError . UserError . Text.pack $ err
@@ -319,7 +313,7 @@ compileContract sourceList = do
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
 
-  pure $ trace ("CAN I PRINT HERE???!!EVM" ) (Map.fromList details)
+  pure $ Map.fromList details
 
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
@@ -351,7 +345,7 @@ createMetadataNoCompile sourceList = do
         }
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
-  pure $ trace ("CAN I PRINT HERE???!!SOLIDVM" ) details
+  pure details
 
 instance DefaultFromField PGBytea Address where
   defaultFromField = fromPGSFromField
