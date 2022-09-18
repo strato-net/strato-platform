@@ -106,24 +106,6 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just $ (" ", Prag (n,v))
           _ -> pure Nothing
 
---DELETE!
---      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
-   {-    sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6, cs7) -> case sUnit of
-        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6, cs7)
-        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5, cs6, cs7)
-        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5 ,cs6,cs7)
-        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5, cs6, cs7) --conversion to match struct form
-        FLF f -> (cs, cs2, cs3, cs4, (name, f):cs5, cs6, cs7)
-        FLER (Def.Error vals _ a) -> (cs, cs2, cs3, cs4, cs5, (name, (\(k,v) -> (k,v,a)) <$> vals):cs6, cs7)
-        Prag (l,r) -> (cs, cs2, cs3, cs4, cs5, cs6, (l,r):cs7)
-        FLE y -> parseError "FLE non Enum should be impossible"   (show y)
-        FLS x -> parseError "FLS non Struct should be impossible" (show x)
-        FLER x -> parseError "FLER non Error should be impossible" (show x)
-        ) ([], [], [], [], [], [], [])
-      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, unit) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName unit m -}
----- DELETE END!
       throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
       throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
         Nothing -> pure $ M.insert sName unit m
@@ -131,9 +113,6 @@ compileSourceNoInheritance initCodeMap = do
         Just _ ->  Left . PEx
                   $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
                                     (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
-
-      -- listCombine :: (String, String) -> [(String,Strong)] -> Either ParseTypeCheckOrSolidVMError [(String,String)]
-      -- listComnine a as = 
 
       throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
       throwDuplicate (name, sUnit) cc = case sUnit of 
