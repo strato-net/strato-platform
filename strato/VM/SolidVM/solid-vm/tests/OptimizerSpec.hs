@@ -3,21 +3,22 @@
 {-# LANGUAGE TemplateHaskell #-}
 module OptimizerSpec where
 
-import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Data.Map as M
 import           Control.Lens
 
 import qualified Data.Text as T
+import           Data.Source.Annotation
 
 import           Test.Hspec
 import           Text.RawString.QQ
 
 import           SolidVM.Model.CodeCollection
-import           Blockchain.SolidVM.Exception
-import           Data.Source.Annotation
+import           SolidVM.Model.SolidString
+import           SolidVM.Model.Type as SVMType
 
---import Debug.Trace
---import           Text.Printf
+import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.CodeCollectionDB
+
 
 -- Note that compileSourceWithAnnotations calls compileSource which calls the optimizer.detector
 runOptimizer :: String -> CodeCollection
@@ -41,6 +42,13 @@ constDeclHelper cc = cc  ^.. contracts . folded . constants .folded
 funcHelper :: CodeCollection -> [StatementF (SourceAnnotation ())]
 funcHelper cc = (_funcContents <$> (cc  ^.. contracts . folded . functions . folded) ) ^.. folded . folded .folded
 
+getFuncs :: CodeCollection -> [M.Map SolidVM.Model.SolidString.SolidString (FuncF (SourceAnnotation ()))]-- [FuncF (SourceAnnotation ())]
+getFuncs cc  = (cc  ^.. contracts . folded . functions )
+
+getFuncByName :: SolidString -> CodeCollection  ->  [FuncF (SourceAnnotation ())]
+getFuncByName funName cc = case M.lookup funName $ head  (getFuncs cc) of  --replace head with a foreach function 
+                            Just x -> [x]
+                            Nothing -> []
 
 spec :: Spec
 spec = describe "Optimizer tests" $ do
@@ -48,16 +56,37 @@ spec = describe "Optimizer tests" $ do
         let anns = (runOptimizer [r|
             contract A {
                 int b = 2 + 2 + 2;
-            }|])  in case (varDeclHelper' $ varDeclHelper anns) of 
+            }|])  in case (varDeclHelper' $ varDeclHelper anns) of
                 [(NumberLiteral _ 6 _) ] -> True
                 _ -> False
-    
-    --TODO optimize simple statements....             
-    -- fit "cannot simplify binary expressions in simple statements" $ 
-    --     let anns =  (runOptimizer [r|
-    --         contract A {
-    --             function x() {int yy = 2 + 3;}
-    --         }
-    --     |]) in case funcHelper anns of
-    --          [SimpleStatement (VariableDefinition _ _ ) _]-> True
-    --          _ -> False
+    it "Variable  wrap --- then takes the wrap and turns it to." $
+        let anns = runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+            }|]  in case (varDeclHelper' $ varDeclHelper anns) of
+                [NumberLiteral _ 2 _] -> True
+                _ -> False
+    it "Unwrap Variable by name of Variable " $
+        let anns = runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+                int xxx = Mytype.unwrap(a);
+            }|]  in case varDeclHelper' $ varDeclHelper anns of
+                [NumberLiteral _ 2 _, (NumberLiteral _ 2 _) ] -> True
+                _ -> False
+    it "can turn func arguements and values to user defined" $
+        let anns = runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+                function f(Mytype y) returns (Mytype) { return (y);}
+            }|] in case
+             concat $ (_funcArgs <$> getFuncByName"f" anns) ++ (_funcArgs <$> getFuncByName"f" anns)
+             of
+                [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
+                _ -> False
