@@ -829,7 +829,7 @@ execTestPeerWithContext f ctx = do
 data P2PPeer = P2PPeer
   { _p2pPeerPrivKey        :: PrivateKey
   , _p2pPeerPPeer          :: DataPeer.PPeer
-  , _p2pPeerUnseqSource    :: TQueue SeqLoopEvent
+  , _p2pPeerUnseqSource    :: TQueue [SeqLoopEvent]
   , _p2pPeerSeqP2pSource   :: TMChan (Either TxrResult P2pEvent)
   , _p2pPeerSeqVmSource    :: TQueue [VmEvent]
   , _p2pPeerApiIndexSource :: TQueue [IndexEvent]
@@ -857,7 +857,10 @@ runNode p =
       (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerTxrIndexer)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
-postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) e
+postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
+
+postEvents :: [SeqLoopEvent] -> P2PPeer -> IO ()
+postEvents es p = atomically $ writeTQueue (_p2pPeerUnseqSource p) es
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot MP.NodeData)) where
   lookup _ k   = M.lookup k <$> State.gets snd
@@ -918,7 +921,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
         DBDB.bootstrapGenesisBlock genHash 1
         A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
         runConduit $ sourceTQueue unseqSource
-                  .| mapMC (Seq.runSequencerBatch . (:[]))
+                  .| mapMC Seq.runSequencerBatch
                   .| (awaitForever $ \b -> do
                         chainIds <- lift $ unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
                         txHashes <- lift $ unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
@@ -951,7 +954,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                   .| (awaitForever $ \b -> do
                         $logInfoS (T.pack name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
                         atomically $ do
-                          traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                          writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
                           writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                           writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                           traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
@@ -979,7 +982,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                       orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
                                         Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
                                         Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
-                                      atomically . writeTQueue unseqSource . UnseqEvent $ IENewChainMember cId addr enode
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
                                     RemoveMember (Right (cId, addr)) -> do
                                       mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
                                       chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
@@ -1003,7 +1006,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                  , 30303
                                  )
       unseq ies = do
-        for_ (UnseqEvent <$> ies) $ atomically . writeTQueue unseqSource
+        atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
         unseqSink ies
   pure $ P2PPeer
     privKey
@@ -1489,6 +1492,7 @@ contract B {
       --  , (peers' !! 2, peers' !! 3)
       --  ]
       --let connections' = connections ++ connections4
+
     it "can register and unregister a cert on the main chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..2]
@@ -1548,9 +1552,9 @@ contract RegisterCert {
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx1
             threadDelay 1000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
-
       void . timeout 3000000 $ concurrently_ (runNetwork peers connections) routine
       True `shouldBe` True
+  
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do

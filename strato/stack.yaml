@@ -55,11 +55,12 @@ packages:
 - libs/prometheus/cross-monitoring
 - libs/secp256k1-haskell
 - libs/type-lits
+- libs/x509-certs
 
 - test-suite
 
 - tools/blockapps-tools
-- tools/x509-certs
+- tools/x509-tools
 
 - vault/api
 - vault/client
