@@ -292,7 +292,8 @@ getContractsDetails :: ( MonadUnliftIO m
                        , HasBlocEnv m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId = completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
+getContractsDetails contractAddress chainId = 
+  completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
@@ -422,7 +423,7 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> ( (parseSolidXabi "src" (Text.unpack postxabirequestSrc)) <|> (parseXabi "src" (Text.unpack postxabirequestSrc)))
+         partialXabis <- Map.fromList . snd <$> ( (parseXabi "src" (Text.unpack postxabirequestSrc)) <|> (parseSolidXabi "src" (Text.unpack postxabirequestSrc)) )
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .

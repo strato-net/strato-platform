@@ -11,7 +11,6 @@ import qualified Data.Map.Strict as M
 import Text.Parsec
 import Text.Printf
 
-
 import BlockApps.Bloc22.Database.Solc
 import BlockApps.Solidity.Parse.Parser (parseXabi, parseXabiNoInheritanceMerge)
 import BlockApps.Solidity.Parse.ParserTypes
@@ -88,7 +87,6 @@ solcSpec =
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
         mods `shouldSatisfy` isRight
-
 
 
 fromEither :: Either String a -> IO a

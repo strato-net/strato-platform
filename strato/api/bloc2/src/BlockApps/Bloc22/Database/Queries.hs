@@ -322,13 +322,10 @@ createMetadataNoCompile :: ( MonadIO m
                            )
                         => SourceMap -> m (Map Text ContractDetails)
 createMetadataNoCompile sourceList = do
-  --List of things to try
-    --Finding some Text to Xabi function from SolidVm code base?
-
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
-      eVerXabis = parseSolidXabi  "-" $ Text.unpack source -- So this says SOLIDVm only? ParseXabi ::  ->Either String (SolcVersion, [(Text, Xabi)])
-      srcHash = hash (Text.encodeUtf8 encodedSrc)      --so I can either  
+      eVerXabis = parseSolidXabi  "-" $ Text.unpack source 
+      srcHash = hash (Text.encodeUtf8 encodedSrc)
   xabis <- case eVerXabis of
     Left err -> blocError . UserError $ (Text.pack $ err ++" NY ERROR HERE?")
     Right (_, xs) -> return $ Map.fromList xs
