@@ -311,12 +311,16 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time' (txChainId bt)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
-        Right execResult -> do
+        Right execResult ->
           let supportedPragmas = [("svm","3.0"),("svm","3.2"),("svm","3.3")]
               findInvalidPragmas pragma = if pragma `elem` supportedPragmas then id else (pragma:)
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
-                 then return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
+                 then do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  putCertTxDBMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
                  else do
                    let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
@@ -326,19 +330,6 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
                    mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
 
         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
--- <<<<<<< HEAD
--- =======
---           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
---           flushMemAddressStateTxToBlockDB
---           flushMemStorageTxDBToBlockDB
---           flushMemCertTxToBlockDB
-
---           mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
---         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
--- >>>>>>> develop
--- =======
-
--- >>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
