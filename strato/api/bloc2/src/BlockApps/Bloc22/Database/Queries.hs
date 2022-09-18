@@ -280,7 +280,7 @@ compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    )
                 => SourceMap -> m (Map Text ContractDetails)
 compileContract sourceList = do
-  let source =sourceBlob sourceList
+  let source = sourceBlob sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
       encodedSrc = serializeSourceMap sourceList
       srcHash = hash (Text.encodeUtf8 encodedSrc)
@@ -327,7 +327,7 @@ createMetadataNoCompile sourceList = do
       eVerXabis = parseSolidXabi  "-" $ Text.unpack source 
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   xabis <- case eVerXabis of
-    Left err -> blocError . UserError $ (Text.pack $ err ++" NY ERROR HERE?")
+    Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs
   let contracts = xabis
       details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
