@@ -11,8 +11,6 @@ import qualified Data.Map.Strict as M
 import Text.Parsec
 import Text.Printf
 
-import BlockApps.Bloc22.XabiHelper
-import Debug.Trace
 
 import BlockApps.Bloc22.Database.Solc
 import BlockApps.Solidity.Parse.Parser (parseXabi, parseXabiNoInheritanceMerge)
@@ -78,25 +76,19 @@ solcSpec =
         modifier `shouldSatisfy` M.null . modifierArgs
       it "should leave pragmas alone!" $ do
         soliditySrc <- pack <$> readFile "./test/contracts/Pragma.sol"
-        let eXabi = parseSolidXabi "" . unparse =<< parseXabiNoInheritanceMerge "" (unpack soliditySrc)
+        let eXabi = parseXabi "" . unparse =<< parseXabiNoInheritanceMerge "" (unpack soliditySrc)
         actualXabi <- fromEither eXabi
         expectedXabi <- fromEither $ parseXabi "" (unpack soliditySrc)
         actualXabi `shouldBe` expectedXabi
       it "should get the correct compiler version" $ do
         soliditySrc <- readFile "./test/contracts/FivePointOh.sol"
-        let eXabi = parseSolidXabi "" soliditySrc
+        let eXabi = parseXabi "" soliditySrc
         fmap fst eXabi `shouldBe` Right ZeroPointFive
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
         mods `shouldSatisfy` isRight
-      fit "should leave pragmas alone!" $ do
-        soliditySrc <- pack <$> readFile "./test/contracts/SolidVMParse.sol"
-        let eXabi1 = parseSolidXabi "" . unparse =<< parseXabiNoInheritanceMerge "" (unpack soliditySrc)
-        let eXabi = trace (show eXabi1) eXabi
-        actualXabi <- fromEither eXabi
-        expectedXabi <- fromEither $ parseXabi "" (unpack soliditySrc)
-        actualXabi `shouldBe` expectedXabi
+
 
 
 fromEither :: Either String a -> IO a

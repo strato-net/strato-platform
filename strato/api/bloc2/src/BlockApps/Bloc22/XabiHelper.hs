@@ -33,7 +33,7 @@ import qualified SolidVM.Model.CodeCollection.Def          as SolidDef
 import qualified SolidVM.Model.CodeCollection.Event        as SolidEv
 
 import           SolidVM.Solidity.Parse.Declarations
-import qualified SolidVM.Solidity.Parse.File               as SParse
+import           SolidVM.Solidity.Parse.File
 import qualified SolidVM.Solidity.Parse.UnParser           as SolidUnparse 
 
 import           SolidVM.Model.SolidString
@@ -42,7 +42,7 @@ import           SolidVM.Model.SolidString
 parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
 parseSolidXabi sName sCode = do
   --SHould this be a a showError or something else?
-  fi@(File parsedFile) <-  showError $ runParser SParse.solidityFile (ParserState "" "" M.empty) sName sCode
+  fi@(File parsedFile) <-  showError $ runParser solidityFile (ParserState "" "" M.empty) sName sCode
   let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile] 
   let associatedEVMVersion = case decideVersion fi of
             SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour 

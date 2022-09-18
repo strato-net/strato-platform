@@ -114,7 +114,6 @@ import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 import           SQLM
 
-
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
   TxParams (txparamsGasLimit inner <|> txparamsGasLimit outer)
