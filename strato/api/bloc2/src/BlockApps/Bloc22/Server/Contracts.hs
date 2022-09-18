@@ -294,7 +294,7 @@ getContractsDetails :: ( MonadUnliftIO m
                        , HasBlocEnv m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId = trace ("WE ARE HERE GETcontrACTdETAILS") (completeContractDetailXabi <$> getContractsDetails' contractAddress chainId)
+getContractsDetails contractAddress chainId = trace ("WE HERE GETcontrACTdETAILS") (completeContractDetailXabi <$> getContractsDetails' contractAddress chainId)
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
@@ -403,9 +403,9 @@ postContractsCompile :: ( MonadIO m
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      let shouldCompile = trace ("POSTCOMILEREQUEST " ) (case Text.toLower <$> postcompilerequestVm of
+      let shouldCompile = case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
-            _ -> Do Compile)--- GOING ROGUE
+            _ -> Do Compile
       idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ details -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details

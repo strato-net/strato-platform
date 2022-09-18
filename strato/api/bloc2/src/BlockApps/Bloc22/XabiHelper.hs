@@ -4,7 +4,6 @@
 
 module BlockApps.Bloc22.XabiHelper
   ( parseSolidXabi
-  --, hideFucn2
   , transFormXabi
   ) where
 import           BlockApps.Solidity.Parse.Parser
@@ -24,73 +23,56 @@ import qualified SolidVM.Solidity.Xabi                     as SVMXabi
 
 import qualified SolidVM.Model.Type                        as SolidType
 import qualified BlockApps.Solidity.Xabi.Type              as XabiType
+
 import qualified BlockApps.Solidity.Xabi.Def               as XabiDef
 
 import qualified SolidVM.Model.CodeCollection.VarDef       as CCVarfDef
 import qualified SolidVM.Model.CodeCollection.Function     as SolidF
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVarDec
+import qualified SolidVM.Model.CodeCollection.Def          as SolidDef 
+import qualified SolidVM.Model.CodeCollection.Event        as SolidEv
 
 import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File               as SParse
-import qualified SolidVM.Solidity.Parse.UnParser           as  SolidUnparse 
+import qualified SolidVM.Solidity.Parse.File               as SParse
+import qualified SolidVM.Solidity.Parse.UnParser           as SolidUnparse 
+
 import           SolidVM.Model.SolidString
-import qualified SolidVM.Model.CodeCollection.Def          as SolidDef 
 
 
-import Debug.Trace
---import qualified Data.Binary.Builder as M
-
-
---An Expeirment by Garrett
---TODO change names
-parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )--[(T.Text, EVMXabi.Xabi)]
-parseSolidXabi x y = do
-  fi@(File parsedFile) <-  showError $ runParser SParse.solidityFile (ParserState "" "" M.empty) x y --of Left _ -> []; Right xx-> [xx];
-  --parsedFile1 <- --either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) x y
+parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
+parseSolidXabi sName sCode = do
+  --SHould this be a a showError or something else?
+  fi@(File parsedFile) <-  showError $ runParser SParse.solidityFile (ParserState "" "" M.empty) sName sCode
   let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile] 
-
-
-  let associatedEVMVersion = trace "In parseSolidXabi helper" (case decideVersion fi of
+  let associatedEVMVersion = case decideVersion fi of
             SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour 
-            SolidParseT.ZeroPointFive -> EVMParseT.ZeroPointFive)
+            SolidParseT.ZeroPointFive -> EVMParseT.ZeroPointFive
   return $! (associatedEVMVersion, nameXabi)
 
    
-
-
-  --[(name, xabi) |  NamedXabi name (xabi, parents') <- parsedFile]
---TODO change name
--- hideFucn2 ::  SourceName -> SourceCode -> (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
--- hideFucn2 x  y= (EVMParseT.ZeroPointFour, (hideFucn x y))
-
-
-
 transFormXabi :: SVMXabi.Xabi -> EVMXabi.Xabi 
 transFormXabi SVMXabi.Xabi{..} =  
-  EVMXabi.Xabi { xabiFuncs =  M.fromList [ (T.pack ss,  tFormFunc f) |(ss, f)<- (M.toList _xabiFuncs)]--M.singleton (T.pack "Test") 
-             --Clean this up case _xabiConstr of M.empty -> Nothing;  
-             , xabiConstr = case M.toList _xabiConstr of --Shouldn't _xabiConstr always be a size of 1?
+  EVMXabi.Xabi { xabiFuncs   = M.map tFormFunc $ M.mapKeysMonotonic T.pack _xabiFuncs  -- M.fromList [ (T.pack ss,  tFormFunc f) |(ss, f)<- (M.toList _xabiFuncs)]
+             , xabiConstr    = case M.toList _xabiConstr of --Shouldn't _xabiConstr always be a size of 1?
                             [] -> Nothing
                             [(_, f)] -> Just $ tFormFunc f
                             _ -> Just $ tFormFunc $ snd $ head $ M.toList _xabiConstr --I don't think this should ever run
-              --Map SolidString (VariableDeclF a) -> Map Text Xabi.VarType
-             , xabiVars = M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)]
-             -- Map SolidString SolidVM.Def -> (xabiTypes:: Map Text Xabi.Def)
-             , xabiTypes = M.fromList  [ (t, def) |(t, Just def) <- [ (T.pack ss,  tFormDef f) | (ss, f) <- (M.toList _xabiTypes)]]
-             -- Map SolidString (ModifierF a) -> xabiModifiers :: Map Text Modifier
-             , xabiModifiers = M.fromList   [ (T.pack ss,  tFormModifer m) | (ss, m) <- (M.toList _xabiModifiers)]
-             , xabiEvents = M.empty --TODO
-             , xabiKind = EVMXabi.ContractKind --TODO
-             , xabiUsing = M.empty --TODO
+             , xabiVars      = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic T.pack _xabiVars  --M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)]
+             , xabiTypes     = M.fromList  [ (t, def) |(t, Just def) <- [ (T.pack ss,  tFormDef f) | (ss, f) <- (M.toList _xabiTypes)]]
+             , xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers  --M.fromList   [ (T.pack ss,  tFormModifer m) | (ss, m) <- (M.toList _xabiModifiers)]
+             , xabiEvents    = M.map tFormEv $ M.mapKeysMonotonic T.pack _xabiEvents --M.fromList   [ (T.pack ss,  tFormEv m) | (ss, m) <- (M.toList _xabiEvents)]
+             , xabiKind      = case _xabiKind of SVMXabi.ContractKind -> EVMXabi.ContractKind ; SVMXabi.InterfaceKind-> EVMXabi.InterfaceKind; SVMXabi.LibraryKind ->  EVMXabi.LibraryKind;
+             , xabiUsing     = M.map tFormUs _xabiUsing
            }
 
 
 ----------------------------------
---Transforming SolidFuncs to Xabi Funcs Section
+--General Helper functions for transforming
+--each part of the Xabi
 ----------------------------------
 tFormFunc :: SolidF.Func -> EVMXabi.Func
 tFormFunc SolidF.Func{..} = EVMXabi.Func {      
-  funcArgs   = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcArgs)]      --Map Text Xabi.IndexedType
+  funcArgs   = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcArgs)]  --Map Text Xabi.IndexedType
   , funcVals = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcVals)]  --Map Text Xabi.IndexedType
   , funcStateMutability = case _funcStateMutability of 
                           Nothing -> Nothing;
@@ -109,92 +91,54 @@ tFormFunc SolidF.Func{..} = EVMXabi.Func {
                           Just SolidF.Internal    -> Just EVMXabi.Internal
                           Just SolidF.External    -> Just EVMXabi.External -- Maybe Visibility
   , funcModifiers =  case _funcModifiers of 
-                          [] -> Nothing --Not 100% if this is a correct translastion
+                          [] -> Nothing --Not 100% if this is a correct translastion TODO
                           contents -> Just $ map (\(_, [e])->  SolidUnparse.unparseExpression e  ) contents -- Maybe [String]
   }
 
 
-
-
-----------------------------------
-----VarDecl -> Vartype Section
-----------------------------------
 tFormVarDeclToVartype :: SolidVarDec.VariableDecl -> XabiType.VarType
 tFormVarDeclToVartype    SolidVarDec.VariableDecl{..} = XabiType.VarType { 
-  varTypeAtBytes        = 0 ::Int32 --TODO change this      -- :: Int32
-  , varTypePublic       = Just _varIsPublic        -- :: Maybe Bool
-  , varTypeConstant     = Nothing   -- :: Maybe String
+  varTypeAtBytes        = 0 ::Int32 --TODO --> change this to ?
+  , varTypePublic       = Just _varIsPublic
+  , varTypeConstant     = Nothing 
   , varTypeInitialValue =   case _varInitialVal of 
                           Nothing -> Nothing --Not 100% if this is a correct translastion
-                          Just contents -> Just $  SolidUnparse.unparseExpression contents -- Maybe [String]-- :: Maybe String
-  , varTypeType         = tFormTypeToType _varType        -- :: Type
+                          Just contents -> Just $  SolidUnparse.unparseExpression contents 
+  , varTypeType         = tFormTypeToType _varType
   }
--- data VariableDeclF a = VariableDecl
---   { _varType       :: SVMType.Type
---   , _varIsPublic   :: Bool
---   , _varInitialVal :: Maybe (ExpressionF a)
---   , _varContext    :: a
---   , _isImmutable   :: Bool
---   } 
 
-
-
-----------------------------------
-----SolidVM.Def -> Vartype Section
-----------------------------------
 
 tFormDef :: SolidDef.Def -> Maybe XabiDef.Def
 tFormDef (SolidDef.Enum nam byte _)      = Just $ (XabiDef.Enum (map T.pack nam) byte)
 tFormDef (SolidDef.Struct fields byte _) = Just $ (XabiDef.Struct  (map (\(x, y)-> (T.pack x,  tFormFieldType y) ) fields)  byte)
 tFormDef (SolidDef.Contract bytes _)     = Just $ XabiDef.Contract bytes
 tFormDef      _                          = Nothing
---  Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
-
--- data DefF a = Enum { names::[SolidString], bytes::Word, context :: a}
---             | Error { params :: [(SolidString, SolidVM.IndexedType)], bytes::Word, context :: a }
---             | Struct { fields::[(SolidString, SolidVM.FieldType)], bytes::Word, context :: a}
---             | Contract { bytes::Word, context :: a}
 
 
 tFormFieldType :: CCVarfDef.FieldType -> XabiType.FieldType
 tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToType typ)
 
--- data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
---                deriving (Eq, Show, Generic,NFData)
 
-
-----------------------------------
-----SolidVM.ModifierF -> Modifier Section
-----------------------------------
 tFormModifer :: SolidF.Modifier -> EVMXabi.Modifier
 tFormModifer SolidF.Modifier{..} = EVMXabi.Modifier{
-    modifierArgs       = M.fromList [ (a, tFormIndexedType b) |(a, b)<- (M.toList _modifierArgs)] -- :: Map Text Xabi.IndexedType
+    modifierArgs       = M.map tFormIndexedType _modifierArgs-- M.fromList [ (a, tFormIndexedType b) |(a, b)<- (M.toList _modifierArgs)] -- :: Map Text Xabi.IndexedType
     , modifierSelector = _modifierSelector 
     , modifierVals     = M.empty -- :: Map Text Xabi.IndexedType __TODO!!!!
     , modifierContents = case _modifierContents of 
                             Nothing         -> Nothing
-                            Just contents   -> Just $ T.pack $ foldl (++) "" $ map SolidUnparse.unparseStatement   contents
-                             
-
+                            Just contents   -> Just $ T.pack $ foldl (++) "" $ map SolidUnparse.unparseStatement   contents -- WHat is a better way of doing this?                          
 }
 
---XABI
--- data Modifier = Modifier
---   { modifierArgs     :: Map Text Xabi.IndexedType
---   , modifierSelector :: Text
---   , modifierVals     :: Map Text Xabi.IndexedType
---   , modifierContents :: Maybe Text
---   } deriving (Eq,Show,Generic,NFData)
+
+tFormEv :: SolidEv.Event -> EVMXabi.Event
+tFormEv SolidEv.Event{..}= EVMXabi.Event {
+      eventAnonymous =  _eventAnonymous
+      , eventLogs    =  [ ( a, tFormIndexedType b) | (a, b) <- _eventLogs]  
+}
 
 
---SOLIDVM
--- data ModifierF a = Modifier
---   { _modifierArgs     :: Map Text SolidVM.IndexedType
---   , _modifierSelector :: Text
---   , _modifierContents :: Maybe [StatementF a]
---   , _modifierContext  :: a
---   } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
-
+tFormUs:: SVMXabi.Using ->  EVMXabi.Using
+tFormUs (SVMXabi.Using a _) = EVMXabi.Using a
 
 
 ----------------------------------
@@ -209,34 +153,24 @@ tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
 tFormIndexedType (CCVarfDef.IndexedType x y) = XabiType.IndexedType x (tFormTypeToType y)
 
 
---TODO fill this out......
 tFormTypeToType :: SolidType.Type -> XabiType.Type
 tFormTypeToType = \case 
-  (SolidType.Int maybeBool maybeBytes) ->  (XabiType.Int maybeBool maybeBytes)  -- Int {signed::Maybe Bool, bytes::Maybe Int32} ->
-  _ -> (XabiType.Int Nothing Nothing)
-  -- | String {dynamic::Maybe Bool}
-  -- | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
-  -- | Fixed {signed::Maybe Bool, decimals::Maybe (Int32,Int32)}
-  -- | Bool
-  -- | Address {isPayable :: Bool}
-  -- | Account {isPayable :: Bool}
-  -- | UnknownLabel SolidString (Maybe SolidString)
-  -- | Struct { bytes::Maybe Int32, typedef::SolidString}
-  -- | UserDefined { alias ::  SolidString, actual:: Type}
-  -- | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
-  -- | Error { bytes::Maybe Int32, typedef::SolidString }
-  -- | Array { entry:: Type, length :: Maybe Word }
-  -- | Contract {typedef::SolidString}
-  -- | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
+  (SolidType.Int maybeBool maybeBytes)    ->  (XabiType.Int maybeBool maybeBytes)
+  (SolidType.String maybeBool)            ->  (XabiType.String maybeBool)
+  (SolidType.Bytes maybeBool maybeBytes)  ->  (XabiType.Bytes maybeBool maybeBytes)
+  (SolidType.UnknownLabel  a _)           ->  (XabiType.UnknownLabel a )
+  (SolidType.Struct  maybeInt typeD )     ->  (XabiType.Struct maybeInt $ T.pack typeD )
+  (SolidType.Enum  maybeInt typeD nams)   ->  (XabiType.Enum maybeInt (T.pack typeD) ( (map T.pack) <$> nams) )
+  (SolidType.Array  typ len)              ->  (XabiType.Array (tFormTypeToType typ) len)
+  (SolidType.Contract  s)                 ->  (XabiType.Contract $ T.pack s)
+  (SolidType.Mapping  maybeBoo k v)       ->  (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
+  (SolidType.UserDefined   _ t)           ->  tFormTypeToType t
+  (SolidType.Bool)                        ->  (XabiType.Bool)
+  (SolidType.Address _)                   ->  (XabiType.Address)
+  (SolidType.Account _)                   ->  (XabiType.Account)
+  _ -> (XabiType.Int Nothing Nothing)  -- !!!!! TODO FIX THIS, THIS IS NOT WHAT SHOULD BE DONE HERE!
 
-
-
----TODO Clean up
----NOT USING AT THE MOMENT
--- ---SO I am Commenting them out
--- removeMaybeBool :: Maybe Bool -> Bool 
--- removeMaybeBool = \case {Just a -> a; Nothing -> False; }
-
-
--- removeMaybeInt :: Maybe Int32 -> Int32 
--- removeMaybeInt = \case {Just a -> a; Nothing -> 0; }
+--THE BELOW ARE SOLIDVM types that I was not sure how to map over
+-- data Type
+--   | Fixed {signed::Maybe Bool, decimals::Maybe (Int32,Int32)}
+--   | Error { bytes::Maybe Int32, typedef::SolidString }
