@@ -6744,7 +6744,7 @@ contract C {
       , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
       , BString "C"]
 
-  it "fails for overloaded foreign functions using local variable .code and .delegatecall" $ runTest ( do
+  it "fails for overloaded foreign functions using local variable .code and .staticcall" $ runTest ( do
     runBS [r|
 pragma solidvm 3.3;
 contract Test {
@@ -6782,7 +6782,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    (status, codeInt) = address(this).delegatecall(codeTest, (13, 14));
+    (status, codeInt) = address(this).staticcall(codeTest, (13, 14));
   }
 }|]) `shouldThrow` anyException
 
@@ -6825,7 +6825,7 @@ contract qq {
     getFields ["a", "b", "c"] `shouldReturn`
       [ BInteger 27, BInteger 14, BInteger 82 ]
 
-  it "can run an overloaded foreign function using .code and .delegatecall, using a foreign variable." $ runTest ( do
+  it "can run an overloaded foreign function using .code and .staticcall, using a foreign variable." $ runTest ( do
     runBS [r|
 pragma solidvm 3.3;
 contract Test {
@@ -6859,14 +6859,14 @@ contract qq {
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    (doesItWork, codeInt) = account(t).delegatecall(codeTest, (13, true));
+    (doesItWork, codeInt) = account(t).staticcall(codeTest, (13, true));
   }
 }|])
     `shouldThrow` anyException
       -- [ BDefault, BBool True, BInteger 53 ]
-    -- (doesItWork, codeInt) = account(t).delegatecall(codeTest, (13, 14));
+    -- (doesItWork, codeInt) = account(t).staticcall(codeTest, (13, 14));
 
-  it "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
+  it "can run a foreign function using .code and .staticcall, with an argument" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6888,14 +6888,14 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("randomFunc");
-    (status, functionTest) = account(this).delegatecall(codeTest, 13);
+    (status, functionTest) = account(this).staticcall(codeTest, 13);
   }
 }|]
     runBS codeSnippet
     getFields ["functionTest", "status"] `shouldReturn`
       [ BInteger 26, BBool True ]
 
-  it "can run a foreign function using .code and .delegatecall, without an argument" . runTest $ do
+  it "can run a foreign function using .code and .staticcall, without an argument" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6917,14 +6917,14 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("randomFunc");
-    (status, functionTest) = address(this).delegatecall(codeTest);
+    (status, functionTest) = address(this).staticcall(codeTest);
   }
 }|]
     runBS codeSnippet
     getFields ["status", "functionTest"] `shouldReturn`
       [ BBool True, BInteger 13]
 
-  it "can run a statement using .delegatecall" . runTest $ do
+  it "can run a statement using .staticcall" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6946,7 +6946,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("randomFunc");
-    (status, functionTest) = address(this).delegatecall(codeTest);
+    (status, functionTest) = address(this).staticcall(codeTest);
   }
 }|]
     runBS codeSnippet

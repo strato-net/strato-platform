@@ -778,7 +778,7 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
---TODO: Finish the other codes after delegatecall is finished
+--TODO: Finish the other codes after staticcall is finished
 
 -- genericCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 -- genericCallWrapper from to input isRCC args
@@ -786,17 +786,17 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 --   let payload = makePayload input
 
 -- --Very similar to genericCallWrapper but only touches pure and view functions/variables.
--- genericStaticCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
--- genericStaticCallWrapper from to input isRCC args
+-- genericDelegateCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+-- genericDelegateCallCallWrapper from to input isRCC args
 --   let payload = makePayload input
 
 --Very similar to the call function except this runs in the context of the local contract
 --TODO: reimplement the function or create a new function for the parser that is able to handle multiple overloaded functions
   -- the function `functionDeclaration` is only able to parse a single function  not multiple functions.
-genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
-genericDelegateCallWrapper from to input ro = do
+genericStaticCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
+genericStaticCallWrapper from to input ro = do
   -- TODO: ensure both contracts have the same pragma version
-  (codetype, args, _) <- superPayload "delegatecall" from input
+  (codetype, args, _) <- superPayload "staticcall" from input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
@@ -804,7 +804,7 @@ genericDelegateCallWrapper from to input ro = do
   result <- case codetype of
     CC.FunctionCode (n, f) -> 
       if ( length (f ^. CC.funcOverload) > 0) then 
-        generalMetaProgrammingError "Overloaded functions are not supported in delegatecall" (show f)
+        generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show f)
         --TODO: implement the overloaded function call, here is a helpful start, was having problems with: `getVariableOfNamefromList []` error
         -- matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
         -- doesFunctionMatch <- (testMatch argCount args) f
@@ -845,7 +845,7 @@ superPayload functionType address input = do
                 Right s -> pure $ CC.StatementCode s
               Right (funcName, actualFunction) -> case actualFunction of
                 Decl.FuncDeclaration fun -> if (length (fun ^. CC.funcOverload) > 0) then
-                    generalMetaProgrammingError "Overloaded functions are not supported in delegatecall" (show actualFunction)
+                    generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show actualFunction)
                   else
                     pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
@@ -2298,8 +2298,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                         in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
               pure . Constant $ SString ( unlines codeSnippets)
 
-          -- Isolate the payload and the inputted arguments, send to the actual delegatecaller function
-          Constant (SContractItem address' "delegatecall") -> do
+          -- Isolate the payload and the inputted arguments, send to the actual staticcaller function
+          Constant (SContractItem address' "staticcall") -> do
             --TODO: Add most of this checking to a separate function to reduce verbosity
             from <- getCurrentAccount
             cid <- case (address' ^. namedAccountChainId) of 
@@ -2316,12 +2316,12 @@ expToVar' (CC.FunctionCall _ e args) = do
             isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
             ro <- readOnly <$> getCurrentCallInfo
-            (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals ro
+            (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
             return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
           
           -- Constant (SContractItem address' "staticcall")
           --   (payload, argumentList) <- superPayload argVals
-          --   return . Constant . SBool $ genericStaticCallWrapper address' payload argVals
+          --   return . Constant . SBool $ genericDelegateCallWrapper address' payload argVals
 
           -- Constant (SContractItem address' "call")
           --   (payload, argumentList) <- superPayload argVals

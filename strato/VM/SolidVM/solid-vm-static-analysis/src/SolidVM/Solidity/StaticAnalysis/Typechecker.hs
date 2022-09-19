@@ -620,8 +620,8 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                          []
                          []
                ]
--- typecheckMember (MultiVariate (SVMType.Account _) x) "delegatecall" = pure $ Product [Static (SVMType.Bool) x, Static (SVMType.String False) x ] x
-typecheckMember (Static (SVMType.Account _) x) "delegatecall" = 
+-- typecheckMember (MultiVariate (SVMType.Account _) x) "staticcall" = pure $ Product [Static (SVMType.Bool) x, Static (SVMType.String False) x ] x
+typecheckMember (Static (SVMType.Account _) x) "staticcall" = 
   pure $ Function 
     --Allow the first argument to be a string, and the next arguments can be any type
     (MultiVariate (topType' x) x) 
@@ -657,7 +657,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
               -- | Static { staticType :: Type
               --          , staticContext :: a
               --          }
-typecheckMember (Static (SVMType.Contract _) x) "delegatecall" = 
+typecheckMember (Static (SVMType.Contract _) x) "staticcall" = 
   pure $ Function 
     --Allow the first argument to be a string, and the next arguments can be any type
     (MultiVariate (topType' x) x) 
