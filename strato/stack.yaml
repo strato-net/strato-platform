@@ -57,6 +57,8 @@ packages:
 - libs/type-lits
 - libs/x509-certs
 
+- simulator/strato-lite
+
 - test-suite
 
 - tools/blockapps-tools
