@@ -6744,40 +6744,32 @@ contract C {
       , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
       , BString "C"]
 
-  it "can detect when referencing a contract not at file level using type function" $ (runTest $
+  it "fails for overloaded foreign functions using local variable .code and .delegatecall" $ runTest ( do
     runBS [r|
-pragma solidvm 3.2;
-contract A {
-  uint x = type(B).name;
-
-}|]) `shouldThrow` anyTypeError
-
-  fit "can run an overloaded foreign function using local variable .code and .delegatecall" . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
   uint myNum = 26;
   bool myStatus;
   string myString = "butts";
 
-  function addToNum(uint x, uint y) public returns (uint) {
-    myNum += x + y;
-    return myNum;
+  function addToNum(int x, int y) returns (int) {
+    return x + y;
   }
 
-  function randomFunc(uint x) public returns (uint){
-    return myNum + x;
+  function addToNum(int x, bool g) returns (int){
+    if (g) {
+      return 1 + x;
+    } else {
+      return x;
+    }
   }
 
-  function addToNum(uint x, bool y) public returns (uint) {
-    myNum += x;
-    myStatus = y;
-  }
-
-  function addToNum(uint x, string z) public returns (uint) {
-    myNum += x;
-    myString = z;
+  function addToNum(int x, string z) returns (int){
+    if (z == "butts") {
+      return 69 + x;
+    } else {
+      return x;
+    }
   }
 }
 
@@ -6792,12 +6784,9 @@ contract qq{
     codeTest = account(t).code("addToNum");
     (status, codeInt) = address(this).delegatecall(codeTest, (13, 14));
   }
-}|]
-    runBS codeSnippet
-    getFields ["status", "codeInt"] `shouldReturn`
-      [BBool True, BInteger 39 ]
+}|]) `shouldThrow` anyException
 
-  fit "can run an overloaded function" . runTest $ do
+  it "can run an overloaded function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -6810,7 +6799,7 @@ contract qq {
     return x + y;
   }
 
-  function addToNum(uint x, bool g) returns (int){
+  function addToNum(int x, bool g) returns (int){
     if (g) {
       return 1 + x;
     } else {
@@ -6818,7 +6807,7 @@ contract qq {
     }
   }
 
-  function addToNum(uint x, string z) returns (int){
+  function addToNum(int x, string z) returns (int){
     if (z == "butts") {
       return 69 + x;
     } else {
@@ -6836,16 +6825,15 @@ contract qq {
     getFields ["a", "b", "c"] `shouldReturn`
       [ BInteger 27, BInteger 14, BInteger 82 ]
 
-  fit "can run an overloaded foreign function using .code and .delegatecall, using a foreign variable." . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|
+  it "can run an overloaded foreign function using .code and .delegatecall, using a foreign variable." $ runTest ( do
+    runBS [r|
 pragma solidvm 3.3;
 contract Test {
   function addToNum(int x, int y) returns (int) {
     return x + y;
   }
 
-  function addToNum(uint x, bool g) returns (int){
+  function addToNum(int x, bool g) returns (int){
     if (g) {
       return 1 + x;
     } else {
@@ -6853,7 +6841,7 @@ contract Test {
     }
   }
 
-  function addToNum(uint x, string z) returns (int){
+  function addToNum(int x, string z) returns (int){
     if (z == "butts") {
       return 69 + x;
     } else {
@@ -6871,12 +6859,12 @@ contract qq {
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    (doesItWork, codeInt) = account(t).delegatecall(codeTest, (13, 14));
+    (doesItWork, codeInt) = account(t).delegatecall(codeTest, (13, true));
   }
-}|]
-    runBS codeSnippet
-    getFields ["doesItWork", "codeInt"] `shouldReturn`
-      [ BBool True, BInteger 53 ]
+}|])
+    `shouldThrow` anyException
+      -- [ BDefault, BBool True, BInteger 53 ]
+    -- (doesItWork, codeInt) = account(t).delegatecall(codeTest, (13, 14));
 
   it "can run a foreign function using .code and .delegatecall, with an argument" . runTest $ do
     let codeSnippet :: String
