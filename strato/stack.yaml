@@ -55,11 +55,14 @@ packages:
 - libs/prometheus/cross-monitoring
 - libs/secp256k1-haskell
 - libs/type-lits
+- libs/x509-certs
+
+- simulator/strato-lite
 
 - test-suite
 
 - tools/blockapps-tools
-- tools/x509-certs
+- tools/x509-tools
 
 - vault/api
 - vault/client
@@ -113,7 +116,7 @@ extra-lib-dirs:
 - /usr/lib
 
 allow-newer: true
-
+allow-different-user: true
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints
 
