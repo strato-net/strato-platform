@@ -203,9 +203,7 @@ type PostChainInfo = "chain"
 -- GET /chain
 
 type GetChainInfo = "chain"
-  :> QueryParam "chainid" ChainId
-  :> QueryParam "offset" Integer
-  :> QueryParam "limit" Integer
+  :> QueryParams "chainid" ChainId
   :> Get '[JSON] [ChainIdChainOutput]
 
 -- POST /chains
