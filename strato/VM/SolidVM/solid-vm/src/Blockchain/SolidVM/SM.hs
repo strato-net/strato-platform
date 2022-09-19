@@ -499,7 +499,7 @@ getVariableOfName name = do
       , maybeThis
       , maybeConstant
       --, maybeUserDefined
-      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
+      , unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
