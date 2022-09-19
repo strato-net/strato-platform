@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module BlockApps.Bloc22.Server.Contracts where
-import           Control.Applicative ((<|>))
 import           Control.Arrow
 import           Control.Monad                   (join)
 import qualified Control.Monad.Change.Alter      as A
@@ -30,7 +29,6 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
-import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
@@ -423,7 +421,7 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> ( (parseXabi "src" (Text.unpack postxabirequestSrc)) <|> (parseSolidXabi "src" (Text.unpack postxabirequestSrc)) )
+         partialXabis <- Map.fromList . snd <$> (parseSolidXabi "src" (Text.unpack postxabirequestSrc))
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .

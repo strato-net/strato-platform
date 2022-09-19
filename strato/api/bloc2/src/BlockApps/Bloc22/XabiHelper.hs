@@ -41,7 +41,6 @@ import           SolidVM.Model.SolidString
 
 parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
 parseSolidXabi sName sCode = do
-  --SHould this be a a showError or something else?
   fi@(File parsedFile) <-  showError $ runParser solidityFile (ParserState "" "" M.empty) sName sCode
   let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile] 
   let associatedEVMVersion = case decideVersion fi of
@@ -52,23 +51,22 @@ parseSolidXabi sName sCode = do
    
 transFormXabi :: SVMXabi.Xabi -> EVMXabi.Xabi 
 transFormXabi SVMXabi.Xabi{..} =  
-  EVMXabi.Xabi { xabiFuncs   = M.map tFormFunc $ M.mapKeysMonotonic T.pack _xabiFuncs  -- M.fromList [ (T.pack ss,  tFormFunc f) |(ss, f)<- (M.toList _xabiFuncs)]
+  EVMXabi.Xabi { xabiFuncs   = M.map tFormFunc  $ M.mapKeysMonotonic T.pack _xabiFuncs 
              , xabiConstr    = case M.toList _xabiConstr of --Shouldn't _xabiConstr always be a size of 1?
                             [] -> Nothing
                             [(_, f)] -> Just $ tFormFunc f
                             _ -> Just $ tFormFunc $ snd $ head $ M.toList _xabiConstr --I don't think this should ever run
-             , xabiVars      = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic T.pack _xabiVars  --M.fromList [ (T.pack ss,  tFormVarDeclToVartype f) |(ss, f)<- (M.toList _xabiVars)]
-             , xabiTypes     = M.fromList  [ (t, def) |(t, Just def) <- [ (T.pack ss,  tFormDef f) | (ss, f) <- (M.toList _xabiTypes)]]
-             , xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers  --M.fromList   [ (T.pack ss,  tFormModifer m) | (ss, m) <- (M.toList _xabiModifiers)]
-             , xabiEvents    = M.map tFormEv $ M.mapKeysMonotonic T.pack _xabiEvents --M.fromList   [ (T.pack ss,  tFormEv m) | (ss, m) <- (M.toList _xabiEvents)]
+             , xabiVars      = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic T.pack _xabiVars
+             , xabiTypes     = M.map tFormDef     $ M.mapKeysMonotonic T.pack _xabiTypes
+             , xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers
+             , xabiEvents    = M.map tFormEv      $ M.mapKeysMonotonic T.pack _xabiEvents
              , xabiKind      = case _xabiKind of SVMXabi.ContractKind -> EVMXabi.ContractKind ; SVMXabi.InterfaceKind-> EVMXabi.InterfaceKind; SVMXabi.LibraryKind ->  EVMXabi.LibraryKind;
              , xabiUsing     = M.map tFormUs _xabiUsing
            }
 
 
 ----------------------------------
---General Helper functions for transforming
---each part of the Xabi
+--General helper functions for transforming Xabi
 ----------------------------------
 tFormFunc :: SolidF.Func -> EVMXabi.Func
 tFormFunc SolidF.Func{..} = EVMXabi.Func {      
@@ -108,11 +106,11 @@ tFormVarDeclToVartype    SolidVarDec.VariableDecl{..} = XabiType.VarType {
   }
 
 
-tFormDef :: SolidDef.Def -> Maybe XabiDef.Def
-tFormDef (SolidDef.Enum nam byte _)      = Just $ (XabiDef.Enum (map T.pack nam) byte)
-tFormDef (SolidDef.Struct fields byte _) = Just $ (XabiDef.Struct  (map (\(x, y)-> (T.pack x,  tFormFieldType y) ) fields)  byte)
-tFormDef (SolidDef.Contract bytes _)     = Just $ XabiDef.Contract bytes
-tFormDef      _                          = Nothing
+tFormDef :: SolidDef.Def -> XabiDef.Def
+tFormDef (SolidDef.Enum nam byte _)      = (XabiDef.Enum (map T.pack nam) byte)
+tFormDef (SolidDef.Struct fields byte _) = (XabiDef.Struct  (map (\(x, y)-> (T.pack x,  tFormFieldType y) ) fields)  byte)
+tFormDef (SolidDef.Contract bytes _)     = XabiDef.Contract bytes
+tFormDef (SolidDef.Error params byte _)  = (XabiDef.Struct  (map (\(x, (CCVarfDef.IndexedType z y))-> (T.pack x,  XabiType.FieldType z $ tFormTypeToType y ) ) params)  byte) --  { params :: [(SolidString, SolidVM.IndexedType)], bytes::Word, context :: a }
 
 
 tFormFieldType :: CCVarfDef.FieldType -> XabiType.FieldType
@@ -121,7 +119,7 @@ tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToTy
 
 tFormModifer :: SolidF.Modifier -> EVMXabi.Modifier
 tFormModifer SolidF.Modifier{..} = EVMXabi.Modifier{
-    modifierArgs       = M.map tFormIndexedType _modifierArgs-- M.fromList [ (a, tFormIndexedType b) |(a, b)<- (M.toList _modifierArgs)] -- :: Map Text Xabi.IndexedType
+    modifierArgs       = M.map tFormIndexedType _modifierArgs
     , modifierSelector = _modifierSelector 
     , modifierVals     = M.empty -- :: Map Text Xabi.IndexedType __TODO!!!!
     , modifierContents = case _modifierContents of 
@@ -140,14 +138,6 @@ tFormEv SolidEv.Event{..}= EVMXabi.Event {
 tFormUs:: SVMXabi.Using ->  EVMXabi.Using
 tFormUs (SVMXabi.Using a _) = EVMXabi.Using a
 
-
-----------------------------------
---General Helper Function Section
-----------------------------------
-tformMaybeSoldStringToText :: Maybe SolidString -> T.Text
-tformMaybeSoldStringToText x = case x of 
-  Just st -> T.pack st
-  Nothing -> T.pack ""  
 
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
 tFormIndexedType (CCVarfDef.IndexedType x y) = XabiType.IndexedType x (tFormTypeToType y)
@@ -168,9 +158,11 @@ tFormTypeToType = \case
   (SolidType.Bool)                        ->  (XabiType.Bool)
   (SolidType.Address _)                   ->  (XabiType.Address)
   (SolidType.Account _)                   ->  (XabiType.Account)
-  _ -> (XabiType.Int Nothing Nothing)  -- !!!!! TODO FIX THIS, THIS IS NOT WHAT SHOULD BE DONE HERE!
+  (SolidType.Fixed _ _)                   ->  (XabiType.UnknownLabel "FixedType") --Questionable at best
+  (SolidType.Error _ ss)                  ->  (XabiType.UnknownLabel ss)          --Questionable at best
+ 
 
---THE BELOW ARE SOLIDVM types that I was not sure how to map over
--- data Type
---   | Fixed {signed::Maybe Bool, decimals::Maybe (Int32,Int32)}
---   | Error { bytes::Maybe Int32, typedef::SolidString }
+tformMaybeSoldStringToText :: Maybe SolidString -> T.Text
+tformMaybeSoldStringToText x = case x of 
+  Just st -> T.pack st
+  Nothing -> T.pack ""  
