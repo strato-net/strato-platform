@@ -791,26 +791,31 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 --   let payload = makePayload input
 
 --Very similar to the call function except this runs in the context of the local contract
-genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> m (Bool, Maybe Value)
-genericDelegateCallWrapper from to input = do
+--TODO: reimplement the function or create a new function for the parser that is able to handle multiple overloaded functions
+  -- the function `functionDeclaration` is only able to parse a single function  not multiple functions.
+genericDelegateCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
+genericDelegateCallWrapper from to input ro = do
   -- TODO: ensure both contracts have the same pragma version
-  (codetype, args, argCount) <- superPayload "delegatecall" from input
+  (codetype, args, _) <- superPayload "delegatecall" from input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
   (toContract, toHsh, toCC) <- getCodeAndCollection to
   result <- case codetype of
-    -- runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
-    -- runTheConstructors from to hsh cc contractName' argExps = do
-    -- n=name of function; f=actual function that wants to be run
-    CC.FunctionCode (n, f) -> do
-      matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
-      doesFunctionMatch <- (testMatch argCount args) f
-      if (doesFunctionMatch)
-        then runTheCall to toContract n toHsh toCC f args False True
-        else case matchingOverload of
-          Nothing -> runTheCall to toContract n toHsh toCC f args False True
-          Just mo -> runTheCall to toContract n toHsh toCC mo args False True
+    CC.FunctionCode (n, f) -> 
+      if ( length (f ^. CC.funcOverload) > 0) then 
+        generalMetaProgrammingError "Overloaded functions are not supported in delegatecall" (show f)
+        --TODO: implement the overloaded function call, here is a helpful start, was having problems with: `getVariableOfNamefromList []` error
+        -- matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
+        -- doesFunctionMatch <- (testMatch argCount args) f
+        -- if (doesFunctionMatch)
+        --   then runTheCall to toContract n toHsh toCC f args ro True
+        --   else case matchingOverload of
+        --     Nothing -> runTheCall to toContract n toHsh toCC f args ro True
+        --     Just mo -> runTheCall to toContract n toHsh toCC mo args ro True
+      else 
+        runTheCall to toContract n toHsh toCC f args ro True
+      
 
       -- runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
     CC.StatementCode s -> runStatement s
@@ -838,8 +843,11 @@ superPayload functionType address input = do
               Left _ -> case runParser statement (ParserState "" "" M.empty) "" payload of
                 Left _ -> generalMetaProgrammingError "parsing" payload
                 Right s -> pure $ CC.StatementCode s
-              Right (funcName, actualFunction)  -> case actualFunction of
-                Decl.FuncDeclaration fun -> pure $ CC.FunctionCode (funcName, fun)
+              Right (funcName, actualFunction) -> case actualFunction of
+                Decl.FuncDeclaration fun -> if (length (fun ^. CC.funcOverload) > 0) then
+                    generalMetaProgrammingError "Overloaded functions are not supported in delegatecall" (show actualFunction)
+                  else
+                    pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
   --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
   liftIO $ print ("\n_+++++++++++++++++++++++++++++++++_\n" ++ (show code) ++ "\n_+++++++++++++++++++++++++++++++++_\n")
@@ -2307,7 +2315,8 @@ expToVar' (CC.FunctionCall _ e args) = do
               --check that the from and to are on the same chain`
             isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
-            (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals
+            ro <- readOnly <$> getCurrentCallInfo
+            (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals ro
             return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
           
           -- Constant (SContractItem address' "staticcall")
@@ -2497,23 +2506,6 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
--- evaluateAccountMember a True "delegatecall" = do
---   from <- getCurrentAccount
---   cid <- case (a ^. namedAccountChainId) of 
---       UnspecifiedChain -> do
---         --Assume that the chainId is the same as the from chainId when it is unset 
---         cid1 <- view accountChainId <$> getCurrentAccount
---         case cid1 of
---           Nothing -> return Nothing
---           Just cid2 -> return $ Just cid2
---       MainChain -> return Nothing
---       ExplicitChain cid -> return $ Just cid
---   let toAccount = namedAccountToAccount cid a
---     --check that the from and to are on the same chain`
---   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
---   unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
---   (didItWork, result) <- genericDelegateCallWrapper from toAccount argVals
---   return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
 evaluateAccountMember a _ "balance" = do 
   cid <- case (a ^. namedAccountChainId) of 
     UnspecifiedChain -> do
@@ -3268,8 +3260,14 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
       localVars <-
         forM locals $ \(n, (t, v)) -> do
-          newVar <- liftIO $ fmap Variable $ newIORef v
-          return (n, (t, newVar))
+          val <- (liftIO $ fmap Variable $ newIORef v)
+          -- newVar <- case val of
+          --   Left _ -> internalError "runTheCall: newIORef failed" (v)
+          --   Right x -> return x
+          -- -- newVar <- case (liftIO $ fmap Variable $ newIORef v) of
+          -- --   Left _ -> internalError "runTheCall: newIORef failed" (v)
+          -- --   Right x -> return x
+          return (n, (t, val))
 
       addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro False -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
