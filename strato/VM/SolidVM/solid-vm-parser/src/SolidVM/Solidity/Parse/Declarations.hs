@@ -400,7 +400,7 @@ errorDeclaration = do
   })
 
 -- | Parses a function definition.
---
+-- NOTICE: Not able to parse multiple functions at the same time (AKA: overloaded functions are not handled here)
 functionDeclaration :: Bool -> SolidityParser (String, Declaration)
 functionDeclaration free = do
   ~(a, (functionName, xabi')) <- withPosition $ do
