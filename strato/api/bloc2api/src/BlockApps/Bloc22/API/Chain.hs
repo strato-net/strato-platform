@@ -138,6 +138,11 @@ instance ToSchema ChainInput where
 instance ToParam (QueryParams "chainid" ChainId) where
   toParam _ = DocQueryParam "chainid" [] "chain ID to be looked up" Normal
 
+instance ToParam (QueryParams "limit" Integer) where
+  toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
+
+instance ToParam (QueryParams "offset" Integer) where
+  toParam _ = DocQueryParam "offset" [] "Starting index of contract array slice" Normal
 
 data ChainOutput = ChainOutput
   { chainoutputLabel    :: Text
@@ -204,6 +209,8 @@ type PostChainInfo = "chain"
 
 type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId
+  :> QueryParams "limit" Integer
+  :> QueryParams "offset" Integer
   :> Get '[JSON] [ChainIdChainOutput]
 
 -- POST /chains
