@@ -851,8 +851,6 @@ superPayload functionType address input = do
                   else
                     pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
-  --If the code was a part of a contract then we will need to view inside of the CodeCollection to get the contract
-  liftIO $ print ("\n_+++++++++++++++++++++++++++++++++_\n" ++ (show code) ++ "\n_+++++++++++++++++++++++++++++++++_\n")
   pure (code, args, argCount)
 
 testMatch :: MonadSM m => Int -> ValList -> CC.Func -> m Bool
@@ -2321,7 +2319,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
             return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
           
-          -- Constant (SContractItem address' "staticcall")
+          -- Constant (SContractItem address' "delegatecall")
           --   (payload, argumentList) <- superPayload argVals
           --   return . Constant . SBool $ genericDelegateCallWrapper address' payload argVals
 
@@ -3263,12 +3261,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       localVars <-
         forM locals $ \(n, (t, v)) -> do
           val <- (liftIO $ fmap Variable $ newIORef v)
-          -- newVar <- case val of
-          --   Left _ -> internalError "runTheCall: newIORef failed" (v)
-          --   Right x -> return x
-          -- -- newVar <- case (liftIO $ fmap Variable $ newIORef v) of
-          -- --   Left _ -> internalError "runTheCall: newIORef failed" (v)
-          -- --   Right x -> return x
           return (n, (t, val))
 
       addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro False -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]

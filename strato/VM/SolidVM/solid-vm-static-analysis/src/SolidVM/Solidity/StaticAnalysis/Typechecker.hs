@@ -248,9 +248,6 @@ intType' = Static (SVMType.Int Nothing Nothing)
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
 
--- callType' :: SourceAnnotation Text -> Type'
--- callType' = Product [(Static (SVMType.String Nothing)), Bottom]
-
 bytesType' :: SourceAnnotation Text -> Type'
 bytesType' = Static (SVMType.Bytes Nothing Nothing)
 
@@ -616,11 +613,7 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
   pure . Sum $ (Static (SVMType.String Nothing) x)
             :| [Function (Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ])
                          (Static (SVMType.String Nothing) x)
-                         x
-                         []
-                         []
-               ]
--- typecheckMember (MultiVariate (SVMType.Account _) x) "staticcall" = pure $ Product [Static (SVMType.Bool) x, Static (SVMType.String False) x ] x
+                         x [] [] ]
 typecheckMember (Static (SVMType.Account _) x) "staticcall" = 
   pure $ Function 
     --Allow the first argument to be a string, and the next arguments can be any type
@@ -648,15 +641,6 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
                          (Static (SVMType.String Nothing) x)
                          x [] []
                ]
-              -- | MultiVariate { multiVariateType :: (TypeF' a)
-              --                , multiVariateContext :: a
-              --                }
-              -- | Product { productTypes :: [TypeF' a]
-              --           , productContext :: a
-              --           }
-              -- | Static { staticType :: Type
-              --          , staticContext :: a
-              --          }
 typecheckMember (Static (SVMType.Contract _) x) "staticcall" = 
   pure $ Function 
     --Allow the first argument to be a string, and the next arguments can be any type
