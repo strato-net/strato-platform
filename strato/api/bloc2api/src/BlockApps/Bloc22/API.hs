@@ -25,12 +25,15 @@ import           BlockApps.Bloc22.API.Git
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
+import           BlockApps.Bloc22.API.X509
 
 type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
   GetGitInfo
   -- /users endpoints
   :<|> PostUsersFill
+  -- /x509 endpoints
+  :<|> CreateCertificate
   -- /contracts endpoints
   :<|> GetContracts
   :<|> PostContractsBatchStates

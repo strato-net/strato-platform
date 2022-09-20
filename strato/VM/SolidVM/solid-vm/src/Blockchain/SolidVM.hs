@@ -343,7 +343,8 @@ create' creator newAccount ch cc contractName' argExps = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erNewX509Certs = x509s'
+    erNewX509Certs = x509s',
+    erPragmas = CC._pragmas cc
     }
 
 {-
@@ -422,7 +423,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
       erAction = Just $ finalAct,
       erException = Nothing,
       erKind = SolidVM,
-      erNewX509Certs = x509s
+      erNewX509Certs = x509s,
+      erPragmas=[]
       }
 
 

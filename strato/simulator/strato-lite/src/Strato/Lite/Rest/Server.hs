@@ -1,0 +1,81 @@
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
+
+module Strato.Lite.Rest.Server where
+
+import           Control.Lens
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Data.Bifunctor                    (first)
+import           Data.Foldable                     (traverse_)
+import           Data.Traversable                  (for)
+import qualified Data.Map.Strict                   as M
+import qualified Data.Text                         as T
+import           Blockchain.Data.Json
+import qualified Blockchain.Data.TXOrigin          as Origin
+import           Blockchain.Sequencer.Event
+import           Strato.Lite.Rest.Api
+import           Strato.Lite.Monad
+import           Blockchain.Strato.Model.MicroTime
+import           Servant
+import           UnliftIO                          hiding (Handler)
+
+getNodes :: NetworkManager -> Handler ThreadResultMap
+getNodes mgr = liftIO . atomically $ do
+  ths <- readTVar $ mgr ^. threads
+  for (ths ^. nodeThreads) $ \a -> do
+    mExp <- pollSTM a
+    pure $ fmap (first show) mExp
+
+getConnections :: NetworkManager -> Handler ThreadResultMap
+getConnections mgr = liftIO . atomically $ do
+  ths <- readTVar $ mgr ^. threads
+  let f (s,c) = "(" <> s <> "," <> c <> ")"
+  fmap (M.mapKeys f) . for (ths ^. connectionThreads) $ \a -> do
+    mExp <- pollSTM a
+    pure $ fmap (first show) mExp
+
+postAddNode :: NetworkManager -> T.Text -> T.Text -> Handler Bool
+postAddNode mgr label ip = liftIO $ runReaderT (addNode label ip) mgr
+
+postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
+postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
+
+postAddConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
+postAddConnection mgr s c = liftIO $ runReaderT (addConnection s c) mgr
+
+postRemoveConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
+postRemoveConnection mgr s c = liftIO $ runReaderT (removeConnection s c) mgr
+
+postTimeout :: NetworkManager -> Int -> Handler ()
+postTimeout mgr rn = do
+  let ev = TimerFire $ fromIntegral rn 
+  peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
+  liftIO $ traverse_ (postEvent ev) peers
+
+postTx :: NetworkManager -> Transaction' -> Handler ()
+postTx mgr (Transaction' tx) = do
+  ts <- liftIO $ getCurrentMicrotime
+  let ev = UnseqEvent . IETx ts $ IngestTx Origin.API tx
+  peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
+  
+  liftIO $ traverse_ (postEvent ev) peers
+
+stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
+stratoLiteRestServer mgr =
+       getNodes mgr
+  :<|> getConnections mgr
+  :<|> postAddNode mgr
+  :<|> postRemoveNode mgr
+  :<|> postAddConnection mgr
+  :<|> postRemoveConnection mgr
+  :<|> postTimeout mgr
+  :<|> postTx mgr
+
+stratoLiteRestApp :: NetworkManager -> Application
+stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer

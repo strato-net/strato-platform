@@ -27,10 +27,10 @@ runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack 
             Right cc -> cc
 
 runTest :: CodeCollection -> IO ()
-runTest f = case f of
-    (CodeCollection _ _ _ _ _ _) -> return ()
-
-varDeclHelper :: CodeCollection -> [VariableDeclF (SourceAnnotation ())]
+runTest f = case f of 
+    (CodeCollection _ _ _ _ _ _ _) -> return ()
+    
+varDeclHelper :: CodeCollection -> [VariableDeclF (SourceAnnotation ())] 
 varDeclHelper cc = cc  ^.. contracts . folded . storageDefs .folded
 
 varDeclHelper' :: [VariableDeclF (SourceAnnotation ())] -> [ExpressionF (SourceAnnotation ())]
