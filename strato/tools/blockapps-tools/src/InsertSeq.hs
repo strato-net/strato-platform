@@ -38,6 +38,7 @@ disableValidator disVal = do
     writeUnseqEvents [msg]
   print resp
   exitSuccess
+
 addTx :: String -> IO ()
 addTx tx' = do
   rtx <- either (die . printf "failed raw tx decoding: %s") (return . rtPrimeToRt) . eitherDecodeStrict . C8.pack $ tx'

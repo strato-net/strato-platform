@@ -83,7 +83,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             , maxUsPerIter = 20000
             , vaultClient = Just clientEnv
             }
-      runLoggingT . runSequencerM dummySequencerCfg False Nothing $ do
+      runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
         A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
         flushLdbBatchOps

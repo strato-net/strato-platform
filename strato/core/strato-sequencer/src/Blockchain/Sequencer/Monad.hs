@@ -22,7 +22,7 @@ module Blockchain.Sequencer.Monad
   , HasNamespace(..)
   , BlockPeriod(..)
   , RoundPeriod(..)
-  , ValidatorRestriction(..)
+  -- , ValidatorRestriction(..)
   , isInNamespace
   , fromNamespace
   , lookupInLDB
@@ -52,7 +52,7 @@ module Blockchain.Sequencer.Monad
   , dbeRegistry
   , blockHashRegistry
   , emittedBlockRegistry
-  , isDisableValidator
+  -- , isDisableValidator
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
@@ -120,7 +120,7 @@ import qualified Strato.Strato23.Client                    as VC
 
 
 
-newtype ValidatorRestriction = ValidatorRestriction Bool
+-- newtype ValidatorRestriction = ValidatorRestriction Bool
 
 
 data Modification a = Modification a | Deletion
@@ -140,7 +140,7 @@ data SequencerContext = SequencerContext
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
-  , _isDisableValidator  :: ValidatorRestriction
+  -- , _isDisableValidator  :: ValidatorRestriction
   }
 makeLenses ''SequencerContext
 
@@ -364,9 +364,9 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance Mod.Modifiable (ValidatorRestriction) SequencerM where
-  get _ = use isDisableValidator
-  put _ = modify' . (.~) isDisableValidator
+-- instance Mod.Modifiable (ValidatorRestriction) SequencerM where
+--   get _ = use isDisableValidator
+--   put _ = modify' . (.~) isDisableValidator
 
 instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
@@ -445,8 +445,8 @@ prunePrivacyDBs = do
   where prune = setTo M.empty
         setTo s r = modify' $ r .~ s
 
-runSequencerM :: SequencerConfig -> Bool -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM c disableValidator mbc m = do
+runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM c mbc m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     a <- runResourceT . flip runReaderT c $ do
         dbCS     <- asks depBlockDBCacheSize
@@ -471,7 +471,7 @@ runSequencerM c disableValidator mbc m = do
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
-            , _isDisableValidator  = ValidatorRestriction disableValidator
+            -- , _isDisableValidator  = ValidatorRestriction disableValidator
             }
     return $ fst a
 
@@ -534,9 +534,9 @@ flushLdbBatchOps = do
   incCounter seqLdbBatchWrites
   setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
-  let getBool (ValidatorRestriction b) = b
-  disValSeqContext <- (Mod.get (Mod.Proxy @ValidatorRestriction))
-  $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
+  -- let getBool (ValidatorRestriction b) = b
+  -- disValSeqContext <- (Mod.get (Mod.Proxy @ValidatorRestriction))
+  -- $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
   clearLdbBatchOps
 
 -- flipDisableValidator :: Mod.Modifiable Bool m => Bool -> m ()

@@ -63,7 +63,7 @@ main = do
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
-  putStrLn $ "strato-sequencer isDisableValidator: " ++ show flags_isDisableValidator
+  -- putStrLn $ "strato-sequencer isDisableValidator: " ++ show flags_isDisableValidator
   
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -145,6 +145,7 @@ main = do
                
                ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
                putStrLn $ "Checkpoint: " ++ show ckpt
+              --  putStrLn $ "Disable Validator qwerty: " ++ show flags_isDisableValidator
  
                return $ Just $ newContext ckpt selfAddress
   
@@ -169,7 +170,7 @@ main = do
         , vaultClient = Just clientEnv
         }
   race_ (runTheGregor gregorCfg)
-      . race_ (runLoggingT (runSequencerM seqCfg flags_isDisableValidator mCtx sequencer ))
+      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
       . run flags_blockstanbul_port
       . prometheus def{ prometheusInstrumentApp = False }
       . instrumentApp "blockstanbul-admin"

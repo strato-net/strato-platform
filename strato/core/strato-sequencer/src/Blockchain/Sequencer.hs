@@ -152,15 +152,15 @@ oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (
 oneSequencerIter src = timeAction seqLoopTiming $ do
   (src', events) <- readEventsInBufferedWindow src
   BatchSeqEvent{..} <- runSequencerBatch events
-  let myFunc [] = []
-      myFunc ((UnseqEvent (IEDisableValidator b)) : xs) = b : (myFunc xs)
-      myFunc (_:xs) = myFunc xs
+  -- let myFunc [] = []
+  --     myFunc ((UnseqEvent (IEDisableValidator b)) : xs) = b : (myFunc xs)
+  --     myFunc (_:xs) = myFunc xs
 
-  let getBool (ValidatorRestriction b) = b
-  mapM_ ((Mod.put (Proxy @ValidatorRestriction)) . (ValidatorRestriction)) $ myFunc events  
-  let logF = logFF "sequencer/events"
-  disValSeqContext <- (Mod.get (Proxy @ValidatorRestriction))
-  logF . printf "disable validator value = %s" $ show (getBool disValSeqContext)
+  -- let getBool (ValidatorRestriction b) = b
+  -- mapM_ ((Mod.put (Proxy @ValidatorRestriction)) . (ValidatorRestriction)) $ myFunc events  
+  -- let logF = logFF "sequencer/events"
+  -- disValSeqContext <- (Mod.get (Proxy @ValidatorRestriction))
+  -- logF . printf "disable validator value = %s" $ show (getBool disValSeqContext)
   -- $logDebugS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
   -- $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
 
@@ -657,7 +657,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
       --      mapM_ (puts . (\vr -> sc & isDisableValidator .~ vr) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool))) events
   
       -- mapM_ (Mod.put (Proxy @ValidatorRestriction)) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool)) events
-      blockstanbulSend $ map (\(IEDisableValidator theBool) -> ForcedValidatorChange theBool) events
+      -- blockstanbulSend $ map (\(IEDisableValidator theBool) -> ForcedValidatorChange theBool) events
 
       -- logFF IETDisableValidator 
       -- logFF _isDisableValidator
