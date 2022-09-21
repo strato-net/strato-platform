@@ -324,7 +324,8 @@ createMetadataNoCompile :: ( MonadIO m
 createMetadataNoCompile sourceList = do
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
-      eVerXabis = parseSolidXabi  "-" $ Text.unpack source 
+      oldXabi  =  parseXabi "-" $ Text.unpack source
+      eVerXabis = (case oldXabi of Left _ -> parseSolidXabi "-" $ Text.unpack source; _ -> oldXabi;)
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err

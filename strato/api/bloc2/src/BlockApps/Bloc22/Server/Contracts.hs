@@ -29,6 +29,7 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
@@ -421,7 +422,8 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> (parseSolidXabi "src" (Text.unpack postxabirequestSrc))
+         let oldXabi  =  parseXabi "src" (Text.unpack postxabirequestSrc)
+         partialXabis <- Map.fromList . snd <$>  (case oldXabi of Left _ -> parseSolidXabi "src" (Text.unpack postxabirequestSrc); _ -> oldXabi;)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .
