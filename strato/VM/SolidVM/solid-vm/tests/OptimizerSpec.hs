@@ -5,6 +5,7 @@
 module OptimizerSpec where
 
 import qualified Data.Map as M
+import Data.Maybe            (catMaybes) 
 import           Control.Lens
 --import           Control.Monad (liftM2)
 import qualified Data.Text as T
@@ -14,21 +15,26 @@ import           Test.Hspec
 import           Test.QuickCheck
 import           Text.RawString.QQ
 
-
+--import Blockchain.SolidVM.SM (MonadSM)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type as SVMType
 
+--import  SolidVM.Model.Value
+
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.CodeCollectionDB
---import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
+import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP 
+
 --import qualified Blockchain.SolidVM                              as SolidVM
 import           Data.Source.Position 
---import           Blockchain.SolidVM.SM
-
+-- --import           Blockchain.SolidVM.SM
+-- import           Blockchain.Strato.Model.ExtendedWord (Word256)
 --import qualified SolidVM.Model.Type                              as SVMType 
---import Debug.Trace
+import Debug.Trace
 --import           Text.Printf
+import  SolidVM.Solidity.Parse.UnParser
 data Colour = Red | Blue | Green
     deriving Show
 
@@ -58,30 +64,75 @@ dummyAnnotation =
   }
 
 
----I commented out so I get get working
---- THis will have to be redone for testing purposes
--- varDeclOptimizeredHelper :: MonadSM m => m Bool -> Bool
--- varDeclOptimizeredHelper m True = True
--- varDeclOptimizeredHelper _  = False
+-- This maybe useful, no...
+-- dummyCodeCollection :: CodeCollection
 
--- --Should check if size is smaller or atleast the same
--- --Should check if optimized twice it does differ from optimized once
--- --Should check that both unomptized and optimized expressions result in the same value
--- varDeclOptimizered :: [VariableDecl] -> Bool
--- varDeclOptimizered vd = varDeclOptimizeredHelper (liftM2 (==)
+
+-- varDeclOptimizeredHelper :: MonadSM m => m Bool -> Bool
+-- varDeclOptimizeredHelper (m True) = True
+-- varDeclOptimizeredHelper (m False)  = False
+
+--Should check if size is smaller or atleast the same
+--Should check if optimized twice it does differ from optimized once
+--Should check that both unomptized and optimized expressions result in the same value
+--It may need to be able to create an entire Random CodeCollection.
+--Then Filter the random code collections...- This could be messy as fuck.
+-- I guess step one would be to create random code collections
+-- Step two would be to type check those, filtering out all that are not good
+-- step three would be then testing it
+
+-- varDeclOptimizered :: CodeCollection -> Maybe Contract -> [VariableDecl] -> Bool
+-- varDeclOptimizered cc mc vd = varDeclOptimizeredHelper (liftM2 (==)
 --         (head (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- vd ]))
---         (head (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- (O.varDeclHelper <$> vd) ])))
---             -- do
---             -- l1 <- (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- vd ]) 
---             -- l2 <- (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- (O.varDeclHelper <$> vd) ])
---             -- pure $ l1 == l2
---         --
+--         (head (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- (O.varDeclHelper cc mc <$> vd) ])))
+            -- do
+            -- l1 <- (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- vd ]) 
+            -- l2 <- (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- (O.varDeclHelper <$> vd) ])
+            -- pure $ l1 == l2
+        --
         
---         --pure $ trace (" SHow some TExts\n\t" ++(show val1) )(O.varDeclHelper <$> (O.varDeclHelper <$> vd)) == (O.varDeclHelper <$> vd) -- Check idempotence 
-         
-        
+        --pure $ trace (" SHow some TExts\n\t" ++(show val1) )(O.varDeclHelper <$> (O.varDeclHelper <$> vd)) == (O.varDeclHelper <$> vd) -- Check idempotence 
+
+storageDefSize :: VariableDecl -> Int
+storageDefSize vd  = case  _varInitialVal vd of
+        Nothing -> 0
+        Just ex -> count ex
+    where 
+        count :: (Expression) -> Int
+        count (Binary _ _ expr1 expr2 ) = (count expr1 ) + (count expr2)
+        count _ = 1
+
+
+--Properties tested:
+--                   StorageDefs same size or smaller
+--                   StorageDefs the same if Optimizer ran more than once
+--                   TODO StorageDef expression are the evaluted as the same
+propTest :: [CodeCollection] -> Bool
+propTest arrCC = do 
+    --Prelude.length arrCC == Prelude.length (TP.detector <$> arrCC)
+    let map2 = (map fst) $ (filter (([] == ) . snd)) $ (zip arrCC $ TP.detector <$> arrCC)
+    let len2 =  (O.detector <$> map2)
+    let storgeDefs1 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> len2)
+    let storgeDefs2 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> len2))
+    let storgeDefs3 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)
+    
+    let listOf1VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs1))
+    let listOf2VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs3))
+
+    -- let lsExprs1 = catMaybes $ _varInitialVal <$> listOf1VariableDeclF
+    -- --let lsExprs2 = catMaybes $ _varInitialVal <$> listOf2VariableDeclF
     
     
+    -- let vals1 =   SolidVM.expToVar  <$> lsExprs1 -- `:: [Word256 SolidVM.Model.Value.Variable]
+    -- -- vals2 <-  SolidVM.expToVar <$> lsExprs2
+    -- let printGarb =  trace ((show vals1)) "garb"
+    -- --(show $ head lsExprs1)++ " " ++(show $ head lsExprs2) 
+    -- let storgeDefs3 = trace(printGarb) (storgeDefs2) 
+
+    trace (show $ (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)) (storgeDefs2 ==  storgeDefs1) && ((storageDefSize <$> listOf1VariableDeclF) <= (storageDefSize <$>   listOf2VariableDeclF)) -- && ( vals1 == vals2 )
+    --Prelude.length map2 == Prelude.length len2
+
+
     -- case liftM2 (==) (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- vd ])  (map (\expr -> SolidVM.expToVar expr)  [ e | (VariableDecl  _ _ (Just e) _ _) <- (O.varDeclHelper <$> vd) ]) of
     --     True -> True
     --     False -> False
@@ -220,6 +271,8 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-
+    fit "Should do something" $
+            quickCheck propTest
+            --verboseCheck propSmaller
     -- fit "Something something" $
     --     quickCheck varDeclOptimizered

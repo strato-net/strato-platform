@@ -4,6 +4,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
 
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
@@ -31,10 +33,16 @@ import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
+--import Data.Text as T
 import qualified Data.Map as M
 import Data.Source
 import Data.Traversable (for)
+
 import GHC.Generics
+
+--import qualified Generic.Random                     as GR
+import           Test.QuickCheck.Instances    ()
+import           Test.QuickCheck
 
 import           Blockchain.SolidVM.Exception
 
@@ -77,3 +85,70 @@ getParents cc c =
                         Right
   in for (c ^. parents) $ \p ->
        toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
+
+-- instance Arbitrary a => Arbitrary (CodeCollectionF a) where
+--   arbitrary = GR.genericArbitrary GR.uniform
+
+--instance Arbitrary CodeCollection  where
+
+--instance Arbitrary a => Arbitrary (CodeCollectionF a) where
+instance Arbitrary CodeCollection where
+  arbitrary = do 
+
+  -- sized arbHeapP
+  --  where
+  --   arbHeapP s =
+  --     frequency
+  --     [ (1, do return Empty)
+  --     , (1, do x <- ) 
+    contr <- arbitrary
+    -- ary <- arbitrary SourceAnnotation
+    oneof [return $ CodeCollection {
+        _contracts  = M.fromList [("qq", contr)]-- = M.fromList [("qq", Contract {     
+    --   _contractName = "SolidString",
+    --   _parents = [],
+    --   _constants = M.empty ,
+    --   _storageDefs = M.empty ,
+    --   _userDefined = M.empty ,
+    --   _enums       = M.empty ,
+    --   _structs     = M.empty ,
+    --   _errors      = M.empty ,
+    --   _events      = M.empty,
+    --   _functions   = M.empty ,
+    --   _constructor = Nothing ,
+    --   _modifiers   = M.empty ,
+    --   _vmVersion   = "",
+    --   _contractContext = emptyAnnotation
+    --     })]
+    , _flFuncs     = M.empty
+    , _flConstants = M.empty
+    , _flEnums     = M.empty
+    , _flStructs   = M.empty
+    , _flErrors    = M.empty}]
+
+-- instance Arbitrary (ExpressionF (SourceAnnotation T.Text)) where -- I think I can turn this signature into an a
+--    arbitrary =  --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
+--       [return $ (NumberLiteral (emptyAnnotation) 2 Nothing), return $ (NumberLiteral (emptyAnnotation) 3 Nothing)]
+
+
+
+-- emptyAnnotation :: SourceAnnotation T.Text
+-- emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
+
+
+-- dummyAnnotation :: SourceAnnotation ()
+-- dummyAnnotation =
+--   SourceAnnotation
+--   {
+--     _sourceAnnotationStart=SourcePosition {
+--       _sourcePositionName="",
+--       _sourcePositionLine=0,
+--       _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationEnd=SourcePosition {
+--       _sourcePositionName="",
+--         _sourcePositionLine=0,
+--         _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationAnnotation = ()
+--   }

@@ -103,6 +103,7 @@ tests:
       - utf8-string
       - test-framework
       - QuickCheck
+      - solid-vm-parser
 
 benchmarks:
     codebench:

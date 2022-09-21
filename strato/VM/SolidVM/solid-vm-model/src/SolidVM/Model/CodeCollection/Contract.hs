@@ -4,7 +4,8 @@
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE DeriveAnyClass     #-}
-
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -28,9 +29,15 @@ module SolidVM.Model.CodeCollection.Contract (
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
-import Data.Map (Map)
+import Data.Map (Map, empty)
 import Data.Source
 import GHC.Generics
+
+
+
+--import qualified Generic.Random                     as GR
+import           Test.QuickCheck.Instances    ()
+import           Test.QuickCheck
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM
@@ -64,3 +71,30 @@ instance FromJSON a => FromJSON (ContractF a)
 type Contract = Positioned ContractF
 
 makeLenses ''ContractF
+
+
+-- instance Arbitrary a => Arbitrary (ContractF a) where
+--   arbitrary = GR.genericArbitrary GR.uniform
+
+instance Arbitrary Contract  where
+  arbitrary = do -- GR.genericArbitrary GR.uniform
+    stateVars <- arbitrary
+    a <- arbitrary
+    --arbitrary
+    -- ary <- arbitrary SourceAnnotation
+    oneof [return $ Contract {     
+    _contractName = "qq",
+    _parents = [],
+    _constants  =  empty ,-- :: Map SolidString (ConstantDeclF a),
+    _storageDefs =  stateVars,  -- :: Map SolidString (VariableDeclF a),
+    _userDefined = empty ,
+    _enums  =  empty ,
+    _structs  =  empty ,
+    _errors  =  empty ,
+    _events  =  empty ,
+    _functions =  empty ,
+    _constructor  =  Nothing ,
+    _modifiers  =  empty ,
+    _vmVersion  =  "" ,
+    _contractContext = a
+  }]

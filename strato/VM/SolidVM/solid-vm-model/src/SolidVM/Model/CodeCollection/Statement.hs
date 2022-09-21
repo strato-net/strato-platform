@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module SolidVM.Model.CodeCollection.Statement
   ( StatementF(..)
@@ -36,7 +37,12 @@ import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 import Control.DeepSeq
 import Test.QuickCheck
-import Control.Monad
+--import Control.Monad
+
+
+import qualified Generic.Random                     as GR
+import           Test.QuickCheck.Instances    ()
+
 
 -- Changes to this structure should also have changes in the Unparser :)
 data StatementF a =
@@ -86,6 +92,10 @@ data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 instance ToJSON Location
 instance FromJSON Location
 
+instance Arbitrary Location where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
 data VarDefEntryF a = BlankEntry
                     | VarDefEntry { vardefType :: Maybe Type
                                   , _vardefLocation :: Maybe Location
@@ -128,6 +138,9 @@ data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFDa
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
+
+instance Arbitrary InlineAssembly where
+  arbitrary = GR.genericArbitrary GR.uniform
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -177,34 +190,90 @@ instance FromJSON a => FromJSON (ExpressionF a)
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
                   deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
-instance Arbitrary Expression  where -- I think I can turn this signature into an a
-   arbitrary = 
-    -- do
-    -- --inter <- (choose (0, 10000))
-    -- expr1 <- numberOnlyExpressions
-    -- expr2 <- numberOnlyExpressions
-    oneof --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
-      [ numberOnlyExpressions
-      , binaryExpressions
-      ]
 
-numberOnlyExpressions :: Gen (Expression)
-numberOnlyExpressions = do
-    inter <- (choose (0, 10000))
-    oneof 
-      [ return $ NumberLiteral (dummyAnnotation) inter  Nothing
-      --, return $ (Binary dummyAnnotation  "+" (numberOnlyExpressions >>=)  (numberOnlyExpressions >>= ))
-      ]
+instance Arbitrary a => Arbitrary (ExpressionF a) where
+  arbitrary = sized exprArb
+    where exprArb s = do 
+            -- a        <- arbitrary
+            -- str      <- arbitrary
+            -- express1 <- arbitrary
+            -- express2 <- arbitrary
+            -- num      <- arbitrary
+            -- num2     <- arbitrary
+            
+            -- let numL = 
+            frequency [ (1, do
+              a        <- arbitrary
+              num      <- arbitrary
+              num2     <- arbitrary
+              return $ (NumberLiteral a num2  $ Just num) ),
+              (1, do 
+                  a        <- arbitrary
+                  str      <- arbitrary
+                  express1 <- arbitrary
+                  express2 <- arbitrary
+                  --x <- arbitrary
+                  return $ Binary a str express1 express2),
+              (s, do
+                    a        <- arbitrary
+                    num      <- arbitrary
+                    num2     <- arbitrary
+                    return $ (NumberLiteral a num2  $ Just num))]
+              --where
+              -- s1 = s`div`2 -- = n-1
+                    
+                
+                -- (s, do 
+                --   a        <- arbitrary
+                --   str      <- arbitrary
+                --   express1 <- exprArb s1
+                --   express2 <- exprArb s1
+                --   x <- arbitrary
+                --   return $ Binary a str express1 express2),
+                 
+            --where
+              -- s1 = s`div`2 -- = n-1
+      --s2 = n`div`2
+  --shrink (Binary a str e1 e2) = [ Binary a str  e1' e2'  | e1' <- shrink e1,  e2' <- shrink e2]
+  --[return $ Binary a str express1 express2,  return $ NumberLiteral a num  num2] 
+            --oneof [return $ Binary a str express1 express2,  return $ NumberLiteral a num  num2]
 
-binaryExpressions :: Gen (Expression)
-binaryExpressions = sized binaryExpressions'
 
-binaryExpressions' :: Integral n => n  -> Gen (Expression)
---binaryExpressions' a | n < 0 = numberOnlyExpressions
-binaryExpressions'  0 = numberOnlyExpressions
--- binaryExpressions' 1 = numberOnlyExpressions
-binaryExpressions' n  = oneof [ numberOnlyExpressions, liftM2 (Binary dummyAnnotation  "+") subExpress  subExpress ]
-  where subExpress = binaryExpressions' (n `div` 2)
+instance Arbitrary a => Arbitrary (ArgListF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+
+
+
+-- instance Arbitrary Expression  where -- I think I can turn this signature into an a
+--    arbitrary = 
+--     -- do
+--     -- --inter <- (choose (0, 10000))
+--     -- expr1 <- numberOnlyExpressions
+--     -- expr2 <- numberOnlyExpressions
+--     oneof --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
+--       [ numberOnlyExpressions
+--       , binaryExpressions
+--       ]
+
+-- numberOnlyExpressions :: Gen (Expression)
+-- numberOnlyExpressions = do
+--     inter <- (choose (0, 10000))
+--     oneof 
+--       [ return $ NumberLiteral (dummyAnnotation) inter  Nothing
+--       --, return $ (Binary dummyAnnotation  "+" (numberOnlyExpressions >>=)  (numberOnlyExpressions >>= ))
+--       ]
+
+-- binaryExpressions :: Gen (Expression)
+-- binaryExpressions = sized binaryExpressions'
+
+-- binaryExpressions' :: Integral n => n  -> Gen (Expression)
+-- --binaryExpressions' a | n < 0 = numberOnlyExpressions
+-- binaryExpressions'  0 = numberOnlyExpressions
+-- -- binaryExpressions' 1 = numberOnlyExpressions
+-- binaryExpressions' n  = oneof [ numberOnlyExpressions, liftM2 (Binary dummyAnnotation  "+") subExpress  subExpress ]
+--   where subExpress = binaryExpressions' (n `div` 2)
 
 
   
@@ -225,23 +294,44 @@ instance FromJSON a => FromJSON (ArgListF a)
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
+instance Arbitrary NumberUnit where
+  arbitrary = GR.genericArbitrary GR.uniform
+
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit
 
 
-dummyAnnotation :: SourceAnnotation ()
-dummyAnnotation =
-  SourceAnnotation
-  {
-    _sourceAnnotationStart=SourcePosition {
-      _sourcePositionName="",
-      _sourcePositionLine=0,
-      _sourcePositionColumn=0
-      },
-    _sourceAnnotationEnd=SourcePosition {
-      _sourcePositionName="",
-        _sourcePositionLine=0,
-        _sourcePositionColumn=0
-      },
-    _sourceAnnotationAnnotation = ()
-  }
+-- dummyAnnotation :: SourceAnnotation ()
+-- dummyAnnotation =
+--   SourceAnnotation
+--   {
+--     _sourceAnnotationStart=SourcePosition {
+--       _sourcePositionName="",
+--       _sourcePositionLine=0,
+--       _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationEnd=SourcePosition {
+--       _sourcePositionName="",
+--         _sourcePositionLine=0,
+--         _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationAnnotation = ()
+--   }
+
+
+
+instance Arbitrary a => Arbitrary (StatementF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+-- instance Arbitrary Expression where
+--   arbitrary = GR.genericArbitrary GR.uniform
+
+
+
+instance Arbitrary a => Arbitrary (SimpleStatementF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+
+instance Arbitrary a => Arbitrary (VarDefEntryF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+

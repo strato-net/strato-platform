@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
-  --, varDeclHelper -- POssibly throw this away. -- Exporting for testing purposes. Needed? I think not.
+  , varDeclHelper -- POssibly throw this away. -- Exporting for testing purposes. Needed? I think not.
   ) where
 
 import           Control.Monad.Reader
@@ -17,16 +17,16 @@ import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
 import           SolidVM.Solidity.Parse.UnParser
-import Debug.Trace -- Throw away for later
+--import Debug.Trace -- Throw away for later
 
 data R = R
   { codeCollection :: CodeCollection
   , contract :: Maybe Contract
   }
 
-
+--trace ("OG CODE COLLECTION\n\t" ++(show cc)) 
 detector ::  CodeCollection -> CodeCollection
-detector cc = trace ("OG CODE COLLECTION\n\t" ++(show cc)) (over (contracts . mapped) (contractHelper cc)
+detector cc = (over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
           $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
 
