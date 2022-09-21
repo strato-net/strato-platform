@@ -64,6 +64,7 @@ import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
+import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -269,7 +270,7 @@ sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
 sourceToContractDetails shouldCompile sourceList =
   let createContractDetails =
         case shouldCompile of
-          Do Compile -> compileContract
+          Do Compile    -> compileContract
           Don't Compile -> createMetadataNoCompile
    in createContractDetails sourceList
 
@@ -323,7 +324,8 @@ createMetadataNoCompile :: ( MonadIO m
 createMetadataNoCompile sourceList = do
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
-      eVerXabis = parseXabi "-" $ Text.unpack source
+      oldXabi  =  parseXabi "-" $ Text.unpack source
+      eVerXabis = (case oldXabi of Left _ -> parseSolidXabi "-" $ Text.unpack source; _ -> oldXabi;)
       srcHash = hash (Text.encodeUtf8 encodedSrc)
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
