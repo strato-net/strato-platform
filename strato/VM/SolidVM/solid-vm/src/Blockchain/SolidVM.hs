@@ -221,7 +221,7 @@ solidVMBreakpoint ann = do
 -- end debugger-related code
 
 requireOriginCert :: MonadSM m => Account -> m ()
-requireOriginCert acct = unless (flags_requireCerts && acct ^. accountAddress == fromPublicKey rootPubKey) $ do
+requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
   originHasCert <- A.exists (A.Proxy @X509Certificate) $ acct ^. accountAddress
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
