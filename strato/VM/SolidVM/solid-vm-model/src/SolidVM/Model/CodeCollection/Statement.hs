@@ -204,9 +204,9 @@ instance Arbitrary a => Arbitrary (ExpressionF a) where
             -- let numL = 
             frequency [ (1, do
               a        <- arbitrary
-              num      <- arbitrary
+              --num      <- arbitrary
               num2     <- arbitrary
-              return $ (NumberLiteral a num2  $ Just num) ),
+              return $ (NumberLiteral a num2  $ Just Wei) ),
               (1, do 
                   a        <- arbitrary
                   str      <- arbitrary
@@ -216,9 +216,9 @@ instance Arbitrary a => Arbitrary (ExpressionF a) where
                   return $ Binary a str express1 express2),
               (s, do
                     a        <- arbitrary
-                    num      <- arbitrary
+                    --num      <- arbitrary
                     num2     <- arbitrary
-                    return $ (NumberLiteral a num2  $ Just num))]
+                    return $ (NumberLiteral a num2  $ Just Wei))]
               --where
               -- s1 = s`div`2 -- = n-1
                     

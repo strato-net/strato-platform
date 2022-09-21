@@ -271,7 +271,7 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-    fit "Should do something" $
+    it "Should do something" $
             quickCheck propTest
             --verboseCheck propSmaller
     -- fit "Something something" $

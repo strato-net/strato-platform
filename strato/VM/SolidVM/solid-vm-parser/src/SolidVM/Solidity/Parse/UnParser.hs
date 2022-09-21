@@ -30,7 +30,7 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi
 
-import           Blockchain.VM.SolidException
+--import           Blockchain.VM.SolidException
 
 
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
@@ -331,7 +331,8 @@ unparseExpression (Binary _ op v1 v2) =
   unparseExpression v1 ++ " " ++ op ++ " " ++ unparseExpression v2
 unparseExpression (Variable _ name) = labelToString name
 unparseExpression (MemberAccess _ e name) = unparseExpression e ++ "." ++ labelToString name
-unparseExpression (NumberLiteral _ x Nothing) = show x
+unparseExpression (NumberLiteral _ x _) = show x
+--unparseExpression (NumberLiteral _ x (Just _)) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
 unparseExpression (StringLiteral _ s) = ('"':) . (++"\"") $ s
@@ -347,7 +348,7 @@ unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpre
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
-unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
+--unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: Show a => (SolidString, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
