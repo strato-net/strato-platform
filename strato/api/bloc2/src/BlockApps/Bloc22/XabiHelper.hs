@@ -13,7 +13,7 @@ import           Data.Int                                  (Int32)
 import qualified Data.Map                                  as M
 import qualified Data.Text                                 as T
 import           Text.Parsec                               hiding (parse)
-
+import           Data.Maybe                                (fromMaybe)
 
 import qualified BlockApps.Solidity.Parse.ParserTypes      as EVMParseT (SolcVersion(..)) 
 import           SolidVM.Solidity.Parse.ParserTypes        as SolidParseT
@@ -35,8 +35,6 @@ import qualified SolidVM.Model.CodeCollection.Event        as SolidEv
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import qualified SolidVM.Solidity.Parse.UnParser           as SolidUnparse 
-
-import           SolidVM.Model.SolidString
 
 
 parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
@@ -70,8 +68,8 @@ transFormXabi SVMXabi.Xabi{..} =
 ----------------------------------
 tFormFunc :: SolidF.Func -> EVMXabi.Func
 tFormFunc SolidF.Func{..} = EVMXabi.Func {      
-  funcArgs   = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcArgs)]  --Map Text Xabi.IndexedType
-  , funcVals = M.fromList [ (tformMaybeSoldStringToText a, tFormIndexedType b) |(a, b)<- (_funcVals)]  --Map Text Xabi.IndexedType
+  funcArgs   = M.fromList [ (T.pack $ fromMaybe "" a, tFormIndexedType b) |(a, b)<- (_funcArgs)]  --Map Text Xabi.IndexedType
+  , funcVals = M.fromList [ (T.pack $ fromMaybe "" a, tFormIndexedType b) |(a, b)<- (_funcVals)]  --Map Text Xabi.IndexedType
   , funcStateMutability = case _funcStateMutability of 
                           Nothing -> Nothing;
                           Just SolidF.Pure     -> Just EVMXabi.Pure
@@ -158,11 +156,6 @@ tFormTypeToType = \case
   (SolidType.Bool)                        ->  (XabiType.Bool)
   (SolidType.Address _)                   ->  (XabiType.Address)
   (SolidType.Account _)                   ->  (XabiType.Account)
-  (SolidType.Fixed _ _)                   ->  (XabiType.UnknownLabel "FixedType") --Questionable at best
+  (SolidType.Fixed _ _)                   ->  (XabiType.Bool) --Questionable at best
   (SolidType.Error _ ss)                  ->  (XabiType.UnknownLabel ss)          --Questionable at best
  
-
-tformMaybeSoldStringToText :: Maybe SolidString -> T.Text
-tformMaybeSoldStringToText x = case x of 
-  Just st -> T.pack st
-  Nothing -> T.pack ""  
