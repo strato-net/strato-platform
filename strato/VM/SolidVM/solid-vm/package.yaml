@@ -17,6 +17,7 @@ library:
   - aeson
   - base16-bytestring
   - binary
+  - bloc2
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
@@ -66,6 +67,7 @@ executables:
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
+      - deepseq
 
 tests:
   solid-vm-spec:
@@ -106,3 +108,19 @@ benchmarks:
       dependencies:
         - file-embed
         - solid-vm
+        - deepseq
+        - criterion
+        - binary
+        - memory
+        - bytestring
+        - containers
+        - text
+        - parsec
+        - strato-model
+        - solid-vm-parser
+        - solid-vm-static-analysis
+        - solid-vm-model
+        - lens
+        - common-log
+        - vm-tools
+        - hflags

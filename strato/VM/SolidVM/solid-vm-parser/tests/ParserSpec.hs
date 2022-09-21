@@ -13,11 +13,11 @@ import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
-
+import qualified Data.Map as M
 -- import SolidVM.Solidity.Parse.Declarations
 -- import SolidVM.Model.CodeCollection.Def as Def
 
-import SolidVM.Solidity.Parse.UnParser
+-- import SolidVM.Solidity.Parse.UnParser
 import SolidVM.Solidity.Parse.ParserTypes 
 
 import           Data.Source.Annotation as SA 
@@ -50,7 +50,7 @@ dummyAnnotation =
 spec :: Spec
 spec = do
   describe "String lexing" $ do
-    let parseStr = runParser (stringLiteral <* eof) (ParserState "" "") ""
+    let parseStr = runParser (stringLiteral <* eof) (ParserState "" "" M.empty) ""
         cases = [ ([r|"ok"|], "ok")
                 , ([r|"ok" |], "ok")
                 ]
@@ -58,7 +58,7 @@ spec = do
       it ("can parse " ++ show input) $ parseStr input `shouldBe` Right want
 
   describe "Expression parsing" $ do
-    let parseExpr = fmap (fmap (const ())) . runParser expression (ParserState "" "") ""
+    let parseExpr = fmap (fmap (const ())) . runParser expression (ParserState "" "" M.empty) ""
         cases = [ ("x++", PlusPlus () (Variable () "x"))
                 , ("++x", Unitary () "++" (Variable () "x"))
                 , ("--x", Unitary () "--" (Variable () "x"))
@@ -67,6 +67,8 @@ spec = do
                 , ("x + y", Binary () "+" (Variable () "x") (Variable () "y"))
                 , ("x ** y", Binary () "**" (Variable () "x") (Variable () "y"))
                 , ("x[q]", IndexAccess () (Variable () "x") (Just $ Variable () "q"))
+                , ("hex'4F9A'", HexaLiteral () "4F9A")
+                , ("hex\"4F9A\"", HexaLiteral () "4F9A")
                 , ("x[a][b][c]", IndexAccess () (
                                    IndexAccess () (
                                      IndexAccess ()
@@ -86,8 +88,6 @@ spec = do
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
 
-    forM_ cases $ \(want, input) -> do
-      it ("can unparse to " ++ want) $ unparseExpression input `shouldBe` want
 
     it "can parse function calls" $ do
       let f = FunctionCall () (Variable () "f")
@@ -142,7 +142,7 @@ spec = do
 -}
 
   describe "Statement parsing" $ do
-    let parseStatement = fmap (fmap (const ())) . runParser statement (ParserState "" "") ""
+    let parseStatement = fmap (fmap (const ())) . runParser statement (ParserState "" "" M.empty) ""
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus () $ Variable () "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 -- |
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
@@ -8,6 +9,7 @@
 -- Maintainer: Charles Crain <charles@blockapps.net>
 -- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 module SolidVM.Solidity.Parse.Declarations where
 
 import           Control.Monad                     (when)
@@ -17,6 +19,8 @@ import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 import           Data.Source
+
+import           Control.DeepSeq
 
 import           GHC.Generics
 
@@ -41,13 +45,15 @@ import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
+                   | Alias a String String
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func
                    | FLConstant Text.Text SolidVM.ConstantDecl
                    | FLStruct Text.Text SolidVM.Def
                    | FLEnum Text.Text SolidVM.Def
+                   | FLError Text.Text SolidVM.Def
                    | DummySourceUnit
-                   deriving (Eq, Show, Generic, Functor)
+                   deriving (Eq, Show, Generic, NFData, Functor)
 
 type SourceUnit = Positioned SourceUnitF
 
@@ -62,7 +68,7 @@ solidityContract = do
     --Throw an error if 'account' is used.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
-    setContractName $ labelToString contractName'
+    modifyState(\s -> s { contractName = (labelToString contractName') })
     baseConstrs <- option [] $ do
       reserved "is"
       commaSep1 $ do
@@ -82,33 +88,34 @@ solidityContract = do
                   else return . Map.fromList $ ctorList
 
   return $ NamedXabi (labelToText contractName') (
-        Xabi { xabiFuncs = allFunctions
-             , xabiConstr = allCtors
+        Xabi { _xabiFuncs = allFunctions
+             , _xabiConstr = allCtors
 --             , xabiVars = variables declarations
-             , xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
-             , xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
-             , xabiTypes =
+             , _xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
+             , _xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
+             , _xabiTypes =
                Map.fromList $
                [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
-             , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
-             , xabiEvents = Map.fromList events
-             , xabiKind = kind
-             , xabiUsing = Map.fromList using
-             , xabiContext = a
+               ++ [ (stringToLabel n, e) | (n, ErrorDeclaration e) <- declarations]
+             , _xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
+             , _xabiEvents = Map.fromList events
+             , _xabiKind = kind
+             , _xabiUsing = Map.fromList using
+             , _xabiContext = a
            },
         map (Text.pack . fst) baseConstrs
       )
   where
     parseOverloads :: SolidVM.Func -> SolidVM.Func -> SolidVM.Func
     parseOverloads new old = do
-      let oldParamTypes = fmap snd $ SolidVM.funcArgs old
-          newParamTypes = fmap snd $ SolidVM.funcArgs new
-          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM.funcArgs x]) $ SolidVM.funcOverload old
+      let oldParamTypes = fmap snd $ SolidVM._funcArgs old
+          newParamTypes = fmap snd $ SolidVM._funcArgs new
+          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
       if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
-        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs new
+        then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
         else
-          old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
+          old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
 
 --  where -- constants = byMutability True (repeat 0)
@@ -136,18 +143,18 @@ solidityContract = do
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
   (fname, (FuncDeclaration a)) <- functionDeclaration True
-  when (SolidVM.funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
+  when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
   return $ FLFunc fname $ SolidVM.Func 
-    { SolidVM.funcArgs = SolidVM.funcArgs a
-    , SolidVM.funcVals = SolidVM.funcVals a
-    , SolidVM.funcStateMutability = SolidVM.funcStateMutability a
-    , SolidVM.funcContents = SolidVM.funcContents a
-    , SolidVM.funcVisibility = SolidVM.funcVisibility a
-    , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls a
-    , SolidVM.funcModifiers = SolidVM.funcModifiers a
-    , SolidVM.funcContext = SolidVM.funcContext a
-    , SolidVM.funcIsFree = True
-    , SolidVM.funcOverload = SolidVM.funcOverload a
+    { SolidVM._funcArgs = SolidVM._funcArgs a
+    , SolidVM._funcVals = SolidVM._funcVals a
+    , SolidVM._funcStateMutability = SolidVM._funcStateMutability a
+    , SolidVM._funcContents = SolidVM._funcContents a
+    , SolidVM._funcVisibility = SolidVM._funcVisibility a
+    , SolidVM._funcConstructorCalls = SolidVM._funcConstructorCalls a
+    , SolidVM._funcModifiers = SolidVM._funcModifiers a
+    , SolidVM._funcContext = SolidVM._funcContext a
+    , SolidVM._funcIsFree = True
+    , SolidVM._funcOverload = SolidVM._funcOverload a
     }
 
 data Declaration =
@@ -155,6 +162,7 @@ data Declaration =
   | ConstructorDeclaration SolidVM.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration SolidVM.Def
+  | ErrorDeclaration SolidVM.Def
   | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration SolidVM.Event
@@ -171,11 +179,12 @@ solidityDeclaration free =
   structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration free <|>
+  errorDeclaration <|>
+  functionDeclaration free<|>
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
-
+  
 {- New types -}
 
 -- | Parses a struct definition
@@ -235,6 +244,26 @@ solidityFLEnum = do
     --     SolidVM.context = a
     --     }
     -- )
+
+solidityFLError :: SolidityParser SourceUnit
+solidityFLError = do
+  ~(a, (errorName, errorArgs)) <- withPosition $ do
+    reserved "error"
+    errorName <- identifier
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+    errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+    semi
+    pure (errorName, errorArgs)
+  return $ FLError (Text.pack errorName) (SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = a
+  })
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
@@ -348,6 +377,27 @@ simpleVariableDeclaration = do
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+    --else return $ trace ("WHAT IS SIMPLE DEC DECLARING AS " ++ (show variableType)) (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+
+errorDeclaration :: SolidityParser (String, Declaration)
+errorDeclaration = do
+  start <- getSourcePosition
+  reserved "error"
+  errorName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+  errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+  end <- getSourcePosition
+  semi
+  return (errorName, ErrorDeclaration SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = SourceAnnotation start end ()
+  })
 
 -- | Parses a function definition.
 --
@@ -367,7 +417,7 @@ functionDeclaration free = do
     xabi <- functionXabi free
     pure (functionName, xabi)
   cName <- getContractName
-  let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
+  let xabi = xabi'{SolidVM._funcContext = a <> SolidVM._funcContext xabi'}
       tipe = if cName == functionName
                 then ConstructorDeclaration 
                 else FuncDeclaration 
@@ -382,19 +432,20 @@ functionXabi free = do
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
+  -- TODO: use Lenses instead?
   return SolidVM.Func{
-        SolidVM.funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
+        SolidVM._funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
-      , SolidVM.funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
+      , SolidVM._funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
-      , SolidVM.funcContents = contents
-      , SolidVM.funcVisibility = if (free) then Just freevisibility else Just visibility
-      , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
-      , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
-      , SolidVM.funcContext = ctx
-      , SolidVM.funcIsFree = False
-      , SolidVM.funcOverload = []
+      , SolidVM._funcContents = contents
+      , SolidVM._funcVisibility = if (free) then Just freevisibility else Just visibility
+      , SolidVM._funcStateMutability = mutability
+      , SolidVM._funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
+      , SolidVM._funcModifiers = funcConstructorCallsOrModifiers
+      , SolidVM._funcContext = ctx
+      , SolidVM._funcIsFree = False
+      , SolidVM._funcOverload = []
       }
 
 eventDeclaration :: SolidityParser (String, Declaration)
@@ -404,16 +455,18 @@ eventDeclaration = do
   name <- identifier
   logs <- tupleDeclaration
   anon <- option False (reserved "anonymous" >> return True)
-  semi
   end <- getSourcePosition
+  semi
+
   let ctx = SourceAnnotation start end ()
   return
     (
       name,
+      --TODO: use lenses?
       EventDeclaration SolidVM.Event{
-          SolidVM.eventAnonymous = anon
-        , SolidVM.eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
-        , SolidVM.eventContext = ctx
+          SolidVM._eventAnonymous = anon
+        , SolidVM._eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
+        , SolidVM._eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,
@@ -443,12 +496,12 @@ modifierDeclaration = do
         (
           name,
           ModifierDeclaration Xabi.Modifier{
-            Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
+            Xabi._modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
               Map.fromList $
                 zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
-          , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-          , Xabi.modifierContents = contents -- :: Maybe [Statement]
-          , Xabi.modifierContext = ctx
+          , Xabi._modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+          , Xabi._modifierContents = contents -- :: Maybe [Statement]
+          , Xabi._modifierContext = ctx
           }
         )
 
@@ -519,8 +572,10 @@ functionModifiers = do
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     constructorCallModifiersOrOtherModifiers = do 
+      pVersion <- getPragmaVersion
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
+      when ((pVersion == "3.0" || pVersion == "") && isNothing exps) $ fail "modifiers are not supported below pragma solidvm 3.0"
       return (name, fromMaybe [] exps) 
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
@@ -621,5 +676,7 @@ isReservedWord version reservedWord = do
         "transaction_hash" -> True
         "transaction_sender" -> True
         "salt" -> True
+        "error" -> True
+        "throw" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False

@@ -1,10 +1,13 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
 
 module SolidVM.Model.CodeCollection.Function (
   FuncF(..),
@@ -15,10 +18,25 @@ module SolidVM.Model.CodeCollection.Function (
   Modifier,
   tShow,
   tShow',
-  tRead
+  tRead,
+  funcArgs,
+  funcVals,
+  funcStateMutability,
+  funcContents,
+  funcVisibility,
+  funcConstructorCalls,
+  funcModifiers,
+  funcContext,
+  funcIsFree,
+  funcOverload,
+  modifierArgs,
+  modifierSelector,
+  modifierContents,
+  modifierContext
   ) where
 
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (mapped, (&), (?~), makeLenses)
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -34,7 +52,18 @@ import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+--------------------------------------------------------------------------------
+soliditySchemaOptions :: SchemaOptions
+soliditySchemaOptions = SchemaOptions
+  { fieldLabelModifier = camelCase . dropFPrefix
+  , constructorTagModifier = id
+  , datatypeNameModifier = id
+  , allNullaryToStringTag = True
+  , unwrapUnaryRecords = True
+  }
+--------------------------------------------------------------------------------
+
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -67,33 +96,11 @@ instance ToSchema StateMutability where
     & mapped.schema.description ?~ "Reserved keywords for function state mutability"
     & mapped.schema.example ?~ toJSON View
 
-data FuncF a = Func
-  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
-
-  -- These Values are only used for parsing and unparsing solidity.
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
-  , funcContext :: a
-  , funcIsFree :: Bool
-  , funcOverload :: [FuncF a]
-  } deriving (Eq,Show,Generic, Functor)
-
-instance ToJSON a => ToJSON (FuncF a)
-instance FromJSON a => FromJSON (FuncF a)
-
-type Func = Positioned FuncF
-
 data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
 tShow' :: Visibility -> Text
 tShow' Private = "private"
@@ -115,13 +122,38 @@ instance ToSchema Visibility where
       ex = Public
 
 
+-- Changes to this structure should also have changes in the Unparser :)
+data FuncF a = Func
+  { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcStateMutability :: Maybe StateMutability
+  -- These Values are only used for parsing, not for the actual function
+  -- This data will not be stored in the db and will have no
+  -- relevance when constructing from the db.
+  , _funcContents :: Maybe [StatementF a]
+  , _funcVisibility :: Maybe Visibility
+  , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
+  , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
+  , _funcContext :: a
+  , _funcIsFree :: Bool
+  , _funcOverload :: [FuncF a]
+  } deriving (Eq,Show,Generic, Functor, NFData, Foldable, Traversable)
+
+makeLenses ''FuncF
+
+instance ToJSON a => ToJSON (FuncF a)
+instance FromJSON a => FromJSON (FuncF a)
+
+type Func = Positioned FuncF 
 
 data ModifierF a = Modifier
-  { modifierArgs     :: Map Text SolidVM.IndexedType
-  , modifierSelector :: Text
-  , modifierContents :: Maybe [StatementF a]
-  , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
+  { _modifierArgs     :: Map Text SolidVM.IndexedType
+  , _modifierSelector :: Text
+  , _modifierContents :: Maybe [StatementF a]
+  , _modifierContext  :: a
+  } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
+
+makeLenses ''ModifierF
 
 type Modifier = Positioned ModifierF
 
@@ -132,13 +164,3 @@ instance FromJSON a => FromJSON (ModifierF a) where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 
---------------------------------------------------------------------------------
-
-soliditySchemaOptions :: SchemaOptions
-soliditySchemaOptions = SchemaOptions
-  { fieldLabelModifier = camelCase . dropFPrefix
-  , constructorTagModifier = id
-  , datatypeNameModifier = id
-  , allNullaryToStringTag = True
-  , unwrapUnaryRecords = True
-  }

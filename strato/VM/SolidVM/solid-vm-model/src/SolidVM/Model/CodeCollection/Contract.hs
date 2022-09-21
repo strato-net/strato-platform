@@ -1,6 +1,10 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -10,7 +14,9 @@ module SolidVM.Model.CodeCollection.Contract (
   constants,
   storageDefs,
   enums,
+  userDefined,
   structs,
+  errors,
   events,
   functions,
   modifiers,
@@ -20,6 +26,7 @@ module SolidVM.Model.CodeCollection.Contract (
   ) where
 
 import Control.Lens
+import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
 import Data.Source
@@ -32,21 +39,24 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
+-- Changes to this structure should also have changes in the Unparser :)
 data ContractF a =
-  Contract {
+  Contract {     
     _contractName :: SolidString,
     _parents :: [SolidString],
     _constants :: Map SolidString (ConstantDeclF a),
     _storageDefs :: Map SolidString (VariableDeclF a),
+    _userDefined :: Map String String,
     _enums :: Map SolidString ([SolidString], a),
     _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
+    _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
     _events :: Map SolidString (SolidVM.EventF a),
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)

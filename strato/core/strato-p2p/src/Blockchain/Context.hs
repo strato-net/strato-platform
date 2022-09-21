@@ -167,7 +167,6 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , vmTrace               :: [String]
   , blockHeaders          :: [BlockData]
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
@@ -304,7 +303,7 @@ instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT Config m) where
   access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
 instance MonadIO m => Mod.Accessible CertificateRegistryInitialized (ReaderT Config m) where
-  access _ = RBDB.withRedisBlockDB RBDB.getInitializeCertificateRegistry
+  access _ = isJust <$> RBDB.withRedisBlockDB RBDB.getInitializeCertificateRegistry
 
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _   = readIORef =<< asks configContext
@@ -509,7 +508,6 @@ initContext = Context
   , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
   , blockHeaders = []
   , remainingBlockHeaders = RemainingBlockHeaders []
-  , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
   }

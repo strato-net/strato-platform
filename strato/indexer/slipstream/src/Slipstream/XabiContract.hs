@@ -30,8 +30,10 @@ xabiToPartialContract xabi =
     _parents=error "_parents undefined",
     _constants=error "_constants undefined",
     _storageDefs=M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
+    _userDefined = error "_userDefined undefined", 
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
+    _errors=error "_errors undefined",
     _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
@@ -42,9 +44,9 @@ xabiToPartialContract xabi =
 
 evmEventToEvent :: OLDXABI.Event -> Event
 evmEventToEvent e = Event {
-  eventAnonymous = OLDXABI.eventAnonymous e,
-  eventLogs = map (fmap evmIndexedTypeToIndexedType) $ OLDXABI.eventLogs e,
-  eventContext = dummyAnnotation
+  _eventAnonymous = OLDXABI.eventAnonymous e,
+  _eventLogs = map (fmap evmIndexedTypeToIndexedType) $ OLDXABI.eventLogs e,
+  _eventContext = dummyAnnotation
   }
 
 evmIndexedTypeToIndexedType :: OLDXABI.IndexedType -> IndexedType
@@ -70,11 +72,11 @@ evmTypeToType (OLDXABI.Mapping x y z) = SVMType.Mapping x (evmTypeToType y) (evm
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())
 varTypeToVariableDecl x =
   VariableDecl {
-  varType=evmTypeToType $ OLDXABI.varTypeType x,
-  varIsPublic=False,
-  varInitialVal=Nothing,
-  varContext=dummyAnnotation,
-  isImmutable=False
+  _varType=evmTypeToType $ OLDXABI.varTypeType x,
+  _varIsPublic=False,
+  _varInitialVal=Nothing,
+  _varContext=dummyAnnotation,
+  _isImmutable=False
   }
 
 dummyAnnotation :: SourceAnnotation ()

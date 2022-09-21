@@ -60,8 +60,8 @@ import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Address
 import           Blockchain.TimerSource
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Util
 import           Blockchain.Watchdog
 import           BlockApps.X509

@@ -31,6 +31,7 @@ data R = R
 type SSS = StateT [M.Map SolidString (SourceAnnotation ())] (Reader R)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+-- detector cc  = []
 detector :: CompilerDetector
 detector cc@CodeCollection{..} = concat $ contractHelper cc <$> M.elems _contracts
 
@@ -38,23 +39,23 @@ contractHelper :: CodeCollection -> Contract -> [SourceAnnotation Text]
 contractHelper cc c@Contract{..} = 
   let constr = maybe M.empty (M.singleton "constructor") _constructor
       funcsAndConstr = constr <> _functions
-      varTypes = (varContext &&& varType) <$> M.elems _storageDefs
-      constTypes = (constContext &&& constType) <$> M.elems _constants
+      varTypes = (_varContext &&& _varType) <$> M.elems _storageDefs
+      constTypes = (_constContext &&& _constType) <$> M.elems _constants
       varAnns = uncurry (ccTypeHelper cc c) <$> varTypes ++ constTypes
       funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
    in concat $ varAnns ++ funcAnns
 
 functionHelper :: CodeCollection -> Contract -> M.Map SolidString VariableDecl -> Func -> [SourceAnnotation Text]
-functionHelper cc c stateVariables Func{..} = case funcContents of
+functionHelper cc c stateVariables Func{..} = case _funcContents of
   Nothing -> []
   Just stmts ->
-    let r = R funcStateMutability stateVariables cc c
-        argTypes = indexedTypeType . snd <$> funcArgs
-        valTypes = indexedTypeType . snd <$> funcVals
-        typeAnns = ccTypeHelper cc c funcContext <$> argTypes ++ valTypes
-        argNames = catMaybes $ fst <$> funcArgs
-        valNames = catMaybes $ fst <$> funcVals
-        names = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
+    let r = R _funcStateMutability stateVariables cc c
+        argTypes = indexedTypeType . snd <$> _funcArgs
+        valTypes = indexedTypeType . snd <$> _funcVals
+        typeAnns = ccTypeHelper cc c _funcContext <$> argTypes ++ valTypes
+        argNames = catMaybes $ fst <$> _funcArgs
+        valNames = catMaybes $ fst <$> _funcVals
+        names = M.fromList $ zip (argNames ++ valNames) (repeat _funcContext)
         nameAnns = runReader (statementsHelper names stmts) r
      in concat $ nameAnns : typeAnns
 
@@ -93,7 +94,7 @@ statementHelper (IfStatement cond thens mElse _) = do
   pure $ concat [cs, ts, es]
 statementHelper (TryCatchStatement try catchMap _) = do
   ts <- statementsHelper' try
-  cs <- statementsHelper' (concatMap snd (M.toList catchMap))
+  cs <- statementsHelper' (concatMap (snd . snd) (M.toList catchMap))
   pure $ concat [ts, cs]
 statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
   cs <- expressionHelper expr
@@ -120,7 +121,8 @@ statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
@@ -357,3 +359,4 @@ expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper e
 expressionHelper (Variable x name) =
   localVarReadHelper name x
 expressionHelper (ObjectLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []

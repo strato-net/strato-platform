@@ -196,7 +196,7 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
-    int expirationDate;
+    uint expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -212,23 +212,11 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
-        expirationDate = 0; // stringToUint(parsedCert["expirationDate"]);
+        expirationDate = uint(parsedCert["expirationDate"],10);
         parent = address(parsedCert["parent"]);
         children = [];
     }
     
-    // function stringToUint(string s) constant returns (uint result) {
-    //     bytes memory b = bytes(s);
-    //     uint i;
-    //     result = 0;
-    //     for (i = 0; i < b.length; i++) {
-    //         uint c = uint(b[i]);
-    //         if (c >= 48 && c <= 57) {
-    //             result = result * 10 + (c - 48);
-    //         }
-    //     }
-    // }
-
     function addChild(address _child) public {
         children.push(_child);
     }

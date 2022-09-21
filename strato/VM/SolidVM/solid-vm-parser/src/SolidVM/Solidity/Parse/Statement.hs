@@ -46,6 +46,7 @@ statement =
           _ <- semi
           pure $ EmitStatement i (map ((,) Nothing) e) a
       )
+  <|> throwStatement
   <|> try (do
               ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
               pure $ SimpleStatement e a 
@@ -112,9 +113,10 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        ident <- identifier
+        err <- option "" identifier
+        params <- optionMaybe (parens $ commaSep $ do identifier)
         ss <- statements
-        pure (ident, ss)
+        pure (err, (params, ss))
       pure (s, catchs)
     pure $ TryCatchStatement test1 (Map.fromList test2) a
 
@@ -169,6 +171,15 @@ forStatement = do
     s <- statements
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
+
+throwStatement :: SolidityParser Statement
+throwStatement = do
+  ~(a, (errorExp)) <- withPosition $ do
+    reserved "throw"
+    errorExp <- expression
+    _ <- semi
+    pure $ (errorExp)
+  pure $ Throw errorExp a
 
 -- revert("foo") <|> revert({x: y, q: z})
 revertStatement :: SolidityParser Statement
@@ -336,7 +347,8 @@ primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
       
-  (uncurry Variable . fmap stringToLabel <$> res "msg")
+  myHexParser
+    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
     <|> (uncurry Variable . fmap stringToLabel <$> res "address")
     <|> (uncurry Variable . fmap stringToLabel <$> res "account")
     <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
@@ -360,6 +372,15 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+
+myHexParser :: SolidityParser Expression
+myHexParser = try $ do
+  ~(a,val) <- withPosition $ do
+    reservedOp "hex"
+    val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit)  <|>  (between (symbol "\"") (symbol "\"") $ many1 hexDigit)               --make this work with double quotes as well
+    when(Prelude.length val' `mod` 2/=0) $ fail "hex digit must be even number"
+    pure val'
+  return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
 scientific = do 

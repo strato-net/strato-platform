@@ -133,6 +133,12 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
 
+instance (Monad m, HasMemCertDB m) => HasMemCertDB (ConduitT i o m) where
+  getCertTxDBMap    = lift getCertTxDBMap
+  putCertTxDBMap    = lift . putCertTxDBMap
+  getCertBlockDBMap = lift getCertBlockDBMap
+  putCertBlockDBMap = lift . putCertBlockDBMap 
+
 -- todo: lovely!
 
 addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
@@ -141,6 +147,8 @@ addBlocks unfiltered = do
       timerToUse = Just vmBlockInsertionMined
   unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
   bbi <- getContextBestBlockInfo
+  $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
+  $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
@@ -203,6 +211,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
+    putBlockHeaderInCertDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
@@ -251,7 +260,7 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-  lift $ timeit "flushX509ToLevelDB" (Just vmBlockInsertionMined) flushX509ToLevelDB
+  lift $ timeit "flushMemCertDB" (Just vmBlockInsertionMined) $ flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 => BlockData
@@ -259,27 +268,20 @@ addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 -> ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
  timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty M.empty
+  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty
   mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
   yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
 
   where
-    go _ [] trrs _ = return $ DL.toList trrs
-    go blockGas (t:rest) trrs x509s = do
+    go _ [] trrs = return $ DL.toList trrs
+    go blockGas (t:rest) trrs = do
       let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
+      flushMemCertTxToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
-      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) x509s
-      beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
-      case result of
-          Left _  -> do
-            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
-
-          Right execResult -> do
-            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
 
       afterMap <- getAddressStateTxDBMap
 
@@ -293,37 +295,41 @@ addTransactions blockData txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
+      go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs = do
-  res <- mineTransactions' bd remGas DL.empty otxs
-  Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.empty --clear X509 cache to prevent memory leak
-  return res
+mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
   
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
     let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
     beforeMap <- getAddressStateTxDBMap
-    beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time' (txChainId bt)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
-        Right execResult -> do
-          let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
-          flushMemAddressStateTxToBlockDB
-          flushMemStorageTxDBToBlockDB
+        Right execResult ->
+          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3")]
+              findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
+              invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
+           in if not $ null invalidPragmasUsed
+                 then do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  putCertTxDBMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
-          Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
-          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-        Left  failure    -> do Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s -- revert changes to X509 map
-                               return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+                 else do
+                   let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
+                   flushMemAddressStateTxToBlockDB
+                   flushMemStorageTxDBToBlockDB
+                   flushMemCertTxToBlockDB
+                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
 
+        Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
@@ -380,9 +386,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            x509s <- lift $ Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-            lift $ Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResults) x509s
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -562,23 +566,23 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
-  when flags_createTransactionResults $ do
-    let chainId = txChainId t
-        beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
-        beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
-        afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
-        afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
-        ranBlockHash = hashFunction b
-        mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-        mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
-        (!response, theTrace', theLogs, theEvents) =
-          case result of
-            Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
-            Right r ->
-              (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+      chainId = txChainId t
+      beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
+      beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
+      afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
+      afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
+      ranBlockHash = hashFunction b
+      mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+      mkEventEntry Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+      (!response, theTrace', theLogs, theEvents) =
+        case result of
+          Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
+          Right r ->
+            (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-    yieldMany $ OutLog . mkLogEntry <$> theLogs
-    yieldMany $ OutEvent . mkEventEntry <$> theEvents
+  yieldMany $ OutLog . mkLogEntry <$> theLogs
+  yieldMany $ OutEvent . mkEventEntry <$> theEvents
+  when flags_createTransactionResults $ do
     yield . OutTXR $
            TransactionResult { transactionResultBlockHash        = ranBlockHash
                              , transactionResultTransactionHash  = theHash
@@ -597,8 +601,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
                              , transactionResultChainId          = chainId
                              , transactionResultKind             = erKind <$> eitherToMaybe result
                              }
-    when flags_diffPublish $ do
-      traverse_ (yield . OutAction) $ either (const Nothing) erAction result
+  when flags_diffPublish $ do
+    traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 
 multilineLog :: MonadLogger m =>
                 T.Text -> String -> m ()
@@ -736,12 +740,14 @@ completeDiff :: ( MonadLogger m
                 , Mod.Modifiable MemDBs m
                 , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
+                , Mod.Modifiable CertRoot m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
+                , HasMemCertDB m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do
