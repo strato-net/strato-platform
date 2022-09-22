@@ -36,6 +36,7 @@ import qualified Data.Text                      as T
 import qualified Database.Esqueleto.Legacy      as E
 import           Servant
 import           Servant.Client
+import           Numeric.Natural
 
 import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
