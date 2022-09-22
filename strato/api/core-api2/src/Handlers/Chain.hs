@@ -51,7 +51,10 @@ import           SQLM
 import           UnliftIO
 
 type API = 
-  "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
+  "chain" :> QueryParams "chainid" ChainId  
+          :> QueryParam "limit" Natural
+          :> QueryParam "offset" Natural
+          :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
 
