@@ -33,6 +33,7 @@ import           Conduit
 import qualified Data.Map                       as M
 import           Data.Swagger
 import qualified Data.Text                      as T
+import qualified Database.Esqueleto.Legacy      as E
 import           Servant
 import           Servant.Client
 
@@ -73,8 +74,8 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 instance HasSQL m => Selectable ChainId ChainInfo m where
-  selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos
-  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
+  selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos . E.limit $ appFetchLimit
+  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo . E.limit $ appFetchLimit
 
 getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
