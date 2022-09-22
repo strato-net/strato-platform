@@ -154,14 +154,14 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
 
-  dvFlag="--isDisableValidator=${isDisableValidator}"
+  vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
   vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
-    "${baFlag}" "${scFlag}" "${dvFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
+    "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 

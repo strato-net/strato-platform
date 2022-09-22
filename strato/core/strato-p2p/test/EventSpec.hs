@@ -753,7 +753,6 @@ newSequencerContext bc = do
       , _blockstanbulContext = Just bc
       , _loopTimeout         = error "MonadTest: Evaluating loopTimeout" -- loopCh
       , _latestRoundNumber   = latestRound
-      -- , _isDisableValidator  = ValidatorRestriction False
       }
 
 -- testContext is useful for testing because it doesn't require

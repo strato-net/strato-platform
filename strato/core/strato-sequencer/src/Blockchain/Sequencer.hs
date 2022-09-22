@@ -152,18 +152,6 @@ oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (
 oneSequencerIter src = timeAction seqLoopTiming $ do
   (src', events) <- readEventsInBufferedWindow src
   BatchSeqEvent{..} <- runSequencerBatch events
-  -- let myFunc [] = []
-  --     myFunc ((UnseqEvent (IEDisableValidator b)) : xs) = b : (myFunc xs)
-  --     myFunc (_:xs) = myFunc xs
-
-  -- let getBool (ValidatorRestriction b) = b
-  -- mapM_ ((Mod.put (Proxy @ValidatorRestriction)) . (ValidatorRestriction)) $ myFunc events  
-  -- let logF = logFF "sequencer/events"
-  -- disValSeqContext <- (Mod.get (Proxy @ValidatorRestriction))
-  -- logF . printf "disable validator value = %s" $ show (getBool disValSeqContext)
-  -- $logDebugS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
-  -- $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
-
   chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
   txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
   let chainIdsList = toList chainIds
@@ -644,23 +632,11 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETForcedConfigChange -> do
       record "inevent_type_forced_config_change" "ForcedConfigChanges"
       blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
-    IETDisableValidator  -> do
-      record "inevent_type_disable_validator" "DisableValidator"
-      
-      
-
-      -- blockstanbulSend 
-
-      -- Monad m => (a-> m b) -> [a] -> m [b]
-      -- Monad m => (a-> m b) -> [a] -> m ()
-
-      --      mapM_ (puts . (\vr -> sc & isDisableValidator .~ vr) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool))) events
-  
+    IETValidatorBehavior  -> do
+      record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
+      blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
       -- mapM_ (Mod.put (Proxy @ValidatorRestriction)) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool)) events
       -- blockstanbulSend $ map (\(IEDisableValidator theBool) -> ForcedValidatorChange theBool) events
-
-      -- logFF IETDisableValidator 
-      -- logFF _isDisableValidator
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

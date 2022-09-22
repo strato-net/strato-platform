@@ -88,7 +88,7 @@ data Options = State{root::String, db::String}
              | CompressRoundChanges { infilename :: String, outfilename :: String }
              | GetPrivacy { registry :: String, key :: String }
              | PutPrivacy { registry :: String, key :: String , value :: String }
-             | DisableValidator { disVal :: Bool } 
+             | ValidatorBehavior { valB :: Bool } 
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -301,9 +301,9 @@ addTxsFromFileOptions = record AddTxsFromFile { fileName = error "unused fileNam
              [ fileName := error "addtxsfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
              ]
 
-disableValidatorOptions :: Annotate Ann
-disableValidatorOptions = record DisableValidator{disVal = undefined} 
-                        [ disVal := error "disVal" += typ "BOOL" += argPos 0
+validatorBehaviorOptions :: Annotate Ann
+validatorBehaviorOptions = record ValidatorBehavior{valB = undefined} 
+                        [ valB := error "valB" += typ "BOOL" += argPos 0
                         ]
 
 saveKafkaOptions :: Annotate Ann
@@ -388,7 +388,7 @@ options = modes_ [blockGoOptions
                 , addBlocksFromFileOptions
                 , addGenesisFromFileOptions
                 , addTxsFromFileOptions
-                , disableValidatorOptions
+                , validatorBehaviorOptions
                 , saveKafkaOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
@@ -431,7 +431,7 @@ run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingB
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
-run DisableValidator{..}       = disableValidator disVal
+run ValidatorBehavior{..}      = validatorBehavior valB
 run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp

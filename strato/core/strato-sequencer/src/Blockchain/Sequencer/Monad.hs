@@ -52,7 +52,6 @@ module Blockchain.Sequencer.Monad
   , dbeRegistry
   , blockHashRegistry
   , emittedBlockRegistry
-  -- , isDisableValidator
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
@@ -140,7 +139,6 @@ data SequencerContext = SequencerContext
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
-  -- , _isDisableValidator  :: ValidatorRestriction
   }
 makeLenses ''SequencerContext
 
@@ -455,7 +453,7 @@ runSequencerM c mbc m = do
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         loopCh <- atomically newTMChan
         latestRound <- liftIO $ newIORef 0
-
+        
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize
@@ -471,7 +469,6 @@ runSequencerM c mbc m = do
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
-            -- , _isDisableValidator  = ValidatorRestriction disableValidator
             }
     return $ fst a
 
@@ -534,13 +531,7 @@ flushLdbBatchOps = do
   incCounter seqLdbBatchWrites
   setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
-  -- let getBool (ValidatorRestriction b) = b
-  -- disValSeqContext <- (Mod.get (Mod.Proxy @ValidatorRestriction))
-  -- $logInfoS "SEQUENCER DISABLE VALIDATOR" . T.pack $ show (getBool disValSeqContext)
   clearLdbBatchOps
-
--- flipDisableValidator :: Mod.Modifiable Bool m => Bool -> m ()
--- flipDisableValidator disVal = Mod.put (Mod.Proxy @ Bool) 
 
 addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
 addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->

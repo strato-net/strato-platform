@@ -9,6 +9,8 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import System.Exit
 import Text.Printf
 
+-- import Control.Monad
+import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
@@ -29,15 +31,17 @@ insertSeq iev = do
     writeUnseqEvents [iev]
   mapM_ print resps
 
-disableValidator :: Bool -> IO ()
-disableValidator disVal = do
-  printf "Disable Validator Flag = %s \n" $ show disVal
-  let msg = IEDisableValidator disVal
+validatorBehavior :: Bool -> IO ()
+validatorBehavior valB = do
+  printf "Validator behavior = %s \n" $ show valB
+  let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
-  resp <- runKafkaConfigured (KP.KString "disable-validator-flag") $ do
+  resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
     writeUnseqEvents [msg]
   print resp
-  exitSuccess
+  let iev = IEValidatorBehavior . ForcedValidator $ valB
+  print msg
+  insertSeq iev 
 
 addTx :: String -> IO ()
 addTx tx' = do

@@ -63,7 +63,7 @@ main = do
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
-  -- putStrLn $ "strato-sequencer isDisableValidator: " ++ show flags_isDisableValidator
+  putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -145,7 +145,6 @@ main = do
                
                ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
                putStrLn $ "Checkpoint: " ++ show ckpt
-              --  putStrLn $ "Disable Validator qwerty: " ++ show flags_isDisableValidator
  
                return $ Just $ newContext ckpt selfAddress
   
