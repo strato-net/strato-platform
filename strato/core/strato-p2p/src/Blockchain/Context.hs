@@ -53,7 +53,8 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , peerX509M
+    , getPeerX509
+  
     ) where
 
 
@@ -526,10 +527,10 @@ getPeerByIP :: A.Selectable String PPeer m
             -> m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
 
-peerX509M :: A.Selectable Address X509CertInfoState m
+getPeerX509 :: A.Selectable Address X509CertInfoState m
           => PPeer 
           -> m (Maybe X509CertInfoState)
-peerX509M peer =  A.select (Proxy @X509CertInfoState) 
+getPeerX509 peer =  A.select (Proxy @X509CertInfoState) 
   $ fromPublicKey . pointToSecPubKey $ fromJust $ pPeerPubkey peer
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
