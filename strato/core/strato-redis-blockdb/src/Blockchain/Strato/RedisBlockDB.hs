@@ -250,7 +250,7 @@ registerCertificate contractAddress userAddr x509CertInfoState = do
         _ -> 
             pure . Left . SingleLine $ "registerCertificate - invalid contractAddress, contract is not CertificateRegistry"
     where
-        insertNewX509 = set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
+        insertNewX509 = set (inNamespace X509Certificates userAddr) (toValue x509CertInfoState)
         updateParent p@X509CertInfoState{..} = set (inNamespace X509Certificates $ toKey userAddress) (toValue p{children=userAddr:children})
         txToEither = \case
             TxSuccess _ -> Right Ok 

@@ -530,7 +530,7 @@ getPeerByIP = A.select (Proxy @PPeer)
 getPeerX509 :: A.Selectable Address X509CertInfoState m
           => PPeer 
           -> m (Maybe X509CertInfoState)
-getPeerX509 peer =  A.select (Proxy @X509CertInfoState) 
+getPeerX509 peer = A.select (Proxy @X509CertInfoState) 
   $ fromPublicKey . pointToSecPubKey $ fromJust $ pPeerPubkey peer
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
