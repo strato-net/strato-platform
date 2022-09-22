@@ -55,8 +55,8 @@ import           Settings
 
 type API = 
   "chain" :> QueryParams "chainid" ChainId  
-          :> QueryParam "limit" Natural
-          :> QueryParam "offset" Natural
+          :> QueryParam "limit" Integer
+          :> QueryParam "offset" Integer
           :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
