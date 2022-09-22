@@ -51,6 +51,7 @@ import           Blockchain.TypeLits
 import           Control.Monad.Composable.SQL
 import           SQLM
 import           UnliftIO
+import           Settings
 
 type API = 
   "chain" :> QueryParams "chainid" ChainId  
