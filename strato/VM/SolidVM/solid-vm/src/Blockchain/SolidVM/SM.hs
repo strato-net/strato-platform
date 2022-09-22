@@ -159,7 +159,6 @@ data SState = SState
   , ssEvents        :: Q.Seq Event
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
-  , _codeCollections :: M.Map Keccak256 CC.CodeCollection
   }
 makeLenses ''SState
 
@@ -267,18 +266,14 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
 
 
 instance (Keccak256 `A.Alters` DBCodeCollection) m => (Keccak256 `A.Alters` CC.CodeCollection) (SM m) where
-  lookup _ k = use (codeCollections . at k) >>= \case
-    Just cc -> pure $ Just cc
-    Nothing -> do
+  lookup _ k = do
       mcc <- lift $ A.lookup (A.Proxy @DBCodeCollection) k
       let myFunc (force -> !arg) = id arg
       let !x = myFunc $ Binary.decode . BL.fromStrict . unDBCodeCollection <$> mcc 
       pure x
   insert _ k v = do
-    codeCollections . at k ?= v
     lift . A.insert (A.Proxy @DBCodeCollection) k . DBCodeCollection . BL.toStrict $! Binary.encode v
   delete _ k = do
-    codeCollections . at k .= Nothing
     lift $ A.delete (A.Proxy @DBCodeCollection) k
 
 instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
@@ -352,8 +347,7 @@ runSM maybeCode env chainId' f = do
         callStack = [],
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
-        _action = startingAction maybeCode env chainId',
-        _codeCollections = M.empty
+        _action = startingAction maybeCode env chainId'
         }
 
   eValState <- try $ runStateT f startingState
