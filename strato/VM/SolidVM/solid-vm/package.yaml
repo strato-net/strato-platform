@@ -104,6 +104,7 @@ tests:
       - test-framework
       - QuickCheck
       - solid-vm-parser
+      - transformers
 
 benchmarks:
     codebench:

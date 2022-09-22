@@ -76,6 +76,11 @@ import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP
 import Debug.Trace
 
+import Control.Monad.Trans.Reader
+
+import Test.QuickCheck.Monadic (assert, monadicIO, pick, pre, run)
+
+
 import  SolidVM.Solidity.Parse.UnParser
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -532,6 +537,63 @@ runValidContracts arrCC = do
   (runBS $ snd last1)
   res2 <- checkStorage
   return $ res1 == res2
+  -- let be1 = (void . runResourceT . flip runReaderT r res2)
+  -- let be2 = (void . runResourceT . flip runReaderT r res1)
+  -- be1 == be2
+
+
+runTest'' :: ContextM a -> IO ()
+runTest'' f = do
+  let timeout = 5000000
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
+  case result of
+    Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
+    Right{} -> return  ()
+
+
+prop_factor' :: [CodeCollection]  -> Property
+prop_factor' arrCC = monadicIO $ do
+  let last1 = last $ getStringContracts arrCC
+  return $ runTest $ do 
+    --let t1 = runTest'' $  
+    (runBS $ snd last1)
+    (runBS $ fst last1)
+    res1 <- checkStorage
+     
+    res2 <- checkStorage
+    return $ res2 == res1
+
+prop_factor'' :: [CodeCollection]  -> Property
+prop_factor'' arrCC = monadicIO $ do
+  case arrCC of
+    [] -> Test.QuickCheck.Monadic.assert $ True
+    _ ->  do
+          let last1 = last $ getStringContracts arrCC
+          good <-  run $ runConte (do runBS  $ snd last1) (do runBS $ snd last1)
+          Test.QuickCheck.Monadic.assert $ good
+    --let t2 = (runTestContextM $ withCurrentBlockHash zeroHash res)
+  --Test.QuickCheck.Monadic.assert $ res
+
+--So My goal is to make a function of IO [(Key, ByteString)]
+
+
+
+prop_writeThenRead :: Property
+prop_writeThenRead = monadicIO $ do 
+                                    good <-  run $ runConte (do
+                                        runBS [r|
+                                    pragma solidvm 3.3;
+                                    contract qq {
+                                      int a =3;
+                                      }
+                                    |]) (do
+                                        runBS [r|
+                                    pragma solidvm 3.3;
+                                    contract qq {
+                                      int a =3;
+                                      }
+                                    |])
+                                    Test.QuickCheck.Monadic.assert $ good 
 
 runValidContracts''' ::  ContextM Bool ->  ContextM Bool -> ContextM Bool
 runValidContracts''' a1  a2=  do
@@ -539,6 +601,14 @@ runValidContracts''' a1  a2=  do
   a2' <- a2
   return $ a1' == a2' 
 
+-- runConte :: ContextM a -> IO (a, ContextState)
+-- runConte f =  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
+
+runConte :: ContextM a -> ContextM a  -> IO (Bool) --(a, ContextState)
+runConte f b =  do
+  (_, forSure) <-  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
+  (_, forSure2) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash b)
+  pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2)) --(printf "test case timed out after")
 -- runValidContracts' ::  ContextM Bool
 -- runValidContracts' arrCC = do
 --   let last1 = last $ getStringContracts 
@@ -575,7 +645,7 @@ contract qq {
    uint address;
 }|]) `shouldThrow` anyParseError
 
-  fit "cannot allow negative block number" $ runTest (do
+  it "cannot allow negative block number" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -597,8 +667,38 @@ contract qq {
   fit "Should do something" $
             --quickCheck propTest
             --withMaxSuccess 10 propTest
-            verboseCheck  propTest
+            --verboseCheck  propTest
+            quickCheck prop_factor''
+  
 
+
+--   fit "cannot allow negative block number" $ 
+--     runConte (do
+--     runBS [r|
+-- pragma solidvm 3.3;
+-- contract qq {
+--   int a =3;
+--   }
+-- |]) (do
+--     runBS [r|
+-- pragma solidvm 3.3;
+-- contract qq {
+--   int a =3;
+--   }
+-- |])
+
+--   fit "can assign from constants" . runTest $ do
+--     runBS [r|
+-- contract qq {
+--   uint constant c = 2007;
+--   uint x;
+--   constructor() public {
+--     x = c;
+--   }
+-- }|]
+--     case checkStorage of 
+--        Blockchain.VMContext.ContextM [] -> False
+--       Blockchain.VMContext.ContextM  _  -> True
   -- it "cannot allow negative block number" $ 
   --   runTest (do  quickCheck runValidContracts) --``shouldBe` True
 
