@@ -644,7 +644,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
 typecheckMember (Static (SVMType.Contract _) x) "staticcall" = 
   pure $ Function 
     --Allow the first argument to be a string, and the next arguments can be any type
-    (MultiVariate (topType' x) x) 
+    Sum (Static SVMType.String x :| [Product [Static SVMType.String x, MultiVariate (topType' x) x]]) x
     --Return a tuple of a bool and anything
     (Product [Static (SVMType.Bool) x, topType' x ] x) 
     x [] []
