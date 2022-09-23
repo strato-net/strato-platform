@@ -803,27 +803,31 @@ genericStaticCallWrapper from to input ro = do
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
   (toContract, toHsh, toCC) <- getCodeAndCollection to
-  result <- case codetype of
-    CC.FunctionCode (n, f) -> 
-      if ( length (f ^. CC.funcOverload) > 0) then 
-        generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show f)
-        --TODO: implement the overloaded function call, here is a helpful start, was having problems with: `getVariableOfNamefromList []` error
-        -- matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
-        -- doesFunctionMatch <- (testMatch argCount args) f
-        -- if (doesFunctionMatch)
-        --   then runTheCall to toContract n toHsh toCC f args ro True
-        --   else case matchingOverload of
-        --     Nothing -> runTheCall to toContract n toHsh toCC f args ro True
-        --     Just mo -> runTheCall to toContract n toHsh toCC mo args ro True
-      else 
-        runTheCall to toContract n toHsh toCC f args ro True
-      
+  executed <- (`EUnsafe.catchAll` (pure . Left . displayException))
+    (case codetype of
+      CC.FunctionCode (n, f) -> 
+        if ( length (f ^. CC.funcOverload) > 0) then 
+          generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show f)
+          --TODO: implement the overloaded function call, here is a helpful start, was having problems with: `getVariableOfNamefromList []` error
+          -- matchingOverload <- findM (testMatch argCount args) $ f ^. CC.funcOverload
+          -- doesFunctionMatch <- (testMatch argCount args) f
+          -- if (doesFunctionMatch)
+          --   then runTheCall to toContract n toHsh toCC f args ro True
+          --   else case matchingOverload of
+          --     Nothing -> runTheCall to toContract n toHsh toCC f args ro True
+          --     Just mo -> runTheCall to toContract n toHsh toCC mo args ro True
+        else 
+          Right <$> runTheCall to toContract n toHsh toCC f args ro True
+        -- runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
+      CC.StatementCode s -> Right <$> runStatement s)
+  case executed of
+    Left _ -> pure (False, Nothing)
+    Right r -> pure (True, r)
 
-      -- runTheCall to toContract n toHsh toCC f args True (f ^. CC.funcIsFree)
-    CC.StatementCode s -> runStatement s
-  case result of 
-    Nothing -> pure (False, result)
-    Just _ -> pure (True, result)
+-- eitherMap f _ (Left a)  = Left $ f a
+-- eitherMap _ g (Right b) = Right $ g b
+-- -- solidTry m = lmap displayException <$> EUnsafe.try m
+-- solidTry m = eitherMap (show id) <$> EUnsafe.try m
 
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
