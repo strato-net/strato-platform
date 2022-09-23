@@ -615,12 +615,11 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                          (Static (SVMType.String Nothing) x)
                          x [] [] ]
 typecheckMember (Static (SVMType.Account _) x) "staticcall" = 
-  pure $ Function 
-    --Allow the first argument to be a string, and the next arguments can be any type
-    (MultiVariate (topType' x) x) 
-    --Return a tuple of a bool and anything
-    (Product [Static (SVMType.Bool) x, topType' x ] x) 
-    x [] []
+  pure $ Sum 
+  --Allow for the first input to be a string
+  (Static (SVMType.String Nothing) x :| 
+  -- Allow for the next few inputs to be anything
+  [Product [stringType' x, MultiVariate (topType' x) x] x])
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -642,12 +641,11 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
                          x [] []
                ]
 typecheckMember (Static (SVMType.Contract _) x) "staticcall" = 
-  pure $ Function 
-    --Allow the first argument to be a string, and the next arguments can be any type
-    Sum (Static SVMType.String x :| [Product [Static SVMType.String x, MultiVariate (topType' x) x]]) x
-    --Return a tuple of a bool and anything
-    (Product [Static (SVMType.Bool) x, topType' x ] x) 
-    x [] []
+  pure $ Sum 
+  --Allow for the first input to be a string
+  (Static (SVMType.String Nothing) x :| 
+  -- Allow for the next few inputs to be anything
+  [Product [stringType' x, MultiVariate (topType' x) x] x])
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
