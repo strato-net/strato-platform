@@ -891,19 +891,19 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
   script {
     echo "Waiting for network nodes to be in-sync and healthy..."
     int counter = 0
-    int restartEveryThirtyMins = 0
+    int restartEveryHour = 0
     for (int i = 0; i < 6000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         // Restart strato container once sync is done or every 30 mins
-        if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryThirtyMins == 900) {
+        if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
             sh "sudo docker restart strato_strato_1"
         }
         if(counter != 60) {
             counter = counter + 1
         }
-        restartEveryThirtyMins = restartEveryThirtyMins + 1
-        if(restartEveryThirtyMins == 901) {
-          restartEveryThirtyMins = 1
+        restartEveryHour = restartEveryHour + 1
+        if(restartEveryHour > 1800) {
+          restartEveryHour = 1
         }
         sleep 2
       } else {
