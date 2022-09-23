@@ -3583,6 +3583,54 @@ contract qq{
         BInteger 26,
         BInteger 13 ]
 
+  it "will throw an error when trying to set a variable with the transfer function.." . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  account b;
+  account payable bPay;
+  account c;
+  account payable cPay;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    aPay = payable(a);
+    b = account(0xdeadbeef);
+    bPay = payable(b);
+    c = account(t);
+    cPay = payable(c);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      bPay.transfer(13);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 1,
+        BInteger 26,
+        BInteger 13 ]
+
   it "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -6744,8 +6792,49 @@ contract C {
       , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
       , BString "C"]
 
-  it "fails for overloaded foreign functions using local variable .code and .staticcall" $ runTest ( do
-    runBS [r|
+
+--   it "can run an overloaded function with staticcall" . runTest $ do
+--     let codeSnippet :: String
+--         codeSnippet = [r|
+-- pragma solidvm 3.3;
+-- contract Test {
+--   uint myNum = 26;
+--   bool myStatus;
+--   string myString = "butts";
+
+--   function addToNum(int x, int y) returns (int) {
+--     return x + y;
+--   }
+
+--   function addToNum(int x, bool g) returns (int){
+--     if (g) {
+--       return 1 + x;
+--     } else {
+--       return x;
+--     }
+--   }
+-- }
+
+-- pragma solidvm 3.3;
+-- contract qq{
+--   string codeTest;
+--   int codeInt;
+--   int myNum = 13;
+--   bool status;
+--   constructor() public {
+--     Test t = new Test();
+--     codeTest = account(t).code("addToNum");
+--     (status, codeInt) = address(this).staticcall(codeTest, 13, "string");
+--   }
+-- }
+-- |]
+--     runBS codeSnippet
+--     getFields ["status", "codeInt"] `shouldReturn`
+--       [ BBool False , BDefault ]
+
+  it "can run an overloaded function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
 pragma solidvm 3.3;
 contract Test {
   uint myNum = 26;
@@ -6776,15 +6865,19 @@ contract Test {
 pragma solidvm 3.3;
 contract qq{
   string codeTest;
-  int codeInt;
+  int codeInt = 0;
   int myNum = 13;
   bool status;
   constructor() public {
     Test t = new Test();
     codeTest = account(t).code("addToNum");
-    (status, codeInt) = address(this).staticcall(codeTest, (13, 14));
+    (status, codeInt) = address(this).staticcall(codeTest, 13, 14);
   }
-}|]) `shouldThrow` anyException
+}
+|]
+    runBS codeSnippet
+    getFields ["status", "codeInt"] `shouldReturn`
+      [ BBool False , BInteger 0 ]
 
   it "can run an overloaded function" . runTest $ do
     let codeSnippet :: String
@@ -6825,10 +6918,15 @@ contract qq {
     getFields ["a", "b", "c"] `shouldReturn`
       [ BInteger 27, BInteger 14, BInteger 82 ]
 
-  it "can run an overloaded foreign function using .code and .staticcall, using a foreign variable." $ runTest ( do
-    runBS [r|
+  it "can run an overloaded function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
 pragma solidvm 3.3;
-contract Test {
+contract qq {
+  int a;
+  int b;
+  int c;
+
   function addToNum(int x, int y) returns (int) {
     return x + y;
   }
@@ -6848,52 +6946,54 @@ contract Test {
       return x;
     }
   }
-}
-
-pragma solidvm 3.3;
-contract qq {
-  string codeTest;
-  int codeInt;
-  int public myNum = 13;
-  bool doesItWork;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code("addToNum");
-    (doesItWork, codeInt) = account(t).staticcall(codeTest, (13, true));
-  }
-}|])
-    `shouldThrow` anyException
-      -- [ BDefault, BBool True, BInteger 53 ]
-    -- (doesItWork, codeInt) = account(t).staticcall(codeTest, (13, 14));
-
-  it "can run a foreign function using .code and .staticcall, with an argument" . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|
-pragma solidvm 3.3;
-contract Test {
-  uint myNum = 13;
-  bool myStatus;
-  string myString = "butts";
-
-  function randomFunc(uint x) public returns (uint){
-    return x+13;
+  constructor () {
+    a = addToNum(13, 14);
+    b = addToNum(13, true);
+    c = addToNum(13, "butts");
   }
 }
-
-pragma solidvm 3.3;
-contract qq{
-  string codeTest;
-  int functionTest;
-  bool status;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code("randomFunc");
-    (status, functionTest) = account(this).staticcall(codeTest, 13);
-  }
-}|]
+|]
     runBS codeSnippet
-    getFields ["functionTest", "status"] `shouldReturn`
-      [ BInteger 26, BBool True ]
+    getFields ["a", "b", "c"] `shouldReturn`
+      [ BInteger 27, BInteger 14, BInteger 82 ]
+
+--   it "can run an overloaded foreign function using .code and .staticcall, using a foreign variable." $ runTest ( do
+--     runBS [r|
+-- )
+--     `shouldThrow` anyException
+--       -- [ BDefault, BBool True, BInteger 53 ]
+--     -- (doesItWork, codeInt) = account(t).staticcall(codeTest, (13, 14));
+
+    
+
+--   it "can run a foreign function using .code and .staticcall, with an argument" . runTest $ do
+--     let codeSnippet :: String
+--         codeSnippet = [r|
+-- pragma solidvm 3.3;
+-- contract Test {
+--   uint myNum = 13;
+--   bool myStatus;
+--   string myString = "butts";
+
+--   function randomFunc(uint x) public returns (uint){
+--     return x+13;
+--   }
+-- }
+
+-- pragma solidvm 3.3;
+-- contract qq{
+--   string codeTest;
+--   int functionTest;
+--   bool status;
+--   constructor() public {
+--     Test t = new Test();
+--     codeTest = account(t).code("randomFunc");
+--     (status, functionTest) = account(this).staticcall(codeTest, 13);
+--   }
+-- }|]
+--     runBS codeSnippet
+--     getFields ["functionTest", "status"] `shouldReturn`
+--       [ BInteger 26, BBool True ]
 
   it "can run a foreign function using .code and .staticcall, without an argument" . runTest $ do
     let codeSnippet :: String
@@ -6934,7 +7034,7 @@ contract Test {
   string myString = "butts";
 
   function randomFunc() public returns (uint){
-    return 13;
+    return myNum + 13;
   }
 }
 
@@ -6952,3 +7052,4 @@ contract qq{
     runBS codeSnippet
     getFields ["functionTest", "status"] `shouldReturn`
       [ BInteger 13 , BBool True]
+      
