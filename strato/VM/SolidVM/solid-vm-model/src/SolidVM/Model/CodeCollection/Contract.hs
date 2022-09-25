@@ -29,7 +29,7 @@ module SolidVM.Model.CodeCollection.Contract (
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
-import Data.Map (Map, empty)
+import Data.Map (Map, empty, fromList)
 import Data.Source
 import GHC.Generics
 
@@ -78,15 +78,17 @@ makeLenses ''ContractF
 
 instance Arbitrary Contract  where
   arbitrary = do -- GR.genericArbitrary GR.uniform
-    stateVars <- arbitrary
+    --stateVars <- arbitrary
     a <- arbitrary
+    varName <- genCourse
+    varDecl <- arbitrary
     --arbitrary
     -- ary <- arbitrary SourceAnnotation
     oneof [return $ Contract {     
     _contractName = "qq",
     _parents = [],
     _constants  =  empty ,-- :: Map SolidString (ConstantDeclF a),
-    _storageDefs =  stateVars,  -- :: Map SolidString (VariableDeclF a),
+    _storageDefs =  fromList [(varName, varDecl)],  -- :: Map SolidString (VariableDeclF a),
     _userDefined = empty ,
     _enums  =  empty ,
     _structs  =  empty ,
@@ -98,3 +100,21 @@ instance Arbitrary Contract  where
     _vmVersion  =  "" ,
     _contractContext = a
   }]
+
+
+-- genVarIdName :: Gen String
+-- genVarIdName = vectorOf 5 $ Test.QuickCheck.elements ['0'..'9']
+
+
+genCourse ::  Gen String
+genCourse = vectorOf 5 $ Test.QuickCheck.elements ['a'..'z']
+  -- ls <- listOf1 $ Test.QuickCheck.elements ['a'..'z']
+  -- ls2 <- listOf1 $Test.QuickCheck.elements ['a'..'z']
+  -- return ls ++ ls2
+
+-- genVarName :: Gen String
+-- genVarName = do
+--   --date <- genVarIdName
+--   dates <- listOf1 $ frequency [(1, return date)]
+--   courses <- traverse genCourse dates
+--   return $ unwords courses

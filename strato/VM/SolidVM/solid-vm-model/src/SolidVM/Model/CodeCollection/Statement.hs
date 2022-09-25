@@ -205,11 +205,11 @@ instance Arbitrary a => Arbitrary (ExpressionF a) where
             frequency [ (1, do
               a        <- arbitrary
               --num      <- arbitrary
-              num2     <- arbitrary
+              num2     <- genPos--arbitrary
               return $ (NumberLiteral a num2  $ Just Wei) ),
               (1, do 
                   a        <- arbitrary
-                  str      <- arbitrary
+                  str      <- vectorOf 1 $ Test.QuickCheck.elements ['+']
                   express1 <- arbitrary
                   express2 <- arbitrary
                   --x <- arbitrary
@@ -217,7 +217,7 @@ instance Arbitrary a => Arbitrary (ExpressionF a) where
               (s, do
                     a        <- arbitrary
                     --num      <- arbitrary
-                    num2     <- arbitrary
+                    num2     <- genPos --arbitrary
                     return $ (NumberLiteral a num2  $ Just Wei))]
               --where
               -- s1 = s`div`2 -- = n-1
@@ -284,7 +284,8 @@ instance Arbitrary a => Arbitrary (ArgListF a) where
   --     --, return $ (Binary dummyAnnotation  "+" (numberOnlyExpressions >>=)  (numberOnlyExpressions >>= ))
   --     ]
 
-
+genPos :: Gen Integer
+genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
 
 
 type ArgList = Positioned ArgListF

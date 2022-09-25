@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
@@ -74,14 +75,17 @@ import           SolidVM.Model.CodeCollection
 
 import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP
-import Debug.Trace
+import  SolidVM.Solidity.Parse.UnParser
 
 import Control.Monad.Trans.Reader
 
 import Test.QuickCheck.Monadic (assert, monadicIO, pick, pre, run)
 
 
-import  SolidVM.Solidity.Parse.UnParser
+
+import Debug.Trace --TO REMOVE
+
+
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -669,6 +673,11 @@ contract qq {
             --withMaxSuccess 10 propTest
             --verboseCheck  propTest
             quickCheck prop_factor''
+  fit "Should do something number2" $
+            quickCheck propTest
+            --withMaxSuccess 10 propTest
+            --verboseCheck  propTest
+            --quickCheck prop_factor''
   
 
 

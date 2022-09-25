@@ -17,7 +17,7 @@ module SolidVM.Model.CodeCollection (
   flStructs,
   flEnums,
   flErrors,
-  
+  pragmas,  
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -65,7 +65,8 @@ data CodeCollectionF a =
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)],
-    _flErrors :: Map SolidString [(SolidString, IndexedType, a)]
+    _flErrors :: Map SolidString [(SolidString, IndexedType, a)],
+    _pragmas :: [(String, String)]
   } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
@@ -124,7 +125,8 @@ instance Arbitrary CodeCollection where
     , _flConstants = M.empty
     , _flEnums     = M.empty
     , _flStructs   = M.empty
-    , _flErrors    = M.empty}]
+    , _flErrors    = M.empty
+    , _pragmas     = [("solidvm","3.3")]}]
 
 -- instance Arbitrary (ExpressionF (SourceAnnotation T.Text)) where -- I think I can turn this signature into an a
 --    arbitrary =  --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
