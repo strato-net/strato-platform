@@ -4,49 +4,40 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 module OptimizerSpec where
 
-import qualified Data.Map as M
-import Data.Maybe            (catMaybes) 
+
 import           Control.Lens
---import           Control.Monad (liftM2)
+import qualified Data.Map as M
+import           Data.Maybe            (catMaybes) 
 import qualified Data.Text as T
 import           Data.Source.Annotation
 
 import           Test.Hspec
 import           Test.QuickCheck
+import           Test.QuickCheck.Monadic (assert, monadicIO, run) --pick, pre,
 import           Text.RawString.QQ
 
---import Blockchain.SolidVM.SM (MonadSM)
+import           BlockApps.Logging
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.CodeCollectionDB
+import           Blockchain.VMContext
+
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type as SVMType
-
---import  SolidVM.Model.Value
-
-import           Blockchain.SolidVM.Exception
-import           Blockchain.SolidVM.CodeCollectionDB
 import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP 
+import           SolidVM.Solidity.Parse.UnParser
 
-import BlockApps.Logging
-import Blockchain.Strato.Model.Keccak256
---import qualified Blockchain.SolidVM                              as SolidVM
---import           Data.Source.Position 
--- --import           Blockchain.SolidVM.SM
--- import           Blockchain.Strato.Model.ExtendedWord (Word256)
---import qualified SolidVM.Model.Type                              as SVMType 
+import           SolidVMSpec
+
+
 import Debug.Trace
-import  SolidVM.Solidity.Parse.UnParser
-import SolidVMSpec
 
-import Test.QuickCheck.Monadic (assert, monadicIO, run) --pick, pre,
-import Blockchain.VMContext
+
 --------------------
 --Helper Functions
 --------------------
-
-
-
-
 
 runOptimizer :: String -> CodeCollection
 runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
@@ -91,11 +82,6 @@ filterValidCodeCollections :: [CodeCollection] -> [CodeCollection]
 filterValidCodeCollections arrCC = (map fst) $ (filter (([] == ) . snd)) $ zip arrCC $ TP.detector <$> arrCC
 
 
----------------------------------------
---Dummy Data
----------------------------------------
-
-
 ---------------------------------------------
 --Functions related to size of CodeCollection
 ---------------------------------------------
@@ -108,7 +94,6 @@ storageDefSize vd  = case  _varInitialVal vd of
         count :: (Expression) -> Int
         count (Binary _ _ expr1 expr2 ) = (count expr1 ) + (count expr2)
         count _ = 1
-
 
 
 -----------------------
@@ -147,7 +132,6 @@ propTest arrCC = do
     let listOf1VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs1))
     let listOf2VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs3))
     trace (show $ (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)) (storgeDefs2 ==  storgeDefs1) && ((storageDefSize <$> listOf1VariableDeclF) <= (storageDefSize <$>   listOf2VariableDeclF)) -- && ( vals1 == vals2 )
-    --Prelude.length map2 == Prelude.length len2
 
 propEvaluatesToTheSame :: [CodeCollection]  -> Property
 propEvaluatesToTheSame arrCC = monadicIO $ do
@@ -169,11 +153,6 @@ prop_factor'' arrCC = monadicIO $ do
           let last111 = last $ getStringContracts arrCC
           good <-  run $ runConte (do runBS  $ snd last111) (do runBS $ snd last111)
           Test.QuickCheck.Monadic.assert $ good
-    --let t2 = (runTestContextM $ withCurrentBlockHash zeroHash res)
-  --Test.QuickCheck.Monadic.assert $ res
-
---So My goal is to make a function of IO [(Key, ByteString)]
-
 
 
 prop_writeThenRead :: Property
@@ -206,10 +185,7 @@ runConte :: ContextM a -> ContextM a  -> IO (Bool) --(a, ContextState)
 runConte f b =  do
   (_, forSure) <-  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   (_, forSure2) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash b)
-  pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2)) --(printf "test case timed out after")
---This doesn't seem like a good check, what would be better?
---Maybe just run expression?
---Look into this?
+  pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2)) 
 
 
 ---------------------
