@@ -382,7 +382,7 @@ runChainConstructors cId cInfo = do
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
   let evs = Action._events <$> actions
-  $logInfoS "Events" evs
+  $logInfoS "Events" (T.pack $ show evs)
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
