@@ -33,15 +33,12 @@ import Data.Source
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
+import qualified Generic.Random                     as GR
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 import Control.DeepSeq
 import Test.QuickCheck
---import Control.Monad
-
-
-import qualified Generic.Random                     as GR
-import           Test.QuickCheck.Instances    ()
+import Test.QuickCheck.Instances    ()
 
 
 -- Changes to this structure should also have changes in the Unparser :)

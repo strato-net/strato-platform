@@ -92,25 +92,10 @@ instance Arbitrary CodeCollection where
     contr <- arbitrary
     -- ary <- arbitrary SourceAnnotation
     oneof [return $ CodeCollection {
-        _contracts  = M.fromList [("qq", contr)]
-    --   _contractName = "SolidString",
-    --   _parents = [],
-    --   _constants = M.empty ,
-    --   _storageDefs = M.empty ,
-    --   _userDefined = M.empty ,
-    --   _enums       = M.empty ,
-    --   _structs     = M.empty ,
-    --   _errors      = M.empty ,
-    --   _events      = M.empty,
-    --   _functions   = M.empty ,
-    --   _constructor = Nothing ,
-    --   _modifiers   = M.empty ,
-    --   _vmVersion   = "",
-    --   _contractContext = emptyAnnotation
-    --     })]
+    _contracts  = M.fromList [("qq", contr)]
     , _flFuncs     = M.empty
     , _flConstants = M.empty
     , _flEnums     = M.empty
     , _flStructs   = M.empty
     , _flErrors    = M.empty
-    , _pragmas     = [("solidvm","3.3")]}]
+    , _pragmas     = [("solidvm","3.4")]}]

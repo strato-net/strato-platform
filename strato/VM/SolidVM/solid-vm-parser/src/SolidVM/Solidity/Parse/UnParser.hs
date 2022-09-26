@@ -30,7 +30,6 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi
 
---import           Blockchain.VM.SolidException
 
 
 sortWith :: Ord b => (a -> b) -> [a] -> [a]

@@ -23,13 +23,11 @@ import           Control.Lens
 import           Data.Aeson
 import           Data.Source
 import           Control.DeepSeq
---import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 import           Test.QuickCheck
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
---import           Data.Source.Annotation
 
 
 -- Changes to this structure should also have changes in the Unparser :)
@@ -49,16 +47,14 @@ instance FromJSON a => FromJSON (VariableDeclF a)
 type VariableDecl = Positioned VariableDeclF
 
 
--- instance Arbitrary a => Arbitrary (VariableDeclF a)  where -- I think I can turn this signature into an a
---   arbitrary = GR.genericArbitrary GR.uniform
-
+--TODO
+--Just realize this needs to match
+--The expression generator
+--AKA I need to make more tests cases for this
 instance Arbitrary VariableDecl  where
-  arbitrary = do -- GR.genericArbitrary GR.uniform
+  arbitrary = do 
     a <- arbitrary
     exprss <- arbitrary
-    --exp <- arbitrary
-    
-    -- ary <- arbitrary SourceAnnotation
     oneof [return $ VariableDecl { 
     _varType       = (SVMType.Int Nothing Nothing)
   , _varIsPublic   = True

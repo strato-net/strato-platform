@@ -51,6 +51,3 @@ type ConstantDecl = Positioned ConstantDeclF
 
 instance Arbitrary a => Arbitrary (ConstantDeclF a) where
   arbitrary = GR.genericArbitrary GR.uniform
-
--- instance Arbitrary ConstantDecl  where
---   arbitrary = GR.genericArbitrary GR.uniform

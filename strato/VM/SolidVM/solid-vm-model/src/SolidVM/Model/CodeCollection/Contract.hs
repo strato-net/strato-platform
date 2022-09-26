@@ -71,9 +71,6 @@ type Contract = Positioned ContractF
 makeLenses ''ContractF
 
 
--- instance Arbitrary a => Arbitrary (ContractF a) where
---   arbitrary = GR.genericArbitrary GR.uniform
-
 instance Arbitrary Contract  where
   arbitrary = do 
     a <- arbitrary
