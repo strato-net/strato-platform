@@ -66,32 +66,3 @@ instance Arbitrary VariableDecl  where
   , _varContext    = a
   , _isImmutable   = False
   }]
-
-
-
---    arbitrary = do
---       inter <- arbitrary
---       oneof
---         [return $ (VariableDecl (SVMType.Int (Just False) Nothing)    False Nothing  (dummyAnnotation) False)
---         , return $ (VariableDecl (SVMType.Int (Just False) Nothing)   False (Just (NumberLiteral dummyAnnotation inter Nothing))  (dummyAnnotation) False)
---         --, return $ (VariableDecl (SVMType.Int (Just False) Nothing)  False (Just 1)  (dummyAnnotation) False)
---         , return $ (VariableDecl (SVMType.Int (Just False) Nothing)    False (Just (Binary dummyAnnotation  "+" (NumberLiteral dummyAnnotation  2 Nothing) (NumberLiteral dummyAnnotation  2 Nothing)) )   dummyAnnotation  False)
---         ]
-
-
--- dummyAnnotation :: SourceAnnotation ()
--- dummyAnnotation =
---   SourceAnnotation
---   {
---     _sourceAnnotationStart=SourcePosition {
---       _sourcePositionName="",
---       _sourcePositionLine=0,
---       _sourcePositionColumn=0
---       },
---     _sourceAnnotationEnd=SourcePosition {
---       _sourcePositionName="",
---         _sourcePositionLine=0,
---         _sourcePositionColumn=0
---       },
---     _sourceAnnotationAnnotation = ()
---   }

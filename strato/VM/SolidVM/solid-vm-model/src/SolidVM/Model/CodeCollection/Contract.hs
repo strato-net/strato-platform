@@ -34,8 +34,6 @@ import Data.Source
 import GHC.Generics
 
 
-
---import qualified Generic.Random                     as GR
 import           Test.QuickCheck.Instances    ()
 import           Test.QuickCheck
 
@@ -77,16 +75,14 @@ makeLenses ''ContractF
 --   arbitrary = GR.genericArbitrary GR.uniform
 
 instance Arbitrary Contract  where
-  arbitrary = do -- GR.genericArbitrary GR.uniform
-    --stateVars <- arbitrary
+  arbitrary = do 
     a <- arbitrary
     varName <- vectorOf 7 $ Test.QuickCheck.elements ['a'..'z'] --There is a chance this won't be unique
     varDecl <- arbitrary
-    -- ary <- arbitrary SourceAnnotation
     oneof [return $ Contract {     
     _contractName = "qq",
     _parents = [],
-    _constants  =  empty ,-- :: Map SolidString (ConstantDeclF a),
+    _constants  =  empty ,                          -- :: Map SolidString (ConstantDeclF a),
     _storageDefs =  fromList [(varName, varDecl)],  -- :: Map SolidString (VariableDeclF a),
     _userDefined = empty ,
     _enums  =  empty ,

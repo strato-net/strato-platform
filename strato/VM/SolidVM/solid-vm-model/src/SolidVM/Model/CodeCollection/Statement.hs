@@ -190,7 +190,9 @@ instance FromJSON a => FromJSON (ExpressionF a)
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
                   deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
-
+-- TODO!!!
+-- A self pruning mechnism 
+-- Otherwise the trees get too big
 instance Arbitrary a => Arbitrary (ExpressionF a) where
   arbitrary = sized exprArb
     where exprArb s = do 
@@ -219,6 +221,7 @@ instance Arbitrary a => Arbitrary (ExpressionF a) where
                     --num      <- arbitrary
                     num2     <- genPos --arbitrary
                     return $ (NumberLiteral a num2  $ Just Wei))]
+              
               --where
               -- s1 = s`div`2 -- = n-1
                     
@@ -243,47 +246,6 @@ instance Arbitrary a => Arbitrary (ArgListF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 
-
-
-
--- instance Arbitrary Expression  where -- I think I can turn this signature into an a
---    arbitrary = 
---     -- do
---     -- --inter <- (choose (0, 10000))
---     -- expr1 <- numberOnlyExpressions
---     -- expr2 <- numberOnlyExpressions
---     oneof --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
---       [ numberOnlyExpressions
---       , binaryExpressions
---       ]
-
--- numberOnlyExpressions :: Gen (Expression)
--- numberOnlyExpressions = do
---     inter <- (choose (0, 10000))
---     oneof 
---       [ return $ NumberLiteral (dummyAnnotation) inter  Nothing
---       --, return $ (Binary dummyAnnotation  "+" (numberOnlyExpressions >>=)  (numberOnlyExpressions >>= ))
---       ]
-
--- binaryExpressions :: Gen (Expression)
--- binaryExpressions = sized binaryExpressions'
-
--- binaryExpressions' :: Integral n => n  -> Gen (Expression)
--- --binaryExpressions' a | n < 0 = numberOnlyExpressions
--- binaryExpressions'  0 = numberOnlyExpressions
--- -- binaryExpressions' 1 = numberOnlyExpressions
--- binaryExpressions' n  = oneof [ numberOnlyExpressions, liftM2 (Binary dummyAnnotation  "+") subExpress  subExpress ]
---   where subExpress = binaryExpressions' (n `div` 2)
-
-
-  
-  -- do
-  --   inter <- (choose (0, 10000))
-  --   oneof 
-  --     [ return $ NumberLiteral (dummyAnnotation) inter  Nothing
-  --     --, return $ (Binary dummyAnnotation  "+" (numberOnlyExpressions >>=)  (numberOnlyExpressions >>= ))
-  --     ]
-
 genPos :: Gen Integer
 genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
 
@@ -302,37 +264,15 @@ instance ToJSON NumberUnit
 instance FromJSON NumberUnit
 
 
--- dummyAnnotation :: SourceAnnotation ()
--- dummyAnnotation =
---   SourceAnnotation
---   {
---     _sourceAnnotationStart=SourcePosition {
---       _sourcePositionName="",
---       _sourcePositionLine=0,
---       _sourcePositionColumn=0
---       },
---     _sourceAnnotationEnd=SourcePosition {
---       _sourcePositionName="",
---         _sourcePositionLine=0,
---         _sourcePositionColumn=0
---       },
---     _sourceAnnotationAnnotation = ()
---   }
-
-
-
 instance Arbitrary a => Arbitrary (StatementF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 -- instance Arbitrary Expression where
 --   arbitrary = GR.genericArbitrary GR.uniform
 
 
-
 instance Arbitrary a => Arbitrary (SimpleStatementF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 
-
 instance Arbitrary a => Arbitrary (VarDefEntryF a) where
   arbitrary = GR.genericArbitrary GR.uniform
-
