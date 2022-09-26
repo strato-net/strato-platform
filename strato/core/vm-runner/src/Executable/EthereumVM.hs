@@ -381,12 +381,15 @@ runChainConstructors cId cInfo = do
            ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
+  let evs = Action._events <$> actions
+  $logInfoS "Events" evs
+
   flushMemStorageDB
   Mem.flushMemAddressStateDB
   flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
-  return (sr, actions)
+  return (sr,actions) 
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m

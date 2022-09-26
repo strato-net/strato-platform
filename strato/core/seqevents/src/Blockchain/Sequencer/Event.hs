@@ -207,7 +207,7 @@ instance Format VmEvent where
   format (VmTx ts o)              = show ts ++ " " ++ format o
   format (VmBlock o)              = format o
   format (VmGenesis o)            = show o
-  format x                          = show x
+  format x                        = show x
 
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
                          , otHash        :: Keccak256

@@ -125,7 +125,7 @@ data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | PutTxResult TransactionResult
                deriving (Show, Eq)
 
-indexEventToTxrResults :: IndexEvent -> [TxrResult]
+indexEventToTxrResults :: IndexEvent -> [TxrResult] -- emit MemberAdded(address,enode);
 indexEventToTxrResults = \case
   LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
     case logDBTopic1 l of

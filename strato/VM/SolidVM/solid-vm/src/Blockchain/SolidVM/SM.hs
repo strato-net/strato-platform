@@ -301,8 +301,8 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
   -- adding events to the action so that slipstream gets them,
   --   and also to the events field of the sstate, so that they get sent to
   --    TxrIndexer for governance updates
-  get    _   = gets ssEvents
-  put    _ q = do
+  get    _   = gets ssEvents    -- This will get (Q.Seq Event)
+  put    _ q = do               -- This will replace (Q.Seq Event)
     action . Action.events .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
