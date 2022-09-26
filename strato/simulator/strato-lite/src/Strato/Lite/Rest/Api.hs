@@ -57,7 +57,7 @@ data PostTxParams = PostTxParams
   , _metadata :: M.Map T.Text T.Text
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-type PostTx = "tx" :> Capture "nodeLabel" T.Text :> ReqBody '[JSON] PostTxParams :> Post '[JSON] ()
+type PostTx = "node" :> Capture "nodeLabel" T.Text :> "tx" :> ReqBody '[JSON] PostTxParams :> Post '[JSON] ()
 -- type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 -- type PutResume = "resume" :> Put '[JSON] DebuggerStatus
 -- type GetBreakpoints = "breakpoints" :> Get '[JSON] [Breakpoint]
