@@ -29,18 +29,15 @@ module SolidVM.Model.CodeCollection (
   module SolidVM.Model.CodeCollection.VarDef
   ) where
 
-import Control.Lens
-import Control.DeepSeq
-import Data.Aeson as A
-import Data.Map (Map)
---import Data.Text as T
+import           Control.Lens
+import           Control.DeepSeq
+import           Data.Aeson as A
+import           Data.Map (Map)
 import qualified Data.Map as M
-import Data.Source
-import Data.Traversable (for)
+import           Data.Source
+import           Data.Traversable (for)
+import           GHC.Generics
 
-import GHC.Generics
-
---import qualified Generic.Random                     as GR
 import           Test.QuickCheck.Instances    ()
 import           Test.QuickCheck
 
@@ -87,25 +84,15 @@ getParents cc c =
   in for (c ^. parents) $ \p ->
        toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
 
--- instance Arbitrary a => Arbitrary (CodeCollectionF a) where
---   arbitrary = GR.genericArbitrary GR.uniform
 
---instance Arbitrary CodeCollection  where
-
---instance Arbitrary a => Arbitrary (CodeCollectionF a) where
 instance Arbitrary CodeCollection where
   arbitrary = do 
 
-  -- sized arbHeapP
-  --  where
-  --   arbHeapP s =
-  --     frequency
-  --     [ (1, do return Empty)
-  --     , (1, do x <- ) 
+
     contr <- arbitrary
     -- ary <- arbitrary SourceAnnotation
     oneof [return $ CodeCollection {
-        _contracts  = M.fromList [("qq", contr)]-- = M.fromList [("qq", Contract {     
+        _contracts  = M.fromList [("qq", contr)]
     --   _contractName = "SolidString",
     --   _parents = [],
     --   _constants = M.empty ,
@@ -127,30 +114,3 @@ instance Arbitrary CodeCollection where
     , _flStructs   = M.empty
     , _flErrors    = M.empty
     , _pragmas     = [("solidvm","3.3")]}]
-
--- instance Arbitrary (ExpressionF (SourceAnnotation T.Text)) where -- I think I can turn this signature into an a
---    arbitrary =  --Note I rather just us an Expression, not an ExpressionF(SourceAnnotation T.Text)
---       [return $ (NumberLiteral (emptyAnnotation) 2 Nothing), return $ (NumberLiteral (emptyAnnotation) 3 Nothing)]
-
-
-
--- emptyAnnotation :: SourceAnnotation T.Text
--- emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
-
-
--- dummyAnnotation :: SourceAnnotation ()
--- dummyAnnotation =
---   SourceAnnotation
---   {
---     _sourceAnnotationStart=SourcePosition {
---       _sourcePositionName="",
---       _sourcePositionLine=0,
---       _sourcePositionColumn=0
---       },
---     _sourceAnnotationEnd=SourcePosition {
---       _sourcePositionName="",
---         _sourcePositionLine=0,
---         _sourcePositionColumn=0
---       },
---     _sourceAnnotationAnnotation = ()
---   }

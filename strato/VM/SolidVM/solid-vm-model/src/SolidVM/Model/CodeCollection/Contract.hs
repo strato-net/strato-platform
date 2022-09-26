@@ -80,9 +80,8 @@ instance Arbitrary Contract  where
   arbitrary = do -- GR.genericArbitrary GR.uniform
     --stateVars <- arbitrary
     a <- arbitrary
-    varName <- genCourse
+    varName <- vectorOf 7 $ Test.QuickCheck.elements ['a'..'z'] --There is a chance this won't be unique
     varDecl <- arbitrary
-    --arbitrary
     -- ary <- arbitrary SourceAnnotation
     oneof [return $ Contract {     
     _contractName = "qq",
@@ -101,20 +100,3 @@ instance Arbitrary Contract  where
     _contractContext = a
   }]
 
-
--- genVarIdName :: Gen String
--- genVarIdName = vectorOf 5 $ Test.QuickCheck.elements ['0'..'9']
-
-
-genCourse ::  Gen String
-genCourse = vectorOf 5 $ Test.QuickCheck.elements ['a'..'z']
-  -- ls <- listOf1 $ Test.QuickCheck.elements ['a'..'z']
-  -- ls2 <- listOf1 $Test.QuickCheck.elements ['a'..'z']
-  -- return ls ++ ls2
-
--- genVarName :: Gen String
--- genVarName = do
---   --date <- genVarIdName
---   dates <- listOf1 $ frequency [(1, return date)]
---   courses <- traverse genCourse dates
---   return $ unwords courses
