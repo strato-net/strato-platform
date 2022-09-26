@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 module OptimizerSpec where
 
-
 import           Control.Lens
 import qualified Data.Map as M
 import           Data.Maybe            (catMaybes) 
@@ -32,7 +31,13 @@ import           SolidVM.Solidity.Parse.UnParser
 import           SolidVMSpec
 
 
-import Debug.Trace
+--import Blockchain.SolidVM
+import Blockchain.DB.SolidStorageDB
+--import qualified Blockchain.Database.MerklePatricia          as MP
+import SolidVM.Model.Storable
+
+--import Debug.Trace
+
 
 
 --------------------
@@ -72,14 +77,45 @@ getFuncByName funName cc = case M.lookup funName $ head  (getFuncs cc) of  --rep
 
 getStringContracts :: [CodeCollection] -> [(String, String) ]
 getStringContracts arrCC = do 
-    let map2 = (map fst) $ (filter (([] == ) . snd)) $ (zip arrCC $ TP.detector <$> arrCC)
+    let map2 = filterValidCodeCollections arrCC
     let ls1  = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)
-    let ls2  =  (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> (O.detector <$> map2))
+    let ls2  = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> (O.detector <$> map2))
     (zip ls1 ls2)
 
 
 filterValidCodeCollections :: [CodeCollection] -> [CodeCollection]
 filterValidCodeCollections arrCC = (map fst) $ (filter (([] == ) . snd)) $ zip arrCC $ TP.detector <$> arrCC
+
+
+runValidContracts''' ::  ContextM Bool ->  ContextM Bool -> ContextM Bool
+runValidContracts''' a1  a2=  do
+  a1' <- a1
+  a2' <- a2
+  return $ a1' == a2' 
+
+getAllVars ::  ContextM [BasicValue] --ContextM [(MP.Key, BasicValue)]
+getAllVars = do 
+    vals <- getAllSolidStorageKeyVals' uploadAddress 
+    return [ y |(_, y)<- vals]
+
+
+runConte :: ContextM a -> ContextM a  -> IO (Bool) --(a, ContextState)
+runConte f b =  do
+  (_, forSure) <-  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
+  (_, forSure2) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash b)
+  --pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2))
+  pure $ (show $ _memDBs forSure) == (show $ _memDBs forSure2) 
+
+
+
+evaluateContractsBatch :: [(String, String)] ->  IO [Bool]
+evaluateContractsBatch  = sequence . map (\(x, y) -> runConte (contractToBasicValue x) (contractToBasicValue y))
+
+
+contractToBasicValue :: String -> ContextM [BasicValue]
+contractToBasicValue y = do 
+    runBS  $ y
+    getAllVars
 
 
 ---------------------------------------------
@@ -100,7 +136,6 @@ storageDefSize vd  = case  _varInitialVal vd of
 --Property Based Tests
 ------------------------
 
-
 propSameOrSmallerSize :: [CodeCollection] -> Bool
 propSameOrSmallerSize arrCC = do 
     let map2 = filterValidCodeCollections arrCC
@@ -120,28 +155,13 @@ propSameValueAfterNOpts arrCC = do
     let storgeDefsDoubleOptimized = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> lsCC))
     storgeDefsOptimizedOnce == storgeDefsDoubleOptimized
 
-propTest :: [CodeCollection] -> Bool
-propTest arrCC = do 
-    --Clean code up put in let block
-    let map2 = (map fst) $ (filter (([] == ) . snd)) $ (zip arrCC $ TP.detector <$> arrCC)
-    let len2 =  (O.detector <$> map2)
-    let storgeDefs1 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> len2)
-    let storgeDefs2 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> len2))
-    let storgeDefs3 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)
-    
-    let listOf1VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs1))
-    let listOf2VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs3))
-    trace (show $ (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)) (storgeDefs2 ==  storgeDefs1) && ((storageDefSize <$> listOf1VariableDeclF) <= (storageDefSize <$>   listOf2VariableDeclF)) -- && ( vals1 == vals2 )
-
 propEvaluatesToTheSame :: [CodeCollection]  -> Property
 propEvaluatesToTheSame arrCC = monadicIO $ do
   let last11 = last $ getStringContracts arrCC
   return $ runTest $ do 
-    --let t1 = runTest'' $  
     (runBS $ snd last11)
     (runBS $ fst last11)
     res1 <- checkStorage
-     
     res2 <- checkStorage
     return $ res2 == res1
 
@@ -155,6 +175,34 @@ prop_factor'' arrCC = monadicIO $ do
           Test.QuickCheck.Monadic.assert $ good
 
 
+
+-- propEvaluatesToTheSame' :: [CodeCollection]  -> Property
+-- propEvaluatesToTheSame' arrCC = monadicIO $ do
+--     case arrCC of
+--         [] -> Test.QuickCheck.Monadic.assert $ True
+--         _ -> do
+--             let lsStrings = getStringContracts arrCC
+--             let f  = sequence $ map  (\y ->  return $ runTest $ do 
+--                             (runBS $ snd y)
+--                             res1 <- getAllVars
+--                             (runBS $ fst y)
+--                             res2 <- getAllVars
+--                             return $ res2 == res1) lsStrings
+--             ls <-f
+--             Test.QuickCheck.Monadic.assert  $ all id f
+
+-- stringLS :: [(String, String)] -> IO [Bool]
+
+propEvaluatesToTheSame' :: [CodeCollection]  -> Property
+propEvaluatesToTheSame' arrCC = monadicIO $ do
+  case arrCC of
+    [] -> Test.QuickCheck.Monadic.assert $ True
+    _ ->  do
+          res <-  run $ ((return . (all id)) =<<) $ evaluateContractsBatch $ getStringContracts arrCC
+          Test.QuickCheck.Monadic.assert $ res
+
+    
+--EXAMPLE
 prop_writeThenRead :: Property
 prop_writeThenRead = monadicIO $ do 
                                     good <-  run $ runConte (do
@@ -172,33 +220,18 @@ prop_writeThenRead = monadicIO $ do
                                     |])
                                     Test.QuickCheck.Monadic.assert $ good 
 
-runValidContracts''' ::  ContextM Bool ->  ContextM Bool -> ContextM Bool
-runValidContracts''' a1  a2=  do
-  a1' <- a1
-  a2' <- a2
-  return $ a1' == a2' 
-
--- runConte :: ContextM a -> IO (a, ContextState)
--- runConte f =  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
-
-runConte :: ContextM a -> ContextM a  -> IO (Bool) --(a, ContextState)
-runConte f b =  do
-  (_, forSure) <-  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
-  (_, forSure2) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash b)
-  pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2)) 
-
 
 ---------------------
 spec :: Spec
 spec = describe "Optimizer tests" $ do
-    fit "can replace binary expression with number literal for state variables" $
+    it "can replace binary expression with number literal for state variables" $
         let anns = (runOptimizer [r|
             contract A {
                 int b = 2 + 2 + 2;
             }|])  in case (varDeclHelper'' $ varDeclHelper' anns) of
                 [(NumberLiteral _ 6 _) ] -> True
                 _ -> False
-    fit "Variable  wrap --- then takes the wrap and turns it to." $
+    it "Variable  wrap --- then takes the wrap and turns it to." $
         let anns = runOptimizer [r|
             pragma solidvm 3.3;
             type Mytype is int;
@@ -207,7 +240,7 @@ spec = describe "Optimizer tests" $ do
             }|]  in case (varDeclHelper'' $ varDeclHelper' anns) of
                 [NumberLiteral _ 2 _] -> True
                 _ -> False
-    fit "Unwrap Variable by name of Variable " $
+    it "Unwrap Variable by name of Variable " $
         let anns = runOptimizer [r|
             pragma solidvm 3.3;
             type Mytype is int;
@@ -217,7 +250,7 @@ spec = describe "Optimizer tests" $ do
             }|]  in case varDeclHelper'' $ varDeclHelper' anns of
                 [NumberLiteral _ 2 _, (NumberLiteral _ 2 _) ] -> True
                 _ -> False
-    fit "can turn func arguements and values to user defined" $
+    it "can turn func arguements and values to user defined" $
         let anns = runOptimizer [r|
             pragma solidvm 3.3;
             type Mytype is int;
@@ -229,9 +262,11 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-    it "Should be the same after one optimization" $
+    fit "Should be the same after one optimization" $
             quickCheck propSameValueAfterNOpts
-    it "Should have equal evaluated expressions after optimization" $
+    fit "Should have equal evaluated expressions after optimization" $
             quickCheck propEvaluatesToTheSame
     fit "Should be same or less size (_storageDefs)" $
             quickCheck propSameOrSmallerSize
+    fit "REAL version of should be same value" $
+            quickCheck propEvaluatesToTheSame'
