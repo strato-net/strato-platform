@@ -1016,8 +1016,8 @@ createConnection server client = do
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
 
-mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Transaction
-mkSignedTx privKey utx =
+mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
+mkSignedTx privKey utx md =
   let Nonce n = U.unsignedTransactionNonce utx
       Gas gl = U.unsignedTransactionGasLimit utx
       cId = unChainId <$> U.unsignedTransactionChainId utx
@@ -1037,7 +1037,7 @@ mkSignedTx privKey utx =
                    , transactionR        = fromIntegral r'
                    , transactionS        = fromIntegral s'
                    , transactionV        = v'
-                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   , transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
                    }
         else ContractCreationTX
                    { transactionNonce    = fromIntegral n
@@ -1049,7 +1049,7 @@ mkSignedTx privKey utx =
                    , transactionR        = fromIntegral r'
                    , transactionS        = fromIntegral s'
                    , transactionV        = v'
-                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   , transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
                    }
 
 runConnection :: P2PConnection

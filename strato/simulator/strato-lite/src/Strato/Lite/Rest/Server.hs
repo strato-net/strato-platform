@@ -12,11 +12,10 @@ import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (traverse_)
+import           Data.Foldable                     (for_, traverse_)
 import           Data.Traversable                  (for)
 import qualified Data.Map.Strict                   as M
 import qualified Data.Text                         as T
-import           Blockchain.Data.Json
 import qualified Blockchain.Data.TXOrigin          as Origin
 import           Blockchain.Sequencer.Event
 import           Strato.Lite.Rest.Api
@@ -58,13 +57,14 @@ postTimeout mgr rn = do
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
   liftIO $ traverse_ (postEvent ev) peers
 
-postTx :: NetworkManager -> Transaction' -> Handler ()
-postTx mgr (Transaction' tx) = do
-  ts <- liftIO $ getCurrentMicrotime
-  let ev = UnseqEvent . IETx ts $ IngestTx Origin.API tx
-  peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
-  
-  liftIO $ traverse_ (postEvent ev) peers
+postTx :: NetworkManager -> T.Text -> PostTxParams -> Handler ()
+postTx mgr nodeLabel (PostTxParams tx md) = do
+  mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
+  liftIO . for_ mPeer $ \peer -> do
+    ts <- liftIO $ getCurrentMicrotime
+    let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
+        ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
+    postEvent ev peer
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =

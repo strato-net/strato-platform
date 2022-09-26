@@ -3,20 +3,24 @@
 {-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
 {-# LANGUAGE TypeOperators     #-} -- DEBUGGING
 {-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Strato.Lite.Rest.Api
   ( ThreadResultMap
+  , PostTxParams(..)
   , StratoLiteRestAPI
   , stratoLiteRestAPI
   ) where
 
+import           Data.Aeson
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
+import           GHC.Generics
 import           Servant
-import           Blockchain.Data.Json
+import           Blockchain.Data.AlternateTransaction
 
 type ThreadResultMap = M.Map T.Text (Maybe (Either String ()))
 
@@ -47,7 +51,13 @@ type PostRemoveConnection = "connection" :> Capture "server" T.Text
                                          :> "remove"
                                          :> Post '[JSON] Bool
 type PostTimeout = "timeout" :> ReqBody '[JSON] Int :> Post '[JSON] ()
-type PostTx = "tx" :> ReqBody '[JSON] Transaction' :> Post '[JSON] ()
+
+data PostTxParams = PostTxParams
+  { _tx :: UnsignedTransaction
+  , _metadata :: M.Map T.Text T.Text
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type PostTx = "tx" :> Capture "nodeLabel" T.Text :> ReqBody '[JSON] PostTxParams :> Post '[JSON] ()
 -- type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 -- type PutResume = "resume" :> Put '[JSON] DebuggerStatus
 -- type GetBreakpoints = "breakpoints" :> Get '[JSON] [Breakpoint]
