@@ -83,7 +83,7 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas' = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            curPragmas = pragmas <$> sourceUnits
+            curPragmas = pragmas' <$> sourceUnits
             vmVersion' = if | (Just ("solidvm", "3.4")) `elem` curPragmas -> "svm3.4"
                             | (Just ("solidvm", "3.3")) `elem` curPragmas -> "svm3.3"
                             | (Just ("solidvm", "3.2")) `elem` curPragmas -> "svm3.2"
