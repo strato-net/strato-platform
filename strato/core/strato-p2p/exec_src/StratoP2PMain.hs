@@ -11,6 +11,7 @@ import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
+import           Executable.StratoP2PClientDirect
 import           Executable.StratoP2PLoopback
 import           BlockApps.Init
 import           Data.IORef
@@ -28,4 +29,5 @@ main = do
     (runLoggingT $
       race_ (stratoP2PLoopback wireMessagesRef)
         (race_ (stratoP2PClient wireMessagesRef)
-               (stratoP2PServer wireMessagesRef)))
+            (race_ (stratoP2PClientDirect wireMessagesRef)
+                      (stratoP2PServer wireMessagesRef))))
