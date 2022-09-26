@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeOperators #-}
@@ -12,6 +14,7 @@ module Blockchain.Strato.StateDiff.Database
 import           Database.Persist                            hiding (Update, get)
 import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
 
+import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
 import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
@@ -30,12 +33,15 @@ import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
 import           Data.Maybe
+import qualified Data.Text                                   as T
 
 import           Blockchain.Strato.StateDiff
 
+import           UnliftIO
+
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
+commitSqlDiffs :: (MonadLogger m, MonadUnliftIO m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   sqlQuery $ do
     createAccount blockNumber $ Map.toList createdAccounts
@@ -60,23 +66,24 @@ codePtrChainId :: CodePtr -> Maybe Word256
 codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
 codePtrChainId _ = Nothing
 
-createAccount :: MonadIO m =>
+createAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
-createAccount blockNumber accountDiffs = do
-  let newAccounts = map (uncurry addrRef) accountDiffs
-  addrIDs <- SQL.insertMany newAccounts
-
-  newStorage <-
-    forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
-      let (_, diff) = accountDiff
-      case storage diff of
-        EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
-                            | (k, Value v) <- Map.toList m]
-        SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
-                                | (k, Value v) <- Map.toList m]
-  SQL.insertMany_ $ concat newStorage
-
+createAccount blockNumber accountDiffs =
+  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
+    tryCreates = do
+      let newAccounts = map (uncurry addrRef) accountDiffs
+      addrIDs <- SQL.insertMany newAccounts
+
+      newStorage <-
+        forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
+          let (_, diff) = accountDiff
+          case storage diff of
+            EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
+                                | (k, Value v) <- Map.toList m]
+            SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
+                                    | (k, Value v) <- Map.toList m]
+      SQL.insertMany_ (concat newStorage)
     addrRef account diff = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
       addressStateRefNonce = getField (theError account "nonce") $ nonce diff,
@@ -108,7 +115,7 @@ deleteAccount account = do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
-updateAccount :: MonadIO m =>
+updateAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
                  Integer -> Account -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount blockNumber account diff = do
   mAddrID <- getAddressStateSQL account

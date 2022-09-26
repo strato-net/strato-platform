@@ -54,6 +54,7 @@ spec :: Spec
 spec = describe "Optimizer tests" $ do
     it "can replace binary expression with number literal for state variables" $
         let anns = (runOptimizer [r|
+            pragma solidvm 3.4;
             contract A {
                 int b = 2 + 2 + 2;
             }|])  in case (varDeclHelper' $ varDeclHelper anns) of
@@ -61,7 +62,7 @@ spec = describe "Optimizer tests" $ do
                 _ -> False
     it "Variable  wrap --- then takes the wrap and turns it to." $
         let anns = runOptimizer [r|
-            pragma solidvm 3.3;
+            pragma solidvm 3.4;
             type Mytype is int;
             contract A {
                 Mytype a = Mytype.wrap(2);
@@ -70,7 +71,7 @@ spec = describe "Optimizer tests" $ do
                 _ -> False
     it "Unwrap Variable by name of Variable " $
         let anns = runOptimizer [r|
-            pragma solidvm 3.3;
+            pragma solidvm 3.4;
             type Mytype is int;
             contract A {
                 Mytype a = Mytype.wrap(2);
@@ -80,7 +81,7 @@ spec = describe "Optimizer tests" $ do
                 _ -> False
     it "can turn func arguements and values to user defined" $
         let anns = runOptimizer [r|
-            pragma solidvm 3.3;
+            pragma solidvm 3.4;
             type Mytype is int;
             contract A {
                 Mytype a = Mytype.wrap(2);

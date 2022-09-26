@@ -5,7 +5,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Alias (solidityAlias) where
-
+  
+import           Control.Monad                     (when)
 import           Text.Parsec 
 import           Data.Source
 
@@ -15,9 +16,10 @@ import           SolidVM.Solidity.Parse.ParserTypes
 
 solidityAlias :: SolidityParser SourceUnit
 solidityAlias = do
+  pragmaVersion' <- getPragmaVersion
+  when (pragmaVersion' /= "3.4") $ fail "User defined type aliases are not supported below pragma solidvm 3.4"
   ~(a, (aliasName, rest)) <- withPosition $ do
-    reserved "type"
-    
+    symbol "type"
     aliasName <- identifier
     reserved "is"
     rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error

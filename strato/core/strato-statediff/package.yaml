@@ -26,6 +26,7 @@ library:
     - strato-conf
     - strato-model
     - text
+    - unliftio
   default-extensions:
     - MultiParamTypeClasses
     - FlexibleContexts
