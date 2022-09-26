@@ -386,22 +386,21 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
             yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       P2pTx tx -> do
-        let cId = txChainId tx
-        match <- do
-          if isNothing cId
-          then return True
-          else do
-            mems     <- lift $ selectWithDefault (Proxy @ChainMembers) (fromJust cId)
+        let mCid = txChainId tx
+        match <- case mCid of
+          Nothing -> return True
+          Just cId -> do
+            mems     <- lift $ selectWithDefault (Proxy @ChainMembers) cId
             peerX509 <- lift $ getPeerX509 peer
             ochains  <- lift $ selectWithDefault (Proxy @OrgNameChains) $ certOrgTuple peerX509 -- swole from all this lifting
             return $ checkPeerIsMember'' flags_privateChainAuthorizationMode peer mems peerX509 ochains
 
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
-          if not (match)
+          if not match
             then $logInfoS "handleEvents/P2pTx" $ T.pack $
-                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId cId)
+                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId mCid)
             else do
-              $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
+              $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId mCid
               $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
       P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
@@ -537,7 +536,7 @@ handleGetChainDetails peer cids' = do
   unless (null filteredPairs) $ do
     cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids 
     -- chains that use X509 may not have ChainMembers with enode addresses,
-    -- so they will not have a Map in mems and need to be queried separately
+    -- so they will not have a Map in mems and their cInfos need to be queried separately
     cInfos' <-  fmap M.toList . lift $ selectMany (Proxy @ChainInfo) $ S.toList (unOrgNameChains orgNameChains) 
     for_ (cInfos ++ cInfos') $ yieldR . ChainDetails . (:[])
     lift stampActionTimestamp
