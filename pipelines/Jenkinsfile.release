@@ -1,0 +1,239 @@
+pipeline {
+  agent {
+    label "test1"
+  }
+  options { disableConcurrentBuilds() }
+  parameters {
+    string(name: 'GIT_TAG', defaultValue: 'tags/0.0.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
+    string(name: 'RELEASE_VERSION', defaultValue: '0.0.0', description: 'The version tag for the future release')
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        script {
+          if (!env.GIT_TAG.contains("tags/")) {
+            echo "Unexpected GIT_TAG format: ${env.GIT_TAG}, expected to include 'tags/'. Exit 1."
+            currentBuild.result = 'FAILURE'
+            sh "exit 1"
+          }
+        }
+        sh '''#!/bin/bash -le
+          set -x
+
+          # Install prerequisites if required (assuming VM has docker, docker-compose, git and npm + nodeJS v.6+ by default
+          if [ ! $(command -v github-release) ]; then
+            if [ ! $(command -v go) ]; then
+              wget -qO- https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+              echo "export GOPATH=\$HOME/go" >> ~/.profile
+              echo "export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin:" >> ~/.profile
+              . ~/.profile # to reload profile
+            fi
+            go get github.com/aktau/github-release
+          fi
+        '''
+        sh 'git worktree remove --force strato-worktree || true'
+        sh "git worktree add strato-worktree ${env.GIT_TAG}"
+        dir ('strato-worktree') {
+          sh 'git worktree list'
+          sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
+          sh 'docker ps'
+        }
+      }
+    }
+
+    stage('Build') {
+      steps {
+        dir ('strato-worktree') {
+          sh "echo ${env.RELEASE_VERSION} > VERSION"
+          sh 'rm -rf .docker-work'
+          sh 'REPO=public make all'
+          dir ('blockapps-rest') {
+            sh 'yarn install --pure-lockfile'
+            sh 'yarn build'
+          }
+        }
+      }
+    }
+
+
+    stage('Deploy') {
+
+      steps {
+          sh '''#!/bin/bash -le
+            set -x
+            rm -rf strato-getting-started
+            git clone https://github.com/blockapps/strato-getting-started
+            cp strato-worktree/docker-compose.yml strato-getting-started/
+            cd strato-getting-started
+            export NODE_HOST=$(</host)
+            export genesis=smokeTest
+            export BLOC_DEBUG=true
+            export SLIPSTREAM_OPTIONAL=false
+            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+            export OAUTH_CLIENT_ID=dev
+            export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
+            export PASSWORD=123
+            ./strato --single
+            docker ps
+            # Few quick tests
+            check_availability() {
+              counter=0
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for STRATO health endpoint to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "STRATO health endpoint is available through nginx - node is running"
+            }
+            check_availability
+            echo "Restarting docker containers to simulate computer restart..."
+            docker-compose -p strato --log-level ERROR stop
+            docker-compose -p strato --log-level ERROR start
+            PASSWORD=${PASSWORD} ./strato --set-password
+            check_availability
+          '''
+      }
+    }
+
+    stage('Some quick tests') {
+      steps {
+        parallel(
+          'Apex tests': {
+            sh '''#!/bin/bash -le
+              set -x
+              echo "Running apex unit tests"
+              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
+              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
+            '''
+            },
+
+            'STRATO API Tests': {
+              withCredentials([
+                usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+              ]) {
+
+                sh '''#!/bin/bash -le
+                  set -x
+                  # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
+                  rm -rf strato-api-tests
+                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  #git checkout develop # we must not checkout the custom branch here - we must test with develop branch of strato-api-tests here as well as in the nightly job.
+                  docker build --tag strato-api-tests .
+                  docker run \
+                    -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+                    -e OAUTH_CLIENT_ID=dev \
+                    -e OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
+                    -e STRATO_NODE_URL=http://172.17.0.1:80 \
+                    -e DEBUG_LOG=false \
+                    strato-api-tests
+                '''
+              }
+            },
+
+            'BA-Rest Tests': {
+              sh '''#!/bin/bash -le
+                set -x
+                echo "Running ba-rest E2E tests"
+                cd strato-worktree/blockapps-rest
+                DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+                docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+              '''
+            },
+        )
+      }
+    }
+
+    stage('Release') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+        ]) {
+          dir ('strato-worktree') {
+            // Push images to Docker Registry
+            sh '''#!/bin/bash -le
+              set -x
+              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+              docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+            '''
+
+            // Release to blockapps/strato-getting-started
+            sh '''#!/bin/bash -le
+              set -x
+              RELEASE_VERSION=$(<VERSION)
+              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
+              github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
+              sleep 5
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
+            '''
+
+            // Merge release code to master
+            sh 'git checkout VERSION'
+            // Make sure no master branch exists with random/old code, we want code from origin/master
+            sh 'git branch -D master'
+            sh 'git checkout master'
+            sh "git merge ${env.GIT_TAG}"
+            sh "echo ${env.RELEASE_VERSION} > VERSION"
+            sh 'git add VERSION'
+            sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
+            sh "git tag ${env.RELEASE_VERSION}"
+            // The following step requires `cd-blockapps` user to be able to push directly to master
+            // (requirement for pull-request reviews should be disabled for `master` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
+            // any ideas how to avoid that?
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
+
+            // A trick to avoid error: "fatal: 'develop' is already checked out at <...>/jenkins/workspace/RELEASE_STRATO_release_build"
+            sh "(cd ../ && git checkout ${env.GIT_TAG})"
+            
+            // Merge VERSION change back to develop
+            sh 'git checkout develop'
+            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh 'git merge master'
+            // The following step requires `cd-blockapps` user to be able to push directly to develop
+            // (requirement for pull-request reviews should be disabled for `develop` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
+            // any ideas how to avoid that?
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh './fetchlogs --as-dir'
+        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+      }
+    }
+
+    success {
+      slackSend (
+        color: 'good',
+        message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+
+      slackSend (
+        channel: '#the-core',
+        color: 'good',
+        message: "STRATO ${env.RELEASE_VERSION} is released"
+      )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Release ${env.RELEASE_VERSION} Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}

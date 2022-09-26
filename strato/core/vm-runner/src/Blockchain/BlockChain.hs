@@ -311,15 +311,25 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time' (txChainId bt)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
-        Right execResult -> do
-          let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
-          flushMemAddressStateTxToBlockDB
-          flushMemStorageTxDBToBlockDB
-          flushMemCertTxToBlockDB
+        Right execResult ->
+          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3"),("solidvm","3.4")]
+              findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
+              invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
+           in if not $ null invalidPragmasUsed
+                 then do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  putCertTxDBMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
-          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+                 else do
+                   let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
+                   flushMemAddressStateTxToBlockDB
+                   flushMemStorageTxDBToBlockDB
+                   flushMemCertTxToBlockDB
+                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+
         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
-
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock

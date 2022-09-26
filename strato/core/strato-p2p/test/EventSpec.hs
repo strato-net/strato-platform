@@ -73,6 +73,8 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
+--import  BlockApps.X509.Certificate           
+
 import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
@@ -827,7 +829,7 @@ execTestPeerWithContext f ctx = do
 data P2PPeer = P2PPeer
   { _p2pPeerPrivKey        :: PrivateKey
   , _p2pPeerPPeer          :: DataPeer.PPeer
-  , _p2pPeerUnseqSource    :: TQueue SeqLoopEvent
+  , _p2pPeerUnseqSource    :: TQueue [SeqLoopEvent]
   , _p2pPeerSeqP2pSource   :: TMChan (Either TxrResult P2pEvent)
   , _p2pPeerSeqVmSource    :: TQueue [VmEvent]
   , _p2pPeerApiIndexSource :: TQueue [IndexEvent]
@@ -855,7 +857,10 @@ runNode p =
       (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerTxrIndexer)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
-postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) e
+postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
+
+postEvents :: [SeqLoopEvent] -> P2PPeer -> IO ()
+postEvents es p = atomically $ writeTQueue (_p2pPeerUnseqSource p) es
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot MP.NodeData)) where
   lookup _ k   = M.lookup k <$> State.gets snd
@@ -916,7 +921,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
         DBDB.bootstrapGenesisBlock genHash 1
         A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
         runConduit $ sourceTQueue unseqSource
-                  .| mapMC (Seq.runSequencerBatch . (:[]))
+                  .| mapMC Seq.runSequencerBatch
                   .| (awaitForever $ \b -> do
                         chainIds <- lift $ unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
                         txHashes <- lift $ unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
@@ -949,7 +954,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                   .| (awaitForever $ \b -> do
                         $logInfoS (T.pack name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
                         atomically $ do
-                          traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                          writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
                           writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                           writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                           traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
@@ -977,7 +982,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                       orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
                                         Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
                                         Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
-                                      atomically . writeTQueue unseqSource . UnseqEvent $ IENewChainMember cId addr enode
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
                                     RemoveMember (Right (cId, addr)) -> do
                                       mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
                                       chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
@@ -1001,7 +1006,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                  , 30303
                                  )
       unseq ies = do
-        for_ (UnseqEvent <$> ies) $ atomically . writeTQueue unseqSource
+        atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
         unseqSink ies
   pure $ P2PPeer
     privKey
@@ -1487,6 +1492,68 @@ contract B {
       --  , (peers' !! 2, peers' !! 3)
       --  ]
       --let connections' = connections ++ connections4
+
+    it "can register and unregister a cert on the main chain" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..2]
+      let globalAdmin = privKeys !! 0
+          orgAdmin = privKeys !! 1
+          validators' = makeValidators privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+        [ ("node1", "1.2.3.4")
+        , ("node2", "5.6.7.8")
+        ]
+      connections <- traverse (uncurry createConnection)
+        [ (peers !! 0, peers !! 1)
+        ]
+      let src = [r|
+pragma solidvm 3.0;
+
+contract RegisterCert {
+
+  constructor(address _user, string _cert) {
+    registerCert(_user, _cert);
+  }
+}
+|]
+          contractName = "RegisterCert"
+      ts <- liftIO getCurrentMicrotime
+      let testCert1 = "-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----"
+          emptyCert = "-----BEGIN CERTIFICATE-----\nMIIBVDCB+aADAgECAhBPjHUswOXtDsbDeQIsdepkMAwGCCqGSM49BAMCBQAwLDEJ\nMAcGA1UEAwwAMQkwBwYDVQQKDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMB4XDTIx\nMDUyNTE1MzQxNVoXDTIyMDUyNTE1MzQxNVowLDEJMAcGA1UEAwwAMQkwBwYDVQQK\nDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE\n4X1p4KE8cB6vYqKzSHIl+V5fDUC9p0j8OfOQOUhCfkjG1ALuRyP68tTohz9TLPLk\nYCVKrCiueuZJbejnGsp21TAMBggqhkjOPQQDAgUAA0gAMEUCIQCVtizg/N3MBdLi\nfHto7tqu1ia6cZpMI/G2bLWSPErK9AIgcBw+S8iVqSjh61CkgBAS066Z7M/W9eeY\n+sm9OKHDfQQ=\n-----END CERTIFICATE-----"
+          args addr cert = "(0x" <> T.pack (formatAddressWithoutColor addr) <> ", \"" <> cert <> "\")"
+          utx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack src
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          txMd addr cert = M.fromList [("src", src), ("name", contractName), ("args", args addr cert)]
+          addMd addr cert t = t{transactionMetadata = M.union (txMd addr cert) <$> transactionMetadata t}
+          mkTx pSigner pCert n =
+            let utx' = utx{U.unsignedTransactionNonce = Nonce n}
+                addr = fromPrivateKey pCert
+             in addMd addr testCert1 $ mkSignedTx pSigner utx'
+          mkEmptyTx pSigner pCert n =
+            let utx' = utx{U.unsignedTransactionNonce = Nonce n}
+                addr = fromPrivateKey pCert
+             in addMd addr emptyCert $ mkSignedTx pSigner utx'
+          toIetx = IETx ts . IngestTx Origin.API
+          routine = do
+            threadDelay 200000
+            for_ peers $ postEvent (TimerFire 0)
+            threadDelay 200000
+            for_ peers $ postEvent (TimerFire 1)
+            threadDelay 200000
+            let tx1 = mkTx globalAdmin orgAdmin 0
+                tx2 = mkEmptyTx orgAdmin orgAdmin 0
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx1
+            threadDelay 1000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
+      void . timeout 3000000 $ concurrently_ (runNetwork peers connections) routine
+      True `shouldBe` True
   
   describe "handleEvents" $ do
     it "should pong a ping" $
