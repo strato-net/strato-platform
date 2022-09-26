@@ -205,6 +205,6 @@ spec = describe "Optimizer tests" $ do
             quickCheck propIdempotence
     it "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
             quickCheck propEvaluatesToTheSame
-    fit "Should be same or less size (_storageDefs)" $
+    it "Should be same or less size (_storageDefs)" $
             quickCheck propSameOrSmallerSize
    

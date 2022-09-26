@@ -190,40 +190,98 @@ instance FromJSON a => FromJSON (ExpressionF a)
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
                   deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
+
+intGen :: (Arbitrary a) =>  Gen (ExpressionF a)
+intGen = oneof
+  [( do
+      --dumma        <- arbitrary  -- :: Gen SourceAnnotation
+      b <- arbitrary
+      num2     <- genPos
+      return $ (NumberLiteral b  num2  $ Just Wei)),
+       (do 
+       express1 <- intGen 
+       express2 <- intGen
+       a <- arbitrary
+       str <- vectorOf 1 $ Test.QuickCheck.elements ['+', '-']
+       return $ Binary a str express1 express2)
+      ]
+
+stringGen :: (Arbitrary a) =>  Gen (ExpressionF a)
+stringGen = oneof
+  [( do
+      b       <- arbitrary
+      str     <- arbitrary
+      return $ (StringLiteral b  str)),
+       (do 
+       express1 <- stringGen 
+       express2 <- stringGen
+       a <- arbitrary
+       str <- vectorOf 1 $ Test.QuickCheck.elements ['+']
+       return $ Binary a str express1 express2)
+      ]
+
+
+instance Arbitrary a =>  Arbitrary (ExpressionF a) where
+  arbitrary = oneof [intGen, stringGen]
+
+
+-- dummyAnnotation :: SourceAnnotation ()
+-- dummyAnnotation =
+--   SourceAnnotation
+--   {
+--     _sourceAnnotationStart=SourcePosition {
+--       _sourcePositionName="",
+--       _sourcePositionLine=0,
+--       _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationEnd=SourcePosition {
+--       _sourcePositionName="",
+--         _sourcePositionLine=0,
+--         _sourcePositionColumn=0
+--       },
+--     _sourceAnnotationAnnotation = ()
+--   }
+
+
+
 -- TODO!!!
 -- A self pruning mechnism 
 -- Otherwise the trees get too big
-instance Arbitrary a => Arbitrary (ExpressionF a) where
-  arbitrary = sized exprArb
-    where exprArb s = do 
-            -- a        <- arbitrary
-            -- str      <- arbitrary
-            -- express1 <- arbitrary
-            -- express2 <- arbitrary
-            -- num      <- arbitrary
-            -- num2     <- arbitrary
+-- instance Arbitrary a => Arbitrary (ExpressionF a) where
+--   arbitrary = sized exprArb
+--     where exprArb s = do 
+--             -- a        <- arbitrary
+--             -- str      <- arbitrary
+--             -- express1 <- arbitrary
+--             -- express2 <- arbitrary
+--             -- num      <- arbitrary
+--             -- num2     <- arbitrary
             
-            -- let numL = 
-            frequency [ (1, do
-              a        <- arbitrary
-              --num      <- arbitrary
-              num2     <- genPos--arbitrary
-              return $ (NumberLiteral a num2  $ Just Wei) ),
-              (1, do 
-                  a        <- arbitrary
-                  str      <- vectorOf 1 $ Test.QuickCheck.elements ['+']
-                  express1 <- arbitrary
-                  express2 <- arbitrary
-                  --x <- arbitrary
-                  return $ Binary a str express1 express2),
-              (s, do
-                    a        <- arbitrary
-                    --num      <- arbitrary
-                    num2     <- genPos --arbitrary
-                    return $ (NumberLiteral a num2  $ Just Wei))]
-              
-              --where
-              -- s1 = s`div`2 -- = n-1
+--             -- let numL = 
+--             frequency [ (1, do
+--               a        <- arbitrary
+--               --num      <- arbitrary
+--               num2     <- genPos--arbitrary
+--               return $ (NumberLiteral a num2  $ Just Wei) ),
+--               (1, do 
+--                   a        <- arbitrary
+--                   str      <- vectorOf 1 $ Test.QuickCheck.elements ['+', '-']
+--                   express1 <- exprArb s1
+--                   express2 <- arbitrary
+--                   --x <- arbitrary
+--                   return $ Binary a str express1 express2),
+--               (s, do
+--                     a        <- arbitrary
+--                     --num      <- arbitrary
+--                     num2     <- genPos --arbitrary
+--                     return $ (NumberLiteral a num2  $ Just Wei))]
+--               -- (s, do
+--               --       a        <- arbitrary
+--               --       --num      <- arbitrary
+--               --       num2     <- genPos --arbitrary
+--               --       return $ (NumberLiteral a num2  $ Just Wei))
+--               where
+--               s1 = s`div`2 -- = n-1
                     
                 
                 -- (s, do 
