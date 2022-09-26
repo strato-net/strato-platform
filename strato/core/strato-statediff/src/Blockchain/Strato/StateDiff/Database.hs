@@ -69,7 +69,9 @@ codePtrChainId _ = Nothing
 createAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
-  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
+  catch tryCreates $ \(e :: SomeException) -> do
+    $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
+    SQL.transactionUndo
   where
     tryCreates = do
       let newAccounts = map (uncurry addrRef) accountDiffs
