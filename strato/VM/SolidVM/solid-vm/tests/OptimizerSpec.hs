@@ -9,37 +9,29 @@ import qualified Data.Map as M
 import           Data.Maybe            (catMaybes) 
 import qualified Data.Text as T
 import           Data.Source.Annotation
-
 import           Test.Hspec
 import           Test.QuickCheck
 import           Test.QuickCheck.Monadic (assert, monadicIO, run) --pick, pre,
 import           Text.RawString.QQ
 
 import           BlockApps.Logging
-import           Blockchain.Strato.Model.Keccak256
+
+import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.CodeCollectionDB
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
+import           SolidVM.Model.Storable
 import           SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.StaticAnalysis.Optimizer       as O
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP 
 import           SolidVM.Solidity.Parse.UnParser
 
 import           SolidVMSpec
-
-
---import Blockchain.SolidVM
-import Blockchain.DB.SolidStorageDB
---import qualified Blockchain.Database.MerklePatricia          as MP
-import SolidVM.Model.Storable
-
---import Debug.Trace
-
-
-
+import           Debug.Trace
 --------------------
 --Helper Functions
 --------------------
@@ -74,42 +66,22 @@ getFuncByName funName cc = case M.lookup funName $ head  (getFuncs cc) of  --rep
                             Just x -> [x]
                             Nothing -> []
 
-
 getStringContracts :: [CodeCollection] -> [(String, String) ]
 getStringContracts arrCC = do 
     let map2 = filterValidCodeCollections arrCC
-    let ls1  = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)
-    let ls2  = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> (O.detector <$> map2))
-    (zip ls1 ls2)
+    let notOptimized  = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2)
+    let optimized     = (unparseContract <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> (O.detector <$> map2))
+    zip notOptimized optimized
 
-
+--Uses Typechecker to filter CocdeCollections that QuickCheck produces randomly
 filterValidCodeCollections :: [CodeCollection] -> [CodeCollection]
 filterValidCodeCollections arrCC = (map fst) $ (filter (([] == ) . snd)) $ zip arrCC $ TP.detector <$> arrCC
 
-
-runValidContracts''' ::  ContextM Bool ->  ContextM Bool -> ContextM Bool
-runValidContracts''' a1  a2=  do
-  a1' <- a1
-  a2' <- a2
-  return $ a1' == a2' 
-
-getAllVars ::  ContextM [BasicValue] --ContextM [(MP.Key, BasicValue)]
-getAllVars = do 
-    vals <- getAllSolidStorageKeyVals' uploadAddress 
-    return [ y |(_, y)<- vals]
-
-
-runConte :: ContextM a -> ContextM a  -> IO (Bool) --(a, ContextState)
-runConte f b =  do
-  (_, forSure) <-  runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
-  (_, forSure2) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash b)
-  --pure $ trace ("\tMY PRINT" ++ ((show $ _memDBs forSure))) ( (show $ _memDBs forSure) == (show $ _memDBs forSure2))
-  pure $ (show $ _memDBs forSure) == (show $ _memDBs forSure2) 
-
-
+getAllVars ::  ContextM [BasicValue] 
+getAllVars = (getAllSolidStorageKeyVals' uploadAddress) >>= (return . (\vals -> [ y |(_, y)<- vals])) 
 
 evaluateContractsBatch :: [(String, String)] ->  IO [Bool]
-evaluateContractsBatch  = sequence . map (\(x, y) -> runConte (contractToBasicValue x) (contractToBasicValue y))
+evaluateContractsBatch  = sequence . map (\(x, y) -> getOutContextM $ comparteContracts  x y)
 
 
 contractToBasicValue :: String -> ContextM [BasicValue]
@@ -117,7 +89,16 @@ contractToBasicValue y = do
     runBS  $ y
     getAllVars
 
+comparteContracts :: String -> String -> ContextM Bool
+comparteContracts contract1 contract2 = do
+    res1 <-  contractToBasicValue contract1 
+    res2 <- contractToBasicValue contract2
+    return $ res2 == res1
 
+getOutContextM :: ContextM Bool -> IO (Bool) 
+getOutContextM  mB = do 
+    (a, _) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash mB)
+    return $ trace (show a) (a)
 ---------------------------------------------
 --Functions related to size of CodeCollection
 ---------------------------------------------
@@ -131,7 +112,6 @@ storageDefSize vd  = case  _varInitialVal vd of
         count (Binary _ _ expr1 expr2 ) = (count expr1 ) + (count expr2)
         count _ = 1
 
-
 -----------------------
 --Property Based Tests
 ------------------------
@@ -140,16 +120,16 @@ propSameOrSmallerSize :: [CodeCollection] -> Bool
 propSameOrSmallerSize arrCC = do 
     let map2 = filterValidCodeCollections arrCC
 
-        storgeDefs1 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2) 
-        storgeDefs2 = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> map2))
+        storgeDefsNotOptimized = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> map2) 
+        storgeDefsOptimized = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> map2))
         
-        listOf1VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs1))
-        listOf2VariableDeclF = (snd <$> (concat $ M.toList <$> storgeDefs2))
-    (storageDefSize <$> listOf1VariableDeclF) <= (storageDefSize <$>   listOf2VariableDeclF) 
+        listOf1VariableDeclFNotOpt = (snd <$> (concat $ M.toList <$> storgeDefsNotOptimized))
+        listOf2VariableDeclFOpt = (snd <$> (concat $ M.toList <$> storgeDefsOptimized))
+    (sum $ storageDefSize <$> listOf1VariableDeclFNotOpt) >=  (sum $ storageDefSize <$>   listOf2VariableDeclFOpt) 
 
 
-propSameValueAfterNOpts :: [CodeCollection] -> Bool
-propSameValueAfterNOpts arrCC = do 
+propIdempotence:: [CodeCollection] -> Bool
+propIdempotence arrCC = do 
     let lsCC = O.detector <$> filterValidCodeCollections arrCC  
     let storgeDefsOptimizedOnce   = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$> lsCC)
     let storgeDefsDoubleOptimized = (_storageDefs <$>) $ catMaybes $ (M.lookup "qq") <$> (_contracts <$>  (O.detector <$> lsCC))
@@ -157,62 +137,21 @@ propSameValueAfterNOpts arrCC = do
 
 propEvaluatesToTheSame :: [CodeCollection]  -> Property
 propEvaluatesToTheSame arrCC = monadicIO $ do
-  let last11 = last $ getStringContracts arrCC
-  return $ runTest $ do 
-    (runBS $ snd last11)
-    (runBS $ fst last11)
-    res1 <- checkStorage
-    res2 <- checkStorage
-    return $ res2 == res1
-
-prop_factor'' :: [CodeCollection]  -> Property
-prop_factor'' arrCC = monadicIO $ do
-  case arrCC of
-    [] -> Test.QuickCheck.Monadic.assert $ True
-    _ ->  do
-          let last111 = last $ getStringContracts arrCC
-          good <-  run $ runConte (do runBS  $ snd last111) (do runBS $ snd last111)
-          Test.QuickCheck.Monadic.assert $ good
-
-
-
--- propEvaluatesToTheSame' :: [CodeCollection]  -> Property
--- propEvaluatesToTheSame' arrCC = monadicIO $ do
---     case arrCC of
---         [] -> Test.QuickCheck.Monadic.assert $ True
---         _ -> do
---             let lsStrings = getStringContracts arrCC
---             let f  = sequence $ map  (\y ->  return $ runTest $ do 
---                             (runBS $ snd y)
---                             res1 <- getAllVars
---                             (runBS $ fst y)
---                             res2 <- getAllVars
---                             return $ res2 == res1) lsStrings
---             ls <-f
---             Test.QuickCheck.Monadic.assert  $ all id f
-
--- stringLS :: [(String, String)] -> IO [Bool]
-
-propEvaluatesToTheSame' :: [CodeCollection]  -> Property
-propEvaluatesToTheSame' arrCC = monadicIO $ do
   case arrCC of
     [] -> Test.QuickCheck.Monadic.assert $ True
     _ ->  do
           res <-  run $ ((return . (all id)) =<<) $ evaluateContractsBatch $ getStringContracts arrCC
           Test.QuickCheck.Monadic.assert $ res
 
-    
 --EXAMPLE
-prop_writeThenRead :: Property
-prop_writeThenRead = monadicIO $ do 
-                                    good <-  run $ runConte (do
-                                        runBS [r|
+prop_example :: Property
+prop_example = monadicIO $ do 
+                                    good <-  run $ getOutContextM $ comparteContracts ( [r|
                                     pragma solidvm 3.3;
                                     contract qq {
                                       int a =3;
                                       }
-                                    |]) (do
-                                        runBS [r|
+                                    |]) ( [r|
                                     pragma solidvm 3.3;
                                     contract qq {
                                       int a =3;
@@ -262,11 +201,10 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-    fit "Should be the same after one optimization" $
-            quickCheck propSameValueAfterNOpts
-    fit "Should have equal evaluated expressions after optimization" $
+    it "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
+            quickCheck propIdempotence
+    it "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
             quickCheck propEvaluatesToTheSame
     fit "Should be same or less size (_storageDefs)" $
             quickCheck propSameOrSmallerSize
-    fit "REAL version of should be same value" $
-            quickCheck propEvaluatesToTheSame'
+   
