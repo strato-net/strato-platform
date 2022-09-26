@@ -17,7 +17,7 @@ module EventSpec where
 
 import           Prelude hiding (round)
 import           Conduit
-import           Control.Arrow                         ((&&&))
+-- import           Control.Arrow                         ((&&&))
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens                          hiding (Context, view)
 import qualified Control.Lens                          as Lens
@@ -1278,7 +1278,7 @@ spec = do
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
 
-    it "can add a new node to a chain" $ do
+    fit "can add a new node to a chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
@@ -1665,11 +1665,19 @@ contract B {
                     |]
               contractName = "A"
               enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-              -- enode2 = "enode://abcd@5.6.7.8:30303"
-              chainInfo' = ChainInfo
-                UnsignedChainInfo { chainLabel     = "My test chain!"
+          ts <- liftIO getCurrentMicrotime
+          cIdRef <- newIORef undefined
+          cInfoRef <- newIORef undefined
+          let args = "(" <> "\"Blockapps\"" <> ", \"engineering\"" <> ")"
+              txMd = M.fromList [("funcName","addOrg"), ("args",args)]
+              toIetx = IETx ts . IngestTx Origin.API
+              mkChainId = keccak256ToWord256 . rlpHash
+              addMd t = t{transactionMetadata = M.union txMd <$> transactionMetadata t}
+              tChainInfo = ChainInfo
+                UnsignedChainInfo { chainLabel     = "My parent test chain!"
                                   , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                     , NonContract (validators' !! 0) 1000000000000000000000
+                                                    , NonContract (validators' !! 1) 1000000000000000000000
                                                     ]
                                   , codeInfo       = [CodeInfo "" src $ Just contractName]
                                   , members        = M.singleton (validators' !! 0) enode1
@@ -1679,42 +1687,33 @@ contract B {
                                   , chainMetadata  = M.singleton "VM" "SolidVM"
                                   }
                 Nothing
-              chainId = keccak256ToWord256 $ rlpHash chainInfo'
-          ts <- liftIO getCurrentMicrotime
-          let args = "(\"Blockapps\", \"engineering\")"
-              utx' = U.UnsignedTransaction
+              incXUtx cId = U.UnsignedTransaction
                 { U.unsignedTransactionNonce      = Nonce 0
                 , U.unsignedTransactionGasPrice   = Wei 1
                 , U.unsignedTransactionGasLimit   = Gas 1000000000
                 , U.unsignedTransactionTo         = Just $ Address 0x100
                 , U.unsignedTransactionValue      = Wei 0
                 , U.unsignedTransactionInitOrData = Code ""
-                , U.unsignedTransactionChainId    = Just $ ChainId chainId
+                , U.unsignedTransactionChainId    = Just $ ChainId cId
                 }
-              tx'' = mkSignedTx (privKeys !! 0) utx'
-              txMd = M.fromList [("funcName","addOrg"),("args",args)]
-              tx' = tx''{transactionMetadata = M.union txMd <$> transactionMetadata tx''}
-              ietx = IETx ts $ IngestTx Origin.API tx'
+              incXTx = addMd . mkSignedTx (privKeys !! 0) . incXUtx
+
               routine = do
                 threadDelay 500000
-                flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
-                threadDelay 500000
-                flip postEvent (peers !! 1) $ UnseqEvent ietx
-                threadDelay 500000
-                flip postEvent (peers !! 1) . UnseqEvent $ IENewChainOrgName chainId (BC.pack "Blockapps", Just $ BC.pack "engineering")
                 for_ peers $ postEvent (TimerFire 0)
-
+                threadDelay 500000
+                let cInfo = tChainInfo
+                    cId = mkChainId cInfo
+                writeIORef cIdRef cId
+                writeIORef cInfoRef cInfo
+                flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (cId, cInfo)
+                threadDelay 500000
+                flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx cId
 
           runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
-          -- ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` [ctxs1]--(i, if i == 2 then Nothing else Just chainInfo')
-          -- ctx ^. apiChainInfoMap . at cId2
-          let orgTuple = (OrgName . BC.pack . orgName &&& OrgUnit . Just . BC.pack . fromJust . orgUnit) (fromJust cert1)
-              orgMap = (head ctxs1) ^. orgNameChainsMap 
-              orgNameChainQuery = maybe
-                (Set.empty :: Set.Set Word256) unOrgNameChains $
-                M.lookup orgTuple orgMap
-          orgNameChainQuery `shouldBe` Set.singleton chainId
-          for_ ctxs1 $ \ctx -> ctx ^. orgNameChainsMap `shouldBe`
-            M.singleton (OrgName $ BC.pack "Blockapps", OrgUnit $ Just (BC.pack "engineering"))
-            (OrgNameChains $ Set.singleton chainId)
+          testCid <- readIORef cIdRef
+          (head ctxs1) ^. orgNameChainsMap `shouldBe` -- it worowkokwrowrowkrowrkworkworkwokrworkworkworkwoks
+            M.singleton (OrgName $ BC.pack "Blockapps", OrgUnit $ Just (BC.pack "engineering")) (OrgNameChains $ Set.singleton testCid)
+
+          -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO () 

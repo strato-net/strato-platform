@@ -430,9 +430,7 @@ handleEvents peer = awaitForever $ \case
         let formatted = CL.yellow $ format cId
             orgFormat = CL.blue $ format org -- TODO: need to decode from b16
         peerCheck <- lift $ checkPeerIsMember peer (ChainMembers M.empty)
-        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "++++++++++++++++++++++++++++++++++peerCheck=" ++ show peerCheck 
         when peerCheck $ do
-          $logInfoS "handleEvents/P2pNewOrgName" $ T.pack "++++++++++++++++++++++++++++++++++passed peerCheck"
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
           -- TODO: check if this breaks on a main chain call
           -- this should never be Nothing since this should only be called on a private chain
@@ -586,7 +584,7 @@ shouldSendGossip peer txo = recordGossipFinal
 
 -- The checkPeerIsMember functions are split up this way to maintain backwards-compatability
 -- with existing uses of the function where a pure function is needed for some of the checks.
--- however since X509's can only be accessed in an inpure method, we have... this
+-- However, since X.509s can only be accessed through impure methods, we have... this
 checkPeerIsMember :: (MonadLogger m, Selectable Address X509CertInfoState m, Selectable (OrgName, OrgUnit) OrgNameChains m)
   => PPeer
   -> ChainMembers
@@ -599,10 +597,9 @@ checkPeerIsMember' :: (MonadLogger m, Selectable Address X509CertInfoState m, Se
   -> ChainMembers
   -> m Bool
 checkPeerIsMember' mode peer mems = do
-  peerCert <- getPeerX509 peer  -- this is returning Nothing... WTF
-  $logInfoS "checkPeerIsMember'" $ T.pack $ "+++++++++++++++++++++++" ++ (show peerCert)
+  peerCert <- getPeerX509 peer
   orgChains <- case peerCert of
-    Nothing  -> return $ OrgNameChains S.empty -- therefore this is always giving back an empty list
+    Nothing  -> return $ OrgNameChains S.empty
     Just cIs -> selectWithDefault (Proxy @OrgNameChains) $ (OrgName . BS8.pack . orgName &&& OrgUnit . fmap BS8.pack . orgUnit) cIs
 
   return $ checkPeerIsMember'' mode peer mems peerCert orgChains
