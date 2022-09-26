@@ -2321,7 +2321,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
             ro <- readOnly <$> getCurrentCallInfo
             (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
-            return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
+            defaultValue <- unless (didItWork) $ 
+            return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe (defaultValue) result):[])
           
           -- Constant (SContractItem address' "delegatecall")
           --   (payload, argumentList) <- superPayload argVals

@@ -6877,7 +6877,7 @@ contract qq{
 |]
     runBS codeSnippet
     getFields ["status", "codeInt"] `shouldReturn`
-      [ BBool False , BInteger 0 ]
+      [ BBool True , BInteger 27 ]
 
   it "can run an overloaded function" . runTest $ do
     let codeSnippet :: String
