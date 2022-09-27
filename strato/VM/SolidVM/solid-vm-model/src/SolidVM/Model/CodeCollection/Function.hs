@@ -164,3 +164,10 @@ instance FromJSON a => FromJSON (ModifierF a) where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 
+instance Arbitrary a => Arbitrary (ModifierF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance Arbitrary a => Arbitrary (FuncF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+  

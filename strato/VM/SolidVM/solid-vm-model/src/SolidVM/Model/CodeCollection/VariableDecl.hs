@@ -25,9 +25,10 @@ import           Data.Source
 import           Control.DeepSeq
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
-
+import           Test.QuickCheck
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
+
 
 -- Changes to this structure should also have changes in the Unparser :)
 data VariableDeclF a = VariableDecl
@@ -44,3 +45,9 @@ instance ToJSON a => ToJSON (VariableDeclF a)
 instance FromJSON a => FromJSON (VariableDeclF a)
 
 type VariableDecl = Positioned VariableDeclF
+
+instance Arbitrary VariableDecl  where
+  arbitrary =  oneof  [ 
+    (VariableDecl  (SVMType.Int Nothing Nothing) True) <$> arbitrary <*> arbitrary <*> pure False,
+    (VariableDecl  (SVMType.String  $ Just True) True) <$> arbitrary <*> arbitrary <*> pure False
+    ]

@@ -65,6 +65,7 @@ instance Show AccountPath where
 
 data Variable = Variable (IORef Value)
   | Constant Value
+  deriving (Eq)
 
 instance Show Variable where
   show (Variable _) = "<variable>"

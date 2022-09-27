@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
+  , varDeclHelper
   ) where
 
 import           Control.Monad.Reader
@@ -17,7 +18,6 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
 import           SolidVM.Solidity.Parse.UnParser
 
-
 data R = R
   { codeCollection :: CodeCollection
   , contract :: Maybe Contract
@@ -25,9 +25,9 @@ data R = R
 
 
 detector ::  CodeCollection -> CodeCollection
-detector cc = over (contracts . mapped) (contractHelper cc)
+detector cc = (over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
 
 contractHelper :: CodeCollection
                -> Contract
