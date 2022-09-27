@@ -87,7 +87,7 @@ chainFilterParams :: ChainFilterParams
 chainFilterParams = ChainFilterParams
   [] Nothing
 
-instance HasSQL m => Selectable ChainFilterParams m where
+instance HasSQL m => Selectable ChainFilterParams [AddressStateRef'] m where
   selectMany _ = 
     fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos $ 
     E.limit $ appFetchLimit
