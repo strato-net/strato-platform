@@ -22,7 +22,6 @@ module Blockchain.Sequencer.Monad
   , HasNamespace(..)
   , BlockPeriod(..)
   , RoundPeriod(..)
-  -- , ValidatorRestriction(..)
   , isInNamespace
   , fromNamespace
   , lookupInLDB
@@ -117,9 +116,6 @@ import qualified Strato.Strato23.API.Types                 as VC hiding (Address
 import qualified Strato.Strato23.Client                    as VC
 
 
-
-
--- newtype ValidatorRestriction = ValidatorRestriction Bool
 
 
 data Modification a = Modification a | Deletion
@@ -362,10 +358,6 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
--- instance Mod.Modifiable (ValidatorRestriction) SequencerM where
---   get _ = use isDisableValidator
---   put _ = modify' . (.~) isDisableValidator
-
 instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
   put _ = modify' . (.~) ldbBatchOps
@@ -453,7 +445,6 @@ runSequencerM c mbc m = do
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         loopCh <- atomically newTMChan
         latestRound <- liftIO $ newIORef 0
-        
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize

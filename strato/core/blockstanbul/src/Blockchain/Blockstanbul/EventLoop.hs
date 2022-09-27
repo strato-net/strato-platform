@@ -196,7 +196,7 @@ nextRound nt = do
 
 eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
-  $logInfoS "David Nallapu1" . T.pack $ "Running David Nallapu: Create David Nallapu" 
+  debugShowCtx
   authz <- lift $ isAuthorized ev
   recordAuthResult authz
   v <- use view
@@ -208,10 +208,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     ValidatorBehaviorChange vc -> do
       case vc of
           ForcedValidator fv -> modify' $ validatorBehavior .~ fv
-      $logWarnLS "blockstanbul/Disa" vc
-      $logInfoS "David Nallapu22222222222" . T.pack $ "Running David Nallapu: Create David Nallapu"
       valB <- use validatorBehavior
-      $logWarnLS "blockstanbul/Disa valB changed" valB
+      $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
 
     ForcedConfigChange cc -> do
       $logWarnLS "blockstanbul/config_change" cc

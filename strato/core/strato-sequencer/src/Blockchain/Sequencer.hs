@@ -635,8 +635,6 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETValidatorBehavior  -> do
       record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
       blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
-      -- mapM_ (Mod.put (Proxy @ValidatorRestriction)) . (\(IEDisableValidator theBool) -> (ValidatorRestriction theBool)) events
-      -- blockstanbulSend $ map (\(IEDisableValidator theBool) -> ForcedValidatorChange theBool) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

@@ -91,5 +91,3 @@ addTxsFromFile fileName = do
         writeUnseqEvents $
           map (IETx t . IngestTx (TXO.PeerString "")) bs
       mapM_ print resps
-  
-
