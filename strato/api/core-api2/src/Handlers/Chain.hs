@@ -76,8 +76,12 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 instance HasSQL m => Selectable ChainId ChainInfo m where
-  selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos . E.limit 
-  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo . E.limit 
+  selectMany _ = 
+    fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos $ 
+    E.limit $ appFetchLimit
+  select     _ = 
+    fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo $ 
+    E.limit $ appFetchLimit
 
 getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
