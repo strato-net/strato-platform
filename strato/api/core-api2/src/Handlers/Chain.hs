@@ -61,6 +61,13 @@ type API =
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
 
+data ChainFilterParams = ChainFilterParams
+  { _qaChainId        :: [ChainId]
+  , _qaChainInfo      :: Maybe ChainId
+  } deriving (Eq, Ord, Show)
+
+makeLenses ''ChainFilterParams
+
 getChainClient :: [ChainId] -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
 postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
@@ -75,7 +82,11 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-instance HasSQL m => Selectable ChainId ChainInfo m where
+chainFilterParams :: ChainFilterParams
+chainFilterParams = ChainFilterParams
+  [] Nothing
+
+instance HasSQL m => Selectable ChainFilterParams m where
   selectMany _ = 
     fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos $ 
     E.limit $ appFetchLimit
