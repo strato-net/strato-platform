@@ -38,10 +38,7 @@ validatorBehavior valB = do
   print msg
   resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
     writeUnseqEvents [msg]
-  print resp
-  let iev = IEValidatorBehavior . ForcedValidator $ valB
-  print msg
-  insertSeq iev 
+  print resp 
 
 addTx :: String -> IO ()
 addTx tx' = do
