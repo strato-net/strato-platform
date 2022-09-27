@@ -4,8 +4,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-} {-# LANGUAGE QuasiQuotes           #-}
+{-# LANGUAGE PackageImports        #-}
+{-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
@@ -689,7 +691,7 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ _ = pure ()
+  insert _ _ (P2P OutputBlock{..}) = canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _          = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
