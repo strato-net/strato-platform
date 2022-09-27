@@ -191,40 +191,20 @@ data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (Expres
 genPos :: Gen Integer 
 genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
 
+numLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
+numLitGen = frequency [ 
+              (10,  NumberLiteral <$> arbitrary <*> genPos <*>  Test.QuickCheck.elements [Just Wei] ) ,
+              (1,  Binary <$> arbitrary <*>  Test.QuickCheck.elements ["+"] <*> scale (`div` 2) numLitGen <*> scale (`div` 2) numLitGen )
+              ]
 
-
-intGen :: (Arbitrary a) =>  Gen (ExpressionF a)
-intGen = oneof
-  [( do
-      b <- arbitrary
-      num2     <- genPos -- Note that allowing this to be negative breaks SolidVM?
-      return $ (NumberLiteral b  num2  $ Just Wei)),
-       (do 
-       express1 <- intGen 
-       express2 <- intGen
-       a <- arbitrary
-       str <- vectorOf 1 $ Test.QuickCheck.elements ['+', '-']
-       return $ Binary a str express1 express2)
-      ]
-
-stringGen :: (Arbitrary a) =>  Gen (ExpressionF a)
-stringGen = oneof
-  [( do
-      b       <- arbitrary
-      str     <- arbitrary
-      return $ (StringLiteral b  str)),
-       (do 
-       express1 <- stringGen 
-       express2 <- stringGen
-       a <- arbitrary
-       str <- vectorOf 1 $ Test.QuickCheck.elements ['+']
-       return $ Binary a str express1 express2)
-      ]
-
+stringLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
+stringLitGen = frequency [ 
+              (10,  StringLiteral <$> arbitrary <*> arbitrary) ,
+              (1,  Binary <$> arbitrary <*>  Test.QuickCheck.elements ["+"] <*> scale (`div` 2) stringLitGen <*> scale (`div` 2) stringLitGen )
+              ]
 
 instance Arbitrary a =>  Arbitrary (ExpressionF a) where
-  arbitrary = oneof [intGen, stringGen]
-
+  arbitrary = oneof [numLitGen, stringLitGen]
 
 
 instance Arbitrary a => Arbitrary (ArgListF a) where

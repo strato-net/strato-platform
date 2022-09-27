@@ -31,7 +31,6 @@ import qualified SolidVM.Solidity.StaticAnalysis.Typechecker     as TP
 import           SolidVM.Solidity.Parse.UnParser
 
 import           SolidVMSpec
-import           Debug.Trace
 --------------------
 --Helper Functions
 --------------------
@@ -98,7 +97,7 @@ comparteContracts contract1 contract2 = do
 getOutContextM :: ContextM Bool -> IO (Bool) 
 getOutContextM  mB = do 
     (a, _) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash mB)
-    return $ trace (show a) (a)
+    return a
 ---------------------------------------------
 --Functions related to size of CodeCollection
 ---------------------------------------------
@@ -202,10 +201,10 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-    it "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
+    fit "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
             quickCheck propIdempotence
-    it "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
+    fit "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
             quickCheck propEvaluatesToTheSame
-    it "Should be same or less size (_storageDefs)" $
+    fit "Should be same or less size (_storageDefs)" $
             quickCheck propSameOrSmallerSize
    

@@ -18,7 +18,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 
 import qualified SolidVM.Model.Type         as SVMType
 --import SolidVM.Solidity.Parse.Lexer (identifier)
-import Debug.Trace
+
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
@@ -60,7 +60,7 @@ simpleType =
         then do
           typ <- getUserDefinedType name 
           return $ (SVMType.UserDefined name (userTypeHelper' typ ))
-        else return $ trace ("Are you even prinitng anything Label"  ++ (show name) ) (SVMType.UnknownLabel name Nothing)
+        else return $ (SVMType.UnknownLabel name Nothing)
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence[identifier, dot, identifier]
       return $ SVMType.UnknownLabel name Nothing
