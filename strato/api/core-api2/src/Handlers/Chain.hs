@@ -29,6 +29,7 @@ module Handlers.Chain
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
+import           Control.Lens
 import           Conduit
 import qualified Data.Map                       as M
 import           Data.Swagger
