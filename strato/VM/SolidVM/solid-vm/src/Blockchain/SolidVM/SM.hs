@@ -52,8 +52,6 @@ module Blockchain.SolidVM.SM (
 import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
--- import           Control.Monad.Catch (MonadCatch)
--- import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -446,9 +444,10 @@ getVariableOfName name = do
         let ctract = currentContract currentCallInfo
         let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
         CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
-        return $ coerceType ctract constType $ case constInitialVal of
+        return $ coerceType ctract _constType $ case _constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
+
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
@@ -504,7 +503,7 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
@@ -668,7 +667,7 @@ hintFromType = \case
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (stringToLabel $ BC.unpack field)
-                            . fmap CC.varType
+                            . fmap CC._varType
                             . CC._storageDefs
                             . currentContract
                             $ callInfo

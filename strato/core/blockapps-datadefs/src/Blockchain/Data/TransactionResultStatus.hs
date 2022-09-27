@@ -29,6 +29,7 @@ data TransactionFailureType = IncorrectChainId
                             | TrumpedByMoreLucrative
                             | ExecutionFailure String
                             | MissingCode
+                            | InvalidPragmaType
                             deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

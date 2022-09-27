@@ -11,6 +11,10 @@ dependencies:
   - containers
   - evm-solidity
   - text
+  - solid-vm-parser
+  - parsec
+  - solid-vm-model
+
 
 library:
   source-dirs: src/
@@ -72,6 +76,7 @@ library:
     - unliftio
     - vault-monad
     - vector
+    - x509-certs
 
 tests:
   blockapps-bloc22-server-test:

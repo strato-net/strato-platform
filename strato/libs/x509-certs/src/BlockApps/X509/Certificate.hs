@@ -26,6 +26,7 @@ module BlockApps.X509.Certificate (
   verifyCertM,
   verifyBlockAppsM,
   makeSignedCert,
+  makeSignedCertSigF,
   getCertSubject,
   getCertSubjects,
   getCertValidity,
@@ -46,6 +47,8 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           BlockApps.X509.Keys
 import           Control.DeepSeq
+import qualified Control.Lens                       as Lens
+import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
@@ -67,6 +70,9 @@ import           Data.List                          (find)
 
 import           GHC.Generics
 
+import           Data.Swagger                       hiding (Format, get, put, format) -- as Swag
+import           Data.Swagger.Internal.Schema
+
 import qualified Data.Set                           as S
 import           Data.Functor
 import           Data.Either
@@ -79,6 +85,8 @@ import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
+
+import           Servant.Docs
 
 -- import           Data.ASN1.Encoding
 -- import           Data.ASN1.BinaryEncoding
@@ -139,7 +147,7 @@ data Subject = Subject
   , subUnit       :: Maybe String
   , subCountry    :: Maybe String
   , subPub        :: PublicKey
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic)
 
 instance Format Subject where
   format = CL.blue . show
@@ -168,6 +176,19 @@ instance FromJSON Subject where
 
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
+instance ToSchema Subject where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & Lens.mapped.name ?~ "Subject for a X.509 certificate"
+    & Lens.mapped.schema.example ?~ toJSON ex
+    where
+      ex :: Subject
+      ex = Subject
+        { subCommonName = "John Smith"
+        , subOrg        = "BlockApps Inc."
+        , subUnit       = Just "Engineering"
+        , subCountry    = Just "USA"
+        , subPub        = fromMaybe undefined $ importPublicKey "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+        }
 
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
@@ -189,6 +210,35 @@ instance FromJSON X509Certificate where
     let errDump err = fail $ "failed to JSON parse cert " ++ (show str) ++ " because " ++ err
     in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
+
+instance ToSchema X509Certificate where
+  declareNamedSchema = const . pure $ named "X509Certificate bytestring" binarySchema
+
+instance ToSample X509Certificate where
+  toSamples _ = singleSample . fromRight (error "NOOO! 😨") . bsToCert . C8.pack $ unlines
+    [ "-----BEGIN CERTIFICATE-----"
+    , "MIIBjDCCATCgAwIBAgIRAIs9fXiIfXIZ22paA1BYggYwDAYIKoZIzj0EAwIFADBH"
+    , "MQ0wCwYDVQQDDARMdWtlMRIwEAYDVQQKDAlCbG9ja2FwcHMxFDASBgNVBAsMC2Vu"
+    , "Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIwODIzMjAwODQxWhcNMjMwODIz"
+    , "MjAwODQxWjBHMQ0wCwYDVQQDDARMdWtlMRIwEAYDVQQKDAlCbG9ja2FwcHMxFDAS"
+    , "BgNVBAsMC2VuZ2luZWVyaW5nMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUr"
+    , "gQQACgNCAASxPPKgsG0NJu0tNwIfIKOrCnbKgA5PeMuIejm48GXKPgf4Tgtb3hOM"
+    , "wF+PQU9vFtxC8gEbKv/aLn0U+EvS4F1nMAwGCCqGSM49BAMCBQADSAAwRQIhAPkX"
+    , "DGxjCRln4lpSC5DtEGNKkepfkeNuyWzHcBCRyb2KAiAtIUIWWBO3qpCsVILHiD1T"
+    , "56hQTEUFjrewBNx+JTQavA=="
+    , "-----END CERTIFICATE-----"
+    , "-----BEGIN CERTIFICATE-----"
+    , "MIIBizCCAS+gAwIBAgIQahwA5iOvvZh0/1f2zxtxDjAMBggqhkjOPQQDAgUAMEcx"
+    , "DTALBgNVBAMMBEx1a2UxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLZW5n"
+    , "aW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA4MDkxNTA4MzhaFw0yMzA4MDkx"
+    , "NTA4MzhaMEcxDTALBgNVBAMMBEx1a2UxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG"
+    , "A1UECwwLZW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB"
+    , "BAAKA0IABEo5L1XbwQ0kqrM+61HydxVCvANUVncjqXxYGvMsaBgHc8QS4BF6GQQD"
+    , "OILDJkfREUkRW0wT3kQXhcjVLRVdYeAwDAYIKoZIzj0EAwIFAANIADBFAiEAw/oq"
+    , "6/T+yHQoKuvCg6MMQoth/F0JrFlPtGyM+auYPTECIEHbiDKXbaF2rhXBeEJFgZX1"
+    , "prz3Yc03zv5VJ5rP/55A"
+    , "-----END CERTIFICATE-----"
+    ]
 
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- ROOT CERT -------------------------------------------
@@ -286,16 +336,31 @@ makeCert mDateTime iss sub = do
 -- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
 -- make a PR for it
 ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
-ecdsaWithSHA256 mesg' = do
+ecdsaWithSHA256 = ecdsaWithSHA256F sign
+
+makeSignedCertSigF 
+  :: (Monad m, MonadIO m) 
+  => (B.ByteString -> m Signature)  -- Signature function
+  -> Maybe DateTime                 -- Expiry date
+  -> Maybe X509Certificate          -- Parent certificate to append
+  -> Issuer                         -- Certificate issuer
+  -> Subject                        -- Certificate subject
+  -> m (Maybe X509Certificate)      -- The resulting certificate (Nothing if signing failed)
+makeSignedCertSigF signF mDateTime parentCert iss sub = do
+  unsignedCert <- makeCert mDateTime iss sub
+  signedCert <- objectToSignedExactF (ecdsaWithSHA256F signF) unsignedCert
+  return . Just . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert)) $ signedCert
+
+ecdsaWithSHA256F :: MonadIO m => (B.ByteString -> m Signature) -> B.ByteString -> m (B.ByteString, SignatureALG)
+ecdsaWithSHA256F signF mesg' = do
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
-  Signature (SEC.CompactRecSig r s v) <- sign mesgBS
+  Signature (SEC.CompactRecSig r s v) <- signF mesgBS
   -- I too hate that we have to do this r, s swap....but strato-model swaps it because Ethereum
   -- swaps it, and cert validation will fail if we leave them swapped here, so we swap it back
   let sig'' = SEC.CompactRecSig s r v
       sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
       sig = SEC.convertRecSig sig' -- Drop the 'v' because the ASN1 protocol does not support recoverable signatures
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
-
 
 
 toASN1CS :: String -> ASN1CharacterString

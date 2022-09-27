@@ -15,7 +15,7 @@ module SolidVM.Model.CodeCollection (
   flStructs,
   flEnums,
   flErrors,
-  
+  pragmas,  
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -57,7 +57,8 @@ data CodeCollectionF a =
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)],
-    _flErrors :: Map SolidString [(SolidString, IndexedType, a)]
+    _flErrors :: Map SolidString [(SolidString, IndexedType, a)],
+    _pragmas :: [(String, String)]
   } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)

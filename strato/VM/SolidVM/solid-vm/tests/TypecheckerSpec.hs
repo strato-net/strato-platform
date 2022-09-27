@@ -691,7 +691,7 @@ contract A {
 
   it "cannot assign an immutable a new value inside a function" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract A {
   unint immutable g =2;
   uint public x = 75;
@@ -703,7 +703,7 @@ contract A {
     in length anns `shouldBe` 2
   it "cannot incrument an immutable already assigned within the constructor" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d=22;
@@ -715,6 +715,7 @@ contract qq {
     in length anns `shouldBe` 1
   it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external payable {
   }
@@ -723,6 +724,7 @@ contract A {
     in length anns `shouldBe` 0
   it "can throw exception when receive() function has arguments" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive(uint i) external payable {
     uint x = i;
@@ -733,7 +735,7 @@ contract A {
   
   it "can assign a value to a declared unassigned immutable within the constructor" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d;
@@ -745,7 +747,7 @@ contract qq {
     in length anns `shouldBe` 0
   it "cannot assign an immutable a value after already assinged on contract level" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint g = 2022;
   uint immutable d = 22;
@@ -756,6 +758,7 @@ contract qq {
     in length anns `shouldBe` 1
   it "can throw exception when receive() function has return values" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external payable returns (uint) {
     uint x = 5;
@@ -767,6 +770,7 @@ contract A {
 
   it "can throw exception when receive() function is not external" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() internal payable {
   }
@@ -776,6 +780,7 @@ contract A {
 
   it "can throw exception when receive() function is not payable" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   receive() external {
   }
@@ -800,6 +805,7 @@ contract qq {
 
   it "can throw exception when receive() function is decalred with function keyword" $
     let anns = runTypechecker [r|
+pragma solidvm 3.3;
 contract A {
   function receive() external payable {
   }
@@ -818,6 +824,7 @@ contract A {
 
   it "can throw exception when fallback() function has arguments" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
   fallback(uint i) external payable {
     uint x = i;
@@ -828,7 +835,7 @@ contract A {
 
   it "can use an immutable within a function" $
     let anns = runTypechecker [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint c = 2022;
   uint immutable public x =c;
@@ -844,6 +851,7 @@ contract qq {
     in length anns `shouldBe` 0
   it "can throw exception when fallback() function has return values" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
   fallback() external payable returns (uint) {
     uint x = 5;
@@ -855,6 +863,7 @@ contract A {
 
   it "can throw exception when fallback() function is not external" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
    fallback() internal payable {
   }
@@ -883,10 +892,10 @@ contract C {
       in length anns `shouldBe` 0
 
 
-  describe "pure and view modifier for solidvm 3.3" $ do
+  describe "pure and view modifier for solidvm 3.4" $ do
     it "can write pure and view functions" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -900,7 +909,7 @@ contract A {
        in length anns `shouldBe` 0
     it "error when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -911,7 +920,7 @@ contract A {
        in length anns `shouldBe` 1
     it "error when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -927,7 +936,7 @@ contract A {
        in length anns `shouldBe` 2
     it "error when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -992,7 +1001,7 @@ contract C is A, B {
        in length anns `shouldBe` 0
     it "error when referencing a state variable from a non-inherited contract" $
       let anns = runTypechecker [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract A {
   uint x = 7;
 }
@@ -1248,9 +1257,11 @@ contract B {
 |]
        in length anns `shouldBe` 1
 
-  it "must pass the associated type within the wrap function " $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+
+  describe "User Defined Value Types" $ do
+    it "must pass the associated type within the wrap function " $ 
+        let anns = runTypechecker [r|
+  pragma solidvm 3.4;
   type MagicInt is int;
   type MysticalString is string;
     type UBool is bool;
@@ -1267,13 +1278,11 @@ contract B {
     MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
     bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
 }
-|]
-    in length anns `shouldBe` 7
+|] in length anns `shouldBe` 7
 
-
-  it "can use user defined unwrap and unwrap" $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+    it "can use user defined unwrap and unwrap" $
+      let anns = runTypechecker [r|
+  pragma solidvm 3.4;
   
   type MagicInt       is int;
   type MysticalString is string;
@@ -1297,12 +1306,11 @@ contract B {
     string         banach   = MysticalString.unwrap(hilbert);
     string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
 }
-|]
-    in length anns `shouldBe` 0
+|] in length anns `shouldBe` 0
 
-  it "can use user-defined-types wrap and unwrap within fuctions" $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+    it "can use user-defined-types wrap and unwrap within fuctions" $
+      let anns = runTypechecker [r|
+  pragma solidvm 3.4;
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
@@ -1316,6 +1324,34 @@ contract B {
       bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
     }
 
+}|] in length anns `shouldBe` 0
+
+  describe "Built in type function tests" $ do
+    it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
+      let anns = runTypechecker [r|
+contract A {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
 }
-|]
-    in length anns `shouldBe` 0
+
+contract B {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+contract C {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+} |]  in length anns `shouldBe` 0
+  
+    it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
+      let anns = runTypechecker [r|
+contract A {
+  int endofunctor1   = type(A).name;
+  int endofunctor2   = type(A).creationCode;
+  int groupoid       = type(A).runtimeCode;
+}
+|] in length anns `shouldBe` 3

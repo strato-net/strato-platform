@@ -33,7 +33,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -144,6 +144,10 @@ anyTooMuchGasError :: Selector HandledException
 anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
 anyTooMuchGasError _ = False
 
+anyTooManyCooks :: Selector HandledException
+anyTooManyCooks (HE Blockchain.SolidVM.Exception.TooManyCooks{}) = True
+anyTooManyCooks _ = False
+
 anyPaymentError :: Selector HandledException
 anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
 anyPaymentError _ = False
@@ -159,6 +163,10 @@ anyReservedWordError _ = False
 anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
 anyImmutableError _ = False
+
+failedToAttainRunTimCodeError :: Selector HandledException
+failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode{}) = True
+failedToAttainRunTimCodeError _ = False
 
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
@@ -221,13 +229,56 @@ runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 runBS :: String -> ContextM ()
 runBS = void . runBS'
 
+runBSBeef :: String -> ContextM ()
+runBSBeef = void . runBSBeef'
+
 runBS' ::String -> ContextM ExecResults
 runBS' = runArgs "()"
+
+runBSBeef' ::String -> ContextM ExecResults
+runBSBeef' = runArgs "()"
 
 rethrowEx :: ExecResults -> ContextM ()
 rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (void . return) ex
 rethrowEx _ = return ()
 
+--Adds a contract to the 0xfeedbeef chain
+runArgsWithSenderBeef :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef acc args bs = do
+  let code = Code $ UTF8.fromString bs
+      isTest = error "TODO: isTest"
+      isHomestead = error "TODO: isHomestead"
+      suicides = error "TODO: suicides"
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
+      callDepth = 0
+      value = error "TODO: value"
+      gasPrice = error "TODO: gasPrice"
+      availableGas = error "TODO: availableGas"
+      txHash = unsafeCreateKeccak256FromWord256 0x776622233444
+      chainId = Just 0xfeedbeef
+      metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
+
+  newAddress <- getNewAddress acc
+  er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
+          value gasPrice availableGas newAddress code txHash chainId metadata
+  rethrowEx er
+  return er
+
+--Adds contract to the "main chain"
 runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
@@ -300,6 +351,9 @@ runArgsWithOrigin orig acc args bs = do
 
 runArgs :: T.Text -> String -> ContextM ExecResults
 runArgs = runArgsWithSender sender
+
+runArgsBeef :: T.Text -> String -> ContextM ExecResults
+runArgsBeef = runArgsWithSenderBeef sender
 
 
 runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
@@ -1954,7 +2008,7 @@ contract qq {
 
   it "can use hexadecimal string literals" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   string x;
   constructor() public {
@@ -1965,7 +2019,7 @@ contract qq {
   
   it "can use hexadecimal string literals double quotes" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   string x;
   constructor() public {
@@ -1986,7 +2040,7 @@ contract qq {
 
   it "parser can accept variable names without consuming hex" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   string hexString;
   constructor() public {
@@ -3354,7 +3408,7 @@ contract qq{
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3364,7 +3418,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal pure
+  function mySend() internal
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3381,7 +3435,7 @@ contract qq{
 
   it "will allow for sending to self" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3391,7 +3445,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal pure
+  function mySend() internal
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3408,7 +3462,7 @@ contract qq{
 
   it "will not send when there is not anything to send between account" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3418,7 +3472,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal pure
+  function mySend() internal
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3531,7 +3585,7 @@ contract qq{
 
   it "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract Test {
   constructor(){}
 }
@@ -3556,7 +3610,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal pure
+  function mySend() internal
     returns (bool, uint, uint, uint){
       success = bPay.send(13);
       bala = aPay.balance;
@@ -3621,7 +3675,7 @@ contract qq{
 
   it "cannot over send from an account." . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract Test {
   constructor(){}
 }
@@ -3646,7 +3700,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal pure
+  function mySend() internal
     returns (uint, uint, uint){
       success = bPay.send(1300);
       bala = aPay.balance;
@@ -3773,8 +3827,284 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  it "can get the code from an address" . runTest $ do
-    let contract :: String
+  it "can get structs from the '.code' function" . runTest $ do
+    let testCode :: String
+        testCode = [r|struct point {
+  uint x;
+  uint y;
+}
+|]
+        codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.4;
+contract Test {
+  uint bana = 13;
+  uint x = 6;
+  uint y = 7;
+  struct point {
+    uint x;
+    uint y;
+  }
+  constructor () {
+  }
+}
+
+contract qq {
+  string codePiece = "";
+  constructor () {
+    Test t = new Test();
+    codePiece = account(t).code("point");
+  }
+}|]
+    runBS codeSnippet
+    getFields [ "codePiece" ] `shouldReturn`
+      [ BString $ UTF8.fromString testCode]
+
+  it "can get overloaded function using the .code parameter" . runTest $ do
+    let testCode :: String
+        testCode = [r|function addToNum (uint x, uint y) public {
+    myNum += x + y;
+    }
+function addToNum (uint x, bool y) public {
+    myNum += x;
+    myStatus = y;
+    }
+function addToNum (uint x, string z) public {
+    myNum += x;
+    myString = z;
+    }
+
+|]
+        codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.4;
+contract Test {
+  uint myNum = 13;
+  bool myStatus;
+  string myString = "butts";
+
+  function randomFunc(uint x) public returns (uint){
+    return x;
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+
+  function addToNum(uint x, bool y) {
+    myNum += x;
+    myStatus = y;
+  }
+
+  function addToNum(uint x, string z) {
+    myNum += x;
+    myString = z;
+  }
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("addToNum");
+  }
+}|]
+    runBS codeSnippet
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString testCode]
+
+  it "can get events from the '.code' function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|event x(
+    uint v);
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  event x(uint v);
+  constructor(){
+    emit x(13);
+  }
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("x");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can get external modifiers using the '.code' function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|modifier anotherModifier() {
+        require(x == 4,string.concat("x is not 4 : ",string(x)));
+    _;
+    require(x == 5,"x is not 5");
+    }
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract anotherThing {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  modifier anotherModifier() {
+    require(x == 4 , string.concat('x is not 4 : ', string(x)));
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier anotherModifier {
+    x = x + 1;
+    return;
+  }
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    anotherThing oc = new anotherThing();
+    codeTest = account(oc).code("anotherModifier");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can get the code for a contract if supplied an empty string" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|contract Test {
+  
+  constructor () public {
+    }
+}
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can search for an enum body within a codeCollection using .code" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|enum FreshJuiceSize {
+  SMALL,
+  MEDIUM,
+  LARGE
+}
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
+}
+
+pragma solidvm 3.4;
+contract qq {
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("FreshJuiceSize");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can search for any public variable in a contract initialized value using .code" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|uint public testVar = 1;
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.3;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8+10-661;
+  constructor() public {
+    codeTest = account(this).code("testVar");
+    testVar = 5;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can search for a constant and get its initial code. using .code" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|uint public constant testConst = 136546546541654654324765441651684354646468435468;
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  uint constant public testConst = 136546546541654654324765441651684354646468435468;
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("testConst");
+
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "can get the current contract code without supplying anything to the code using .code" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code;
+  }
+}|]
+        contract :: String
         contract = [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3791,21 +4121,270 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BString $ UTF8.fromString codeSnippet]
 
-  it "can get the current contract code" . runTest $ do
+  it "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
     let contract :: String
         contract = [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.4;
 contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).code;
+    Test t = new Test();
+    codeTest = account(t).code("nothing");
   }
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BDefault ]
+
+  it "Can search for the contract in a given file using the search procedure using .code" . runTest $ do
+    let contractqq :: String
+        contractqq = [r|contract qq {
+  string codeTest;
+  constructor () public {
+    Test t = new Test();
+    codeTest = account(this).code("qq");
+    }
+}
+|]
+        collection :: String
+        collection = [r|
+pragma solidvm 3.4;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(this).code("qq");
+  }
+}|]
+    runBS collection
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contractqq]
+
+  it "can properly add the final } to a contract without a constructor using the code member function using .code" . runTest $ do
+    let myContract :: String
+        myContract = [r|contract Test {
+  uint sixtyNine = 69;
+  // no constructor found
+}
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  uint sixtyNine = 69;
+}
+
+pragma solidvm 3.4;
+contract qq {
+  string codeTest;
+  constructor(){
+    Test t = new Test();
+    codeTest = account(t).code("Test");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myContract]
+
+  it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function using .code" . runTest $ do
+    let myContract :: String
+        myContract = [r|contract Test {
+  uint seventyNine = 79;
+  uint sixtyNine = 69;
+  uint weed = 11;
+  constructor () public {
+    weed = 420;
+    }
+}
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  uint sixtyNine = 69;
+  uint weed = 11;
+  constructor () {
+    weed = 420;
+  }
+  uint seventyNine = 79;
+}
+
+pragma solidvm 3.4;
+contract qq {
+  string codeTest;
+  constructor(){
+    Test t = new Test();
+    codeTest = account(t).code("Test");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myContract]
+
+  it "Can find a function within a codeCollection using .code" . runTest $ do
+    let myFunxion :: String
+        myFunxion = [r|function myFunction () public returns (uint ) {
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;
+    }
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  function myFunction() public returns (uint) {
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;
+  }
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq {
+  string codeTest;
+  constructor(){
+    Test t = new Test();
+    codeTest = account(t).code("myFunction");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myFunxion]
+
+  it "Can avoid getting confused if two functions with the same name are in the same codeCollection using .code" . runTest $ do
+    let myFunxion :: String
+        myFunxion = [r|function myFunction () public returns (uint ) {
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;
+    }
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  function myFunction() public returns (uint) {
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;
+  }
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq {
+  string codeTest;
+  constructor(){
+    Test t = new Test();
+    codeTest = account(t).code("myFunction");
+  }
+  function myFunction() public returns (uint) {
+    uint x = 26;
+    uint y = 26;
+    uint z = x + y;
+    uint w = z + 26;
+    uint u = w + 26;
+    return u;
+  }
+}
+|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myFunxion]
+
+  it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|contract Test {
+  
+  constructor () public {
+    }
+}
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.4;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.4;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("");
+  }
+
+  function myFunction() public returns (uint) {
+    return 13;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
+  it "Can throw an error if more than one item is given to the code member function, using .code" $ (runTest (runBS [r|
+pragma solidvm 3.3;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.3;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("one", "two");
+  }
+
+  function myFunction() public returns (uint) {
+    return 13;
+  }
+}|])) `shouldThrow` anyTypeError
+
+  it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
+pragma solidvm 3.0;
+contract qq {
+  uint z;
+  uint[] x;
+  uint[] myVar;
+  constructor() {
+    myVar = f();
+    z = myVar[0];
+  }
+  function f() returns (uint[]) {
+    // assignment of first value
+    uint[] x;
+    x[0] = 1;
+    return x;
+  }
+  }|])) `shouldThrow` anyInvalidWriteError
 
   it "can transfer value from account a to account b" . runTest $ do
     -- Post contract
@@ -4641,7 +5220,7 @@ contract qq {
 
   it "return default value for index not present-In-Memory Check" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
 
   bool x;
@@ -4690,7 +5269,7 @@ contract qq {
 
   it "returns owner's address for valid ecrecover call" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   
   address addr;
@@ -4820,7 +5399,7 @@ contract qq {
 
   it "an assign an immutable" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint t1a = 2022;
   uint immutable t1x = 2022;
@@ -4831,7 +5410,7 @@ contract qq {
 
   it "can assign an already declared, but unassigned immutable in a constructor" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract qq {
   uint immutable t2a;
   uint t2x = 2022;
@@ -4988,7 +5567,7 @@ contract qq {
 
   it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5014,7 +5593,7 @@ contract qq{
 
   it "allows overloading functions with same number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   string myString = "";
@@ -5065,7 +5644,7 @@ contract qq{
 
   it "can use randomly ordered named argument function calls with overloading" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   bool myStatus;
@@ -5091,7 +5670,7 @@ contract qq{
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5182,6 +5761,7 @@ contract qq {
 
   it "can use msg.data" . runTest $ do
     runBS [r|
+pragma solidvm 3.4;
 contract X {
   function func2(uint _a, string _b, bool _c) pure public returns (string) {
     return msg.data;
@@ -5199,6 +5779,7 @@ contract qq {
 
   it "can use msg.sig" . runTest $ do
     runBS [r|
+pragma solidvm 3.4;
 contract X {
   function func2(uint _a, string _b, bool _c) pure public returns (bytes4) {
     return msg.sig;
@@ -5217,7 +5798,7 @@ contract qq {
 
   it "can use free functions, free functions can access this" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -5242,7 +5823,7 @@ contract qq{
 
   it "free functions cannot access state variables" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum() {
   myNum = 4;
@@ -5257,7 +5838,7 @@ contract qq{
 
   it "free functions cannot access internal functions of contracts" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function callInternal() {
   setNum(4);
@@ -5275,7 +5856,7 @@ contract qq{
 
   it "contracts will prioritize contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum(uint x) returns (uint s) {
   s = x + 2;
@@ -5295,7 +5876,7 @@ contract qq{
 
   it "contracts will prioritize overloaded contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function setNum(uint x, uint y) returns (uint s) {
   s = x + y + 2;
@@ -5320,7 +5901,7 @@ contract qq{
 
   it "can overload free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -5370,7 +5951,7 @@ contract qq{
   
   it "can declare a constant at the file level and use it" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 uint constant myconst = 5;
 contract qq{
   uint mynum = myconst;
@@ -5384,7 +5965,7 @@ contract qq{
 
   it "can declare enums at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 enum Color { red, green, blue }
 contract A {
     function value() public returns (uint) {
@@ -5408,7 +5989,7 @@ contract qq {
 
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 struct Point {
   uint x;
@@ -5426,7 +6007,7 @@ contract qq {
 
   it "should bitshift assign" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   int solidty = 3;  //  00000000000000000000000000000101
   int haskell = 1; //  00000000000000000000000000000010
@@ -5442,7 +6023,7 @@ contract qq {
 
   it "can unsigned bit shift" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   int result1 = 0;
   int result2 = 0;
@@ -5476,7 +6057,7 @@ contract qq {
 
   it "can declare custom errors and file level custom errors" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 error flError(string someString);
 
 contract qq {
@@ -5487,7 +6068,7 @@ contract qq {
 
   it "can throw custom errors" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 contract qq {
   error myError (string message);
@@ -5502,7 +6083,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 contract qq {
   error IsTen (int ten, string message);
@@ -5539,7 +6120,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY, also allows less aliases" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 contract qq {
   error IsTen (int ten, string message);
@@ -5568,7 +6149,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY and catch too many aliases" $ runTest ( do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 
 contract qq {
   error IsTen (int ten, string message);
@@ -5603,7 +6184,7 @@ contract qq {
 
   it "revert sucessfully when invoked without arguments" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   
   uint a;
@@ -5623,7 +6204,7 @@ contract qq {
 
   it "revert sucessfully when invoked with arguments" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   
   uint a;
@@ -5643,7 +6224,7 @@ contract qq {
 
   it "revert sucessfully when invoked with namedargs" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   
   uint a;
@@ -5663,7 +6244,7 @@ contract qq {
 
   it "Revert customError" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   
   uint a;
@@ -5683,7 +6264,7 @@ contract qq {
 
   it "Revert customError  namedargs" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   
   uint a;
@@ -5743,7 +6324,7 @@ contract qq {
 
   it "error when reading from contract state in a pure function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -5754,7 +6335,7 @@ contract qq {
 
   it "error when writing to contract state from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -5770,7 +6351,7 @@ contract qq {
 
   it "error when using assembly code from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6104,7 +6685,7 @@ contract B {
 
   it "can detect duplicate declarations" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
 contract qq {
   function f(){
     uint x = 9;
@@ -6140,10 +6721,10 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
-
-  it "View functions enforced in 3.3" $ (runTest $
+  it "View functions enforced in 3.4" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+pragma solidvm 3.4;
+
 contract qq {
     uint x = 10;
     function f(uint a, uint b) public view returns (uint) {
@@ -6155,3 +6736,35 @@ contract qq {
     }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can get code from other contracts using type function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.4;
+contract qq {
+  string  bb = type(qq).creationCode;
+  string  dd = type(C).name;
+  string  cc = type(B).creationCode;
+}
+
+contract B {
+  string  cc = type(qq).creationCode;
+
+}
+
+contract C {
+  int b = 123;
+}
+
+|]
+    getFields ["bb", "cc", "dd"] `shouldReturn` 
+      [ BString "contract qq {\n  string bb = type(qq).creationCode;\n  string cc = type(B).creationCode;\n  string dd = type(C).name;\n  // no constructor found\n}"
+      , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
+      , BString "C"]
+
+  it "can detect when referencing a contract not at file level using type function" $ (runTest $
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = type(B).name;
+
+}|]) `shouldThrow` anyTypeError

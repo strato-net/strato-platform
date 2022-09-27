@@ -133,6 +133,12 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
 
+instance (Monad m, HasMemCertDB m) => HasMemCertDB (ConduitT i o m) where
+  getCertTxDBMap    = lift getCertTxDBMap
+  putCertTxDBMap    = lift . putCertTxDBMap
+  getCertBlockDBMap = lift getCertBlockDBMap
+  putCertBlockDBMap = lift . putCertBlockDBMap 
+
 -- todo: lovely!
 
 addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
@@ -305,15 +311,25 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time' (txChainId bt)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
-        Right execResult -> do
-          let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
-          flushMemAddressStateTxToBlockDB
-          flushMemStorageTxDBToBlockDB
-          flushMemCertTxToBlockDB
+        Right execResult ->
+          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3"),("solidvm","3.4")]
+              findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
+              invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
+           in if not $ null invalidPragmasUsed
+                 then do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  putCertTxDBMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
-          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+                 else do
+                   let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
+                   flushMemAddressStateTxToBlockDB
+                   flushMemStorageTxDBToBlockDB
+                   flushMemCertTxToBlockDB
+                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+
         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
-
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
@@ -724,12 +740,14 @@ completeDiff :: ( MonadLogger m
                 , Mod.Modifiable MemDBs m
                 , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
+                , Mod.Modifiable CertRoot m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
+                , HasMemCertDB m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do

@@ -45,7 +45,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB)
+import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB, flushMemCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
@@ -99,6 +99,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
       $ mineTransactions theBlockHeader remainingGas txs
     timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
     timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
+    timeit "flushMemCertDB bagger" (Just vmBlockInsertionMined) $ flushMemCertDB baggerBlockHash
     newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
     let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
     return $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -109,6 +110,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFChainIdMismatch{} -> recoverable f
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
+        Just f@TFInvalidPragma{} -> recoverable f
 
 rewardCoinbases :: MonadBagger m => Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 rewardCoinbases us uncles ourNumber = do
@@ -119,6 +121,7 @@ rewardCoinbases us uncles ourNumber = do
         return ()
     flushMemStorageDB
     flushMemAddressStateDB
+    flushMemCertDB baggerBlockHash
     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
 -- todo batch insert results
@@ -196,6 +199,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
     CodeNotFound s q a n OutputTx{otHash=h} ->
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
+    InvalidPragma s q erPragmas OutputTx{otHash=hsh} ->
+        (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "

@@ -66,7 +66,7 @@ import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Address       (Address)
+import           Blockchain.Strato.Model.Address       (Address, formatAddressWithoutColor)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
@@ -417,10 +417,13 @@ handleEvents peer = awaitForever $ \case
               $logDebugLS "handleEvents/P2pGenesis/members" $ members uci
       P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
       P2pGetTx shas -> yieldR $ GetTransactions shas
-      P2pNewChainMember cId _ _ -> do
+      P2pNewChainMember cId addr enode -> do
         let formatted = CL.yellow $ format cId
-        $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted
-        mems <- lift $ selectWithDefault (Proxy @ChainMembers) cId
+            addrStr = formatAddressWithoutColor addr
+            enodeStr = showEnode enode
+        $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted ++ ": " ++ addrStr ++ " with enode " ++ enodeStr
+        (ChainMembers mems') <- lift $ selectWithDefault (Proxy @ChainMembers) cId
+        let mems = ChainMembers $ mems' <> M.singleton addr enode
         peerCheck <- lift $ checkPeerIsMember peer mems
         when peerCheck $ do
           $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
