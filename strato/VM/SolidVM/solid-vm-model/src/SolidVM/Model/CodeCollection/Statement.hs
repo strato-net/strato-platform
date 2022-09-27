@@ -25,6 +25,7 @@ module SolidVM.Model.CodeCollection.Statement
   , ArgListF(..)
   , ArgList
   , NumberUnit(..)
+  , numLitGen
   ) where
 
 import Data.Aeson
@@ -191,6 +192,10 @@ data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (Expres
 genPos :: Gen Integer 
 genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
 
+genString :: Gen String 
+genString =  vectorOf 3 $ Test.QuickCheck.elements ['a'..'z']
+
+
 numLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
 numLitGen = frequency [ 
               (10,  NumberLiteral <$> arbitrary <*> genPos <*>  Test.QuickCheck.elements [Just Wei] ) ,
@@ -199,7 +204,7 @@ numLitGen = frequency [
 
 stringLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
 stringLitGen = frequency [ 
-              (10,  StringLiteral <$> arbitrary <*> arbitrary) ,
+              (10,  StringLiteral <$> arbitrary <*>  genString  ),
               (1,  Binary <$> arbitrary <*>  Test.QuickCheck.elements ["+"] <*> scale (`div` 2) stringLitGen <*> scale (`div` 2) stringLitGen )
               ]
 
@@ -228,8 +233,6 @@ instance FromJSON NumberUnit
 
 instance Arbitrary a => Arbitrary (StatementF a) where
   arbitrary = GR.genericArbitrary GR.uniform
--- instance Arbitrary Expression where
---   arbitrary = GR.genericArbitrary GR.uniform
 
 
 instance Arbitrary a => Arbitrary (SimpleStatementF a) where

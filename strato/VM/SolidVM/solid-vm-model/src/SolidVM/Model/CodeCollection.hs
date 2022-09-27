@@ -87,10 +87,7 @@ getParents cc c =
 
 instance Arbitrary CodeCollection where
   arbitrary = do 
-
-
     contr <- arbitrary
-    -- ary <- arbitrary SourceAnnotation
     oneof [return $ CodeCollection {
     _contracts  = M.fromList [("qq", contr)]
     , _flFuncs     = M.empty

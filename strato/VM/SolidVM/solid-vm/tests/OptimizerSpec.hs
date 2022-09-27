@@ -201,10 +201,10 @@ spec = describe "Optimizer tests" $ do
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False
-    fit "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
+    it "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
             quickCheck propIdempotence
-    fit "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
+    it "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $
             quickCheck propEvaluatesToTheSame
-    fit "Should be same or less size (_storageDefs)" $
+    it "Should be same or less size (_storageDefs)" $
             quickCheck propSameOrSmallerSize
    

@@ -46,19 +46,8 @@ instance FromJSON a => FromJSON (VariableDeclF a)
 
 type VariableDecl = Positioned VariableDeclF
 
-
---TODO
---Just realize this needs to match
---The expression generator
---AKA I need to make more tests cases for this
 instance Arbitrary VariableDecl  where
-  arbitrary = do 
-    a <- arbitrary
-    exprss <- arbitrary
-    oneof [return $ VariableDecl { 
-    _varType       = (SVMType.Int Nothing Nothing)
-  , _varIsPublic   = True
-  , _varInitialVal = exprss
-  , _varContext    = a
-  , _isImmutable   = False
-  }]
+  arbitrary =  oneof  [ 
+    (VariableDecl  (SVMType.Int Nothing Nothing) True) <$> arbitrary <*> arbitrary <*> pure False,
+    (VariableDecl  (SVMType.String  $ Just True) True) <$> arbitrary <*> arbitrary <*> pure False
+    ]
