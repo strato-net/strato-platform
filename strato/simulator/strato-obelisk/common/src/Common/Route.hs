@@ -22,9 +22,12 @@ import Data.Functor.Identity
 import Obelisk.Route
 import Obelisk.Route.TH
 
+import Strato.Lite.Rest.Api
+
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
+  BackendRoute_GetNodes :: BackendRoute (Map Text ThreadResultMap)
   -- You can define any routes that will be handled specially by the backend here.
   -- i.e. These do not serve the frontend, but do something different, such as serving static files.
 
