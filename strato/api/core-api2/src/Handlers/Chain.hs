@@ -84,6 +84,7 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
+chainFilterParams :: ChainFilterParams
 chainFilterParams = ChainFilterParams [] appFetchLimit 0
 
 instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m where
