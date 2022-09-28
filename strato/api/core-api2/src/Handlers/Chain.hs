@@ -63,8 +63,9 @@ type API =
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
 
 data ChainFilterParams = ChainFilterParams
-  { _qaChainId        :: [ChainId]
-  , _qaChainInfo      :: Maybe ChainId
+  { _qaChainId :: [ChainId]
+  , _qaLimit :: Integer
+  , _qaOffset :: Integer
   } deriving (Eq, Ord, Show)
 
 makeLenses ''ChainFilterParams
@@ -83,17 +84,10 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-chainFilterParams :: ChainFilterParams
-chainFilterParams = ChainFilterParams
-  [] Nothing
+chainFilterParams = ChainFilterParams [] appFetchLimit 0
 
-instance HasSQL m => Selectable ChainFilterParams [AddressStateRef'] m where
-  selectMany _ = 
-    fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos $ 
-    E.limit $ appFetchLimit
-  select     _ = 
-    fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo $ 
-    E.limit $ appFetchLimit
+instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m where
+  select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds lim ofs
 
 getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
