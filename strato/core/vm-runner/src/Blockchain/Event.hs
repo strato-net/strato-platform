@@ -19,6 +19,7 @@ module Blockchain.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ExecResults
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
@@ -59,6 +60,7 @@ insertInBatch e b = case e of
   VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
 
 data VmOutEvent = OutAction Action
+                | OutExecResults ExecResults
                 | OutBlock OutputBlock
                 | OutIndexEvent IndexEvent
                 | OutToStateDiff Word256 ChainInfo Keccak256
@@ -71,6 +73,7 @@ data VmOutEvent = OutAction Action
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
+  , outExecResults  :: DL.DList ExecResults
   , outBlocks       :: DL.DList OutputBlock
   , outIndexEvents  :: DL.DList IndexEvent
   , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256)
@@ -93,10 +96,12 @@ newOutBatch = OutBatch DL.empty
                        DL.empty
                        DL.empty
                        DL.empty
+                       DL.empty
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
   OutAction a          -> b{ outActions = outActions b `DL.snoc` a }
+  OutExecResults a     -> b{ outExecResults = outExecResults b `DL.snoc` a }
   OutBlock a           -> b{ outBlocks = outBlocks b `DL.snoc` a }
   OutIndexEvent a      -> b{ outIndexEvents = outIndexEvents b `DL.snoc` a }
   OutToStateDiff x y z -> b{ outToStateDiffs = outToStateDiffs b `DL.snoc` (x,y,z) }
