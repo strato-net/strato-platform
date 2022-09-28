@@ -41,6 +41,7 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
 import qualified Data.Text                             as T
+-- import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Traversable                      (for)
 import           Data.Maybe
 import           Text.Printf
@@ -1036,9 +1037,9 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                           Nothing -> M.insert org (OrgNameChains $ Set.singleton cid) m
                                           Just (OrgNameChains s) -> M.insert org (OrgNameChains $ Set.insert cid s) m
                                         )
-                                      atomically . writeTQueue unseqSource . UnseqEvent $ IENewChainOrgName cid (n, u)
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName cid (n, u)
                                     RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
+                                    RegisterCertificate (Right (_, addr, certState)) -> do x509certMap %= \m -> M.insert addr certState m
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
@@ -1603,7 +1604,7 @@ contract RegisterCert {
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
       void . timeout 3000000 $ concurrently_ (runNetwork peers connections) routine
       True `shouldBe` True
-  
+
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do
@@ -1704,9 +1705,9 @@ contract RegisterCert {
       it "should accept a matching ip" $ FlexibleAuth `shouldAccept` (key4, ip1)
       it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
 
-    describe "X509 Private Chain exchange" $ do
+    describe "X.509 Private Chain exchange" $ do
 --    v remember to change to 'it'
-      fit "adds member through X509" $ do
+      fit "adds member using OrganizationAdded" $ do
           let unseqSink = (unseqEvents %=) . (++)
           privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
           let validators' = makeValidators privKeys
@@ -1720,7 +1721,41 @@ contract RegisterCert {
             , (peers !! 0, peers !! 2)
             , (peers !! 1, peers !! 2)
             ]
+          ts <- liftIO getCurrentMicrotime
+          cIdRef <- newIORef undefined
+          cInfoRef <- newIORef undefined
           let runForThreeSeconds = void . timeout 3000000
+              enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+              toIetx = IETx ts . IngestTx Origin.API
+              mkChainId = keccak256ToWord256 . rlpHash
+
+              -- Create a certificate registry on the main chain
+              registry = [r|
+                    pragma solidvm 3.0;
+                    contract CertRegistry {
+                      event CertificateRegistered(string cert);
+
+                      constructor(string _cert) {
+                        emit CertificateRegistered(_cert)
+                      }
+                    }
+                    |]
+              contractName' = "CertRegistry"
+              -- args' = "(\"" <> decodeUtf8 (certToBytes $ certificate (fromJust cert1)) <> "\")"
+              args' = "(\"" <> "-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----" <> "\")"
+              txMd' = M.fromList [("src", registry), ("name", contractName'), ("args", args')]
+              addMd' t = t{transactionMetadata = M.union txMd' <$> transactionMetadata t}
+              mkRegistryTx = addMd' . mkSignedTx (privKeys !! 0) $ U.UnsignedTransaction
+                { U.unsignedTransactionNonce      = Nonce 0
+                , U.unsignedTransactionGasPrice   = Wei 1
+                , U.unsignedTransactionGasLimit   = Gas 1000000000
+                , U.unsignedTransactionTo         = Nothing
+                , U.unsignedTransactionValue      = Wei 0
+                , U.unsignedTransactionInitOrData = Code $ BC.pack registry
+                , U.unsignedTransactionChainId    = Nothing
+                }
+
+              -- Post a mock dApp to a private chain
               src = [r|
                     pragma solidvm 3.2;
                     contract A {
@@ -1731,17 +1766,11 @@ contract RegisterCert {
                     }
                     |]
               contractName = "A"
-              enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          ts <- liftIO getCurrentMicrotime
-          cIdRef <- newIORef undefined
-          cInfoRef <- newIORef undefined
-          let args = "(" <> "\"Blockapps\"" <> ", \"engineering\"" <> ")"
-              txMd = M.fromList [("funcName","addOrg"), ("args",args)]
-              toIetx = IETx ts . IngestTx Origin.API
-              mkChainId = keccak256ToWord256 . rlpHash
+              args = "(" <> "\"Blockapps\"" <> ", \"engineering\"" <> ")"
+              txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
               addMd t = t{transactionMetadata = M.union txMd <$> transactionMetadata t}
               tChainInfo = ChainInfo
-                UnsignedChainInfo { chainLabel     = "My parent test chain!"
+                UnsignedChainInfo { chainLabel     = "My organization's private chain"
                                   , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                     , NonContract (validators' !! 0) 1000000000000000000000
                                                     , NonContract (validators' !! 1) 1000000000000000000000
@@ -1754,7 +1783,7 @@ contract RegisterCert {
                                   , chainMetadata  = M.singleton "VM" "SolidVM"
                                   }
                 Nothing
-              incXUtx cId = U.UnsignedTransaction
+              setupTx cId = U.UnsignedTransaction
                 { U.unsignedTransactionNonce      = Nonce 0
                 , U.unsignedTransactionGasPrice   = Wei 1
                 , U.unsignedTransactionGasLimit   = Gas 1000000000
@@ -1763,24 +1792,29 @@ contract RegisterCert {
                 , U.unsignedTransactionInitOrData = Code ""
                 , U.unsignedTransactionChainId    = Just $ ChainId cId
                 }
-              incXTx = addMd . mkSignedTx (privKeys !! 0) . incXUtx
+              signedPrivTx = addMd . mkSignedTx (privKeys !! 0) . setupTx
 
               routine = do
-                threadDelay 500000
+                threadDelay 200000
                 for_ peers $ postEvent (TimerFire 0)
-                threadDelay 500000
+                threadDelay 200000
+                for_ peers $ postEvent (TimerFire 1)
+                threadDelay 200000
+                flip postEvent (peers !! 0) . UnseqEvent $ toIetx mkRegistryTx
+                threadDelay 200000
                 let cInfo = tChainInfo
                     cId = mkChainId cInfo
                 writeIORef cIdRef cId
                 writeIORef cInfoRef cInfo
                 flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (cId, cInfo)
-                threadDelay 500000
-                flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx cId
+                threadDelay 200000
+                flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId
 
           runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
           testCid <- readIORef cIdRef
-          (head ctxs1) ^. orgNameChainsMap `shouldBe` -- it worowkokwrowrowkrowrkworkworkwokrworkworkworkwoks
+          (head ctxs1) ^. x509certMap `shouldNotBe` M.empty
+          (head ctxs1) ^. orgNameChainsMap `shouldBe`
             M.singleton (OrgName $ BC.pack "Blockapps", OrgUnit $ Just (BC.pack "engineering")) (OrgNameChains $ Set.singleton testCid)
 
-          -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO () 
+          -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()  

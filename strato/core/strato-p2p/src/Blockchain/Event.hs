@@ -435,8 +435,6 @@ handleEvents peer = awaitForever $ \case
         peerCheck <- lift $ checkPeerIsMember peer (ChainMembers M.empty)
         when peerCheck $ do
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
-          -- TODO: check if this breaks on a main chain call
-          -- this should never be Nothing since this should only be called on a private chain
           cInfo <- lift $ select (Proxy @ChainInfo) cId
           when (isJust cInfo) $ do 
             $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Sending chain info: " ++ show cInfo
