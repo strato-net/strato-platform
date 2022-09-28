@@ -24,6 +24,8 @@ import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
+
+-- import           Control.Monad.State                       (put)
 import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
@@ -598,12 +600,13 @@ transformGenesis chains = forM_ chains $ \ig -> do
 splitEvents :: ( MonadLogger m
                , MonadMonitor m
                , MonadBlockstanbul m
+              --  , MonadSequencer m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
                )
             => [IngestEvent]
-            -> ConduitT a SeqEvent m ()
+            -> ConduitT a SeqEvent m () -- splitWith iEventType es) --> (IET, [IE]) ()IET, IE)
 splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
   let num = length events
       record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
@@ -629,6 +632,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETForcedConfigChange -> do
       record "inevent_type_forced_config_change" "ForcedConfigChanges"
       blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
+    IETValidatorBehavior  -> do
+      record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
+      blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

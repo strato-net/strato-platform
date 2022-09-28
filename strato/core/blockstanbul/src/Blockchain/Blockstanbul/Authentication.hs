@@ -40,7 +40,7 @@ instance Arbitrary IstanbulExtra where
   arbitrary = liftM3 IstanbulExtra arbitrary arbitrary arbitrary
 
 instance Arbitrary ExtraData where
-  arbitrary = liftM2 ExtraData arbitrary arbitrary
+  arbitrary = liftM2 ExtraData arbitrary arbitrary 
 
 
 truncateExtra :: Block -> Block

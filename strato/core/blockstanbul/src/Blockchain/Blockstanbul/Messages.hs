@@ -39,6 +39,7 @@ import Blockchain.Strato.Model.Secp256k1
 import qualified Text.Colors as CL
 import Text.Format
 
+type ValidatorRestriction = Bool
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -55,7 +56,7 @@ instance Ae.FromJSON View where
   parseJSON = Ae.withObject "View" $ \v -> liftM2 View (v Ae..: "round") (v Ae..: "sequence")
 
 instance Format View where
-  format (View r s) = printf "View (round = %d, sequence = %d)" r s
+  format (View r s) = printf "View (round = %d, sequence = %d)" r s 
 
 data MsgAuth = MsgAuth {
   sender :: Address,
@@ -97,6 +98,12 @@ data ForcedConfigChange = ForcedRound RoundNumber
 instance Format ForcedConfigChange where
   format = show
 
+data ForcedValidatorChange = ForcedValidator ValidatorRestriction
+                           deriving (Eq, Show, Generic, Binary, NFData, Data)
+
+instance Format ForcedValidatorChange where
+  format = show
+
 
 blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
@@ -116,6 +123,9 @@ instance Arbitrary WireMessage where
 instance Arbitrary ForcedConfigChange where
   arbitrary = genericArbitrary
 
+instance Arbitrary ForcedValidatorChange where
+  arbitrary = genericArbitrary
+
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
@@ -133,6 +143,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
+             | ValidatorBehaviorChange ForcedValidatorChange
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -144,6 +155,7 @@ instance Format InEvent where
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
+  format (ValidatorBehaviorChange theBool) =  "ValidatorBehaviorChange " ++ format theBool
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -197,6 +209,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
+    ValidatorBehaviorChange vc -> CL.blue "FORCED_VALIDATOR_CHANGE" ++ show vc
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do
@@ -312,7 +325,7 @@ data Checkpoint = Checkpoint
                 } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
 instance Default Checkpoint where
-  def = Checkpoint (View 0 0) M.empty [] []
+  def = Checkpoint (View 0 0 ) M.empty [] []
 
 instance Arbitrary Checkpoint where
   arbitrary = genericArbitrary
