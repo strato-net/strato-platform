@@ -251,12 +251,6 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
 
-  -- Output three things. OutToStateDiff, OutIndexEvent, OutAction, (new one) OutEvent
-  -- for_ execr $ yield . OutExecResults
-  -- for_ (concat $ erEvents <$> execr) $ yield . OutEvent
-  -- for_ (concat $ erLogs <$> execr) $ yield . OutLog
-  -- for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
-
 processBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
               -> ConduitT a VmOutEvent m ()
@@ -326,8 +320,6 @@ runChainConstructors cId cInfo = do
   -- still need to pre-decide what they should be else the VM would crash whenever they are used.
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
-
-  -- new changes made this output of execResults.
 
   let getSrcBS = BC.pack . T.unpack . codeInfoSource
       getCodeHash ci = Keccak256.hash $ getSrcBS ci
