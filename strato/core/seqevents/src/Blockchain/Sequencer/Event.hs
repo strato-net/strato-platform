@@ -113,6 +113,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IECertificateRevoked A.Address
+                 | IEValidatorBehavior PBFT.ForcedValidatorChange
                  deriving (Eq, Show, GHCG.Generic, Data)
 
 data IngestEventType = IETTransaction
@@ -122,6 +123,7 @@ data IngestEventType = IETTransaction
                      | IETBlockstanbul
                      | IETForcedConfigChange
                      | IETCertificateRevoked
+                     | IETValidatorBehavior
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -133,6 +135,7 @@ iEventType = \case
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
   IECertificateRevoked{} -> IETCertificateRevoked
+  IEValidatorBehavior{}   -> IETValidatorBehavior
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -142,6 +145,7 @@ instance Format IngestEvent where
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IECertificateRevoked ua) = format ua
+  format (IEValidatorBehavior o) = show o
 
 type Timestamp = Microtime
 

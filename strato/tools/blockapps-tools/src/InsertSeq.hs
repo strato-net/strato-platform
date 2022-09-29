@@ -9,6 +9,8 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import System.Exit
 import Text.Printf
 
+-- import Control.Monad
+import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
@@ -19,6 +21,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
+import Network.Kafka.Protocol as KP
 
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
@@ -27,6 +30,15 @@ insertSeq iev = do
     assertTopicCreation
     writeUnseqEvents [iev]
   mapM_ print resps
+
+validatorBehavior :: Bool -> IO ()
+validatorBehavior valB = do
+  printf "Validator behavior = %s \n" $ show valB
+  let msg = IEValidatorBehavior . ForcedValidator $ valB
+  print msg
+  resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
+    writeUnseqEvents [msg]
+  print resp 
 
 addTx :: String -> IO ()
 addTx tx' = do

@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module BlockApps.Bloc22.Server.Contracts where
-
 import           Control.Arrow
 import           Control.Monad                   (join)
 import qualified Control.Monad.Change.Alter      as A
@@ -21,13 +20,13 @@ import qualified Data.Text                       as Text
 import           Data.Traversable
 import           Numeric
 import           UnliftIO
-
 import           Blockchain.SolidVM.Model
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
+import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
@@ -292,7 +291,7 @@ getContractsDetails :: ( MonadUnliftIO m
                        , HasBlocEnv m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId =
+getContractsDetails contractAddress chainId = 
   completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
 
 getContractXabi :: ( MonadUnliftIO m
@@ -423,7 +422,8 @@ postContractsXabi :: MonadIO m =>
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList . snd <$> parseXabi "src" (Text.unpack postxabirequestSrc)
+         let oldXabi  =  parseXabi "src" (Text.unpack postxabirequestSrc)
+         partialXabis <- Map.fromList . snd <$>  (case oldXabi of Left _ -> parseSolidXabi "src" (Text.unpack postxabirequestSrc); _ -> oldXabi;)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwIO . UserError .

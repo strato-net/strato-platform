@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module SolidVM.Model.CodeCollection.Statement
   ( StatementF(..)
@@ -24,6 +25,7 @@ module SolidVM.Model.CodeCollection.Statement
   , ArgListF(..)
   , ArgList
   , NumberUnit(..)
+  , numLitGen
   ) where
 
 import Data.Aeson
@@ -32,9 +34,13 @@ import Data.Source
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
+import qualified Generic.Random                     as GR
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 import Control.DeepSeq
+import Test.QuickCheck
+import Test.QuickCheck.Instances    ()
+
 
 -- Changes to this structure should also have changes in the Unparser :)
 data StatementF a =
@@ -84,6 +90,10 @@ data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 instance ToJSON Location
 instance FromJSON Location
 
+instance Arbitrary Location where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
 data VarDefEntryF a = BlankEntry
                     | VarDefEntry { vardefType :: Maybe Type
                                   , _vardefLocation :: Maybe Location
@@ -126,6 +136,9 @@ data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFDa
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
+
+instance Arbitrary InlineAssembly where
+  arbitrary = GR.genericArbitrary GR.uniform
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -175,6 +188,35 @@ instance FromJSON a => FromJSON (ExpressionF a)
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
                   deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
+
+genPos :: Gen Integer 
+genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
+
+genString :: Gen String 
+genString =  vectorOf 3 $ Test.QuickCheck.elements ['a'..'z']
+
+
+numLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
+numLitGen = frequency [ 
+              (10,  NumberLiteral <$> arbitrary <*> genPos <*>  Test.QuickCheck.elements [Just Wei] ) ,
+              (1,  Binary <$> arbitrary <*>  Test.QuickCheck.elements ["+"] <*> scale (`div` 2) numLitGen <*> scale (`div` 2) numLitGen )
+              ]
+
+stringLitGen :: (Arbitrary a) =>   Gen (ExpressionF a)
+stringLitGen = frequency [ 
+              (10,  StringLiteral <$> arbitrary <*>  genString  ),
+              (1,  Binary <$> arbitrary <*>  Test.QuickCheck.elements ["+"] <*> scale (`div` 2) stringLitGen <*> scale (`div` 2) stringLitGen )
+              ]
+
+instance Arbitrary a =>  Arbitrary (ExpressionF a) where
+  arbitrary = oneof [numLitGen, stringLitGen]
+
+
+instance Arbitrary a => Arbitrary (ArgListF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+
 type ArgList = Positioned ArgListF
 
 instance ToJSON a => ToJSON (ArgListF a)
@@ -182,5 +224,20 @@ instance FromJSON a => FromJSON (ArgListF a)
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
+instance Arbitrary NumberUnit where
+  arbitrary = GR.genericArbitrary GR.uniform
+
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit
+
+
+instance Arbitrary a => Arbitrary (StatementF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+instance Arbitrary a => Arbitrary (SimpleStatementF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+instance Arbitrary a => Arbitrary (VarDefEntryF a) where
+  arbitrary = GR.genericArbitrary GR.uniform

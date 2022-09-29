@@ -77,6 +77,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
   , _lastParent :: Maybe Keccak256
+  , _validatorBehavior :: Bool
 }
 makeLenses ''BlockstanbulContext
 
@@ -122,6 +123,7 @@ newContext (Checkpoint v pendingVotes as senderlist) addr =
      , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
      , _lastParent = Nothing
+     , _validatorBehavior = True
      }
 
 generateNonceMap :: [Address] -> M.Map Address Int

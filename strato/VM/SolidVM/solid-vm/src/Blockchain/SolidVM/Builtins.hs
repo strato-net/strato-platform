@@ -28,7 +28,7 @@ push (SReference apt) _ (OrderedVals [av]) = do
 
 push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
   contract' <- getCurrentContract
-  if (CC._vmVersion contract' == "svm3.2" || CC._vmVersion contract' == "svm3.3")
+  if (CC._vmVersion contract' == "svm3.2" || CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
     then do
       let newVar = Constant av
           newArr = V.snoc vec newVar 

@@ -8,7 +8,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveTraversable #-}
-
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module SolidVM.Model.CodeCollection.ConstantDecl (
   ConstantDeclF(..),
@@ -25,6 +25,10 @@ import           Data.Source
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 import           Control.DeepSeq
+
+import qualified Generic.Random                     as GR
+import           Test.QuickCheck.Instances    ()
+import           Test.QuickCheck
 
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
@@ -43,3 +47,7 @@ instance ToJSON a => ToJSON (ConstantDeclF a)
 instance FromJSON a => FromJSON (ConstantDeclF a)
 
 type ConstantDecl = Positioned ConstantDeclF
+
+
+instance Arbitrary a => Arbitrary (ConstantDeclF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
