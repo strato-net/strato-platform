@@ -50,7 +50,7 @@ spec = do
                 parsedCert = fromRight (error "Couldn't parse certString") $ bsToCert $ C8.pack $ certString
                 addr = fromInteger 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[], orgName="Blockapps", orgUnit=Just "sales"})]
+                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[], orgName="BlockApps", orgUnit=Just "Engineering"})]
         it "Index EventDB for CertificateRevoked" $
             let userAddr = fromInteger 0x489384
                 event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRevoked" [show userAddr]
