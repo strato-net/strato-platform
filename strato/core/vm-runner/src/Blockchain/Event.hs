@@ -60,7 +60,6 @@ insertInBatch e b = case e of
   VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
 
 data VmOutEvent = OutAction Action
-                | OutExecResults ExecResults
                 | OutBlock OutputBlock
                 | OutIndexEvent IndexEvent
                 | OutToStateDiff Word256 ChainInfo Keccak256
@@ -101,7 +100,6 @@ newOutBatch = OutBatch DL.empty
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
   OutAction a          -> b{ outActions = outActions b `DL.snoc` a }
-  OutExecResults a     -> b{ outExecResults = outExecResults b `DL.snoc` a }
   OutBlock a           -> b{ outBlocks = outBlocks b `DL.snoc` a }
   OutIndexEvent a      -> b{ outIndexEvents = outIndexEvents b `DL.snoc` a }
   OutToStateDiff x y z -> b{ outToStateDiffs = outToStateDiffs b `DL.snoc` (x,y,z) }
