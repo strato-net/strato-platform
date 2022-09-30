@@ -64,8 +64,8 @@ type API =
 
 data ChainFilterParams = ChainFilterParams
   { _qaChainId :: [ChainId]
-  , _qaLimit :: Integer
-  , _qaOffset :: Integer
+  , _qaLimit :: Maybe Natural
+  , _qaOffset :: Maybe Natural
   } deriving (Eq, Ord, Show)
 
 makeLenses ''ChainFilterParams
