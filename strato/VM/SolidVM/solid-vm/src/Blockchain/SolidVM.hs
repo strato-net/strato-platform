@@ -2320,6 +2320,60 @@ expToVar' (CC.FunctionCall _ e args) = do
             isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
             ro <- readOnly <$> getCurrentCallInfo
+            --Case where the code name is given at the beginning 
+            let codeSnippets :: [String]
+                codeSnippets = 
+                    case (fromMaybe "" searchTerms) of 
+                      --Unparse just the contract
+                      "" -> [unparseContract contract]
+                      term ->
+                      --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
+                        -- Check for and get the different parts of the contract
+                        let contrString = 
+                              case ((contract ^. CC.contractName) == term) of
+                                True -> Just $ unparseContract contract
+                                False -> Nothing
+
+                            constString =   
+                              case ((contract ^. CC.constants) M.!? term) of 
+                                Just constF -> Just $ unparseConstant (term, constF)
+                                Nothing -> Nothing                          
+
+                            storjString = 
+                              case ((contract ^. CC.storageDefs) M.!? term) of
+                                Just storjF -> Just $ unparseVar (term, storjF)
+                                Nothing -> Nothing                           
+
+                            enumString = 
+                              case ((contract ^. CC.enums) M.!? term) of
+                                Just enumF -> Just $ unparseEnum (term, fst enumF)
+                                Nothing -> Nothing                             
+
+                            structString = 
+                              case ((contract ^. CC.structs) M.!? term) of
+                                Just structF -> Just $ unparseStruct (term, structF) 
+                                Nothing -> Nothing
+
+                            eventString = 
+                              case ((contract ^. CC.events) M.!? term) of 
+                                Just eventF -> Just $ unparseEvent (term, eventF)
+                                Nothing -> Nothing                             
+
+                            funcString = 
+                              case ((contract ^. CC.functions) M.!? term) of 
+                                Just funcF -> Just $ unparseFunc (term, funcF)
+                                Nothing -> Nothing
+
+                            modString = 
+                              case ((contract ^. CC.modifiers) M.!? term) of
+                                Just modF -> Just $ unparseModifier (term, modF)
+                                Nothing -> Nothing
+
+                        --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                        in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
+                payloadString = if (codeSnippet == Nothing) then
+                  (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
+              pure . Constant $ SString ( unlines codeSnippets)
             (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
             defaultValue <- unless (didItWork) $ 
             return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe (defaultValue) result):[])
