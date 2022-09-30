@@ -85,10 +85,10 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
     NamedSchema m (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 chainFilterParams :: ChainFilterParams
-chainFilterParams = ChainFilterParams [] fromInteger appFetchLimit 0
+chainFilterParams = ChainFilterParams [] (appFetchLimit . fromIntegral) 0
 
 instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m where
-  select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds fromInteger lim  fromInteger ofs
+  select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds (lim . fromIntegral)  (ofs . fromIntegral)
 
 getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
