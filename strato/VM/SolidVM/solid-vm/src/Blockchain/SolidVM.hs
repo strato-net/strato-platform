@@ -1303,7 +1303,7 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(CC.EmitStatement eventName exptups pos) = do
+runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
