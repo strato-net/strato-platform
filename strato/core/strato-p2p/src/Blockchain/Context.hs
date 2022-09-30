@@ -36,6 +36,8 @@ module Blockchain.Context
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , BestBlockNumber(..)
+    , OrgNameChains(..)
+    , ChainInfo(..)
     , initConfig
     , initContext
     , runContextM
@@ -51,6 +53,8 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , getPeerX509
+  
     ) where
 
 
@@ -58,6 +62,7 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
+import           Control.Arrow                         ((&&&), (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -72,12 +77,14 @@ import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
@@ -223,6 +230,13 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
+instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (ReaderT Config m) where
+  select p ip = A.selectWithDefault p ip <&> toMaybe def
+  selectWithDefault _ = fmap OrgNameChains
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getOrgNameChains
+                      . (unOrgName . fst &&& unOrgUnit . snd)
+                      
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
@@ -250,6 +264,11 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
+instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (ReaderT Config m) where
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain ((unOrgName *** unOrgUnit) k) v
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
@@ -422,14 +441,17 @@ type MonadP2P m = ( MonadIO m
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
+                       , '((OrgName, OrgUnit), OrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
+                       , '(Address, X509CertInfoState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
+                       , '((OrgName, OrgUnit), Word256)
                        , '(Keccak256, Proxy (Inbound WireMessage))
                        , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        ] m
@@ -504,6 +526,13 @@ getPeerByIP :: A.Selectable String PPeer m
             => String
             -> m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
+
+getPeerX509 :: A.Selectable Address X509CertInfoState m
+          => PPeer 
+          -> m (Maybe X509CertInfoState)
+getPeerX509 peer = case pPeerPubkey peer of
+  Nothing -> pure Nothing
+  Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)

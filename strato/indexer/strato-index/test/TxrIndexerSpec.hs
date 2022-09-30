@@ -3,6 +3,7 @@
 module TxrIndexerSpec where
 
 import qualified Data.ByteString.Char8              as C8
+-- import qualified Data.ByteString                    as BS
 import           Data.Either
 
 import           Test.Hspec
@@ -49,14 +50,14 @@ spec = do
                 parsedCert = fromRight (error "Couldn't parse certString") $ bsToCert $ C8.pack $ certString
                 addr = fromInteger 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[]})]
+                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[], orgName="BlockApps", orgUnit=Just "Engineering"})]
         it "Index EventDB for CertificateRevoked" $
             let userAddr = fromInteger 0x489384
                 event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRevoked" [show userAddr]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, CertificateRevoked . Right $ ((Account 0xdeadbeef Nothing), userAddr)]
         it "Index EventDB for CertificateRegistryInitialized" $
-            let event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRegistryInitialized" []
+            let event =  EventDB(Account 0xdeadbeef Nothing) Nothing "CertificateRegistryInitialized" []
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, CertificateRegistryInitialized . Right $ Account 0xdeadbeef Nothing]
         it "Index EventDBEntry for non-special event" $
@@ -64,3 +65,23 @@ spec = do
                 event = EventDB (Account 0xdeadbeef Nothing) (Just chainId) "NotSpecial" ["48193"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event]
+        it "Index EventDBEntry for OrganizationAdded (one argument)" $
+            let cId   = fromInteger 0x42069
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ("blockapps", Nothing))] 
+        it "Index EventDBEntry for OrganizationAdded (two arguments)" $
+            let cId   = fromInteger 0x22222
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps", "sales"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ("blockapps", Just "sales"))] 
+        it "Index EventDBEntry for OrganizationRemoved (one argument)" $
+            let cId   = fromInteger 0x33333
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ("blockapps", Nothing))] 
+        it "Index EventDBEntry for OrganizationRemoved (two arguments)" $
+            let cId   = fromInteger 0x11111
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps", "engineering"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ("blockapps", Just "engineering"))] 

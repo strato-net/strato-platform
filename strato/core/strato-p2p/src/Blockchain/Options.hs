@@ -12,7 +12,7 @@ import           Blockchain.Strato.Model.Util
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
 
-data AuthorizationMode = IPOnly | PubkeyOnly | StrongAuth | FlexibleAuth deriving (Read, Show, Eq, Enum, Ord)
+data AuthorizationMode = IPOnly | PubkeyOnly | X509Only | StrongAuth | FlexibleAuth deriving (Read, Show, Eq, Enum, Ord)
 
 defineFlag "a:address" ("127.0.0.1" :: String) "Connect to server at address"
 defineFlag "l:listen" (30303 :: Int) "Listen on port"
