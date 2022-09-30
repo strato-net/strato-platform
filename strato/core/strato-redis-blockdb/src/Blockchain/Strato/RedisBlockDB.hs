@@ -54,7 +54,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Secp256k1     (importPublicKey)
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Strato.Model.Account
 
@@ -64,9 +63,8 @@ import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
-import           Data.Either                           (fromRight)
 
-import           Data.Foldable                         (foldl', toList)
+import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
@@ -194,17 +192,11 @@ addChainMember cId address enode = do
         TxSuccess _ -> getCompose $
           Compose (addIPChain (ipAddress enode) cId) *>
           Compose (addOrgIdChain (unOrgId $ pubKey enode) cId) *>
-          Compose (addressToOrgName address >>= \org -> addOrgNameChain (fromRight (error "addChainMember - to the left, to the left") org) cId)
+          Compose (addressToOrg address >>= \case
+                    Nothing -> pure $ Right Ok
+                    Just org -> addOrgNameChain org cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
-    where addressToOrgName :: Address -> Redis (Either () (S8.ByteString, Maybe S8.ByteString))  -- OrgName, OrgUnit
-          addressToOrgName addr = do
-            let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr
-                extractDN dn    = (S8.pack (subOrg dn), (Just . S8.pack) =<< subUnit dn)
-                getCertSubject' = fromJust . getCertSubject
-                getCert'        = signedsToX509 . toList . findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode))
-            cert <- x509ToSigneds <$> getCertificate'
-            return $ Right $ extractDN $ getCertSubject' $ getCert' cert
 
 removeChainMember :: Word256
                   -> Address
@@ -219,7 +211,10 @@ removeChainMember cId address = do
           Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
           Just enode -> getCompose $
             Compose (removeIPChain (ipAddress enode) cId) *>
-            Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
+            Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId) *>
+            Compose (addressToOrg address >>= \case
+                        Nothing -> pure $ Right Ok
+                        Just org -> removeOrgNameChain org cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
@@ -234,26 +229,26 @@ registerCertificate contractAddress userAddr x509CertInfoState = do
 
     case parent of
         -- The CertificateRegistry is not initialized and there is not parent certificate
-        Nothing | not crInitialized -> 
+        Nothing | not crInitialized ->
             fmap txToEither . multiExec $ insertNewX509
 
         -- The CertificateRegistry is not initialized and there is a parent certificate
-        Just p  | not crInitialized -> 
+        Just p  | not crInitialized ->
             fmap txToEither . multiExec $ updateParent p >> insertNewX509
 
         -- The CertificateRegistry is initialized, this event it emitted from the right contract,
         -- and the parent certificate is valid
-        Just p  | crInitialized && rightContract && parentIsValid -> 
+        Just p  | crInitialized && rightContract && parentIsValid ->
             fmap txToEither . multiExec $ updateParent p >> insertNewX509
 
         -- We can not register this certificate
-        _ -> 
+        _ ->
             pure . Left . SingleLine $ "registerCertificate - invalid contractAddress, contract is not CertificateRegistry"
     where
         insertNewX509 = set (inNamespace X509Certificates userAddr) (toValue x509CertInfoState)
         updateParent p@X509CertInfoState{..} = set (inNamespace X509Certificates $ toKey userAddress) (toValue p{children=userAddr:children})
         txToEither = \case
-            TxSuccess _ -> Right Ok 
+            TxSuccess _ -> Right Ok
             TxAborted -> Left . SingleLine $ "registerCertificate - Aborted registering cert"
             TxError e -> Left . SingleLine $ "registerCertificate - Error registering cert " <> S8.pack e
 
@@ -960,3 +955,11 @@ runStratoRedisIO :: MonadIO m => Redis a -> m a
 runStratoRedisIO r = liftIO $ do
   conn <- checkedConnect lookupRedisBlockDBConfig
   runRedis conn r
+
+-- Retrieve a organization name and unit associated with an address
+addressToOrg :: Address -> Redis (Maybe (S8.ByteString, Maybe S8.ByteString))
+addressToOrg addr = do
+    cIs <- getCertificate addr
+    case cIs of
+        Nothing -> return Nothing
+        Just c  -> return $ Just . (S8.pack *** fmap S8.pack) $ (orgName &&& orgUnit) c

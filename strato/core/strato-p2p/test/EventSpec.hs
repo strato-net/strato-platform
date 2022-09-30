@@ -1711,7 +1711,7 @@ contract RegisterCert {
       it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
 
     describe "X.509 Private Chain exchange" $ do
-      it "Can add an organization to a private chain" $ do
+      it "can add an organization to a private chain" $ do
           let unseqSink = (unseqEvents %=) . (++)
           privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
           let validators' = makeValidators privKeys
@@ -1777,6 +1777,9 @@ contract RegisterCert {
                     pragma solidvm 3.2;
                     contract A {
                       event OrganizationAdded(string name, string unit);
+
+                      constructor() {}
+
                       function addOrg(string _name, string _unit) {
                         emit OrganizationAdded(_name, _unit);
                       }
@@ -1814,8 +1817,6 @@ contract RegisterCert {
               routine = do
                 threadDelay 200000
                 for_ peers $ postEvent (TimerFire 0)
-                threadDelay 200000
-                for_ peers $ postEvent (TimerFire 1)
                 threadDelay 200000
                 flip postEvent (peers !! 0) . UnseqEvent $ toIetx mkRegistryTx    -- Post cert registry contract to the main chain
                 threadDelay 200000
