@@ -431,11 +431,11 @@ handleEvents peer = awaitForever $ \case
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pNewOrgName cId org -> do
         let formatted = CL.yellow $ format cId
-            orgFormat = CL.blue $ format org -- TODO: need to decode from b16
+            orgFormat = CL.blue $ format org
         peerCheck <- lift $ checkPeerIsMember peer (ChainMembers M.empty)
         when peerCheck $ do
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
-          cInfo <- lift $ select (Proxy @ChainInfo) cId
+          cInfo <- lift $ select (Proxy @ChainInfo) cId -- This should never be Nothing
           when (isJust cInfo) $ do 
             $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Sending chain info: " ++ show cInfo
             yieldR $ ChainDetails [(cId, fromJust cInfo)]

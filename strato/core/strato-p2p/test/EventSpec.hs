@@ -17,7 +17,6 @@ module EventSpec where
 
 import           Prelude hiding (round)
 import           Conduit
--- import           Control.Arrow                         ((&&&))
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens                          hiding (Context, view)
 import qualified Control.Lens                          as Lens
@@ -41,7 +40,7 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
 import qualified Data.Text                             as T
--- import           Data.Text.Encoding                    (decodeUtf8)
+import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Traversable                      (for)
 import           Data.Maybe
 import           Text.Printf
@@ -124,6 +123,7 @@ import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
 import           Test.QuickCheck
 import           Text.RawString.QQ
+import           Time.System
 
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
@@ -1169,6 +1169,11 @@ mkSignedTx privKey utx =
                    , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
                    }
 
+instance HasVault IO where
+  sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
+
 -- endlessStreamOfIPAddresses :: [String]
 -- endlessStreamOfIPAddresses = generateThem
 --   where galois x = let y = (7*chx) `mod` 256 in x : galois y
@@ -1284,7 +1289,7 @@ spec = do
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
 
-    fit "can add a new node to a chain" $ do
+    it "can add a new node to a chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
@@ -1706,8 +1711,7 @@ contract RegisterCert {
       it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
 
     describe "X.509 Private Chain exchange" $ do
---    v remember to change to 'it'
-      fit "adds member using OrganizationAdded" $ do
+      it "Can add an organization to a private chain" $ do
           let unseqSink = (unseqEvents %=) . (++)
           privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
           let validators' = makeValidators privKeys
@@ -1722,6 +1726,7 @@ contract RegisterCert {
             , (peers !! 1, peers !! 2)
             ]
           ts <- liftIO getCurrentMicrotime
+          dt <- liftIO dateCurrent
           cIdRef <- newIORef undefined
           cInfoRef <- newIORef undefined
           let runForThreeSeconds = void . timeout 3000000
@@ -1729,20 +1734,32 @@ contract RegisterCert {
               toIetx = IETx ts . IngestTx Origin.API
               mkChainId = keccak256ToWord256 . rlpHash
 
-              -- Create a certificate registry on the main chain
+          -- Create a certificate registry on the main chain
+              iss   = Issuer {  issCommonName = "Dustin"
+                              , issOrg        = "Blockapps"
+                              , issUnit       = Just "engineering"
+                              , issCountry    = Just "USA"
+                              }
+              subj  = Subject { subCommonName = "Garrett"
+                              , subOrg        = "Blockapps"
+                              , subUnit       = Just "engineering"
+                              , subCountry    = Just "USA"
+                              , subPub        = derivePublicKey (privKeys !! 1)
+                              } 
+          cert <- makeSignedCert (Just dt) (Just rootCert) iss subj
+          let cert' = decodeUtf8 . certToBytes $ cert
+              args' = "(\"" <> cert' <>"\")"
               registry = [r|
-                    pragma solidvm 3.0;
+                    pragma solidvm 3.2;
                     contract CertRegistry {
                       event CertificateRegistered(string cert);
 
                       constructor(string _cert) {
-                        emit CertificateRegistered(_cert)
+                        emit CertificateRegistered(_cert);
                       }
                     }
                     |]
               contractName' = "CertRegistry"
-              -- args' = "(\"" <> decodeUtf8 (certToBytes $ certificate (fromJust cert1)) <> "\")"
-              args' = "(\"" <> "-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----" <> "\")"
               txMd' = M.fromList [("src", registry), ("name", contractName'), ("args", args')]
               addMd' t = t{transactionMetadata = M.union txMd' <$> transactionMetadata t}
               mkRegistryTx = addMd' . mkSignedTx (privKeys !! 0) $ U.UnsignedTransaction
@@ -1800,21 +1817,28 @@ contract RegisterCert {
                 threadDelay 200000
                 for_ peers $ postEvent (TimerFire 1)
                 threadDelay 200000
-                flip postEvent (peers !! 0) . UnseqEvent $ toIetx mkRegistryTx
+                flip postEvent (peers !! 0) . UnseqEvent $ toIetx mkRegistryTx    -- Post cert registry contract to the main chain
                 threadDelay 200000
                 let cInfo = tChainInfo
                     cId = mkChainId cInfo
                 writeIORef cIdRef cId
                 writeIORef cInfoRef cInfo
-                flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (cId, cInfo)
+                flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (cId, cInfo)  -- Post private chain
                 threadDelay 200000
-                flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId
+                flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId -- Add organization to private chain
 
           runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
           testCid <- readIORef cIdRef
-          (head ctxs1) ^. x509certMap `shouldNotBe` M.empty
-          (head ctxs1) ^. orgNameChainsMap `shouldBe`
+
+          -- Cert should be inserted into every node
+          for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
+
+          -- Node 1's cert was registered in the contract so it should receive the chain ID
+          (ctxs1 !! 1) ^. orgNameChainsMap `shouldBe`
             M.singleton (OrgName $ BC.pack "Blockapps", OrgUnit $ Just (BC.pack "engineering")) (OrgNameChains $ Set.singleton testCid)
 
-          -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()  
+          -- Node 2's cert is not registered so it should not have any in the set
+          (ctxs1 !! 2) ^. orgNameChainsMap `shouldBe` M.empty
+
+          -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()

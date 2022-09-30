@@ -200,7 +200,7 @@ addChainMember cId address enode = do
     where addressToOrgName :: Address -> Redis (Either () (S8.ByteString, Maybe S8.ByteString))  -- OrgName, OrgUnit
           addressToOrgName addr = do
             let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr
-                extractDN dn    = (S8.pack (subOrg dn), (Just . S8.pack) =<< subUnit dn)  --(S8.pack . subOrg) &&& (maybe Nothing S8.pack $ subUnit)
+                extractDN dn    = (S8.pack (subOrg dn), (Just . S8.pack) =<< subUnit dn)
                 getCertSubject' = fromJust . getCertSubject
                 getCert'        = signedsToX509 . toList . findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode))
             cert <- x509ToSigneds <$> getCertificate'

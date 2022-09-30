@@ -113,6 +113,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - hourglass
       - labeled-error
       - lens
       - merkle-patricia-db

@@ -107,7 +107,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.Strato.Model.ExtendedWord      (Word256, bytesToWord256) -- perhaps temporary
+import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
@@ -361,11 +361,11 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
-instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
-  -- TODO: Just using this to sneak past the compiler... actually completethese these out
-  lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
-  insert _ _ _ = pure ()
-  delete _ _ = pure ()
+-- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
+--   -- TODO: Just using this to sneak past the compiler... actually completethese these out
+--   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
+--   insert _ _ _ = pure ()
+--   delete _ _ = pure ()
 
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
