@@ -82,7 +82,7 @@ server = getChain :<|> postChain :<|> postChains
 
 instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
-    NamedSchema m (Just "NamedTuple of Word256 and ChainInfo") mempty
+    NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 chainFilterParams :: ChainFilterParams
 chainFilterParams = ChainFilterParams [] (min appFetchLimit . fromIntegral) 0
