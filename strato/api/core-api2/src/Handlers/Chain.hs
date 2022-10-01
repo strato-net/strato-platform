@@ -70,7 +70,7 @@ data ChainFilterParams = ChainFilterParams
 
 makeLenses ''ChainFilterParams
 
-getChainClient :: [ChainId] -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
+getChainClient :: [ChainId] -> Maybe Integer -> Maybe Integer -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
 postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
