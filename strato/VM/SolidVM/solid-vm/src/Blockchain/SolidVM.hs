@@ -843,7 +843,7 @@ superPayload :: MonadSM m => String -> Account -> Account -> ValList -> m (CC.Co
 superPayload functionType fromAddress toAddress input = do
   (payload, args, argCount) <- case input of
     OrderedVals o -> case (length o) of
-      0 -> noPayload functionType (show fromAddress)
+      0 -> noPayload functionType (show toAddress)
       1 -> return (case head o of
         SString s -> s
         _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals [], 0)
@@ -853,21 +853,17 @@ superPayload functionType fromAddress toAddress input = do
     _ -> namedValsNotAccepted functionType (show input)
 
   --see if the payload is string inside of the other function
-  (contract, _, _) <- getCodeAndCollection toAddress
+  (contract, _, _) <- getCodeAndCollection fromAddress
   --filter out any foreign contracts that are not the correct pragma
   when (contract ^. CC.vmVersion /= "svm3.3") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
-  let codeSnippets :: Maybe String
-      codeSnippets = 
-        case (payload) of 
-          --Unparse just the contract
-          "" -> Nothing
-          -- Search for a function with the name of the payload
-          term -> case ((contract ^. CC.functions) M.!? term) of 
-                    Just funcF -> Just $ unparseFunc (term, funcF)
+  let codeSnippet :: Maybe String
+      codeSnippet = case ((contract ^. CC.functions) M.!? payload) of 
+                    Just funcF -> Just $ unparseFunc (payload, funcF)
                     Nothing -> Nothing
 
+  liftIO $ print ("???????????????????????\n" ++ (show contract) ++ "???????????????????????\n")
   -- If the function was discovered in the foreign contract then run the details from the foreign contract (still only works with pure functions)
-  code <- case codeSnippets of
+  code <- case codeSnippet of
     Just snips -> case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" snips of
               --If it can't be a function then try parsing as a statement
               Left _ -> case runParser statement (ParserState "" "" M.empty) "" snips of

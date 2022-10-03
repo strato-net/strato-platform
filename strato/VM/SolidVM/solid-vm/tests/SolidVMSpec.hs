@@ -6879,6 +6879,52 @@ contract qq{
     getFields ["status", "codeInt"] `shouldReturn`
       [ BBool True , BInteger 27 ]
 
+  fit "can run an overloaded function, without payload" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint myNum = 26;
+  bool myStatus;
+  string myString = "butts";
+
+  function addToNum(int x, int y) returns (int) {
+    return x + y;
+  }
+
+  function addToNum(int x, bool g) returns (int){
+    if (g) {
+      return 1 + x;
+    } else {
+      return x;
+    }
+  }
+
+  function addToNum(int x, string z) returns (int){
+    if (z == "butts") {
+      return 69 + x;
+    } else {
+      return x;
+    }
+  }
+}
+
+pragma solidvm 3.3;
+contract qq{
+  string codeTest;
+  int codeInt = 0;
+  int myNum = 13;
+  bool status;
+  constructor() public {
+    Test t = new Test();
+    (status, codeInt) = address(this).staticcall("addToNum", 13, 14);
+  }
+}
+|]
+    runBS codeSnippet
+    getFields ["status", "codeInt"] `shouldReturn`
+      [ BBool True , BInteger 27 ]
+
   it "can run an overloaded function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
@@ -7024,6 +7070,33 @@ contract qq{
     getFields ["status", "functionTest"] `shouldReturn`
       [ BBool True, BInteger 13]
 
+  fit "can run a foreign function using .code and .staticcall, without an argument, and without payload" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint myNum = 13;
+  bool myStatus;
+  string myString = "butts";
+
+  function randomFunc() public returns (uint){
+    return 13;
+  }
+}
+
+pragma solidvm 3.3;
+contract qq{
+  int functionTest;
+  bool status;
+  constructor() public {
+    Test t = new Test();
+    (status, functionTest) = address(this).staticcall("randomFunc");
+  }
+}|]
+    runBS codeSnippet
+    getFields ["status", "functionTest"] `shouldReturn`
+      [ BBool True, BInteger 13]
+
   it "can run a statement using .staticcall" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
@@ -7052,4 +7125,30 @@ contract qq{
     runBS codeSnippet
     getFields ["functionTest", "status"] `shouldReturn`
       [ BInteger 13 , BBool True]
-      
+
+  fit "can run a statement using without payload .staticcall" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint myNum = 13;
+  bool myStatus;
+  string myString = "butts";
+
+  function randomFunc() public returns (uint){
+    return myNum + 13;
+  }
+}
+
+pragma solidvm 3.3;
+contract qq{
+  int functionTest;
+  bool status;
+  constructor() public {
+    Test t = new Test();
+    (status, functionTest) = address(this).staticcall("randomFunc");
+  }
+}|]
+    runBS codeSnippet
+    getFields ["functionTest", "status"] `shouldReturn`
+      [ BInteger 13 , BBool True]
