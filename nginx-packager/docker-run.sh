@@ -18,6 +18,8 @@ debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
+APEX_HOST=${APEX_HOST:-apex}
+VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -118,14 +120,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 fi
 
 echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://apex:3001/_ping
+until curl --silent --output /dev/null --fail --location http://${APEX_HOST}:3001/_ping
 do
   sleep 0.5
 done
 echo 'apex is available'
 
 echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/strato/v2.3/_ping
+until curl --silent --output /dev/null --fail --location http://${VAULT_WRAPPER_HOST}:8000/strato/v2.3/_ping
 do
   sleep 0.5
 done

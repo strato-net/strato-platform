@@ -144,6 +144,10 @@ spec:
           value: "not set (using default)"
         - name: OAUTH_SCOPE
           value: "not set (using default)"
+        - name: APEX_HOST
+          value: "localhost"
+        - name: VAULT_WRAPPER_HOST
+          value: "localhost"
       - image: wurstmeister/zookeeper:3.4.6
         name: zookeeper
       - image: wurstmeister/kafka:1.1.0
