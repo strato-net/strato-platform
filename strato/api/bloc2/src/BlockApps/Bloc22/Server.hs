@@ -31,10 +31,8 @@ import Control.Monad.Logger
 
 import BlockApps.Bloc22.Monad
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
 
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.CoreAPI
@@ -48,7 +46,6 @@ bloc :: ( MonadIO m
         , HasVault m
         , HasCoreAPI m
         , HasSQL m
-        , Selectable ChainId ChainInfo m
         , Selectable Account ContractDetails m
         , Selectable Account AddressState m
         , (Keccak256 `Alters` SourceMap) m

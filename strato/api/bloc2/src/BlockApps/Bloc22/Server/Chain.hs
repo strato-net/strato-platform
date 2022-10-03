@@ -222,27 +222,26 @@ postChainInfos mUserName chainInputs = case mUserName of
     unless (null asyncChains) $ waitForChainInfos asyncChains
     return chainIds
 
-waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,
+waitForChainInfo :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
                      HasSQL m) =>
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m, Selectable ChainId ChainInfo m,
+waitForChainInfos :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
                       HasSQL m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
-        go = do
-          infos <- getChainInfo chainIds
+  where go = do
+          infos <- getChainInfo chainIds Nothing Nothing
           $logInfoLS "waitForChainInfo/req" chainIds
           $logDebugLS "waitForChainInfo/resp" infos
           return $ length infos == length chainIds
 
 
-getChainInfo :: (Selectable ChainId ChainInfo m) =>
-                [ChainId] -> m [ChainIdChainOutput]
-getChainInfo chainIds = do
-  chainIdChainInfos <- getChain chainIds
+getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
+                [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
+getChainInfo chainIds lim off = do
+  chainIdChainInfos <- getChain chainIds lim off
   return $ map convertChainInfo chainIdChainInfos
     where
       convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
