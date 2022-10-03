@@ -798,7 +798,7 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 genericStaticCallWrapper :: MonadSM m => Account -> Account -> ValList -> Bool -> m (Bool, Maybe Value)
 genericStaticCallWrapper from to input ro = do
   -- TODO: ensure both contracts have the same pragma version
-  (codetype, args, _) <- superPayload "staticcall" from input
+  (codetype, args, _) <- superPayload "staticcall" from to input
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain or are not related, nothing otherwise
   isRelated <- (from ^. accountChainId) `isAncestorChainOf` (to ^. accountChainId)
   unless (isRelated) $ inaccessibleChain (show from) (show to)
@@ -829,13 +829,21 @@ genericStaticCallWrapper from to input ro = do
 -- -- solidTry m = lmap displayException <$> EUnsafe.try m
 -- solidTry m = eitherMap (show id) <$> EUnsafe.try m
 
+-- -- split the outcome depending on if the foreign function exists
+-- splitPayload :: MonadSM m => SolidString -> Account -> ValList -> m (Either (SolidString, CC.ArgList) (SolidString, CC.ArgList))
+-- splitPayload input from args = do
+--   let payload = makePayload input
+--   case payload of
+--     Left err -> return $ Left (err, args)
+--     Right (codetype, args, _) -> return $ Right (codetype, args)
+
 -- get both the payload and any arguments that were also supplied, return (payload, args)
 -- functionType and address are only used for error messages
-superPayload :: MonadSM m => String -> Account -> ValList -> m (CC.CodeType (SourceAnnotation ()), ValList, Int)
-superPayload functionType address input = do
+superPayload :: MonadSM m => String -> Account -> Account -> ValList -> m (CC.CodeType (SourceAnnotation ()), ValList, Int)
+superPayload functionType fromAddress toAddress input = do
   (payload, args, argCount) <- case input of
     OrderedVals o -> case (length o) of
-      0 -> noPayload functionType (show address)
+      0 -> noPayload functionType (show fromAddress)
       1 -> return (case head o of
         SString s -> s
         _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals [], 0)
@@ -844,7 +852,34 @@ superPayload functionType address input = do
         _ -> generalMetaProgrammingError "converting payload to string" (show o), OrderedVals $ tail o, length $ tail o)
     _ -> namedValsNotAccepted functionType (show input)
 
-  code <- case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" payload of
+  --see if the payload is string inside of the other function
+  (contract, _, _) <- getCodeAndCollection toAddress
+  --filter out any foreign contracts that are not the correct pragma
+  when (contract ^. CC.vmVersion /= "svm3.3") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
+  let codeSnippets :: Maybe String
+      codeSnippets = 
+        case (payload) of 
+          --Unparse just the contract
+          "" -> Nothing
+          -- Search for a function with the name of the payload
+          term -> case ((contract ^. CC.functions) M.!? term) of 
+                    Just funcF -> Just $ unparseFunc (term, funcF)
+                    Nothing -> Nothing
+
+  -- If the function was discovered in the foreign contract then run the details from the foreign contract (still only works with pure functions)
+  code <- case codeSnippets of
+    Just snips -> case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" snips of
+              --If it can't be a function then try parsing as a statement
+              Left _ -> case runParser statement (ParserState "" "" M.empty) "" snips of
+                Left _ -> generalMetaProgrammingError "parsing" snips
+                Right s -> pure $ CC.StatementCode s
+              Right (funcName, actualFunction) -> case actualFunction of
+                Decl.FuncDeclaration fun -> if (length (fun ^. CC.funcOverload) > 0) then
+                    generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show actualFunction)
+                  else
+                    pure $ CC.FunctionCode (funcName, fun)
+                _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" snips
+    Nothing -> case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" payload of
               --If it can't be a function then try parsing as a statement
               Left _ -> case runParser statement (ParserState "" "" M.empty) "" payload of
                 Left _ -> generalMetaProgrammingError "parsing" payload
@@ -855,6 +890,19 @@ superPayload functionType address input = do
                   else
                     pure $ CC.FunctionCode (funcName, fun)
                 _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
+
+
+  -- code <- case runParser (functionDeclaration False) (ParserState "" "" M.empty) "" payload of
+  --             --If it can't be a function then try parsing as a statement
+  --             Left _ -> case runParser statement (ParserState "" "" M.empty) "" payload of
+  --               Left _ -> generalMetaProgrammingError "parsing" payload
+  --               Right s -> pure $ CC.StatementCode s
+  --             Right (funcName, actualFunction) -> case actualFunction of
+  --               Decl.FuncDeclaration fun -> if (length (fun ^. CC.funcOverload) > 0) then
+  --                   generalMetaProgrammingError "Overloaded functions are not supported in staticcall" (show actualFunction)
+  --                 else
+  --                   pure $ CC.FunctionCode (funcName, fun)
+  --               _ -> generalMetaProgrammingError "I thought it was a function, but it isn't" payload
   pure (code, args, argCount)
 
 testMatch :: MonadSM m => Int -> ValList -> CC.Func -> m Bool
@@ -2321,62 +2369,9 @@ expToVar' (CC.FunctionCall _ e args) = do
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
             ro <- readOnly <$> getCurrentCallInfo
             --Case where the code name is given at the beginning 
-            let codeSnippets :: [String]
-                codeSnippets = 
-                    case (fromMaybe "" searchTerms) of 
-                      --Unparse just the contract
-                      "" -> [unparseContract contract]
-                      term ->
-                      --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
-                        -- Check for and get the different parts of the contract
-                        let contrString = 
-                              case ((contract ^. CC.contractName) == term) of
-                                True -> Just $ unparseContract contract
-                                False -> Nothing
-
-                            constString =   
-                              case ((contract ^. CC.constants) M.!? term) of 
-                                Just constF -> Just $ unparseConstant (term, constF)
-                                Nothing -> Nothing                          
-
-                            storjString = 
-                              case ((contract ^. CC.storageDefs) M.!? term) of
-                                Just storjF -> Just $ unparseVar (term, storjF)
-                                Nothing -> Nothing                           
-
-                            enumString = 
-                              case ((contract ^. CC.enums) M.!? term) of
-                                Just enumF -> Just $ unparseEnum (term, fst enumF)
-                                Nothing -> Nothing                             
-
-                            structString = 
-                              case ((contract ^. CC.structs) M.!? term) of
-                                Just structF -> Just $ unparseStruct (term, structF) 
-                                Nothing -> Nothing
-
-                            eventString = 
-                              case ((contract ^. CC.events) M.!? term) of 
-                                Just eventF -> Just $ unparseEvent (term, eventF)
-                                Nothing -> Nothing                             
-
-                            funcString = 
-                              case ((contract ^. CC.functions) M.!? term) of 
-                                Just funcF -> Just $ unparseFunc (term, funcF)
-                                Nothing -> Nothing
-
-                            modString = 
-                              case ((contract ^. CC.modifiers) M.!? term) of
-                                Just modF -> Just $ unparseModifier (term, modF)
-                                Nothing -> Nothing
-
-                        --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                        in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
-                payloadString = if (codeSnippet == Nothing) then
-                  (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
-              pure . Constant $ SString ( unlines codeSnippets)
             (didItWork, result) <- genericStaticCallWrapper from toAccount argVals ro
-            defaultValue <- unless (didItWork) $ 
-            return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe (defaultValue) result):[])
+            -- defaultValue <- unless (didItWork) $ 
+            return . Constant . STuple $ V.fromList ((Constant $ SBool didItWork):(Constant $ fromMaybe SNULL result):[])
           
           -- Constant (SContractItem address' "delegatecall")
           --   (payload, argumentList) <- superPayload argVals
