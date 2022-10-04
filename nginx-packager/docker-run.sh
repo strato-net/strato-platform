@@ -89,6 +89,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
+  # Replacing HOST NAME PLACEHOLDERS
+  sed -i "s/__APEX_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__VAULT_WRAPPER_HOST__/$/g" /tmp/nginx.conf
+
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########

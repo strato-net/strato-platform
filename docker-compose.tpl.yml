@@ -247,6 +247,8 @@ services:
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
     - vmDebug=${vmDebug}
+    - APEX_HOST=${APEX_HOST}
+    - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
