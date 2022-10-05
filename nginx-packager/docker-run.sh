@@ -20,6 +20,11 @@ SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 APEX_HOST=${APEX_HOST:-apex}
 VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper}
+SMD_HOST=${SMD_HOST:-smd}
+POSTGREST_HOST=${POSTGREST_HOST:-postgrest}
+DOCS_HOST=${DOCS_HOST:-docs}
+STRATO_HOST=${STRATO_HOST:-strato}
+PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -92,6 +97,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Replacing HOST NAME PLACEHOLDERS
   sed -i "s/__APEX_HOST__/$/g" /tmp/nginx.conf
   sed -i "s/__VAULT_WRAPPER_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__SMD_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__POSTGREST_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__DOCS_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_HOST__/$/g" /tmp/nginx.conf
+  sed -i "s/__PROMETHEUS_HOST__/$/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
