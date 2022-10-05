@@ -1837,7 +1837,7 @@ contract RegisterCert {
 
           -- Node 1's cert was registered in the contract so it should receive the chain ID
           (ctxs1 !! 1) ^. orgNameChainsMap `shouldBe`
-            M.singleton (OrgName $ BC.pack "Blockapps", OrgUnit $ Just (BC.pack "engineering")) (OrgNameChains $ Set.singleton testCid)
+            M.singleton (OrgName "Blockapps", OrgUnit $ Just "engineering") (OrgNameChains $ Set.singleton testCid)
 
           -- Node 2's cert is not registered so it should not have any in the set
           (ctxs1 !! 2) ^. orgNameChainsMap `shouldBe` M.empty

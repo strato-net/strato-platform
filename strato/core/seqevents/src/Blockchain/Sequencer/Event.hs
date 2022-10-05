@@ -40,7 +40,6 @@ import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
-import qualified Data.ByteString.Char8                     as C8
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
@@ -111,7 +110,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
                  | IENewChainMember Word256 A.Address Enode
-                 | IENewChainOrgName Word256 (BS.ByteString, Maybe BS.ByteString)
+                 | IENewChainOrgName Word256 (String, Maybe String)
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -143,7 +142,7 @@ instance Format IngestEvent where
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
   format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
-  format (IENewChainOrgName c (n, u)) = intercalate ", " [CL.yellow $ format c, format n, C8.unpack $ fromMaybe BS.empty u]
+  format (IENewChainOrgName c (n, u)) = intercalate ", " [CL.yellow $ format c, show n, fromMaybe "" u]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
@@ -186,7 +185,7 @@ data P2pEvent =
   | P2pGetChain [Word256]
   | P2pGetTx [Keccak256]
   | P2pNewChainMember Word256 A.Address Enode
-  | P2pNewOrgName Word256 (BS.ByteString, Maybe BS.ByteString)
+  | P2pNewOrgName Word256 (String, Maybe String)
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
   | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
@@ -200,7 +199,7 @@ instance Format P2pEvent where
   format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
-  format (P2pNewOrgName c (n, u)) = intercalate ", " [CL.yellow $ format c, format n, C8.unpack $ fromMaybe BS.empty u]
+  format (P2pNewOrgName c (n, u)) = intercalate ", " [CL.yellow $ format c, show n, fromMaybe "" u]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
 
