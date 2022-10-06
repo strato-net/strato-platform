@@ -126,7 +126,7 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:OPS-3
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.6.0
         name: nginx
         ports:
           - containerPort: 80
