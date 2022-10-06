@@ -58,7 +58,7 @@ instance RedisDBValuable Bool where
     toValue True = S8.singleton 't'
     toValue False = S8.empty
     fromValue = not . S8.null
-    
+
 instance RedisDBValuable Account where
     toValue = toStrict . encode
     fromValue = decode . fromStrict
@@ -66,11 +66,11 @@ instance RedisDBValuable Account where
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode
 
-instance RedisDBKeyable (S8.ByteString, Maybe S8.ByteString) where
-    toKey (n, u) = SB16.encode $ S8.concat [n, maybeSnd] 
+instance RedisDBKeyable (String, Maybe String) where
+    toKey (n, u) = SB16.encode . S8.pack $ (n ++ maybeSnd)
         where maybeSnd = case u of
-                Nothing -> S8.empty
-                Just a  -> S8.concat [S8.pack "/", a] 
+                Nothing -> ""
+                Just a  -> "/" ++ a
 instance RedisDBValuable S8.ByteString where
     toValue   = SB16.encode
     fromValue x = case SB16.decode x of

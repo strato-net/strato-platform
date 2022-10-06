@@ -65,8 +65,8 @@ instance Arbitrary IPAddress where
   arbitrary = genericArbitrary
 
 newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
-newtype OrgName = OrgName { unOrgName :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
-newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+newtype OrgName = OrgName { unOrgName :: String } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe String } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 
 instance RLPSerializable OrgId where
