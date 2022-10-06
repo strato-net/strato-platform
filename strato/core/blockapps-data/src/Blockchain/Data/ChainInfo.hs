@@ -20,6 +20,7 @@ module Blockchain.Data.ChainInfo
   , ChainSignature(..)
   , AccountInfo (..)
   , CodeInfo (..)
+  -- , ChainMember (..)
   , isAncestorChainOf
   , getAncestorChains
   , getNthAncestorChain
@@ -27,6 +28,7 @@ module Blockchain.Data.ChainInfo
   , whoSignedThisChainInfo
   ) where
 
+-- import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad                     (join)
@@ -44,7 +46,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
-import           Blockchain.TypeLits
+-- import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -60,6 +62,7 @@ import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
 import           Data.Word
+-- import qualified Data.Set                             as S
 
 import qualified GHC.Generics                         as GHCG
 import           LabeledError
@@ -268,14 +271,12 @@ data UnsignedChainInfo = UnsignedChainInfo
   { chainLabel     :: T.Text
   , accountInfo    :: [AccountInfo]
   , codeInfo       :: [CodeInfo]
-  , members        :: (M.Map Address Enode)
+  , members        :: ChainMembers
   , parentChain    :: (Maybe Word256)
   , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, GHCG.Generic, Data)
-
-
 
 instance Arbitrary UnsignedChainInfo where
   arbitrary = genericArbitrary
@@ -324,12 +325,29 @@ instance Format ChainInfo where
     , tab' $ format chainInfo
     ]
 
+
+
+-- instance FromJSON ChainMember where
+--   parseJSON (Object o) = do
+--     on <- o .: "orgName"
+--     ou <- o .: "orgUnit"
+--     cmn <- o .: "commonName"
+--     return $ ChainMember on ou cmn 
+--   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x    
+
+-- instance ToJSON ChainMember where
+--   toJSON (ChainMember on ou cmn) =
+--     object [ "orgName" .= on
+--             ,"orgUnit" .= ou
+--             ,"commonName" .=cmn
+--            ]
+
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
     l <- o .: "label"
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
-    ms <- M.fromList . map (unNamedTuple @"address" @"enode") <$> (o .: "members")
+    ms <- o .: "members"
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
     cn <- o .: "nonce"
@@ -343,7 +361,7 @@ instance ToJSON ChainInfo where
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= (NamedTuple @"address" @"enode" <$> M.toList ms)
+           , "members" .= ms
            , "parentChain" .= pc
            , "creationBlock" .= cb
            , "nonce" .= cn
@@ -353,6 +371,25 @@ instance ToJSON ChainInfo where
 
 instance Arbitrary ChainInfo where
   arbitrary = genericArbitrary
+
+-- instance RLPSerializable (S.Set ChainMember) where
+--   rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
+--   rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
+--   rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
+
+-- instance RLPSerializable ChainMember where
+--   rlpEncode (ChainMember on ou cmn) = RLPArray
+--     [ rlpEncode on
+--     , rlpEncode ou
+--     , rlpEncode cmn
+--     ]
+--   rlpDecode (RLPArray [on, ou, cmn]) =
+--     ChainMember
+--       (rlpDecode on)
+--       (rlpDecode ou)
+--       (rlpDecode cmn)
+--   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
+
 
 instance RLPSerializable UnsignedChainInfo where
   rlpEncode UnsignedChainInfo{..} = RLPArray

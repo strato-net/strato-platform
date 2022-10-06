@@ -12,11 +12,10 @@ module Blockchain.Data.Enode
   , OrgId(..)
   , OrgName(..)
   , OrgUnit(..)
+  , CommonName(..)
   , ChainMembers(..)
   , ChainTxsInBlock(..)
   , IPChains(..)
-  , OrgIdChains(..)
-  , OrgNameChains(..)
   , showEnode
   , readEnode
   , showIP
@@ -25,6 +24,7 @@ module Blockchain.Data.Enode
 
 
 import           Control.DeepSeq
+-- import           Control.Lens
 import           Data.Aeson
 import           Data.Bits
 import           Data.Binary
@@ -49,7 +49,7 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Text.Regex
 
 import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Address
+-- import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
@@ -68,16 +68,53 @@ newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord,
 newtype OrgName = OrgName { unOrgName :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
+
 instance RLPSerializable OrgId where
   rlpEncode (OrgId bs) = rlpEncode bs
   rlpDecode = OrgId . rlpDecode
+
+instance RLPSerializable OrgName where
+  rlpEncode (OrgName on) = rlpEncode on
+  rlpDecode = OrgName . rlpDecode
+
+instance RLPSerializable OrgUnit where
+  rlpEncode (OrgUnit ou) = rlpEncode ou
+  rlpDecode = OrgUnit . rlpDecode
+
+instance RLPSerializable CommonName where
+  rlpEncode (CommonName cmn) = rlpEncode cmn
+  rlpDecode = CommonName . rlpDecode
 
 instance ToSchema OrgId where
   declareNamedSchema _ = return $
     NamedSchema (Just "OrgId")
       ( mempty )
 
+instance ToSchema OrgName where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgName")
+      ( mempty )
+
+instance ToSchema OrgUnit where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgUnit")
+      ( mempty )
+
+instance ToSchema CommonName where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CommonName")
+      ( mempty )
+
 instance Arbitrary OrgId where
+  arbitrary = genericArbitrary
+
+instance Arbitrary OrgName where
+  arbitrary = genericArbitrary
+
+instance Arbitrary OrgUnit where
+  arbitrary = genericArbitrary
+
+instance Arbitrary CommonName where
   arbitrary = genericArbitrary
 
 instance ToSchema IPAddress where
@@ -90,19 +127,36 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
+data ChainMember = ChainMember
+  { _chainMemberOrgName    :: OrgName
+  , _chainMemberOrgUnit    :: Maybe OrgUnit
+  , _chainMemberCommonName :: Maybe CommonName
+  } deriving (Eq, Ord, GHCG.Generic, Data, Show)
+-- makeLenses ''ChainMember
+
+instance Arbitrary ChainMember where
+  arbitrary = genericArbitrary
+
+instance Arbitrary ChainMembers where
+  arbitrary = genericArbitrary
+
 instance ToSchema Enode where
 
-newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
+instance ToSchema ChainMember where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "ChainMember") mempty
+
+instance ToSchema ChainMembers where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "ChainMembers") mempty
+
+newtype ChainMembers = ChainMembers { unChainMembers :: S.Set ChainMember  } deriving (Eq, Data, GHCG.Generic, Show)
 newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [Keccak256] } deriving (Eq)
 newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
-newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
-newtype OrgNameChains = OrgNameChains { unOrgNameChains :: S.Set Word256 } deriving (Eq)
 
-instance Default ChainMembers    where def = ChainMembers M.empty
-instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty
-instance Default IPChains        where def = IPChains S.empty
-instance Default OrgIdChains     where def = OrgIdChains S.empty
-instance Default OrgNameChains   where def = OrgNameChains S.empty
+instance Default ChainMembers     where def = ChainMembers S.empty
+instance Default ChainTxsInBlock  where def = ChainTxsInBlock M.empty
+instance Default IPChains         where def = IPChains S.empty
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =
@@ -113,6 +167,53 @@ instance RLPSerializable Enode where
 
   rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
 
+instance FromJSON OrgName where
+  parseJSON (Object o) = do
+    on <- o .: "on"
+    return $ OrgName on
+  parseJSON x = error $ "couldn't parse JSON for Org Name info: " ++ show x  
+
+-- instance ToJSON OrgName where
+--   toJSON (OrgName on) =
+--     object [ "on" .= on
+          --  ]
+
+instance FromJSON OrgUnit where
+  -- parseJSON (Object o) = do
+  --   ou <- o .: "ou"
+  --   return $ OrgUnit ou
+  -- parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x  
+
+-- instance ToJSON OrgUnit where
+--   toJSON (OrgUnit ou) =
+--     object [ "ou" .= ou
+--            ]
+           
+instance FromJSON CommonName where
+  -- parseJSON (Object o) = do
+  --   cmn <- o .: "cmn"
+  --   return $ CommonName cmn
+  -- parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x  
+
+-- instance ToJSON CommonName where
+--   toJSON (CommonName cmn) =
+--     object [ "cmn" .= cmn
+--            ]
+
+instance FromJSON ChainMember where
+  parseJSON (Object o) = do
+    on <- o .: "orgName"
+    ou <- o .: "orgUnit"
+    cmn <- o .: "commonName"
+    return $ ChainMember on ou cmn 
+  parseJSON x = error $ "couldn't parse JSON for chain member info: " ++ show x 
+
+instance FromJSON ChainMembers where
+  parseJSON (Object o) = do
+    cm <- o .: "cm"
+    return $ ChainMembers cm
+  parseJSON x = error $ "couldn't parse JSON for chain members info: " ++ show x  
+
 instance FromJSON Enode where
   parseJSON (String str) =
     case readEnodeOrFail $ T.unpack str of
@@ -122,6 +223,11 @@ instance FromJSON Enode where
 
 instance ToJSON Enode where
   toJSON enode = String (T.pack $ showEnode enode)
+
+-- instance ToJSON CommonName where
+--   toJSON (CommonName cmn) =
+--     object [ "cmn" .= cmn
+--            ]
 
 instance Arbitrary Enode where
   arbitrary = Enode
