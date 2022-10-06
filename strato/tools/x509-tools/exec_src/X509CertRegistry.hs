@@ -297,6 +297,10 @@ contract CertificateRegistry {
         }
         return 400;
     }
+
+    function getUserCert(address _address) returns (Certificate) {
+        return certificates[certificatesMap[_address]];
+    }
     
     function getCertByAddress(address _address) returns (Certificate) {
         return getCertByAccount(account(_address));
