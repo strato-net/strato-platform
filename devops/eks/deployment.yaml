@@ -75,7 +75,7 @@ spec:
         - name: network
           value: "blockappsnet"
         - name: networkID
-          value: "unset - using default"
+          value: ""
         - name: postgres_host
           value: "localhost"
         - name: postgres_password
@@ -126,14 +126,18 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.6.0
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:OPS-3
         name: nginx
         ports:
           - containerPort: 80
           - containerPort: 443
         env:
+        - name: APEX_HOST
+          value: "localhost:3001"
         - name: blockstanbul
           value: "true"
+        - name: DOCS_HOST
+          value: "localhost:8080"
         - name: OAUTH_CLIENT_ID
           value: "dev"
         - name: OAUTH_CLIENT_SECRET
@@ -144,20 +148,24 @@ spec:
           value: "not set (using default)"
         - name: OAUTH_SCOPE
           value: "not set (using default)"
-        - name: APEX_HOST
-          value: "localhost"
-        - name: VAULT_WRAPPER_HOST
-          value: "localhost"
-        - name: SMD_HOST
-          value: "localhost"
         - name: POSTGREST_HOST
-          value: "localhost"
-        - name: DOCS_HOST
-          value: "localhost"
+          value: "localhost:3001"
+        - name: PROMETHEUS_HOST
+          value: "localhost:9090"
+        - name: SMD_HOST
+          value: "localhost:3002"
         - name: STRATO_HOST
           value: "localhost"
-        - name: PROMETHEUS_HOST
-          value: "localhost"
+        - name: STRATO_HOST_WITH_PORT_3000
+          value: "localhost:3000"
+        - name: STRATO_HOST_WITH_PORT_3001
+          value: "localhost:3001"
+        - name: STRATO_HOST_WITH_PORT_7065
+          value: "localhost:7065"
+        - name: STRATO_HOST_WITH_PORT_8050
+          value: "localhost_8050"
+        - name: VAULT_WRAPPER_HOST
+          value: "localhost:8000"
       - image: wurstmeister/zookeeper:3.4.6
         name: zookeeper
       - image: wurstmeister/kafka:1.1.0
