@@ -30,6 +30,8 @@ STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-strato:7065}
 STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-strato:8050}
 VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
 
+echo "SMD_HOST: ${SMD_HOST}"
+
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
@@ -140,9 +142,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     cp -r /tmp/ssl/* /etc/ssl/
   fi
 fi
-
-# OPS-3 For troubleshooting and testing only. Will remove
-docker cp strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf /tmp/test
 
 echo 'Waiting for apex to be available...'
 until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
