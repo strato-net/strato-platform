@@ -2,6 +2,9 @@
 
 set -e
 
+echo "APEX_HOST Before: ${APEX_HOST}"
+echo "SMD_HOST Before: ${SMD_HOST}"
+
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
@@ -30,7 +33,8 @@ STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-strato:7065}
 STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-strato:8050}
 VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
 
-echo "SMD_HOST: ${SMD_HOST}"
+echo "APEX_HOST After: ${APEX_HOST}"
+echo "SMD_HOST After: ${SMD_HOST}"
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
