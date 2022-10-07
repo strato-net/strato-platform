@@ -15,7 +15,7 @@ import           Strato.Strato23.API.Types
 
 
 type GetUsers = "users"
-              :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+              :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text-- Does AUoth type have a special type?
               :> QueryParam "address" Address
               :> QueryParam "limit" Int
               :> QueryParam "offset" Int

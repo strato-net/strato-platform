@@ -18,7 +18,7 @@ async function createKey(username, userParams = null) {
 
       userParams = userParams == null ? {} : userParams;
       const userAccount = await ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', {
-        "x-user-unique-name": username,
+        "x-user-access-token": username,
       });
       //faucet user so they can do stuff
       await waitFaucet(userAccount.address);
@@ -46,7 +46,7 @@ async function getKey(username, userQuery = null) {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
 
     const userAccount = await ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key${query}`, {
-      "x-user-unique-name": username,
+      "x-user-access-token": username,
     });
 
     return {

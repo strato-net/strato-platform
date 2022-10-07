@@ -122,6 +122,6 @@ else
 end
 
 -- set request headers to forward to APIs
-ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
+ngx.req.set_header("X-USER-ACCESS-TOKEN", unique_name)
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")

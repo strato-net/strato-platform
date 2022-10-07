@@ -4,7 +4,8 @@ const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const { getOrCreateKey } = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
 async function createUserKey(req, res, next) {
-  const username = req.headers['x-user-unique-name'];
+  console.log(req.headers);
+  const username = req.headers['x-user-access-token'];
 
   if (!username) {
     let err = new Error("invalid param, expected username to be a non-empty string");

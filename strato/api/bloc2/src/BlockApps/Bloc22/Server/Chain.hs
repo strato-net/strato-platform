@@ -190,7 +190,7 @@ postChainInfo :: ( MonadIO m
                  )
               => Maybe Text -> ChainInput -> m ChainId
 postChainInfo mUserName chainInput = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     evmCompatibleOn <- fmap evmCompatible getBlocEnv
     if evmCompatibleOn
@@ -213,7 +213,7 @@ postChainInfos :: ( MonadIO m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]
 postChainInfos mUserName chainInputs = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     chainIds <- postChains chainInfos

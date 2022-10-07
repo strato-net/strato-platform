@@ -70,7 +70,7 @@ instance ToParam (QueryFlag "queue") where
 
 type PostBlocTransactionParallel = "transaction"
   :> "parallel"
-  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> S.Header "X-USER-ACCESS-TOKEN" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> QueryFlag "queue"
@@ -79,14 +79,14 @@ type PostBlocTransactionParallel = "transaction"
 
 type PostBlocTransactionRaw = "transaction"
   :> "raw"
-  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> S.Header "X-USER-ACCESS-TOKEN" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRawRequest
   :> Post '[JSON] BlocChainOrTransactionResult
 
 type PostBlocTransaction = "transaction"
-  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> S.Header "X-USER-ACCESS-TOKEN" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest

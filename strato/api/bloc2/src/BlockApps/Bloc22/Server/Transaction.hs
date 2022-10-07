@@ -285,7 +285,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
   checkIsSynced
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
   case mUserName of
-    Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+    Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just userName -> do
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
