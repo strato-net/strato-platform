@@ -230,12 +230,12 @@ services:
     - strato
     - vault-wrapper
     environment:
-    #- APEX_HOST=${APEX_HOST}
+    - APEX_HOST=${APEX_HOST}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
-    #- DOCS_HOST=${DOCS_HOST}
+    - DOCS_HOST=${DOCS_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -246,7 +246,7 @@ services:
     - SERVE_LOGS=${SERVE_LOGS}
     - SMD_DEV_MODE=${SMD_DEV_MODE}
     - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP}
-    #- SMD_HOST=${SMD_HOST}
+    - SMD_HOST=${SMD_HOST}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
