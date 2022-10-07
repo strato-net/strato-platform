@@ -141,6 +141,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 fi
 
+# OPS-3 For troubleshooting and testing only. Will remove
+docker cp strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf /tmp/test
+
 echo 'Waiting for apex to be available...'
 until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
 do
