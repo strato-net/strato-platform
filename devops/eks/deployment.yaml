@@ -145,9 +145,9 @@ spec:
         - name: OAUTH_DISCOVERY_URL
           value: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
         - name: OAUTH_JWT_USERNAME_PROPERTY
-          value: "not set (using default)"
+          value: ""
         - name: OAUTH_SCOPE
-          value: "not set (using default)"
+          value: ""
         - name: POSTGREST_HOST
           value: "localhost:3001"
         - name: PROMETHEUS_HOST
@@ -156,14 +156,14 @@ spec:
           value: "localhost:3002"
         - name: STRATO_HOST
           value: "localhost"
-        - name: STRATO_HOST_WITH_PORT_3000
+        - name: STRATO_PORT_API
           value: "localhost:3000"
-        - name: STRATO_HOST_WITH_PORT_3001
+        - name: STRATO_PORT_API2
           value: "localhost:3001"
-        - name: STRATO_HOST_WITH_PORT_7065
+        - name: STRATO_PORT_LOGS
           value: "localhost:7065"
-        - name: STRATO_HOST_WITH_PORT_8050
-          value: "localhost_8050"
+        - name: STRATO_PORT_BLOCKSTANBUL_VOTE
+          value: "localhost:8050"
         - name: VAULT_WRAPPER_HOST
           value: "localhost:8000"
       - image: wurstmeister/zookeeper:3.4.6
