@@ -105,10 +105,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__PROMETHEUS_HOST__/$/g" /tmp/nginx.conf
   sed -i "s/__SMD_HOST__/$/g" /tmp/nginx.conf
   sed -i "s/__STRATO_HOST__/$/g" /tmp/nginx.conf
-  sed -i "s/STRATO_HOST_WITH_PORT_3000/$/g" /tmp/nginx.conf
-  sed -i "s/STRATO_HOST_WITH_PORT_3001/$/g" /tmp/nginx.conf
-  sed -i "s/STRATO_HOST_WITH_PORT_7065/$/g" /tmp/nginx.conf
-  sed -i "s/STRATO_HOST_WITH_PORT_8050/$/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_API__/$/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_API2__/$/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_LOGS__/$/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_BLOCKSTANBUL_VOTE__/$/g" /tmp/nginx.conf
   sed -i "s/__VAULT_WRAPPER_HOST__/$/g" /tmp/nginx.conf
 
   ########
@@ -149,7 +149,7 @@ done
 echo 'apex is available'
 
 echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://${VAULT_WRAPPER_HOST}:8000/strato/v2.3/_ping
+until curl --silent --output /dev/null --fail --location http://${VAULT_WRAPPER_HOST}/strato/v2.3/_ping
 do
   sleep 0.5
 done
