@@ -242,6 +242,7 @@ contract CertificateRegistry {
     // Solidity mappings are non-iterable.
     Certificate[] certificates;
     mapping(address => uint) certificatesMap;
+    address public owner;
 
     bool initialized;
 
@@ -251,6 +252,7 @@ contract CertificateRegistry {
 
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+        owner = msg.sender
         
         initialized = false;
     }
@@ -299,7 +301,7 @@ contract CertificateRegistry {
     }
 
     function getUserCert(address _address) returns (Certificate) {
-        return certificates[certificatesMap[_address]];
+        return certificates[certificatesMap[account(_address)]];
     }
     
     function getCertByAddress(address _address) returns (Certificate) {
