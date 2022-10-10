@@ -14,6 +14,7 @@ dependencies:
 executables:
   strato-lite:
     source-dirs: exec_src/
+    ghc-options: -Wall -Werror -dynamic
     main: Main.hs
     dependencies:
       - aeson
@@ -23,6 +24,8 @@ executables:
       - lifted-async
       - ordered-containers
       - strato-lite
+      - strato-p2p
+      - vm-tools
       - warp
 
 library:

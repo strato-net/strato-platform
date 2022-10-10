@@ -7,6 +7,7 @@
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
@@ -149,6 +150,9 @@ data TestContext = TestContext
   , _sequencerContext      :: SequencerContext
   , _blockPeriod           :: BlockPeriod
   , _roundPeriod           :: RoundPeriod
+  , _candidatesReceived    :: TQueue CandidateReceived
+  , _voteResults           :: TQueue VoteResult
+  , _timeoutChan           :: TMChan RoundNumber
   , _vmContext             :: MemContext
   , _apiChainInfoMap       :: Map Word256 ChainInfo
   }
@@ -394,7 +398,7 @@ instance MonadIO m => Mod.Accessible (IORef RoundNumber) (MonadTest m) where
   access _ = use $ sequencerContext . latestRoundNumber
 
 instance MonadIO m => Mod.Accessible (TMChan RoundNumber) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TMChan RoundNumber)")
+  access _ = use timeoutChan
 
 instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
   access _ = use blockPeriod
@@ -403,10 +407,10 @@ instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
   access _ = use roundPeriod
 
 instance MonadIO m => Mod.Accessible (TQueue CandidateReceived) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TQueue CandidateReceived)")
+  access _ = use candidatesReceived
 
 instance MonadIO m => Mod.Accessible (TQueue VoteResult) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TQueue VoteResult)")
+  access _ = use voteResults
 
 instance MonadIO m => Mod.Accessible View (MonadTest m) where
   access _ = currentView
@@ -687,7 +691,7 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ _ = pure ()
+  insert _ _ (P2P OutputBlock{..}) = canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _          = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
@@ -737,8 +741,14 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: PrivateKey -> SequencerContext -> MemContext -> TestContext
-testContext prv seqCtx vmCtx = TestContext
+testContext :: PrivateKey
+            -> TQueue CandidateReceived
+            -> TQueue VoteResult
+            -> TMChan RoundNumber
+            -> SequencerContext
+            -> MemContext
+            -> TestContext
+testContext prv candRecv vRes rNum seqCtx vmCtx = TestContext
   { _blocks                = []
   , _connectionTimeout     = ConnectionTimeout 60
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
@@ -759,8 +769,11 @@ testContext prv seqCtx vmCtx = TestContext
   , _pbftMessages          = S.empty
   , _unseqEvents           = []
   , _sequencerContext      = seqCtx
-  , _blockPeriod           = BlockPeriod 0
-  , _roundPeriod           = RoundPeriod 0
+  , _blockPeriod           = BlockPeriod 1
+  , _roundPeriod           = RoundPeriod 10
+  , _candidatesReceived    = candRecv
+  , _voteResults           = vRes
+  , _timeoutChan           = rNum
   , _vmContext             = vmCtx
   , _apiChainInfoMap       = M.empty
   }
@@ -777,6 +790,7 @@ data P2PPeer = P2PPeer
   , _p2pPeerUnseqSink      :: [IngestEvent] -> TestContextM ()
   , _p2pPeerName           :: String
   , _p2pTestContext        :: TVar TestContext
+  , _p2pPeerSeqTimerSource :: TestContextM ()
   , _p2pPeerSequencer      :: TestContextM ()
   , _p2pPeerVm             :: TestContextM ()
   , _p2pPeerApiIndexer     :: TestContextM ()
@@ -786,9 +800,10 @@ data P2PPeer = P2PPeer
 makeLenses ''P2PPeer
 
 runNode :: P2PPeer -> IO ()
-runNode p =
+runNode p = do
   concurrently_
-    (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
+    (concurrently_ (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
+                                  (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSeqTimerSource)))
                    (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerVm)))
     (concurrently_ 
       (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerApiIndexer))
@@ -819,6 +834,9 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   txrIndexerSource <- newTQueueIO
+  chr <- atomically newTQueue
+  chv <- atomically newTQueue
+  cht <- atomically newTMChan
   seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
   cache <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
@@ -855,10 +873,13 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
         , obReceiptTransactions = []
         , obBlockUncles         = []
         }
-  testContextTVar <- newTVarIO $ testContext privKey seqCtx vmCtx
+  testContextTVar <- newTVarIO $ testContext privKey chr chv cht seqCtx vmCtx
+  let seqTimerSource = runConduit $ sourceTMChan cht .| mapC ((:[]) . TimerFire) .| sinkTQueue unseqSource
   let sequencer = do
         DBDB.bootstrapGenesisBlock genHash 1
         A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
+        atomically $ writeTQueue seqVmSource [VmCreateBlockCommand]
+        createFirstTimer
         runConduit $ sourceTQueue unseqSource
                   .| mapMC Seq.runSequencerBatch
                   .| (awaitForever $ \b -> do
@@ -959,6 +980,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
     unseq
     (T.unpack name)
     testContextTVar
+    seqTimerSource
     sequencer
     vm
     apiIndexer'
@@ -1016,8 +1038,8 @@ createConnection server client = do
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
 
-mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Transaction
-mkSignedTx privKey utx =
+mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
+mkSignedTx privKey utx md =
   let Nonce n = U.unsignedTransactionNonce utx
       Gas gl = U.unsignedTransactionGasLimit utx
       cId = unChainId <$> U.unsignedTransactionChainId utx
@@ -1037,7 +1059,7 @@ mkSignedTx privKey utx =
                    , transactionR        = fromIntegral r'
                    , transactionS        = fromIntegral s'
                    , transactionV        = v'
-                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   , transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
                    }
         else ContractCreationTX
                    { transactionNonce    = fromIntegral n
@@ -1049,7 +1071,7 @@ mkSignedTx privKey utx =
                    , transactionR        = fromIntegral r'
                    , transactionS        = fromIntegral s'
                    , transactionV        = v'
-                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   , transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
                    }
 
 runConnection :: P2PConnection

@@ -22,6 +22,7 @@ module Blockchain.Data.AlternateTransaction
   ) where
 
 import           Control.DeepSeq (NFData)
+import qualified Data.Aeson             as A
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString.Char8  as Char8
 import           Data.Map.Strict        (Map)
@@ -139,7 +140,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionValue      :: Wei
   , unsignedTransactionInitOrData :: Code
   , unsignedTransactionChainId    :: Maybe ChainId
-  } deriving (Eq,Show,Generic)
+  } deriving (Eq,Show,Generic, A.ToJSON, A.FromJSON)
 
 instance Arbitrary UnsignedTransaction where
   arbitrary = genericArbitrary uniform

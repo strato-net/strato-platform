@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
+import           Blockchain.Options ()
+import           Blockchain.VMOptions ()
+import           Executable.EVMFlags ()
 import           HFlags
 import           Strato.Lite
 import           Strato.Lite.Options
