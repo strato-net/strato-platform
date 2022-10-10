@@ -2,21 +2,27 @@
 -- Module: UnParser
 -- Description: The Solidity source unparser to render Xabi into a Solidity Source File
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module SolidVM.Solidity.Parse.UnParser where
 
+import           Control.Lens               hiding (op)
 import           Data.Maybe
 import           Data.Text  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
+import           Data.Source.Annotation
 import           Text.Printf
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import           SolidVM.Model.CodeCollection.Contract as SolidVM
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
@@ -36,9 +42,14 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
+unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
+unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++" "++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
-     (case xabiKind contract of
+     (case _xabiKind contract of
         ContractKind -> "contract "
         InterfaceKind -> "interface "
         LibraryKind -> "library ")
@@ -48,18 +59,21 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
         xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
-  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ _xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ _xabiConstants contract)
+
 --  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
-  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
-  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
-  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
-  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
-  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
-  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
+  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ _xabiTypes contract)
+  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ _xabiModifiers contract)
+  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ _xabiEvents contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ _xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ _xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ _xabiFuncs contract)
   <> "\n}"
+unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
+unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
@@ -91,6 +105,49 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
+unparseContract :: SolidVM.Contract -> String
+unparseContract contr = 
+-- TODO: need to recursively retrieve all of the parent contracts
+     "contract "
+  <> labelToString (contr ^. contractName)
+  -- <> if (contr ^. parents )
+  <> " {\n  "
+  <> (List.intercalate "\n  " $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
+  <> (List.intercalate "\n  " $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
+  <> (List.intercalate "\n  " $ List.map unparseEnum (fmap (fmap fst) (Map.assocs $ contr ^. enums)))
+  <> (List.intercalate "\n  " $ List.map unparseStruct (Map.assocs $ contr ^. structs))
+  <> (List.intercalate "\n  " $ List.map unparseEvent (Map.assocs $ contr ^. events))
+  <> (List.intercalate "\n  " $ List.map unparseFunc (Map.assocs $ contr ^. functions))
+  <> case (contr ^. constructor) of
+    Just funf -> ("\n  " ++ (unparseCtor funf))
+    Nothing -> "\n  // no constructor found"
+  <> (List.intercalate "\n  " $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
+  <> "\n}"
+
+
+unparseStruct :: (SolidString ,[(SolidString, SolidVM.FieldType, SourceAnnotation ())]) -> String
+unparseStruct (name, fields) =
+     "struct "
+  <> labelToString name
+  <> " {\n  "
+  <> (List.intercalate "  " $ List.map unparseStructField fields)
+  <> "}"
+
+unparseStructField :: (SolidString, SolidVM.FieldType, SourceAnnotation ()) -> String
+unparseStructField (name, theType, _) =
+     unparseVarType (fieldTypeType theType)
+  <> " "
+  <> labelToString name
+  <> ";\n"
+
+unparseEnum :: (SolidString, [SolidString]) -> String
+unparseEnum (name, values) =
+     "enum "
+  <> labelToString name
+  <> " {\n  "
+  <> (List.intercalate ",\n  " $ List.map labelToString values)
+  <> "\n}"
+
 unparseVarType :: Type -> String
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
 unparseVarType (SVMType.Int (Just True) Nothing) = "int"
@@ -113,45 +170,64 @@ unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
+unparseFuncOverload :: SolidString -> [Func] -> String
+unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
+
 unparseFunc :: (SolidString, Func) -> String
-unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
+unparseFunc (name, f) = 
+  if (length (f ^. funcOverload) > 1) then Text.unpack $ unparseFuncWithOverload name f
+        else 
+          Text.unpack $ "function " <> labelToText name <> " " <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
-unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
 
-unparseFuncWithoutName :: Func -> Text
-unparseFuncWithoutName Func{..} =
-       "("
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) funcArgs))
+unparseFuncWithOverload :: SolidString -> Func -> Text
+unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
+
+unparseFuncWithoutName:: Func -> Text
+unparseFuncWithoutName f = unparseFuncDeep "" f
+
+unparseFuncDeep :: SolidString -> Func -> Text
+unparseFuncDeep deepName Func{..} =
+       (if (deepName == "") then
+          "("
+        else 
+          "function " <> labelToText deepName <> " (")
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) _funcArgs))
     <> ") "
-    <> case funcStateMutability of
+    <> case _funcStateMutability of
         Just sm -> tShow sm <> " "
         Nothing -> ""
-    <> case funcVisibility of
+    <> case _funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
         Just Internal -> "internal "
         Just External -> "external "
         _ -> ""
-    <> case funcModifiers of
+    <> case _funcModifiers of
         [] -> ""
         xs ->
           "modifiers " <> (Text.intercalate ", " (map Text.pack (map (\(name, args) -> labelToString name <> Text.unpack ("(" <> Text.intercalate ", " (map Text.pack (map unparseExpression args)) <> ")")) xs))) <> " "
-    <> case funcVals of
+    <> case _funcVals of
         [] -> ""
         vals ->
               "returns ("
           <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
-    <> "{\n        "
-    <> case funcContents of
+    <> "{\n    "
+    <> case _funcContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
-        Nothing -> ""
+        Nothing -> "\n"
     <> "}"
+    <> case _funcOverload of
+          [] -> Text.pack ""
+          as -> "\n" <> (Text.unlines $ map (unparseFuncDeep deepName) as)
+    -- <> (Text.pack $ show func)
 
 tab :: String -> String
 tab [] = []
-tab ('\n':rest) = "\n    " ++ tab rest
+tab ('\n':rest) = "\n  " ++ tab rest
 tab (x:rest) = x:tab rest
 
 unparseStatement :: Show a => StatementF a -> String
@@ -189,7 +265,7 @@ unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpressio
 unparseStatementWith f (Break a) = f a $ "break;"
 unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
-unparseStatementWith f (Throw a) = f a $ "throw;"
+unparseStatementWith f (Throw e a) = f a $ "throw " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Block a) = f a $ "{ }"
 unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
 
@@ -208,10 +284,16 @@ unparseStatementWith f (UncheckedStatement code a) = f a $
   "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
 unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
-  "try {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ (List.intercalate " " (map (\(name, block) -> "catch " ++ name ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
+  "try {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ (List.intercalate " " (map (\(name, (params, block)) -> "catch " ++ name ++ 
+  (show (fromMaybe [] params)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
--- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
+
+
+
+-- unparseContract :: ContractF a -> String
+-- --Use a many statement to go through the list items contained in the ContractF. Making sure everything is able to touched
+-- unparseContract = 
 
 unparseVarDefEntry :: VarDefEntryF a -> String
 unparseVarDefEntry BlankEntry = ""
@@ -223,6 +305,7 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
                       Nothing -> " "
                       Just Memory -> " memory "
                       Just Storage -> " storage "
+                      Just Calldata -> " calldata "
   in typeString ++ locString ++ labelToString theName
 
 
@@ -252,6 +335,7 @@ unparseExpression (NumberLiteral _ x Nothing) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
 unparseExpression (StringLiteral _ s) = ('"':) . (++"\"") $ s
+unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\"" 
 unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall _ e args) =
@@ -270,9 +354,9 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
   <> "("
-  <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
+  <> Text.intercalate ", " (List.map unparseArgs (Map.toList _modifierArgs))
   <> ") {\n        "
-  <> case modifierContents of
+  <> case _modifierContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
   <> "}"
@@ -282,9 +366,9 @@ unparseEvent (name, Event{..}) = Text.unpack $
      "event "
   <> labelToText name
   <> "(\n    "
-  <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
+  <> Text.intercalate ",\n    " (List.map unparseArgs _eventLogs)
   <> ")"
-  <> (if eventAnonymous then "anonymous" else "")
+  <> (if _eventAnonymous then "anonymous" else "")
   <> ";"
 
 unparseUsing :: (Text, UsingF a) -> String
@@ -311,6 +395,12 @@ unparseTypes (name, SolidVM.Struct {fields=fields'}) =
                                            <> " "
                                            <> labelToText fieldName
                                            <> ";"
+unparseTypes (name, SolidVM.Error {params=params'}) =
+  Text.unpack $ "error "
+             <> labelToText name
+             <> " ("
+             <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(n, v) -> (labelToText n , v)) params'))
+             <> ")"
 unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text
@@ -319,9 +409,12 @@ unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
 unparseVals :: (Text, IndexedType) -> Text
 unparseVals (name, theType) =
      unparseIndexedType theType
-  <> if Text.head name == '#'
-     then ""
-     else " " <> name
+  <> if ((Text.length name) > 0) then 
+    if Text.head name == '#' then
+      ""
+    else " " <> name
+    else " " <> name 
+
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType

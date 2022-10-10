@@ -18,7 +18,7 @@ module SolidVM.Model.Value (
   ) where
 
 
-import           Control.Lens ((.~))
+import           Control.Lens ((.~), (^.))
 import           Control.Monad (forM, when)
 import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
@@ -98,6 +98,7 @@ data Value =
   | SString String
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
+  | SUserDefined SolidString SolidString Value
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
   | SEnum SolidString
   | SEnumVal SolidString SolidString Word32
@@ -111,6 +112,7 @@ data Value =
   | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
   | SContractDef SolidString
+  -- | SBuiltinTypeF SolidString SolidString CodeCollection 
   | SContractItem NamedAccount SolidString
   | SContract SolidString NamedAccount
   | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName
@@ -204,7 +206,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2 _) -> a1 == a2
   (SAccount a1 _, SContract _ a2) -> a1 == a2
-  (SContract _ a1, SContract _ a2) ->  if ((CC._vmVersion ct == "svm3.0") || (CC._vmVersion ct == "svm3.2") || (CC._vmVersion ct == "svm3.3")) then (a1 == a2) else todo "unsupported type combination in valEquals: " (lhs, rhs)
+  (SContract _ a1, SContract _ a2) ->  if ((CC._vmVersion ct == "svm3.0") || (CC._vmVersion ct == "svm3.2") || (CC._vmVersion ct == "svm3.3") || (CC._vmVersion ct == "svm3.4")) then (a1 == a2) else todo "unsupported type combination in valEquals: " (lhs, rhs)
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
@@ -239,29 +241,39 @@ defaultValue ctract (SVMType.UnknownLabel name _) = fromMaybe (SContract name $ 
 
 defaultValue _ x = todo "defaultValue" x
 
-createDefaultValue :: MonadIO m =>
-                      CC.Contract -> SVMType.Type -> m Value
-createDefaultValue _ (SVMType.Array valType _) = return $ SArray valType V.empty
-createDefaultValue _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
-createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
-createDefaultValue _ SVMType.Bool = return $ SBool False
-createDefaultValue _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
-createDefaultValue _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
-createDefaultValue _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (SVMType.UnknownLabel name _) =
+createDefaultValue :: MonadIO m => 
+                      CC.CodeCollection -> CC.Contract -> SVMType.Type -> m Value
+createDefaultValue _ _ (SVMType.Array valType _) = return $ SArray valType V.empty
+createDefaultValue _ _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
+createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValue _ _ SVMType.Bool = return $ SBool False
+createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
+createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
+createDefaultValue _ _ (SVMType.String _) = return $ SString ""
+createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
+          itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (n, itemVar)
       return $ SStruct name $ M.fromList items
-    _ -> return $ SContract name (unspecifiedChain 0x0)
+    _ -> do
+      case (M.lookup name $ cc ^. CC.flEnums , M.lookup name $ cc ^. CC.flStructs) of
+        (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
+        (Nothing, Just sdef) -> do
+          items <-
+            forM sdef $ \(n, itemType, _) -> do
+              itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+              itemVar <- createVar itemVal
+              return (n, itemVar)
+          return $ SStruct name $ M.fromList items
+        _ -> return $ SContract name (unspecifiedChain 0x0)
 
-createDefaultValue _ x = todo "createDefaultValue" x
+createDefaultValue _ _ x = todo "createDefaultValue" x
 
 
 

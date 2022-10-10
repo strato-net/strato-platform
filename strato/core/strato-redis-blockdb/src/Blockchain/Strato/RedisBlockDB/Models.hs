@@ -15,6 +15,7 @@ import           Data.List                     (intercalate)
 import qualified Data.Map.Strict               as M
 import qualified Data.Set                      as S
 
+import           Blockchain.Strato.Model.Account
 import           BlockApps.X509.Certificate
 import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.ChainInfo
@@ -56,6 +57,10 @@ instance RedisDBValuable Bool where
     toValue True = S8.singleton 't'
     toValue False = S8.empty
     fromValue = not . S8.null
+    
+instance RedisDBValuable Account where
+    toValue = toStrict . encode
+    fromValue = decode . fromStrict
 
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode

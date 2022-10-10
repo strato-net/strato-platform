@@ -22,7 +22,6 @@ import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes
 
 
-
 statementCrawler :: StatementF a -> [T.Text]
 statementCrawler = \case
   AssemblyStatement{} -> ["AssemblyStatement"]
@@ -30,7 +29,7 @@ statementCrawler = \case
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
   ModifierExecutor _ -> ["ModifierExecutor"]
-  Throw _ -> ["Throw"]
+  Throw _ _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
   UncheckedStatement blk _ -> ["UncheckedStatement"]
@@ -78,6 +77,7 @@ expressionCrawler = \case
     expr <- [cond, thn, els]
     expressionCrawler expr
   BoolLiteral{} -> ["BoolLiteral"]
+  HexaLiteral{} -> ["HexaLiteral"]
   NumberLiteral{} -> ["NumberLiteral"]
   StringLiteral{} -> ["StringLiteral"]
   TupleExpression _ subexprs -> "TupleExpression" : do
@@ -95,7 +95,7 @@ simpleStatementCrawler = \case
   VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
 funcCrawler :: FuncF a -> [T.Text]
-funcCrawler = maybe [] (concatMap statementCrawler) . funcContents
+funcCrawler = maybe [] (concatMap statementCrawler) . _funcContents
 
 contractCrawler :: Contract -> [T.Text]
 contractCrawler Contract{..} = concatMap funcCrawler _functions ++ concatMap funcCrawler _constructor
@@ -115,14 +115,15 @@ main = do
     (fn:_) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return
-              $ runParser solidityFile (ParserState "" "") "" contents
+              $ runParser solidityFile (ParserState "" "" M.empty) "" contents
+  let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) parsedFile
   let pragmas = \case
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
   let vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> parsedFile) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""))
-      namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
+      namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' (userDefinedFromFile)  xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
-      cc = CodeCollection $ M.fromList namedContracts
+      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty)
       typecheck = if (vmVersion' == "svm3.2" || vmVersion' == "svm3.3") then TC.detector cc else []
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)

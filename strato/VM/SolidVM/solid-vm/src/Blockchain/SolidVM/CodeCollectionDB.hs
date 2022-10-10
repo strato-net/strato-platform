@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiWayIf #-}
 module Blockchain.SolidVM.CodeCollectionDB
   ( ParseTypeCheckOrSolidVMError(..)
   , parseSource
@@ -39,21 +40,46 @@ import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
+import           Control.DeepSeq                      (force)
+-- import           System.Clock
+-- import qualified Data.Cache                          as DC
+import qualified Data.Cache.LRU                      as LRU
+
+import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
+import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
-{-# NOINLINE unsafeCodeMapIORef #-}
-unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
-unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def
+
+-- | OTHER CACHE OPTIONS
+-- {-# NOINLINE unsafeCodeMapIORef #-}
+-- unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
+-- unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
+
+-- {-# NOINLINE unsafeCodeCahcheIO #-}
+-- unsafeCodeCahcheIORef :: IORef (DC.Cache Keccak256 CodeCollection)
+-- unsafeCodeCahcheIORef = unsafePerformIO $ newIORef $ newCache timeLife
+
+maxCacheSize :: Integer
+maxCacheSize = 1000
+
+{-# NOINLINE unsafeCodeCahcheLRUIORef #-}
+unsafeCodeCahcheLRUIORef :: IORef (LRU.LRU  Keccak256 CodeCollection)
+unsafeCodeCahcheLRUIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
+
+
 
 withAnnotations :: (a -> Either ParseTypeCheckOrSolidVMError b) -> a -> Either [SourceAnnotation T.Text] b
 withAnnotations f = first unwind . f
@@ -62,39 +88,79 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
-      getNamedContracts fileName src = do
+  let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
+      getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""))
+            curPragmas = pragmas <$> sourceUnits
+            vmVersion' = if | (Just ("solidvm", "3.4")) `elem` curPragmas -> "svm3.4"
+                            | (Just ("solidvm", "3.3")) `elem` curPragmas -> "svm3.3"
+                            | (Just ("solidvm", "3.2")) `elem` curPragmas -> "svm3.2"
+                            | (Just ("solidvm", "3.0")) `elem` curPragmas -> "svm3.0"
+                            | otherwise -> ""
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
-            pure $ Just (textToLabel name, ctrct)
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
+            pure $ Just $ (textToLabel name, Con ctrct)
+          FLFunc name fdec -> do
+            pure $ Just $ (name, FLF fdec)
+          FLConstant name cnst -> do
+            pure $ Just $ (textToLabel name, FLC cnst)
+          FLStruct name fls -> do
+            pure $ Just $ (textToLabel name, FLS fls)
+          FLEnum name fle -> do
+            pure $ Just $ (textToLabel name, FLE fle)
+          FLError name args -> do
+            pure $ Just $ (textToLabel name, FLER args)
           _ -> pure Nothing
 
-      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, contract) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName contract m
+      throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
+      throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
+        Nothing -> pure $ M.insert sName unit m
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+                  $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
+                                    (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
 
-  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
-  pure $ CodeCollection {
-    _contracts = deduplicatedContracts
-  }
+      throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
+      throwDuplicate (name, sUnit) cc = case sUnit of 
+        Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) _constContext
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
+        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a) 
+        FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
+        FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
+        FLER z -> parseError  "FLER non Error should be impossible"  (show z)
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
+
+      throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
+      throwDuplicateFunction (fname, func) m = case M.lookup fname m of
+        Nothing -> pure $ M.insert fname func m 
+        Just fdec -> do
+          let oldParamTypes = fmap snd $ _funcArgs fdec
+              newParamTypes = fmap snd $ _funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ _funcArgs x]) $ _funcOverload fdec
+          if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ _funcContext func)
+            else do
+              pure $ M.insert fname (fdec{_funcOverload = _funcOverload fdec ++ [func]}) m
+                                           
+  allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
+  theCC <- sUnitSorter allSUnits
+  pure $ force theCC
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
@@ -107,23 +173,42 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
   where
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
+
+hasSvm3_4 :: CodeCollection -> Bool
+hasSvm3_4 cc = any (=="svm3.4") vmVers
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+
+
     
 --- Don't typecheck in Slipstream!!!
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
   case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
-    Right cc -> do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
+    Right cc | typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) -> typeCheckDetector cc
+             | typeCheck && hasSvm3_4 cc -> O.detector <$> typeCheckDetectorSvm3_4 cc
+             | otherwise                 -> Right cc
     Left x -> Left x
     where
-      typeCheckDetector ecc = case TC.detector ecc of
+      typeCheckDetector ecc = case TypeChecker.detector ecc of
+        [] -> Right ecc
+        xs -> Left $ TCEx xs
+      typeCheckDetectorSvm3_4 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
 compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
 
-codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
+codeCollectionFromSource :: ( MonadIO m
+                            , HasCodeDB m
+                            -- , HasCodeCollectionDB m
+                            )
+                         => Bool
+                         -> B.ByteString
+                         -> m (Keccak256, CodeCollection)
 codeCollectionFromSource typeCheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
@@ -135,12 +220,13 @@ codeCollectionFromSource typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
-  codeMap <- liftIO $ readIORef unsafeCodeMapIORef
-  case M.lookup hsh codeMap of
-    Just cc -> do
+  codeCache <- liftIO $ readIORef unsafeCodeCahcheLRUIORef
+  case LRU.lookup hsh codeCache of
+    (newCache ,(Just cc)) -> do
       recordCacheEvent CacheHit
+      liftIO $ writeIORef unsafeCodeCahcheLRUIORef newCache
       return (hsh, cc)
-    Nothing -> do
+    (_, Nothing) -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
       let ecc = compileSource typeCheck initMap
@@ -149,19 +235,24 @@ codeCollectionFromSource typeCheck initCode = do
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
                  Left (SVMEx (s, _)) -> throw s
                  Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
-      let codeMap' = M.insert hsh cc codeMap
-      recordCacheSize $ M.size codeMap'
-      liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+      liftIO $ modifyIORef' unsafeCodeCahcheLRUIORef (LRU.insert hsh cc) 
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Bool -> Keccak256 -> m CodeCollection
+codeCollectionFromHash :: ( MonadIO m
+                          , HasCodeDB m
+                          -- , HasCodeCollectionDB m
+                          )
+                       => Bool
+                       -> Keccak256
+                       -> m CodeCollection
 codeCollectionFromHash typeCheck hsh = do
-  codeMap <- liftIO $ readIORef unsafeCodeMapIORef
-  case M.lookup hsh codeMap of
-    Just cc -> do
+  codeCache <- liftIO $ readIORef unsafeCodeCahcheLRUIORef
+  case LRU.lookup hsh codeCache of
+    (newCache ,(Just cc)) -> do
       recordCacheEvent CacheHit
+      liftIO $ writeIORef unsafeCodeCahcheLRUIORef newCache
       return cc
-    Nothing -> do
+    (_, Nothing) -> do
       recordCacheEvent CacheMiss
       mCode <- getCode hsh
       case mCode of
@@ -175,8 +266,8 @@ codeCollectionFromHash typeCheck hsh = do
                      Left (PEx p) -> parseError "codeCollectionFromHash" p
                      Left (SVMEx (s, _)) -> throw s
                      Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
-              codeMap' = M.insert hsh cc codeMap
-          recordCacheSize $ M.size codeMap'
-          liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+          --     codeMap' = M.insert hsh cc codeMap
+          -- recordCacheSize $ M.size codeMap'
+          liftIO $ modifyIORef' unsafeCodeCahcheLRUIORef (LRU.insert hsh cc)
           return cc
         Nothing -> internalError "unknown code hash" hsh

@@ -3,14 +3,12 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Sequencer.Metrics where
 
+import BlockApps.Init()
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Resource
 import Data.Ratio ((%))
 import Data.Text
 import Prometheus
 import System.Clock (Clock(..), diffTimeSpec, getTime, toNanoSecs)
-
-import BlockApps.Logging
 
 seqLdbBatchWrites :: Counter
 seqLdbBatchWrites = unsafeRegister $ counter (Info "seq_ldb_batch_writes" "Sequencer counter for ldb batch writes")
@@ -160,6 +158,3 @@ timeAction metric act = do
     let duration = toNanoSecs (end `diffTimeSpec` start) % 1000000000
     observe metric (fromRational duration)
     return res
-
-instance MonadMonitor (ResourceT (LoggingT IO)) where
-    doIO = liftIO
