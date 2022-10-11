@@ -23,11 +23,11 @@ DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
-STRATO_HOST=${STRATO_HOST:-strato}
-STRATO_PORT_API=${STRATO_PORT_API:-strato:3000}
-STRATO_PORT_API2=${STRATO_PORT_API2:-strato:3001}
-STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-strato:7065}
-STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-strato:8050}
+STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+STRATO_PORT_API=${STRATO_PORT_API:-3000}
+STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
+STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
+STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
 VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
 
 # If container is running for the first time - generate config:
@@ -55,9 +55,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
   sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
-  
-  # This is used to remove lines from the nginx.conf 
-  # without having to put the entire replacement string in this file 
+
+  # This is used to remove lines from the nginx.conf
+  # without having to put the entire replacement string in this file
   if [ "$SMD_DEV_MODE" != true ]; then
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
@@ -104,7 +104,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__POSTGREST_HOST__/$POSTGREST_HOST/g" /tmp/nginx.conf
   sed -i "s/__PROMETHEUS_HOST__/$PROMETHEUS_HOST/g" /tmp/nginx.conf
   sed -i "s/__SMD_HOST__/$SMD_HOST/g" /tmp/nginx.conf
-  sed -i "s/__STRATO_HOST__/$STRATO_HOST/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_HOSTNAME__/$STRATO_HOSTNAME/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf

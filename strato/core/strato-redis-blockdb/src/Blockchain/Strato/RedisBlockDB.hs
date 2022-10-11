@@ -392,14 +392,14 @@ removeOrgIdChain ip cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
-getOrgNameChains :: (S8.ByteString, Maybe S8.ByteString)
+getOrgNameChains :: (String, Maybe String)
                  -> Redis (S.Set Word256)
 getOrgNameChains org = getInNamespace PrivateOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-addOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
+addOrgNameChain :: (String, Maybe String)
                 -> Word256
                 -> Redis (Either Reply Status)
 addOrgNameChain org cId = do
@@ -411,7 +411,7 @@ addOrgNameChain org cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
 
-removeOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
+removeOrgNameChain :: (String, Maybe String)
                    -> Word256
                    -> Redis (Either Reply Status)
 removeOrgNameChain org cId = do
@@ -957,9 +957,9 @@ runStratoRedisIO r = liftIO $ do
   runRedis conn r
 
 -- Retrieve a organization name and unit associated with an address
-addressToOrg :: Address -> Redis (Maybe (S8.ByteString, Maybe S8.ByteString))
+addressToOrg :: Address -> Redis (Maybe (String, Maybe String))
 addressToOrg addr = do
     cIs <- getCertificate addr
     case cIs of
         Nothing -> return Nothing
-        Just c  -> return $ Just . (S8.pack *** fmap S8.pack) $ (orgName &&& orgUnit) c
+        Just c  -> return . Just $ (orgName &&& orgUnit) c
