@@ -154,16 +154,16 @@ spec:
           value: "localhost:9090"
         - name: SMD_HOST
           value: "localhost:3002"
-        - name: STRATO_HOST
+        - name: STRATO_HOSTNAME
           value: "localhost"
         - name: STRATO_PORT_API
-          value: "localhost:3000"
+          value: "3000"
         - name: STRATO_PORT_API2
-          value: "localhost:3001"
+          value: "3001"
         - name: STRATO_PORT_LOGS
-          value: "localhost:7065"
+          value: "7065"
         - name: STRATO_PORT_BLOCKSTANBUL_VOTE
-          value: "localhost:8050"
+          value: "8050"
         - name: VAULT_WRAPPER_HOST
           value: "localhost:8000"
       - image: wurstmeister/zookeeper:3.4.6
