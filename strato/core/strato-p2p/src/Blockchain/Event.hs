@@ -431,7 +431,7 @@ handleEvents peer = awaitForever $ \case
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pNewOrgName cId org -> do
         let formatted = CL.yellow $ format cId
-            orgFormat = CL.blue $ format org
+            orgFormat = CL.blue $ show org
         peerCheck <- lift $ checkPeerIsMember peer (ChainMembers M.empty)
         when peerCheck $ do
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
@@ -601,7 +601,7 @@ checkPeerIsMember' mode peer mems = do
   peerCert <- getPeerX509 peer
   orgChains <- case peerCert of
     Nothing  -> return $ OrgNameChains S.empty
-    Just cIs -> selectWithDefault (Proxy @OrgNameChains) $ (OrgName . BS8.pack . orgName &&& OrgUnit . fmap BS8.pack . orgUnit) cIs
+    Just cIs -> selectWithDefault (Proxy @OrgNameChains) $ (OrgName . orgName &&& OrgUnit . orgUnit) cIs
 
   return $ checkPeerIsMember'' mode peer mems peerCert orgChains
 
@@ -632,9 +632,7 @@ peerIPAddress = readIP . T.unpack . pPeerIp
 
 -- extract the organization name from the cert
 certOrgTuple :: Maybe X509CertInfoState -> (OrgName, OrgUnit)
-certOrgTuple = maybe
-  (OrgName BS8.empty, OrgUnit Nothing)
-  (OrgName . BS8.pack . orgName &&& OrgUnit . fmap BS8.pack . orgUnit)
+certOrgTuple = maybe (OrgName "", OrgUnit Nothing) (OrgName . orgName &&& OrgUnit . orgUnit)
 
 {- to reduce redundant computations on dividing block chunks under txsLimit
 splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]

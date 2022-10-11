@@ -34,6 +34,7 @@ library:
   - format
   - labeled-error
   - lens
+  - lrucache
   - memory
   - merkle-patricia-db
   - monad-alter
