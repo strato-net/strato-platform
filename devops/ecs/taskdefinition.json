@@ -416,11 +416,11 @@
                 },
                 {
                     "name": "OAUTH_JWT_USERNAME_PROPERTY",
-                    "value": "not set (using default)"
+                    "value": ""
                 },
                 {
                     "name": "OAUTH_SCOPE",
-                    "value": "not set (using default)"
+                    "value": ""
                 }
             ],
             "mountPoints": [],
