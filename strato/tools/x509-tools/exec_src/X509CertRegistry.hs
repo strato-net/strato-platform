@@ -253,7 +253,7 @@ contract CertificateRegistry {
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
         owner = msg.sender
-        
+
         initialized = false;
     }
 
@@ -300,7 +300,7 @@ contract CertificateRegistry {
         return 400;
     }
 
-    function getUserCert(address _address) returns (Certificate) {
+    function getUserCert(address _address) returns (address) {
         return certificates[certificatesMap[account(_address)]];
     }
     
