@@ -1,0 +1,56 @@
+pipeline {
+  agent {
+    label "test"
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            try {
+              currentBuild.description = "Agent ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              currentBuild.description = "Agent ${env.NODE_NAME}// github"
+            }
+          }
+        }
+        sh '''#!/bin/bash -le
+          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+        '''
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh 'rm -rf .docker-work'
+        sh 'REPO=private make all'
+        sh 'rm -rf .docker-work'
+        dir ('blockapps-rest') {
+          sh 'yarn install --pure-lockfile'
+          sh 'yarn build'
+        }
+      }
+    }
+
+    /*stage('Test and Push Images') {
+      steps {
+        parallel (
+          'Push images': {
+            withCredentials([
+                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+            ]) {
+              archiveArtifacts artifacts: "docker-compose.yml"
+              sh '''#!/bin/bash -le
+                set -x
+                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+              '''
+            }
+          }
+        )
+      }
+    }*/
+
+  }
+
+}
