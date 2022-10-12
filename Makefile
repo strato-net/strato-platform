@@ -1,4 +1,5 @@
 REPO_URL ?= EMPTY
+ECR_REPO_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -103,9 +104,11 @@ docker-compose:
 	@echo Now generating docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
+	sed -e 's|<REPO_URL>|'"${ECR_REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 	cat docker-compose.push.yml
+	cat docker-compose.push.ecr.yml
 
 docker-build:
 	cp -fr strato/licenses ${STRATODIR}
