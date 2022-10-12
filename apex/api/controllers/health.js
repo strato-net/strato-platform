@@ -128,7 +128,7 @@ module.exports = {
 
 async function getLatestHealth() {
   const [healthInfo, stallInfo, systemInfo] = await Promise.all([
-      
+    
     models.CurrentHealth.findOne({
       where: {
         processName: "HealthStat"
@@ -177,12 +177,12 @@ async function getLatestHealth() {
 }
 
 function getPbftData() {
-  if (!process.env['prometheusHost']) {
-    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  if (!process.env['PROMETHEUS_HOST']) {
+    throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
   }
   const options = {
     method: 'GET',
-    url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=pbft_current_view`,
+    url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=pbft_current_view`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
