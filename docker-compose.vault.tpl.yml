@@ -19,6 +19,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+    ports:
+    - 8088:8000                                         # TODO: Remove after the nginx is added to this file!   #fix-before-shared-vault-done
   postgres:
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
