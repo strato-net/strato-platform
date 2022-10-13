@@ -37,13 +37,12 @@ pipeline {
         parallel (
           'Push images': {
             withCredentials([
-                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+                withCredentials([string(credentialsId: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID', variable: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID')
             ]) {
               archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
-                docker login -u $DOCKER_USER -p $DOCKER_PASSWD 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+                echo $BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID
               '''
             }
           }
