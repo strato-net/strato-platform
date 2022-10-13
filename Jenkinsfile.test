@@ -36,8 +36,7 @@ pipeline {
       steps {
         parallel (
           'Push images': {
-            withCredentials([
-                withCredentials([string(credentialsId: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID', variable: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID')
+            withCredentials([string(credentialsId: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID', variable: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID')
             ]) {
               archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
