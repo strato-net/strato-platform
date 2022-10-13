@@ -38,7 +38,7 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             rm -rf strato-getting-started
-            git clone https://github.com/blockapps/strato-getting-started -b shv                  # TODO: Revert back to master branch  #fix-before-shared-vault-done
+            git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv      # TODO: Revert back to master branch  #fix-before-shared-vault-done
             cp docker-compose.yml docker-compose.vault.yml strato-getting-started/
             cd strato-getting-started
             
