@@ -77,6 +77,7 @@ import           Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
+import           Blockchain.SolidVM.GasInfo
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
@@ -91,7 +92,7 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
-
+         
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -241,15 +242,28 @@ create :: SolidVMBase m
        -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
-  recordCreate
+create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
+  
   let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
-        Env.txHash=txHash',
-        Env.metadata=metadata
+        Env.txHash= txHash',
+        Env.metadata= metadata
       }
+  let gasInfo' = GasInfo {
+        _gasLeft = availableGas,
+        _gasInitalAllotment = availableGas, 
+        _gasMetadata = ""
+      }
+
+  -- data GasInfo = 
+  --   GasInfo {
+  --     _gasLeft :: Gas,
+  --     _gasInitalAllotment :: Gas, 
+  --     _gasMetadata :: String
+  --   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
+
 
   initCode <- case code of
     Code c -> pure c
@@ -257,7 +271,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -291,7 +305,10 @@ create' creator newAccount ch cc contractName' argExps = do
                         , addressStateCodeHash = if ((vmVersion' == "svm3.0" || vmVersion' == "svm3.2" || vmVersion' == "svm3.3" || vmVersion' == "svm3.4")  && contractName' /= stringToLabel parentName && not (null parentName)) then CodeAtAccount creator (labelToString contractName') else SolidVMCode (labelToString contractName') ch
                         }
 
-  onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
+  -- get the gasLeft from the environment
+  gasInfo <- getGasInfo
+
+  liftIO $ putStrLn $ C.green $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName' ++ "with gasInfo: " ++ show gasInfo
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
   addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
@@ -386,7 +403,7 @@ call :: SolidVMBase m
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' txHash' chainId' metadata = do
   recordCall
 
   let env' = Env.Environment {
@@ -397,7 +414,14 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         Env.metadata=metadata
         }
 
-  fmap (either solidvmErrorResults id) . runSM Nothing env' chainId' $ do
+  let gasInfo' = GasInfo {
+      _gasLeft = availableGas,
+      _gasInitalAllotment = availableGas, 
+      _gasMetadata = ""
+    }
+
+
+  fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' chainId' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
@@ -889,6 +913,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
+  decrementGas 100
   ret <- runStatement s
 
   case ret of
@@ -1359,6 +1384,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  decrementGas 1000
   cntrct <- getCurrentContract
   if c
     then do
@@ -1378,6 +1404,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
+  decrementGas 1000
   case result of
     Nothing -> do
       c <- condition
@@ -1464,10 +1491,27 @@ expToPath (CC.MemberAccess _ parent field) = do
 
 expToPath x = todo "expToPath/unhandled" x
 
+
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
+  decrementGas 100
   return v
+
+decrementGas :: MonadSM m => Gas -> m ()
+decrementGas gas = do
+  gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
+  let !gasLeft' = gasInfo' ^. gasLeft
+  if (gasLeft') < (Gas 0)
+    then do
+      let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
+      liftIO $ putStrLn $ C.red $ msg
+      tooMuchGas (show (_gasInitalAllotment gasInfo')) gasInfo'
+    else do
+      liftIO $ putStrLn $ C.green $ "with gasInfo: " ++ show gasInfo'
+      return ()
+
+
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
@@ -3442,7 +3486,7 @@ encodeVector v = do
 
 
 
-{- BEN WILL REFACTOR THIS -}
+{- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
   let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do

@@ -36,6 +36,7 @@ module Blockchain.SolidVM.SM (
   getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
+  getGasInfo,
   getVariableOfName,
   getTypeOfName,
   getXabiType,
@@ -100,6 +101,8 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
+import           Blockchain.SolidVM.GasInfo
+
 
 import qualified SolidVM.Model.CodeCollection as CC
 import           Blockchain.Data.BlockSummary 
@@ -151,6 +154,7 @@ data SState = SState
   , ssEvents        :: Q.Seq Event
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
+  , _gasInfo        :: GasInfo
   }
 makeLenses ''SState
 
@@ -167,6 +171,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemRawStorageDB m
                  , HasMemCertDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable GasInfo m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -289,9 +294,15 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
+
+
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
+
+instance Monad m => Mod.Modifiable GasInfo (SM m) where
+  get _ = use gasInfo
+  put _ = assign gasInfo 
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -313,10 +324,11 @@ runSM :: ( MonadIO m
          )
       => (Maybe ByteString)
       -> Env.Environment
+      -> GasInfo
       -> Maybe Word256
       -> SM m a
       -> m (Either SolidException a)
-runSM maybeCode env chainId' f = do
+runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
@@ -325,7 +337,8 @@ runSM maybeCode env chainId' f = do
         callStack = [],
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
-        _action = startingAction maybeCode env chainId'
+        _action = startingAction maybeCode env chainId',
+        _gasInfo = gi
         }
 
   eValState <- try $ runStateT f startingState
@@ -376,6 +389,8 @@ startingAction maybeCode env' chainId' = Action.Action
 
 
 
+getGasInfo :: MonadSM m => m GasInfo
+getGasInfo = Mod.get (Mod.Proxy @GasInfo)
 
 getEnv :: MonadSM m => m Env.Environment
 getEnv = Mod.access (Mod.Proxy @Env.Environment)
