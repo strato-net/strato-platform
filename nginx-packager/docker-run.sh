@@ -18,6 +18,17 @@ debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
+APEX_HOST=${APEX_HOST:-apex:3001}
+DOCS_HOST=${DOCS_HOST:-docs:8080}
+POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
+PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
+SMD_HOST=${SMD_HOST:-smd:3002}
+STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+STRATO_PORT_API=${STRATO_PORT_API:-3000}
+STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
+STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
+STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8000} # TODO: change-vault-proxy-port-when-known
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -44,9 +55,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
   sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
-  
-  # This is used to remove lines from the nginx.conf 
-  # without having to put the entire replacement string in this file 
+
+  # This is used to remove lines from the nginx.conf
+  # without having to put the entire replacement string in this file
   if [ "$SMD_DEV_MODE" != true ]; then
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
@@ -87,6 +98,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
+  # Replacing HOST NAME PLACEHOLDERS
+  sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
+  sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
+  sed -i "s/__POSTGREST_HOST__/$POSTGREST_HOST/g" /tmp/nginx.conf
+  sed -i "s/__PROMETHEUS_HOST__/$PROMETHEUS_HOST/g" /tmp/nginx.conf
+  sed -i "s/__SMD_HOST__/$SMD_HOST/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_HOSTNAME__/$STRATO_HOSTNAME/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_BLOCKSTANBUL_VOTE__/$STRATO_PORT_BLOCKSTANBUL_VOTE/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_VAULT_PROXY__/$STRATO_PORT_VAULT_PROXY/g" /tmp/nginx.conf
+
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
@@ -118,18 +142,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 fi
 
 echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://apex:3001/_ping
+until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
 do
   sleep 0.5
 done
 echo 'apex is available'
 
-echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/strato/v2.3/_ping
+echo 'Waiting for VaultProxy to be available...'
+until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/_ping
 do
   sleep 0.5
 done
-echo 'vault-wrapper is available'
+echo 'VaultProxy is available'
 
 echo  'nginx is now running. See the logs below...'
 openresty -g "daemon off;"
