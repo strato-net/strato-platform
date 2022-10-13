@@ -1,4 +1,7 @@
 version: "3"
+volumes:
+  vaultpgdata:
+    driver: local
 services:
   vault-wrapper:
     depends_on:
@@ -26,7 +29,7 @@ services:
       - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - vaultpgdata:/var/lib/postgresql/data
     command:
       - "postgres"
       - "-c"
