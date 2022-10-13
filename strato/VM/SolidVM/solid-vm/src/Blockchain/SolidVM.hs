@@ -257,14 +257,6 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
         _gasMetadata = ""
       }
 
-  -- data GasInfo = 
-  --   GasInfo {
-  --     _gasLeft :: Gas,
-  --     _gasInitalAllotment :: Gas, 
-  --     _gasMetadata :: String
-  --   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
-
-
   initCode <- case code of
     Code c -> pure c
     PtrToCode cp -> do
@@ -1491,7 +1483,6 @@ expToPath (CC.MemberAccess _ parent field) = do
 
 expToPath x = todo "expToPath/unhandled" x
 
-
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
@@ -1508,10 +1499,8 @@ decrementGas gas = do
       liftIO $ putStrLn $ C.red $ msg
       tooMuchGas (show (_gasInitalAllotment gasInfo')) gasInfo'
     else do
-      liftIO $ putStrLn $ C.green $ "with gasInfo: " ++ show gasInfo'
+      onTraced $ liftIO $ putStrLn $ C.green $ "with gasInfo: " ++ show gasInfo'
       return ()
-
-
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v

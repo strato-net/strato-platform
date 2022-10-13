@@ -294,8 +294,6 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
-
-
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
@@ -386,7 +384,6 @@ startingAction maybeCode env' chainId' = Action.Action
         Nothing -> Env.metadata env'
   , _events             = Q.empty
   }
-
 
 
 getGasInfo :: MonadSM m => m GasInfo
