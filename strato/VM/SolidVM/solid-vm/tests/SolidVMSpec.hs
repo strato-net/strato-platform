@@ -6782,3 +6782,23 @@ contract qq {
   }
 }   |]) `shouldThrow` anyTooMuchGasError
 
+  it "cant infinite loop through a different contract" $ (runTest $
+    runBS [r|
+pragma solidvm 3.4;
+
+contract A {
+  uint x = 3;
+  function f() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}
+
+contract qq {
+  constructor() public returns () {
+    A a = new A();
+    a.f();
+    return;
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
