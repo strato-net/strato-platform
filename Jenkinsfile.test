@@ -45,7 +45,8 @@ pipeline {
                 set -x
                 echo ${BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID}
                 echo ${BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY}
-                AWS_ACCESS_KEY_ID=${BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION=us-east-1 aws s3 ls
+                AWS_ACCESS_KEY_ID=${BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION=us-east-1 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
+                ls -l
               '''
             }
           }
