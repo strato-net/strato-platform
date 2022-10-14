@@ -108,7 +108,7 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${ECR_REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	cat docker-compose.push.ecr.yml
 	sed '/  build: ./d' docker-compose.push.ecr.yml | tee docker-compose.push.ecr.yml
-	cat docker-compose.push.ecr.yml
+	#cat docker-compose.push.ecr.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 	#cat docker-compose.push.yml
