@@ -1,5 +1,4 @@
 REPO_URL ?= EMPTY
-ECR_REPO_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -104,9 +103,9 @@ docker-compose:
 	@echo Now generating all docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml for in house push...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
-	@echo Creating the image-push-ready docker-compose.push.ecr.yml for ecr push...
-	#sed -e 's|<REPO_URL>|'"${ECR_REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' -e '/  build: ./d' docker-compose.tpl.yml > docker-compose.push.ecr.yml
-	sed -e 's|<REPO_URL>|'"${ECR_REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
+	@echo Creating the image-push-ready script for ecr push...
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' ecr_repo_push.sh > ecr_repo_push.sh
+	cat ecr_repo_push.sh
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
