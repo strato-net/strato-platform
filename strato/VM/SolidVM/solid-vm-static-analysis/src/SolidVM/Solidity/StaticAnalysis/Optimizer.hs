@@ -6,6 +6,7 @@ module SolidVM.Solidity.StaticAnalysis.Optimizer
   ) where
 
 import           Control.Monad.Reader
+import           Control.Monad.Trans.State
 import           Control.Applicative ((<|>))
 import           Control.Lens
 
@@ -23,6 +24,8 @@ data R = R
   , contract :: Maybe Contract
   }
 
+type SSS = StateT [String] (Reader R)
+--type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
 detector ::  CodeCollection -> CodeCollection
 detector cc = (over (contracts . mapped) (contractHelper cc)
@@ -46,7 +49,7 @@ varDeclHelper cc c v = case _varType v of
   (SVMType.UserDefined  _ actua )-> v{_varType = actua  , _varInitialVal = run <$> _varInitialVal v }
   _ -> v{ _varInitialVal = run <$> _varInitialVal v }
   where run e = let r = R cc c
-          in runReader (optimizeExpression e) r
+          in runReader (evalStateT (optimizeExpression e) ["Useless string for State manipulation pattern"]) r
 
 
 constDeclHelper :: CodeCollection
@@ -58,7 +61,7 @@ constDeclHelper cc c v =
         (SVMType.UserDefined  _ actua )-> v{ _constType = actua  , _constInitialVal = run  (_constInitialVal v) }
         _ ->  v{ _constInitialVal = run $ _constInitialVal v }
         where run e = let r = R cc c
-                in runReader (optimizeExpression e) r
+                in runReader (evalStateT (optimizeExpression e) ["Useless string for State manipulation pattern"])r
 
 
 -- TODO clean this code up
@@ -90,7 +93,8 @@ functionHelperForUserDefined f = f{ _funcArgs =  tForm  $ _funcArgs f, _funcVals
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $  []
 optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
-  cond' <- optimizeExpression cond
+  let 
+  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
   case cond' of
     BoolLiteral _ True -> do
       thens' <- optimizeStatements thens
@@ -107,26 +111,27 @@ optimizeStatements ((TryCatchStatement tryStatements catchMap x) : ss) = do
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (TryCatchStatement tryStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((SolidityTryCatchStatement expr mtpl successStatements catchMap x) : ss) = do
-  expr' <- optimizeExpression expr
+  expr' <- (evalStateT  (optimizeExpression expr) ["xBS examplex"]) 
   successStatements' <- optimizeStatements successStatements
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (SolidityTryCatchStatement expr' mtpl successStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((WhileStatement cond body x) : ss) = do
-  cond' <- optimizeExpression cond
+  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
   case cond' of
     BoolLiteral _ False -> optimizeStatements ss
     _ -> do
       body' <- optimizeStatements body
       (WhileStatement cond' body' x:) <$> optimizeStatements ss
 optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
-  mCond' <- traverse optimizeExpression mCond
-  mPost' <- traverse optimizeExpression mPost
+  let getExpression = (\xxx -> (evalStateT (optimizeExpression xxx) ["xBS examplex"]))
+  mCond' <- traverse getExpression  mCond
+  mPost' <- traverse getExpression mPost  
   body' <- optimizeStatements body
   (ForStatement mInit mCond' mPost' body' x:) <$> optimizeStatements ss
 optimizeStatements ((Block _) : ss) = optimizeStatements ss
 optimizeStatements ((DoWhileStatement body cond x) : ss) = do
   body' <- optimizeStatements body
-  cond' <- optimizeExpression cond
+  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
   case cond' of
     BoolLiteral _ False -> (body' ++) <$> optimizeStatements ss
     _ -> (DoWhileStatement body' cond' x:) <$> optimizeStatements ss
@@ -145,7 +150,7 @@ optimizeStatements (s@(SimpleStatement _ _) : ss) = (s:) <$> optimizeStatements 
 -- As of right now this is just a helper for UserDefined types.
 -- TODO alter fore all Types
 -- Also maybe a specialized UserDefined version of this
-getVariableByName :: SolidString -> Reader R  (Maybe Expression)--VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type 
+getVariableByName :: SolidString -> SSS  (Maybe Expression)--VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type 
 getVariableByName name = do
   mc <- asks contract
   case mc of
@@ -164,7 +169,7 @@ getVariableByName name = do
     Nothing ->  pure $  Nothing
 
 
-optimizeExpression :: Expression -> Reader R Expression
+optimizeExpression :: Expression -> SSS Expression
 optimizeExpression (Binary x "+" a b) = do
   a' <- optimizeExpression a
   b' <- optimizeExpression b
