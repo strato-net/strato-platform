@@ -81,13 +81,16 @@ pipeline {
         parallel (
           'Push images': {
             withCredentials([
-                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                string(credentialsId: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID', variable: 'BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID'),
+                string(credentialsId: 'BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY', variable: 'BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY')
             ]) {
               archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                 docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+                ./ecr_repo_push.sh ${BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID} ${BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY} "us-east-1"
               '''
             }
           },
