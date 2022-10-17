@@ -24,6 +24,11 @@ data R = R
   , contract :: Maybe Contract
   }
 
+--TODO 
+-- Change SSS to a map? Of something that I can modify and look up state variables
+-- Also add state variables.
+-- 
+
 type SSS = StateT [String] (Reader R)
 --type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
