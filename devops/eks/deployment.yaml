@@ -47,7 +47,7 @@ spec:
       - image: redis:3.2
         name: redis
         command: ["redis-server"]
-        args: ["--appendonly yes"]
+        args: ["--appendonly", "yes"]
       - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.6.0
         name: strato
         ports:
