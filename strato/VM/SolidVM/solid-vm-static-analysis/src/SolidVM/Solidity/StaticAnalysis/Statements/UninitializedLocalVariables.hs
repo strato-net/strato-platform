@@ -19,7 +19,7 @@ contractHelper Contract{..} =
   concat $ functionHelper <$> M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case funcContents of
+functionHelper Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> concat $ statementHelper <$> stmts
 
@@ -30,7 +30,7 @@ statementHelper (IfStatement _ thens mElse _) =
    in concat [ts, es]
 statementHelper (TryCatchStatement statements catches _) =
   let ts = concat $ statementHelper <$> statements
-      cs = concat $ statementHelper <$> concatMap snd (M.toList catches)
+      cs = concat $ statementHelper <$> concatMap (snd . snd) (M.toList catches)
    in concat [ts, cs]
 statementHelper (SolidityTryCatchStatement _ _ successStatements catchesMap _) =
   let ts = concat $ statementHelper <$> successStatements
@@ -50,7 +50,7 @@ statementHelper (Continue _) = []
 statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return _ _) = []
-statementHelper (Throw _) = []
+statementHelper (Throw _ _) = []
 statementHelper (EmitStatement _ _ _) = []
 statementHelper (RevertStatement _ _ _) = []
 statementHelper (UncheckedStatement body _) =

@@ -338,14 +338,14 @@ rowToHistories gref abiid row actions cont oldState = do
 
 contractToEventTables :: (Text, Text, Text) -> Contract -> [EventTable]
 contractToEventTables (org, app, name) c =
-  flip map (Map.toList $ c^.events) $
+  flip map (Map.toList $ c ^. events) $
       \(eName, fields) ->
         EventTable {
           eventOrganization = org,
           eventApplication  = app,
           eventContractName = name,
           eventName = labelToText eName,
-          eventFields = map fst $ eventLogs fields
+          eventFields = map fst $ _eventLogs fields
         }
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
@@ -389,7 +389,7 @@ getCodeCollection f cp ccString = do
         Left e ->
           --return $ CodeCollection Map.empty
           return $ Left $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
-        Right v -> return $ Right $ CodeCollection $ f $ snd v
+        Right v -> return $ Right $ CodeCollection (f $ snd v) Map.empty Map.empty Map.empty Map.empty Map.empty []
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
 getEVMInserts :: (
@@ -467,7 +467,7 @@ processTheMessages env sqlEnv conn g messages = do
 
                 hasHistoryTable <- isHistoric g htn
 
-                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
+                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
                 let nameParts = (o, a, n)
 
                 deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts

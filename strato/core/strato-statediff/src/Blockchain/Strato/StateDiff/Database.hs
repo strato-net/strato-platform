@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeOperators #-}
@@ -33,12 +35,14 @@ import           Data.Maybe
 
 import           Blockchain.Strato.StateDiff
 
+import           UnliftIO
+
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
+commitSqlDiffs :: (MonadUnliftIO m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   sqlQuery $ do
-    createAccount blockNumber $ Map.toList createdAccounts
+    sequence_ $ Map.mapWithKey (\k -> updateAccount blockNumber k . eventualToIncremental) createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
@@ -60,7 +64,7 @@ codePtrChainId :: CodePtr -> Maybe Word256
 codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
 codePtrChainId _ = Nothing
 
-createAccount :: MonadIO m =>
+createAccount :: (MonadIO m, MonadUnliftIO m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs = do
   let newAccounts = map (uncurry addrRef) accountDiffs
@@ -74,8 +78,7 @@ createAccount blockNumber accountDiffs = do
                             | (k, Value v) <- Map.toList m]
         SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
                                 | (k, Value v) <- Map.toList m]
-  SQL.insertMany_ $ concat newStorage
-
+  SQL.insertMany_ (concat newStorage)
   where
     addrRef account diff = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
@@ -108,7 +111,7 @@ deleteAccount account = do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
-updateAccount :: MonadIO m =>
+updateAccount :: (MonadIO m, MonadUnliftIO m) =>
                  Integer -> Account -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount blockNumber account diff = do
   mAddrID <- getAddressStateSQL account

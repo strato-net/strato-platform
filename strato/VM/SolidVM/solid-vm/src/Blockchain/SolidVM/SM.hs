@@ -49,9 +49,9 @@ module Blockchain.SolidVM.SM (
   addEvent
   ) where
 
+import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
-import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -111,6 +111,7 @@ import           SolidVM.Model.Value
 
 import           UnliftIO
 
+
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString
   , currentAccount      :: Account
@@ -121,6 +122,7 @@ data CallInfo = CallInfo
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
+  , isFreeFunction      :: Bool
   } deriving (Show)
 
 {-
@@ -195,6 +197,7 @@ instance Monad m => HasMemCertDB (SM m) where
   putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
@@ -204,6 +207,7 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (Account `A.Alters` AddressState) (SM m) where
@@ -297,8 +301,8 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
   -- adding events to the action so that slipstream gets them,
   --   and also to the events field of the sstate, so that they get sent to
   --    TxrIndexer for governance updates
-  get    _   = gets ssEvents
-  put    _ q = do
+  get    _   = gets ssEvents    -- This will get (Q.Seq Event)
+  put    _ q = do               -- This will replace (Q.Seq Event)
     action . Action.events .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
@@ -387,14 +391,36 @@ getVariableOfName name = do
   let currentCallInfo =
         case cStack of
           [] -> internalError "getVariableValue called with an empty stack" name
-          (x:_) -> x
+          (x:_) -> if (isFreeFunction x)
+                    then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
+                                                ,  CC._parents = currentContract x^.CC.parents
+                                                ,  CC._constants = M.empty
+                                                ,  CC._userDefined = M.empty
+                                                ,  CC._storageDefs = M.empty
+                                                ,  CC._enums = M.empty
+                                                ,  CC._structs = M.empty
+                                                ,  CC._errors = M.empty
+                                                ,  CC._events = M.empty
+                                                ,  CC._functions = M.empty
+                                                ,  CC._constructor = currentContract x^.CC.constructor
+                                                ,  CC._modifiers = M.empty
+                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
+                                                ,  CC._contractContext = currentContract x^.CC.contractContext
+                                                } 
+                              }
+                    else x
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
+
+  -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
+
+      maybeFreeFunction :: Maybe Variable
+      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name) $ M.lookup name $ codeCollection currentCallInfo^.CC.flFuncs
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
@@ -410,19 +436,21 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo ^.CC.enums) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flEnums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
-        return $ coerceType ctract constType $ case constInitialVal of
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
+        return $ coerceType ctract _constType $ case _constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
+
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
@@ -462,6 +490,7 @@ getVariableOfName name = do
       [ maybeLocalValue
       , maybeStorageItem
       , maybeContractFunction
+      , maybeFreeFunction
       , maybeBuiltinFunction
       , maybeBuiltinVariable
       , maybeEnum
@@ -469,15 +498,18 @@ getVariableOfName name = do
       , maybeContract
       , maybeThis
       , maybeConstant
-      , unknownVariable "getVariableOfName" name
+      --, maybeUserDefined
+      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
+        , fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s strcts)
+        , fmap EnumTypo (fst <$> M.lookup s enms)
         ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
@@ -497,8 +529,9 @@ addCallInfo :: MonadSM m
             -> CC.CodeCollection
             -> Map SolidString (SVMType.Type, Variable)
             -> Bool
+            -> Bool
             -> m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro = do
+addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -509,7 +542,8 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           localVariables=initialLocalVariables,
           readOnly=ro,
           isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
-          currentSourcePos=Nothing
+          currentSourcePos=Nothing,
+          isFreeFunction=ff
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
@@ -616,6 +650,8 @@ hintFromType = \case
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger
  SVMType.String{} -> return TString
+ (SVMType.UserDefined _ SVMType.Bool{}) -> return TBool
+ (SVMType.UserDefined _ SVMType.Int{}) -> return TString
  SVMType.UnknownLabel s _ -> do
    t' <- getTypeOfName s
    case t' of
@@ -631,7 +667,7 @@ hintFromType = \case
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (stringToLabel $ BC.unpack field)
-                            . fmap CC.varType
+                            . fmap CC._varType
                             . CC._storageDefs
                             . currentContract
                             $ callInfo

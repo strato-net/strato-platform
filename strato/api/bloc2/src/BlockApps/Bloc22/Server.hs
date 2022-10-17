@@ -23,6 +23,7 @@ import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.TransactionResult
 import           BlockApps.Bloc22.Server.Users
+import           BlockApps.Bloc22.Server.X509
 import           BlockApps.Solidity.Xabi
 
 import Control.Monad.Change.Alter
@@ -30,10 +31,8 @@ import Control.Monad.Logger
 
 import BlockApps.Bloc22.Monad
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
 
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.CoreAPI
@@ -47,7 +46,6 @@ bloc :: ( MonadIO m
         , HasVault m
         , HasCoreAPI m
         , HasSQL m
-        , Selectable ChainId ChainInfo m
         , Selectable Account ContractDetails m
         , Selectable Account AddressState m
         , (Keccak256 `Alters` SourceMap) m
@@ -55,6 +53,7 @@ bloc :: ( MonadIO m
      => ServerT BlocAPI m
 bloc = return gitInfo
   :<|> postUsersFill
+  :<|> createCertificate
   :<|> getContracts
   :<|> postContractsBatchStates
   :<|> getContractsData

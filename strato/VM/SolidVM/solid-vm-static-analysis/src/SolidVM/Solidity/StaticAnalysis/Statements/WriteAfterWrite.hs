@@ -17,6 +17,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+
 detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -24,7 +25,7 @@ contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case funcContents of
+functionHelper Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
 
@@ -72,7 +73,7 @@ statementHelper (TryCatchStatement body catches _) = do
   bs <- statementsHelper' body
   sTry <- get
   put $ M.intersection s sTry
-  css <- forM (M.toList catches) $ \(_, cas) -> do
+  css <- forM (M.toList catches) $ \(_, (_, cas)) -> do
     sCatch <- get
     put $ M.intersection s sCatch
     statementsHelper' cas
@@ -95,7 +96,8 @@ statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
@@ -151,6 +153,15 @@ expressionHelper (Binary y "&=" (Variable x name) b) = do
 expressionHelper (Binary y "^=" (Variable x name) b) = do
   modify $ M.insert name (x <> y)
   expressionHelper b
+expressionHelper (Binary y ">>>=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y ">>=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "<<=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
 expressionHelper (Binary _ _ a b) =
   concat <$> traverse expressionHelper [a, b]
 expressionHelper (PlusPlus _ (Variable x name)) = do
@@ -179,6 +190,7 @@ expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b,
 expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

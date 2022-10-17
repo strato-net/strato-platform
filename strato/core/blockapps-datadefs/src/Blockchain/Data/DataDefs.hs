@@ -55,6 +55,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Account
 
 import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.RLP

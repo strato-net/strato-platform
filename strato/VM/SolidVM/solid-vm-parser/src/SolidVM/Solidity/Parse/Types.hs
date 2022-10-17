@@ -17,12 +17,13 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
 import qualified SolidVM.Model.Type         as SVMType
+--import SolidVM.Solidity.Parse.Lexer (identifier)
 
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
 simpleTypeExpression :: SolidityParser SVMType.Type
-simpleTypeExpression = try arrayType <|> simpleType <|> mappingType
+simpleTypeExpression = try arrayType <|> simpleType <|> mappingType  -- <|> userType
 
 -- | Parses builtins and user-defined names
 simpleType :: SolidityParser SVMType.Type
@@ -54,7 +55,12 @@ simpleType =
       return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
       name <- identifier
-      return $ SVMType.UnknownLabel name Nothing
+      isUserDefined <- isInUserDefinedTypes name
+      if isUserDefined
+        then do
+          typ <- getUserDefinedType name 
+          return $ (SVMType.UserDefined name (userTypeHelper' typ ))
+        else return $ (SVMType.UnknownLabel name Nothing)
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence[identifier, dot, identifier]
       return $ SVMType.UnknownLabel name Nothing
@@ -142,3 +148,10 @@ mappingType = do
     c <- simpleTypeExpression
     return (d, c)
   return $ SVMType.Mapping (Just True) mapDomT mapCodT
+
+userTypeHelper' :: Maybe String -> SVMType.Type
+userTypeHelper' (Just "bool")   =  SVMType.Bool
+userTypeHelper' (Just "string") =  SVMType.String $ Just True
+userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing) 
+userTypeHelper' _             =  SVMType.Bool  --TODO fix this

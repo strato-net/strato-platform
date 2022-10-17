@@ -600,19 +600,22 @@ spec = do
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
-        varType=t,
-        varIsPublic=True,
-        varInitialVal=Nothing,
-        varContext=error "varContext undefined"
+        _varType=t,
+        _varIsPublic=True,
+        _varInitialVal=Nothing,
+        _varContext=error "varContext undefined",
+        _isImmutable = False
         }
   in
     Contract{
       _contractName=undefined,
       _parents=undefined,
       _constants=undefined,
+      _userDefined=undefined,
       _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
       _enums=undefined,
       _structs=undefined,
+      _errors=undefined,
       _events=undefined,
       _functions=undefined,
       _constructor=undefined,

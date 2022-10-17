@@ -33,22 +33,22 @@ contractHelper Contract{..} =
       action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
       stateVariables' = fst $ execState action emptyState
       findStateAnns name (False, False, a) =
-        [("Unused state variable " <> labelToText name <> ".") <$ varContext a]
-      findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing = case varType of
+        [("Unused state variable " <> labelToText name <> ".") <$ _varContext a]
+      findStateAnns name (True, False, VariableDecl{..}) | _varInitialVal == Nothing = case _varType of
         SVMType.Struct{} -> []
         SVMType.Array _ Nothing -> []
         SVMType.Mapping{} -> []
-        _ -> [("Uninitialized state variable " <> labelToText name <> ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
-      findStateAnns name (True, False, a) = case varType a of
+        _ -> [("Uninitialized state variable " <> labelToText name <> ". Consider initializing it to prevent incorrect behavior.") <$ _varContext]
+      findStateAnns name (True, False, a) = case _varType a of
         SVMType.Struct{} -> []
         SVMType.Array _ Nothing -> []
         SVMType.Mapping{} -> []
-        _ -> [("State variable " <> labelToText name <> " is never written to. Consider making it a constant.") <$ varContext a]
+        _ -> [("State variable " <> labelToText name <> " is never written to. Consider making it a constant.") <$ _varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
 functionHelper :: Func -> SSS [SourceAnnotation Text]
-functionHelper Func{..} = maybe (pure []) statementsHelper funcContents
+functionHelper Func{..} = maybe (pure []) statementsHelper _funcContents
 
 statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do
@@ -80,7 +80,7 @@ statementHelper (IfStatement cond thens mElse _) = do
   pure $ concat [cs, ts, es]
 statementHelper (TryCatchStatement try catchMap _) = do
   ts <- statementsHelper try
-  cs <- statementsHelper (concatMap snd (M.toList catchMap))
+  cs <- statementsHelper (concatMap (snd . snd) (M.toList catchMap))
   pure $ concat [ts, cs]
 statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
   cs <- expressionHelper expr
@@ -107,7 +107,8 @@ statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
@@ -149,7 +150,7 @@ expressionHelper (Binary y "+=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
-expressionHelper (Binary y "-=" (Variable x name) b) = do
+expressionHelper (Binary y "-=" (Variable x name) b) = do 
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -166,6 +167,18 @@ expressionHelper (Binary y "%=" (Variable x name) b) = do
   bs <- expressionHelper b
   pure $ concat [ann, bs]
 expressionHelper (Binary y "|=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "<<=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -210,3 +223,4 @@ expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper e
 expressionHelper (Variable x name) =
   [] <$ stateVarReadHelper name x
 expressionHelper (ObjectLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []

@@ -14,6 +14,11 @@
 
 module Handlers.Chain
   ( API
+  , ChainFilterParams(..)
+  , qaChainId
+  , qaLimit
+  , qaOffset
+  , chainFilterParams
   , getChain
   , getChainClient
   , postChain
@@ -29,8 +34,10 @@ module Handlers.Chain
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
+import           Control.Lens
 import           Conduit
 import qualified Data.Map                       as M
+import           Data.Maybe                     (fromMaybe)
 import           Data.Swagger
 import qualified Data.Text                      as T
 import           Servant
@@ -49,13 +56,25 @@ import           Blockchain.TypeLits
 import           Control.Monad.Composable.SQL
 import           SQLM
 import           UnliftIO
+import           Settings
 
 type API = 
-  "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
+  "chain" :> QueryParams "chainid" ChainId  
+          :> QueryParam "limit" Integer
+          :> QueryParam "offset" Integer
+          :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
 
-getChainClient :: [ChainId] -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
+data ChainFilterParams = ChainFilterParams
+  { _qaChainId :: [ChainId]
+  , _qaLimit :: Maybe Integer
+  , _qaOffset :: Maybe Integer
+  } deriving (Eq, Ord, Show)
+
+makeLenses ''ChainFilterParams
+
+getChainClient :: [ChainId] -> Maybe Integer -> Maybe Integer -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
 postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
@@ -69,12 +88,19 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-instance HasSQL m => Selectable ChainId ChainInfo m where
-  selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos
-  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
+chainFilterParams :: ChainFilterParams
+chainFilterParams = ChainFilterParams [] Nothing Nothing
 
-getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
-getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
+instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m where
+  select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
+  selectWithDefault _ (ChainFilterParams cIds lim ofs) = getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
+
+getChain :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m
+         => [ChainId]
+         -> Maybe Integer
+         -> Maybe Integer
+         -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChain cIds mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLim mOff
     
 postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChainConduit ci = do

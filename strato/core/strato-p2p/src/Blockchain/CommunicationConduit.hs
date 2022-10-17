@@ -19,6 +19,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import qualified Control.Monad.Change.Modify           as Mod
+import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -33,8 +34,10 @@ import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
+import qualified Data.Map.Strict                       as M
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Void
 import           Text.Printf
 import           UnliftIO.Concurrent                   hiding (yield)
@@ -46,11 +49,13 @@ import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
+import           Blockchain.Data.ChainInfo             (UnsignedChainInfo(..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.Data.Enode
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
@@ -64,8 +69,8 @@ import           Blockchain.Watchdog
 import           BlockApps.X509
 
 -- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate 
-rootCerts' = S.fromList [rootCert] 
+rootCerts' :: S.Set X509Certificate
+rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -231,24 +236,23 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake $ other
     awaitMsg >>= \case
         -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
+        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash , networkID=networkID', rootCerts=rcs} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+            lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
               when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-
               -- we set to 0 cause we dont necessarily know the number yet
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-              return $ Right NewStatus {
+              lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              yield $ Right NewStatus {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,
                   totalDifficulty = fromIntegral tdiff,
                   latestHash = bHash,
                   genesisHash = genHash,
                   rootCerts= rootCerts'
-              })
+              }
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do

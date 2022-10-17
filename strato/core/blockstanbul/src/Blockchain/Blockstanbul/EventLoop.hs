@@ -38,6 +38,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Text.Format
 
+
 import Blockchain.Blockstanbul.StateMachine
 
 yieldL :: Monad m => b -> ConduitM a (Either b c) m ()
@@ -133,8 +134,10 @@ roundChange = do
   nextView <- uses view (over round (+1))
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
-  msg <- signMessage rawMsg
-  yieldR msg
+  valB <- use validatorBehavior
+  when (valB) $ do
+    msg <- signMessage rawMsg
+    yieldR msg
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
@@ -172,8 +175,11 @@ nextRound nt = do
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
-        msg <- signMessage (Preprepare v lb)
-        yieldR msg 
+        valB <- use validatorBehavior
+        when (valB) $ do
+          msg <- signMessage (Preprepare v lb) 
+          yieldR msg 
+
   prepared .= M.empty
   committed .= M.empty
   roundChanged %= M.dropWhileAntitone (<= thisR)
@@ -182,6 +188,7 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+
   yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
                                               (use voted)
                                               (uses validators S.toList)
@@ -198,6 +205,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       NewBeneficiary{} -> yieldR . VoteResponse $ HA.Rejected reason
       _ -> return ()
    AuthSuccess -> case ev of
+    ValidatorBehaviorChange vc -> do
+      case vc of
+          ForcedValidator fv -> modify' $ validatorBehavior .~ fv
+      valB <- use validatorBehavior
+      $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
+
     ForcedConfigChange cc -> do
       $logWarnLS "blockstanbul/config_change" cc
       case cc of
@@ -252,8 +265,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            msg <- signMessage (Preprepare v realSealed)
-            yieldR msg
+            valB <- use validatorBehavior
+            when (valB) $ do
+              msg <- signMessage (Preprepare v realSealed)
+              yieldR msg
     IMsg auth ppp@(Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -288,8 +303,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   unless wasProposed . yieldL $ OMsg auth ppp
                   proposal .= Just pp
                   editVoted pp pr
-                  msg <- signMessage (Prepare v (blockHash pp))
-                  yieldR msg
+                  valB <- use validatorBehavior
+                  when (valB) $ do
+                    msg <- signMessage (Prepare v (blockHash pp))
+                    yieldR msg
     IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
       preparers <- use prepared
       unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -302,8 +319,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         seal <- commitmentSeal di
-        msg <- signMessage (Commit v di seal)
-        yieldR msg
+        valB <- use validatorBehavior
+        when (valB) $ do
+          msg <- signMessage (Commit v di seal)
+          yieldR msg
     IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
       committors <- use committed
       unless (M.member (sender auth) committors) . yieldL $ OMsg auth ccc
@@ -337,8 +356,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           when (3 * sameRNCount > total && Just rn > sentRN) $ do
             pendingRound .= Just rn
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            msg <- signMessage rawMsg
-            yieldR msg
+            valB <- use validatorBehavior
+            when (valB) $ do
+              msg <- signMessage rawMsg
+              yieldR msg
           when (3 * sameRNCount > 2 * total) $ do
             next <- use pendingRound
             case next of
@@ -444,6 +465,8 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    PreviousBlock{} -> inc "previous_block"
    NewBeneficiary{} -> inc "new_beneficiary"
    ForcedConfigChange{} -> inc "forced_config_change"
+   ValidatorBehaviorChange{} -> inc "validator_behavior_change"
+   
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
 recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter

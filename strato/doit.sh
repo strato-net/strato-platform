@@ -19,6 +19,13 @@ if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
 fi
 
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+echo 'Waiting for Postgres to be available...'
+until pg_isready ${PSQL_CONNECTION_PARAMS}
+do
+  echo "Check at $(date)"
+  sleep 0.5
+done
+echo 'Postgres is available'
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
   # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
@@ -147,13 +154,14 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
 
+  vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
   vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
-    "${baFlag}" "${scFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
+    "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 

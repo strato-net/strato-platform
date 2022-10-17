@@ -19,6 +19,7 @@ module Blockchain.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ExecResults
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
@@ -28,6 +29,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
 import           Blockchain.Stream.Action           (Action)
+import qualified Data.ByteString                    as B
 import qualified Data.DList                         as DL
 import           Data.Map                           (Map)
 
@@ -66,9 +68,11 @@ data VmOutEvent = OutAction Action
                 | OutEvent EventDB
                 | OutTXR TransactionResult
                 | OutASM (Map Account AddressStateModification)
+                | OutJSONRPC String B.ByteString
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
+  , outExecResults  :: DL.DList ExecResults
   , outBlocks       :: DL.DList OutputBlock
   , outIndexEvents  :: DL.DList IndexEvent
   , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256)
@@ -77,10 +81,13 @@ data VmOutEventBatch = OutBatch
   , outEvents       :: DL.DList EventDB
   , outTXRs         :: DL.DList TransactionResult
   , outASMs         :: DL.DList (Map Account AddressStateModification)
+  , outJSONRPCs     :: DL.DList (String, B.ByteString)
   }
 
 newOutBatch :: VmOutEventBatch
 newOutBatch = OutBatch DL.empty
+                       DL.empty
+                       DL.empty
                        DL.empty
                        DL.empty
                        DL.empty
@@ -101,4 +108,5 @@ insertOutBatch e b = case e of
   OutEvent a           -> b{ outEvents = outEvents b `DL.snoc` a }
   OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
   OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
+  OutJSONRPC x y       -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
 

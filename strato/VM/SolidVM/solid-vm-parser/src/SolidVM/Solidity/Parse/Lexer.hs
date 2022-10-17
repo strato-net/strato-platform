@@ -63,7 +63,7 @@ solidityLexer = P.makeTokenParser solidityLanguage
 
 solidityLanguage = javaStyle {
   P.reservedNames = [
-     "pragma", "import", "library", "using", -- "salt",
+     "pragma", "import", "library", "using", 
      "contract", "is", "public", "internal", "private", "external", "import", "payable",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
@@ -71,10 +71,10 @@ solidityLanguage = javaStyle {
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
      "function", "returns", "return", "modifier", "revert",
-     "delete", "constant", "storage", "memory", "calldata",
-     "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "ecrecover",
-     "suicide", "this",
+     "delete", "constant", "storage", "memory", "calldata", "immutable",
+     "if","else","while","for","break","continue",
+     "suicide", "this", 
+     "call", "callcode", "length", "sha3",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
@@ -88,7 +88,7 @@ solidityLanguage = javaStyle {
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
     "<=", ">=", "<", ">", "&", "|", "^", "~", "+", "*", "-", "/"," %", "**",
-    "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", "++", "--",
+    "+=", "-=", "*=", "/=", "%=", "|=", "&=",  ">>=", "<<=", "^=", "++", "--", "hex",
     "=>", "="
     ],
   P.caseSensitive = True,

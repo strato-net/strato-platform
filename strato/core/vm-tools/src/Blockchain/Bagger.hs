@@ -26,7 +26,6 @@ import           Data.Time.Clock
 import           Data.Time.Clock.POSIX              (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import qualified Data.Set                           as S
 import           Data.Word
-import           Numeric                            (readHex)
 
 import           BlockApps.Logging
 import           Blockchain.Constants
@@ -48,7 +47,6 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB, flushMemCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
-import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
@@ -112,6 +110,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFChainIdMismatch{} -> recoverable f
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
+        Just f@TFInvalidPragma{} -> recoverable f
 
 rewardCoinbases :: MonadBagger m => Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 rewardCoinbases us uncles ourNumber = do
@@ -200,6 +199,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
     CodeNotFound s q a n OutputTx{otHash=h} ->
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
+    InvalidPragma s q erPragmas OutputTx{otHash=hsh} ->
+        (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -557,9 +558,6 @@ buildFromMiningCache = do
                        , obBlockData = rewardedBlockData
                        }
 
-ourCoinbase :: Address
-ourCoinbase = fromInteger . fst . head . readHex . Conf.coinbaseAddress . Conf.quarryConfig $ Conf.ethConf
-
 buildNextBlockHeader :: DD.BlockData
                      -> Keccak256
                      -> [DD.BlockData]
@@ -578,7 +576,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
-                        , DD.blockDataCoinbase         = if isPBFT then coinbaseAddr else ourCoinbase
+                        , DD.blockDataCoinbase         = coinbaseAddr -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
                         , DD.blockDataReceiptsRoot     = V.receiptsVerificationValue ()

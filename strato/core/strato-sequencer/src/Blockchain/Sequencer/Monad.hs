@@ -54,6 +54,8 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , chainInfoRegistry
+  , orgNameChainsRegistry
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -95,7 +97,9 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Privacy
+
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
@@ -106,6 +110,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Address
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -129,6 +134,9 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
+  , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
+  , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -225,6 +233,10 @@ instance HasNamespace ChainHashEntry where
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
+
+instance HasNamespace OrgNameChains where
+  type NSKey OrgNameChains = Word256
+  namespace _ = "pnc:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -349,6 +361,12 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
+-- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
+--   -- TODO: Just using this to sneak past the compiler... actually completethese these out
+--   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
+--   insert _ _ _ = pure ()
+--   delete _ _ = pure ()
+
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
     Nothing -> pure . Just $ ParentChainId Nothing
@@ -401,7 +419,7 @@ testPriv = fromMaybe (error "could not import private key") (importPrivateKey (L
 
 instance HasVault SequencerM where
   sign mesg = do
-    mVc <- asks vaultClient    
+    mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
@@ -414,12 +432,12 @@ waitOnVault action = do
   $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
   res <- action
   case res of
-    Left err -> do 
+    Left err -> do
       $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
-    Right val -> do 
-      $logInfoS "HasVault" "Got a signature from vault" 
+    Right val -> do
+      $logInfoS "HasVault" "Got a signature from vault"
       return val
 
 initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)
@@ -454,6 +472,9 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
+            , _chainInfoRegistry   = M.empty
+            , _orgNameChainsRegistry = M.empty
+            , _x509certRegistry    = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

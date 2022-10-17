@@ -11,6 +11,8 @@
 module BlockApps.X509.Certificate (
   X509Certificate(..),
   X509CertInfoState(..),
+  CertificateChain(..),
+  SignedCertificate,
   Issuer(..),
   Subject(..),
   rootCert,
@@ -22,12 +24,20 @@ module BlockApps.X509.Certificate (
   verifyCertSignedBy,
   verifyBlockApps,
   verifyCertM,
+  verifyBlockAppsM,
   makeSignedCert,
+  makeSignedCertSigF,
   getCertSubject,
   getCertSubjects,
+  getCertValidity,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress
+  getParentUserAddress,
+  findNodeCert,
+  x509ToSigneds,
+  signedsToX509,
+  dateTimeToString,
+  getValidity
  ) where
 
 
@@ -37,6 +47,8 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           BlockApps.X509.Keys
 import           Control.DeepSeq
+import qualified Control.Lens                       as Lens
+import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
@@ -54,8 +66,12 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
+import           Data.List                          (find)
 
 import           GHC.Generics
+
+import           Data.Swagger                       hiding (Format, get, put, format) -- as Swag
+import           Data.Swagger.Internal.Schema
 
 import qualified Data.Set                           as S
 import           Data.Functor
@@ -65,10 +81,12 @@ import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
 import           Data.Traversable
-import           Time.Types
+import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
+
+import           Servant.Docs
 
 -- import           Data.ASN1.Encoding
 -- import           Data.ASN1.BinaryEncoding
@@ -89,7 +107,7 @@ instance NFData X509Certificate where
 
 instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
-  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)   
+  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
@@ -99,6 +117,8 @@ data X509CertInfoState = X509CertInfoState
   , certificate :: X509Certificate
   , isValid :: Bool         -- ^ Non-revoked = true, revoked = false
   , children :: [Address]   -- ^ The "userAddress" of the children of the certificate
+  , orgName :: String
+  , orgUnit :: Maybe String
   } deriving (Show, Eq, Generic, Binary)
 
 instance Format X509CertInfoState where
@@ -127,7 +147,7 @@ data Subject = Subject
   , subUnit       :: Maybe String
   , subCountry    :: Maybe String
   , subPub        :: PublicKey
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic)
 
 instance Format Subject where
   format = CL.blue . show
@@ -156,6 +176,19 @@ instance FromJSON Subject where
 
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
+instance ToSchema Subject where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & Lens.mapped.name ?~ "Subject for a X.509 certificate"
+    & Lens.mapped.schema.example ?~ toJSON ex
+    where
+      ex :: Subject
+      ex = Subject
+        { subCommonName = "John Smith"
+        , subOrg        = "BlockApps Inc."
+        , subUnit       = Just "Engineering"
+        , subCountry    = Just "USA"
+        , subPub        = fromMaybe undefined $ importPublicKey "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+        }
 
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
@@ -177,6 +210,35 @@ instance FromJSON X509Certificate where
     let errDump err = fail $ "failed to JSON parse cert " ++ (show str) ++ " because " ++ err
     in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
+
+instance ToSchema X509Certificate where
+  declareNamedSchema = const . pure $ named "X509Certificate bytestring" binarySchema
+
+instance ToSample X509Certificate where
+  toSamples _ = singleSample . fromRight (error "NOOO! 😨") . bsToCert . C8.pack $ unlines
+    [ "-----BEGIN CERTIFICATE-----"
+    , "MIIBjDCCATCgAwIBAgIRAIs9fXiIfXIZ22paA1BYggYwDAYIKoZIzj0EAwIFADBH"
+    , "MQ0wCwYDVQQDDARMdWtlMRIwEAYDVQQKDAlCbG9ja2FwcHMxFDASBgNVBAsMC2Vu"
+    , "Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIwODIzMjAwODQxWhcNMjMwODIz"
+    , "MjAwODQxWjBHMQ0wCwYDVQQDDARMdWtlMRIwEAYDVQQKDAlCbG9ja2FwcHMxFDAS"
+    , "BgNVBAsMC2VuZ2luZWVyaW5nMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUr"
+    , "gQQACgNCAASxPPKgsG0NJu0tNwIfIKOrCnbKgA5PeMuIejm48GXKPgf4Tgtb3hOM"
+    , "wF+PQU9vFtxC8gEbKv/aLn0U+EvS4F1nMAwGCCqGSM49BAMCBQADSAAwRQIhAPkX"
+    , "DGxjCRln4lpSC5DtEGNKkepfkeNuyWzHcBCRyb2KAiAtIUIWWBO3qpCsVILHiD1T"
+    , "56hQTEUFjrewBNx+JTQavA=="
+    , "-----END CERTIFICATE-----"
+    , "-----BEGIN CERTIFICATE-----"
+    , "MIIBizCCAS+gAwIBAgIQahwA5iOvvZh0/1f2zxtxDjAMBggqhkjOPQQDAgUAMEcx"
+    , "DTALBgNVBAMMBEx1a2UxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLZW5n"
+    , "aW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA4MDkxNTA4MzhaFw0yMzA4MDkx"
+    , "NTA4MzhaMEcxDTALBgNVBAMMBEx1a2UxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG"
+    , "A1UECwwLZW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB"
+    , "BAAKA0IABEo5L1XbwQ0kqrM+61HydxVCvANUVncjqXxYGvMsaBgHc8QS4BF6GQQD"
+    , "OILDJkfREUkRW0wT3kQXhcjVLRVdYeAwDAYIKoZIzj0EAwIFAANIADBFAiEAw/oq"
+    , "6/T+yHQoKuvCg6MMQoth/F0JrFlPtGyM+auYPTECIEHbiDKXbaF2rhXBeEJFgZX1"
+    , "prz3Yc03zv5VJ5rP/55A"
+    , "-----END CERTIFICATE-----"
+    ]
 
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- ROOT CERT -------------------------------------------
@@ -232,20 +294,25 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
-makeSignedCert parentCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
+makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
 
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
 
-makeCert :: MonadIO m => Issuer -> Subject -> m (Certificate)
-makeCert iss sub = do
+makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
+makeCert mDateTime iss sub = do
   serial' <- liftIO $ getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
 
-  validity <- liftIO getValidity
+  validity <- case mDateTime of
+    Nothing -> liftIO getValidity
+    Just dateTime -> do
+      (DateTime dt tm') <- liftIO dateCurrent
+      let curDate@(DateTime _ _) = DateTime dt tm'{todNSec = 0}
+      return (curDate, dateTime)
 
 
   return Certificate {
@@ -269,16 +336,31 @@ makeCert iss sub = do
 -- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
 -- make a PR for it
 ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
-ecdsaWithSHA256 mesg' = do
+ecdsaWithSHA256 = ecdsaWithSHA256F sign
+
+makeSignedCertSigF 
+  :: (Monad m, MonadIO m) 
+  => (B.ByteString -> m Signature)  -- Signature function
+  -> Maybe DateTime                 -- Expiry date
+  -> Maybe X509Certificate          -- Parent certificate to append
+  -> Issuer                         -- Certificate issuer
+  -> Subject                        -- Certificate subject
+  -> m (Maybe X509Certificate)      -- The resulting certificate (Nothing if signing failed)
+makeSignedCertSigF signF mDateTime parentCert iss sub = do
+  unsignedCert <- makeCert mDateTime iss sub
+  signedCert <- objectToSignedExactF (ecdsaWithSHA256F signF) unsignedCert
+  return . Just . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert)) $ signedCert
+
+ecdsaWithSHA256F :: MonadIO m => (B.ByteString -> m Signature) -> B.ByteString -> m (B.ByteString, SignatureALG)
+ecdsaWithSHA256F signF mesg' = do
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
-  Signature (SEC.CompactRecSig r s v) <- sign mesgBS
+  Signature (SEC.CompactRecSig r s v) <- signF mesgBS
   -- I too hate that we have to do this r, s swap....but strato-model swaps it because Ethereum
   -- swaps it, and cert validation will fail if we leave them swapped here, so we swap it back
   let sig'' = SEC.CompactRecSig s r v
       sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
       sig = SEC.convertRecSig sig' -- Drop the 'v' because the ASN1 protocol does not support recoverable signatures
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
-
 
 
 toASN1CS :: String -> ASN1CharacterString
@@ -318,6 +400,9 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
+dateTimeToString :: DateTime -> String
+dateTimeToString = show . timeGetElapsed
+
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
 getParentUserAddress _ = Nothing
@@ -345,6 +430,14 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
+
+getCertValidity :: X509Certificate -> (DateTime, DateTime)
+getCertValidity (X509Certificate (CertificateChain (c:_)))= certValidity cert
+  where (Signed cert _ _) = getSigned c
+getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate"
+
+--To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
+-- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
 getCertIssuer cert = listToMaybe =<< getCertIssuers cert
@@ -379,7 +472,7 @@ verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
 
 verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
-verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) = 
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) =
   let signed = getSigned c
       mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
   in
@@ -410,6 +503,9 @@ signedBy c c' = fromMaybe False $ (\k -> verifyCertChain k [c]) . subPub <$> get
 verifyBlockApps :: X509Certificate -> Bool
 verifyBlockApps = verifyCert rootPubKey
 
+verifyBlockAppsM :: MonadIO m => m X509Certificate -> m Bool
+verifyBlockAppsM = fmap verifyBlockApps
+
 verifyCertM :: MonadIO m => PublicKey -> X509Certificate -> m Bool
 verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetails cs $> verifyCertChain pkey cs
   where printCertDetails :: MonadIO m => SignedCertificate -> m ()
@@ -429,3 +525,7 @@ verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetail
             Just subject -> do
               liftIO $ putStrLn $ format subject
               liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject)
+
+-- Find a matching pubkey in a list of signed certs
+findNodeCert :: PublicKey -> [SignedCertificate] -> Maybe SignedCertificate
+findNodeCert pk = find (\x ->  unserializeAndUnwrap (certPubKey (signedObject (getSigned x))) == Just pk)
