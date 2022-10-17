@@ -3633,7 +3633,7 @@ solidityExceptionHandler catchBlockMap ex = do
     (MissingCertificate s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 missingCertificate
       return res
-
+    _ -> error "unhandled solid exception" (show ex)
 
 
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
