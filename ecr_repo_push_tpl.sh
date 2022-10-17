@@ -7,7 +7,6 @@ declare -a arr=("smd" "apex" "vault-wrapper", "strato", "postgrest", "nginx", "p
 for image in "${arr[@]}"
 do
    echo "pushing image $image"
-   # or do whatever with individual element of the array
    docker tag <REPO_URL>"$image":<VERSION> 406773134706.dkr.ecr.us-east-1.amazonaws.com/smd:<VERSION>
    docker push 406773134706.dkr.ecr.us-east-1.amazonaws.com/"$image":<VERSION>
 done
