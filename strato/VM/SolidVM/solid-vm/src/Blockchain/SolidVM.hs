@@ -43,6 +43,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+-- import qualified Data.ByteString.UTF8                 as BSU
 import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
@@ -2664,13 +2665,20 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin ecrecover@("ecrecover") [SString h, SInteger r, SInteger s, SInteger v] _ = do
+callBuiltin ecrecover@("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
   contract' <- getCurrentContract
   if CC._vmVersion contract' == "svm3.4"
     then do 
       let intHash = intBuiltin [SString h]
       bytestringHash <- encodeForReturn intHash
-      let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) r s v
+      -- let bytestringHash = BSU.fromString h
+      let rIntHash = intBuiltin [SString r]
+      rByteStringHash <- encodeForReturn rIntHash
+      let sIntHash = intBuiltin [SString s]
+      sByteStringHash <- encodeForReturn sIntHash      
+      -- let rByteStringHash = BSU.fromString r
+      -- let sByteStringHash = BSU.fromString s
+      let theSignerAddress = whoSignedThisTransactionEcrecover (bytestringHash) rByteStringHash sByteStringHash v
       let theZero ::  Integer
           theZero = 0
       case theSignerAddress of
