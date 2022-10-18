@@ -5274,10 +5274,22 @@ contract qq {
   
   address addr;
   constructor() {
-  addr = ecrecover("3a5d3354533658145308bb0d64dbc1508fc09cdfb776fbd3ef69c5733efff993",62426968875534762403852209127290402186903754337050088741962154937967930754218,50195776013273436178497944053297375925820829706569486652594540226567378884053,27);
+  addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"c99b861c7a2d47bcf5a8423b94cc962b585f340a53e88c91b86a53effd10dc58","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
   }
 }|]
-    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0xe2b74b933b1fbe7f3736ad437b60a7828bcc4b80 UnspecifiedChain)]
+    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0x91bc5385f9cfa1f4c9c9805102d54c7f77bde902 UnspecifiedChain)] -- 666171f931111ae3aed54595fc9776699e5eb03d
+
+--   it "returns 0  for invalid ecrecover call" . runTest $ do
+--     runBS [r|
+-- pragma solidvm 3.4;
+-- contract qq {
+  
+--   address addr;
+--   constructor() {
+--   addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"efd16e46ceb4851861b89aa5fddb18e18a70bdaf029d77482bdd9b2242854b59","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
+--   }
+-- }|]
+--     getFields ["addr"] `shouldReturn` [BDefault]
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
