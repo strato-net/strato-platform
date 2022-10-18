@@ -239,14 +239,14 @@ postBlocTransactionParallel :: ( MonadLogger m
                             -> Bool -- queue
                             -> PostBlocTransactionRequest
                             -> m [BlocChainOrTransactionResult]
-postBlocTransactionParallel a b resolve queue c =
+postBlocTransactionParallel jwtToken b resolve queue c =
   if queue && not resolve
     then do
       checkIsSynced
       tbqueue <- fmap txTBQueue getBlocEnv
-      atomically $ writeTBQueue tbqueue (a,b,resolve,c)
+      atomically $ writeTBQueue tbqueue (jwtToken,b,resolve,c)
       pure []
-    else postBlocTransaction' (Do CacheNonce) a b resolve c
+    else postBlocTransaction' (Do CacheNonce) jwtToken b resolve c
 
 
 postBlocTransaction :: ( MonadLogger m
@@ -281,14 +281,14 @@ postBlocTransaction' :: ( MonadLogger m
                      -> Bool
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
-postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
-  case mUserName of
+  case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
-    Just userName -> do
+    Just jwtToken -> do
       addr <- case mAddr of
-        Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
+        Nothing -> fmap unAddress . blocVaultWrapper $ getKey jwtToken Nothing
         Just addr' -> return addr'
       let src' :: ContractPayload -> Maybe SourceMap
           src' p = if contractpayloadSrc p == mempty
@@ -310,7 +310,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (transferpayloadMetadata p)
                         (transferpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp userName
+            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp jwtToken
           xs -> do
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
@@ -318,7 +318,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp userName
+            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp jwtToken
         CONTRACT -> case txs of
           [] -> return []
           [x] -> do
@@ -343,7 +343,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
                 then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
             else do
-                fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
+                fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
@@ -366,7 +366,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
               then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
             else do
-              fmap BlocTxResult <$> poster cacheNonce bclp userName
+              fmap BlocTxResult <$> poster cacheNonce bclp jwtToken
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do
@@ -381,7 +381,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp userName
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp jwtToken
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
@@ -390,7 +390,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                                 MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp jwtToken
         GENESIS -> case txs of
           [] -> return []
           xs -> do
@@ -402,7 +402,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                 chainInputSrcMap :: ChainInput -> Maybe SourceMap
                 chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
                 hydrate p = p{ chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p }
-            fmap (fmap BlocChainResult) . postChainInfos (Just userName) $ hydrate <$> chainInputs
+            fmap (fmap BlocChainResult) . postChainInfos (Just jwtToken) $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -418,9 +418,9 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
 
 callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
-callSignature userName unsigned@UnsignedTransaction{..} = do
+callSignature jwtToken unsigned@UnsignedTransaction{..} = do
   let msgHash = rlpHash unsigned
-  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  sig <- blocVaultWrapper $ postSignature jwtToken (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
   return $ Transaction
     unsignedTransactionNonce
@@ -457,9 +457,9 @@ postUsersSend' :: ( A.Selectable Account AddressState m
                   , HasSQL m
                   )
                => Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
-postUsersSend' cacheNonce TransferParameters{..} userName = do
+postUsersSend' cacheNonce TransferParameters{..} jwtToken = do
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
-    tx <- signAndPrepare userName fromAddress metadata $
+    tx <- signAndPrepare jwtToken fromAddress metadata $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -479,7 +479,7 @@ postUsersContractEVM' :: ( MonadLogger m
                          , HasSQL m
                          )
                       => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
-postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
+postUsersContractEVM' cacheNonce ContractParameters{..} jwtToken = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
@@ -496,7 +496,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
-  tx <- signAndPrepare userName fromAddr metadata' $
+  tx <- signAndPrepare jwtToken fromAddr metadata' $
     TransactionHeader
       Nothing
       fromAddr
@@ -518,7 +518,7 @@ postUsersContractSolidVM' :: ( MonadLogger m
                              , HasSQL m
                              )
                           => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
-postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
+postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
@@ -531,7 +531,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
 
-  tx <- signAndPrepare userName fromAddr metadata' $
+  tx <- signAndPrepare jwtToken fromAddr metadata' $
     TransactionHeader
       Nothing
       fromAddr
@@ -554,7 +554,7 @@ postUsersUploadListSolidVM' :: ( MonadLogger m
                                , HasSQL m
                                )
                             => Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
-postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
+postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
@@ -569,7 +569,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-      tx <- lift . signAndPrepare userName fromAddr metadata' $
+      tx <- lift . signAndPrepare jwtToken fromAddr metadata' $
           TransactionHeader
             Nothing
             fromAddr
@@ -601,7 +601,7 @@ postUsersUploadListEVM' :: ( MonadLogger m
                            , HasSQL m
                            )
                         => Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
-postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
+postUsersUploadListEVM' cacheNonce ContractListParameters{..} jwtToken = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
@@ -622,7 +622,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
           Right val -> return val
           _ -> throwIO $ AnError "Couldn't decode binary"
 
-      tx <- lift . signAndPrepare userName fromAddr metadata' $
+      tx <- lift . signAndPrepare jwtToken fromAddr metadata' $
           TransactionHeader
             Nothing
             fromAddr
@@ -644,7 +644,7 @@ postUsersSendList' :: ( MonadLogger m
                       , HasSQL m
                       )
                    => Should CacheNonce -> TransferListParameters -> Text -> m [BlocTransactionResult]
-postUsersSendList' cacheNonce TransferListParameters{..} userName = do
+postUsersSendList' cacheNonce TransferListParameters{..} jwtToken = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
   txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
   txs'' <- mapM
@@ -656,7 +656,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
               (Wei $ fromIntegral value)
               (Code ByteString.empty)
               cid
-        signAndPrepare userName fromAddr md header
+        signAndPrepare jwtToken fromAddr md header
     ) txsWithParams
   hashes <- postTransactionList txs''
   getBatchBlocTransactionResult' hashes resolve
@@ -671,7 +671,7 @@ postUsersContractMethodList' :: ( MonadLogger m
                                 , HasSQL m
                                 )
                              => Should CacheNonce -> FunctionListParameters -> Text -> m [BlocTransactionResult]
-postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
+postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
   if null txs
     then return []
     else do
@@ -705,7 +705,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
                 Map.insert "funcName" methodcallMethodName
                 $ Map.insert "args" argsAsSource
                 $ fromMaybe Map.empty methodcallMetadata
-          tx <- lift . signAndPrepare userName fromAddr methodcallMetadataWithCallInfo $
+          tx <- lift . signAndPrepare jwtToken fromAddr methodcallMetadataWithCallInfo $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -731,7 +731,7 @@ postUsersContractMethod' :: ( MonadLogger m
                             , HasSQL m
                             )
                          => Should CacheNonce -> FunctionParameters -> Text -> m BlocTransactionResult
-postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
+postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
     let err = CouldNotFind $ Text.concat
@@ -759,7 +759,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
           $ Map.insert "args" argsAsSource
           $ fromMaybe Map.empty metadata
 
-    tx <- signAndPrepare userName fromAddr (Just metadataWithCallInfo) $
+    tx <- signAndPrepare jwtToken fromAddr (Just metadataWithCallInfo) $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -828,8 +828,8 @@ addMetadata m t = t{transactionMetadata = m}
 
 signAndPrepare :: (MonadIO m, MonadLogger m, HasVault m) =>
                   Text -> Address -> Maybe (Map Text Text) -> TransactionHeader -> m RawTransaction'
-signAndPrepare userName from md th = do
-  let sign' = callSignature userName
+signAndPrepare jwtToken from md th = do
+  let sign' = callSignature jwtToken
   time <- liftIO getCurrentTime
   fmap (preparePostTx time from . addMetadata md) . sign' $ prepareUnsignedTx th
 
