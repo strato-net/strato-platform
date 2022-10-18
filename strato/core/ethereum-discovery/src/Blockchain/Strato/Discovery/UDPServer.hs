@@ -11,6 +11,7 @@ module Blockchain.Strato.Discovery.UDPServer
      ) where
 
 import           Control.Monad.Catch
+import qualified Control.Monad.Change.Alter              as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
@@ -39,7 +40,6 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil
-import           Blockchain.Strato.Discovery.PeerDB
 import           Blockchain.Strato.Discovery.UDP
 import qualified Text.Colors                             as CL
 import           Text.Format
@@ -138,6 +138,8 @@ udpHandshakeServer :: ( HasSQLDB m
                       , MonadThrow m
                       , MonadLogger m
                       , MonadUnliftIO m
+                      , A.Selectable IPAsText ClosestPeers m
+                      , A.Replaceable IPAsText PPeer m
                       )
                    => Socket
                    -> Int
@@ -174,6 +176,8 @@ handleValidPacket :: ( HasSQLDB m
                      , MonadThrow m
                      , MonadLogger m
                      , MonadUnliftIO m -- TODO(tim): Remove when redundant with HasSQLDB
+                     , A.Selectable IPAsText ClosestPeers m
+                     , A.Replaceable IPAsText PPeer m
                      )
                   => Socket
                   -> SockAddr
@@ -230,7 +234,7 @@ handleValidPacket sock addr _ packet otherPubKey = let portNum = 30303 :: Int in
                          , pPeerDisableExpiration=posixSecondsToUTCTime 0
                          , pPeerEnode = peerToEnode peer
                          }
-        void $ addPeer peer
+        addPeer peer
   where addPeer' = do
           curTime <- liftIO getCurrentTime
           let ip   = sockAddrToIP addr
@@ -254,7 +258,7 @@ handleValidPacket sock addr _ packet otherPubKey = let portNum = 30303 :: Int in
                           , pPeerDisableExpiration=posixSecondsToUTCTime 0
                           , pPeerEnode = peerToEnode peer
                           }
-          void $ addPeer peer
+          addPeer peer
 
 
 -- TODO(tim): Reenable port selection

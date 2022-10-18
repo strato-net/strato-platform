@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FlexibleContexts           #-} {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -25,6 +24,9 @@ import           Control.Exception            hiding (try)
 import qualified Control.Monad.Change.Alter   as A
 import qualified Control.Monad.Change.Modify  as Mod
 import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString              as B
+import qualified Data.ByteString.Base16       as B16
+import qualified Data.ByteString.Char8        as BC
 import qualified Data.Text                    as T
 import           Data.Time
 import           Data.Time.Clock.POSIX
@@ -34,15 +36,17 @@ import           Network.URI                  (URI (..), URIAuth (..))
 import qualified Network.URI                  as URI
 
 
-import           Blockchain.Data.Enode        hiding (IPAddress(..))
+import           Blockchain.Data.Enode
 import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Data.PubKey
+import           Blockchain.Data.RLP
 import           Blockchain.DB.SQLDB          (runSqlPool, withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
 import           Blockchain.Strato.Discovery.Metrics
 import           Blockchain.Strato.Model.Keccak256
 import           Prometheus
 import           UnliftIO
+import           Text.Format
 
 import qualified LabeledError
 
@@ -68,8 +72,8 @@ PPeer
     deriving Show Read Eq
 |]
 
-newtype AvailablePeers = AvailablePeers { unAvaiablePeers :: [PPeer] }
-newtype IPAddress = IPAddress T.Text
+newtype AvailablePeers = AvailablePeers { unAvailablePeers :: [PPeer] }
+newtype IPAsText = IPAsText T.Text deriving (Eq, Ord)
 newtype TCPPort = TCPPort Int
 newtype UDPPort = UDPPort Int
 newtype ActivePeers = ActivePeers { unActivePeers :: [PPeer] }
@@ -77,8 +81,10 @@ newtype PeerBondingState = PeerBondingState { unPeerBondingState :: Int }
 newtype BondedPeers = BondedPeers { unBondedPeers :: [PPeer] }
 newtype BondedPeersForUDP = BondedPeersForUDP { unBondedPeersForUDP :: [PPeer] }
 newtype UnbondedPeers = UnbondedPeers { unUnbondedPeers :: [PPeer] }
+newtype ClosestPeers = ClosestPeers { unClosestPeers :: [PPeer] }
 newtype UdpEnableTime = UdpEnableTime UTCTime
 newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
+newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
 data PeerDisable =
     ExtendPeerDisableTime
@@ -92,14 +98,22 @@ data PeerDisable =
     }
   deriving (Eq, Ord)
 
+instance RLPSerializable NodeID where
+  rlpEncode (NodeID x) = RLPString x
+  rlpDecode (RLPString x) = NodeID x
+  rlpDecode x             = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
+
+instance Format NodeID where
+  format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
+
 instance Mod.Accessible AvailablePeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- liftIO getCurrentTime
     fmap (AvailablePeers . map SQL.entityVal) $ flip runSqlPool sqldb $
       SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
-instance (A.Replaceable (IPAddress, TCPPort) ActivityState) IO where
-  replace _ (IPAddress ip, TCPPort port) state = withGlobalSQLPool . runSqlPool $ do
+instance (A.Replaceable (IPAsText, TCPPort) ActivityState) IO where
+  replace _ (IPAsText ip, TCPPort port) state = withGlobalSQLPool . runSqlPool $ do
     SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
                     [PPeerActiveState SQL.=. fromEnum state]
 
@@ -109,8 +123,8 @@ instance Mod.Accessible ActivePeers IO where
     fmap (ActivePeers . map SQL.entityVal) $ flip runSqlPool sqldb $
       SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
   
-instance (A.Replaceable (IPAddress, UDPPort) PeerBondingState) IO where
-  replace _ (IPAddress ip, UDPPort port) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
+instance (A.Replaceable (IPAsText, UDPPort) PeerBondingState) IO where
+  replace _ (IPAsText ip, UDPPort port) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerIp SQL.==. ip, PPeerUdpPort SQL.==. port] [PPeerBondState SQL.=. state]
 
@@ -131,6 +145,11 @@ instance Mod.Accessible UnbondedPeers IO where
     currentTime <- getCurrentTime
     fmap (UnbondedPeers . map SQL.entityVal) $ flip runSqlPool sqldb $
       SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
+
+instance A.Selectable IPAsText ClosestPeers IO where
+  select _ (IPAsText requesterIP) = withGlobalSQLPool $ \sqldb ->
+    fmap (Just . ClosestPeers . map SQL.entityVal) $ flip runSqlPool sqldb $
+      SQL.selectList [ PPeerIp SQL.!=. requesterIP, PPeerPubkey SQL.!=. Nothing] []
 
 instance A.Replaceable PPeer UdpEnableTime IO where
   replace _ peer' (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
@@ -222,21 +241,21 @@ parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.ur
 
 
 getAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m (Either SomeException [PPeer])
-getAvailablePeers = try $ unAvaiablePeers <$> Mod.access (Mod.Proxy @AvailablePeers)
+getAvailablePeers = try $ unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers)
 
 
-setPeerActiveState :: (MonadUnliftIO m, MonadMonitor m, A.Replaceable (IPAddress, TCPPort) ActivityState m)
+setPeerActiveState :: (MonadUnliftIO m, MonadMonitor m, A.Replaceable (IPAsText, TCPPort) ActivityState m)
                    => T.Text -> Int -> ActivityState -> m (Either SomeException ())
 setPeerActiveState ip port state = do
   recordStateChange state
-  try $ A.replace (A.Proxy @ActivityState) (IPAddress ip, TCPPort port) state
+  try $ A.replace (A.Proxy @ActivityState) (IPAsText ip, TCPPort port) state
 
 getActivePeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m (Either SomeException [PPeer])
 getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)
 
-setPeerBondingState :: (MonadUnliftIO m, A.Replaceable (IPAddress, UDPPort) PeerBondingState m)
+setPeerBondingState :: (MonadUnliftIO m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m)
                     => String -> Int -> Int -> m (Either SomeException ())
-setPeerBondingState ip port state = try $ A.replace (A.Proxy @PeerBondingState) (IPAddress $ T.pack ip, UDPPort port) (PeerBondingState state)
+setPeerBondingState ip port state = try $ A.replace (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, UDPPort port) (PeerBondingState state)
 
 getBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeers m) => m (Either SomeException [PPeer])
 getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
@@ -287,3 +306,11 @@ peerToEnode peer = (\pk -> Enode (OrgId $ pointToBytes pk)
                                  (readIP . T.unpack $ pPeerIp peer)
                                  (pPeerTcpPort peer)
                                  (Just $ pPeerUdpPort peer)) <$> pPeerPubkey peer
+
+getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
+getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
+
+-- todo: respect the requester's target. also is this basically getClosePeers?s
+getPeersClosestTo :: (MonadUnliftIO m, A.Selectable IPAsText ClosestPeers m)
+                  => NodeID -> T.Text -> Point -> m [PPeer]
+getPeersClosestTo _ requesterIP _ = take 20 . maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)

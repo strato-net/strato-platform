@@ -28,7 +28,6 @@ import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
 import           Data.List.Split
 import           Data.Maybe
@@ -232,8 +231,6 @@ processDataStream' bs =
         then error "bad UDP data sent from peer, the hash isn't correct"
         else fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
-newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
-
 nodeIDToPoint::NodeID->Point
 nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
 nodeIDToPoint (NodeID nodeID) = Point x y
@@ -244,14 +241,6 @@ nodeIDToPoint (NodeID nodeID) = Point x y
 pointToNodeID::Point->NodeID
 pointToNodeID PointO      = error "called pointToNodeID with PointO, we can't handle that yet"
 pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
-
-instance RLPSerializable NodeID where
-  rlpEncode (NodeID x) = RLPString x
-  rlpDecode (RLPString x) = NodeID x
-  rlpDecode x             = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
-
-instance Format NodeID where
-  format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
 
 
 
