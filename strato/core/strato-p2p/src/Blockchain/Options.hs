@@ -19,7 +19,7 @@ defineFlag "l:listen" (30303 :: Int) "Listen on port"
 defineFlag "sqlPeers" False "Choose peers from the SQL DB, not the config file"
 defineFlag "syncBacktrackNumber" (10::Integer) "block number to go back when syncing"
 defineFlag "debugFail" True "Fail on errors we're not supposed to reach. If false, just log insteand and go on"
-defineFlag "maxConn" (20::Int) "Maximum number of client connections."
+defineFlag "maxConn" (1000::Int) "Maximum number of client connections."
 defineFlag "connectionTimeout" (300 :: Int) "Number of seconds to tolerate a useless peer"
 defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"

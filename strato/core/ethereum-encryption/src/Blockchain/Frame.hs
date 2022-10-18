@@ -9,7 +9,6 @@ module Blockchain.Frame
   , ethDecrypt
   , cbSafeTake
   ) where
-
 import              BlockApps.Logging
 import qualified    Blockchain.AESCTR                 as AES
 import              Blockchain.Error
@@ -26,6 +25,8 @@ import qualified    Data.ByteString.Lazy              as BL
 import              Data.Conduit
 import qualified    Data.Conduit.Binary               as CB
 import              Data.Maybe
+import qualified    Data.Text                         as T
+--import Data.Text() 
 
 bXor :: B.ByteString->B.ByteString->B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
@@ -78,6 +79,7 @@ ethEncrypt ethCryptState = do
           (mac', headMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
 
       yield headCipher
+      $logInfoS "headCipher!!" $ T.pack $ ": "++ (show (headCipher)) 
       yield headMAC
 
       let (aesState'', frameCipher) = AES.encrypt aesState' (bytes `B.append` B.replicate frameBuffSize 0)
@@ -89,7 +91,7 @@ ethEncrypt ethCryptState = do
 
       ethEncrypt ethCryptState{aesState=aesState'', mac=mac'''}
 
-cbSafeTake :: forall o m. Monad m
+cbSafeTake :: forall o m. Monad m 
            => Int
            -> ConduitT B.ByteString o m (Maybe B.ByteString)
 cbSafeTake i = do
@@ -102,7 +104,12 @@ ethDecrypt :: MonadLogger m
            => EthCryptState
            -> ConduitM B.ByteString B.ByteString m ()
 ethDecrypt ethCryptState = do
-  headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
+  -- $logInfoS "cbSafeTake16!!" $ T.pack $ ": "++ (show (cbSafeTake 16)) 
+  cb <- cbSafeTake 16
+  $logInfoS "cbSafeTake16!!" $ T.pack $ show cb
+  let headCipher = fromMaybe (throw HeadCipherTooShort) cb
+  -- headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
+  $logInfoS "cbSafeTake16!!" . T.pack $ ": " ++ show headCipher
   headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16
 
   let (mac', expectedHeadMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
