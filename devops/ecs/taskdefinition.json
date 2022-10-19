@@ -256,7 +256,7 @@
                 },
                 {
                     "name": "USE_OLD_STRATO_API",
-                    "value": ""
+                    "value": "true"
                 }
             ],
             "mountPoints": [],
