@@ -43,6 +43,7 @@ library:
     - fast-keccak256
     - format
     - generic-arbitrary
+    - generic-deriving
     - hashable
     - http-api-data
     - integer-gmp

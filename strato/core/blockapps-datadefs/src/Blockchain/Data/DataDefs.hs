@@ -47,7 +47,9 @@ import           Numeric
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
+
 import           Blockchain.Strato.Model.Address
+-- import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
@@ -62,6 +64,40 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
+-- import qualified LabeledError
+
+-- instance PersistFieldSql OrgName where
+--   sqlType _ = SqlString
+
+-- instance PersistField OrgName where
+--   toPersistValue = PersistText . pack . show
+--   fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/OrgName" . unpack $ t
+--   fromPersistValue x = Left . pack $ "PersistField OrgName: expected string: " ++ show x
+
+-- instance PersistFieldSql OrgUnit where
+--   sqlType _ = SqlString
+
+-- instance PersistField OrgUnit where
+--   toPersistValue = PersistText . pack . show
+--   fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/OrgUnit" . unpack $ t
+--   fromPersistValue x = Left . pack $ "PersistField OrgUnit: expected string: " ++ show x
+
+-- instance PersistFieldSql Access where
+--   sqlType _ = SqlString
+
+-- instance PersistField Access where
+--   toPersistValue = PersistText . pack . show
+--   fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/Access" . unpack $ t
+--   fromPersistValue x = Left . pack $ "PersistField Access: expected string: " ++ show x
+
+-- instance PersistFieldSql CommonName where
+--   sqlType _ = SqlString
+
+-- instance PersistField CommonName where
+--   toPersistValue = PersistText . pack . show
+--   fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/CommonName" . unpack $ t
+--   fromPersistValue x = Left . pack $ "PersistField CommonName: expected string: " ++ show x
+
 
 share [mkPersist sqlSettings, mkMigrate "migrateAuto"]  -- annoying: postgres doesn't like tables called user
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")

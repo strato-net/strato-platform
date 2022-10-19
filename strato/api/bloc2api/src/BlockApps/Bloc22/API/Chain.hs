@@ -19,6 +19,8 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import qualified Data.Set                           as S
+import qualified Data.Functor.Identity as DFI
 import           Data.Map.Strict                    (Map)
 import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
@@ -40,6 +42,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.ChainMember
 import           Data.Source.Map
 
 --------------------------------------------------------------------------------
@@ -52,7 +55,7 @@ data ChainInput  = ChainInput
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" "balance" Address Integer
   , chaininputArgs     :: Map Text ArgValue
-  , chaininputMembers  :: NamedMap "address" "enode" Address Enode
+  , chaininputMembers  :: ChainMembers
   , chaininputParentChain :: Maybe Word256
   , chaininputMetadata :: Maybe (Map Text Text)
   , chaininputAsync    :: Maybe Bool
@@ -63,10 +66,10 @@ instance ToSchema (NamedTuple "address" "balance" Address Integer) where
     & mapped.schema.description ?~ "address and balance pair"
     & mapped.schema.example ?~ toJSON (NamedTuple @"address" @"balance" (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer)))
 
-instance ToSchema (NamedTuple "address" "enode" Address Enode) where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "address and enode pair"
-    & mapped.schema.example ?~ toJSON (NamedTuple @"address" @"balance" (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1))
+-- instance ToSchema (NamedTuple "address" "enode" Address Enode) where
+--   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+--     & mapped.schema.description ?~ "address and enode pair"
+--     & mapped.schema.example ?~ toJSON (NamedTuple @"address" @"balance" (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1))
 
 instance Arbitrary ChainInput where
   arbitrary = GR.genericArbitrary GR.uniform
@@ -92,18 +95,24 @@ instance ToJSON ChainInput where
 exampleSrc :: Text
 exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
 
-exampleEnode1 :: Enode
-exampleEnode1 = Enode (OrgId "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
-                      (readIP "171.16.0.4")
-                      30303
-                      Nothing
+-- exampleEnode1 :: Enode
+-- exampleEnode1 = Enode (OrgId "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
+--                       (readIP "171.16.0.4")
+--                       30303
+--                       Nothing
 
-exampleEnode2 :: Enode
-exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
-                      (readIP "172.16.0.5")
-                      30303
-                      (Just 30303)
+-- exampleEnode2 :: Enode
+-- exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
+--                       (readIP "172.16.0.5")
+--                       30303
+--                       (Just 30303)
 
+exampleChainMember1 :: ChainMember
+exampleChainMember1 = ChainMember (ChainMemberF (DFI.Identity "BlockApps") (DFI.Identity (Just "Engineering")) (DFI.Identity (Just "David Nallapu")))
+                     
+exampleChainMember2 :: ChainMember
+exampleChainMember2 = ChainMember (ChainMemberF (DFI.Identity "BlockApps") (DFI.Identity (Just "Engineering")) (DFI.Identity (Just "Dustin Norwood")))
+                            
 exChainInput :: ChainInput
 exChainInput = ChainInput
     { chaininputSrc = unnamedSource exampleSrc
@@ -118,10 +127,7 @@ exChainInput = ChainInput
          ("addRule", ArgString "AUTO_APPROVE")
        , ("removeRule", ArgString "AUTO_APPROVE")
        ]
-    , chaininputMembers = map (NamedTuple @"address" @"enode") [
-         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
-       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-       ]
+    , chaininputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2])
     , chaininputParentChain = Nothing
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
     , chaininputAsync = Nothing
@@ -147,7 +153,7 @@ instance ToParam (QueryParams "offset" Integer) where
 data ChainOutput = ChainOutput
   { chainoutputLabel    :: Text
   , chainoutputBalances :: NamedMap "address" "balance" Address Integer
-  , chainoutputMembers  :: NamedMap "address" "enode" Address Enode
+  , chainoutputMembers  :: ChainMembers
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainOutput where
@@ -166,10 +172,7 @@ exChainOutput = ChainOutput
       (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
     , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
     ]
-  , chainoutputMembers = map (NamedTuple @"address" @"enode") [
-      (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
-    , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-    ]
+  , chainoutputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2])
   }
 
 instance ToSample ChainOutput where

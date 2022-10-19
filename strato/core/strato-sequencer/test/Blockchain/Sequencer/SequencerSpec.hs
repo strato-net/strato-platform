@@ -13,6 +13,7 @@ import           Data.IORef
 import           Data.Maybe                          (fromMaybe, isNothing)
 import           Data.Time.Clock.POSIX
 import qualified Data.Map                            as M
+import qualified Data.Set                            as S
 import           Data.Maybe                          (isJust)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
@@ -39,6 +40,7 @@ import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Data.Block
+import           Blockchain.Data.Enode
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
@@ -428,7 +430,7 @@ spec = do
 
     describe "Private Chains" $ do
       let getChainInfo lbl = ChainInfo
-                                 (UnsignedChainInfo lbl [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
+                                 (UnsignedChainInfo lbl [] [] (ChainMembers S.empty) Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                                  Nothing
           getChainIdAndDetails cInfo =
             let chainId = Keccak256.rlpHash cInfo

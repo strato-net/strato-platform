@@ -36,16 +36,18 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Control.Lens
 import           Conduit
-import qualified Data.Map                       as M
+-- import qualified Data.Map                       as M
 import           Data.Maybe                     (fromMaybe)
 import           Data.Swagger
 import qualified Data.Text                      as T
+import qualified Data.Set                       as S
 import           Servant
 import           Servant.Client
 
 import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
+import           Blockchain.Data.Enode
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
@@ -152,7 +154,7 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
   \(i, gen@(ChainInfo (UnsignedChainInfo _ acin _ mb _ _ _ _) _)) -> do
     -- add more checks?
     when (length acin == 0) $ Left (i,"account info is empty")
-    when (M.size mb == 0) $ Left (i, "member list is empty")
+    when ((S.size $ unChainMembers mb) == 0) $ Left (i, "member list is empty")
     let cid = rlpHash gen
     return . ChainId $ keccak256ToWord256 cid
 

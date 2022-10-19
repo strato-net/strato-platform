@@ -27,6 +27,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember
 import           Text.Format
 
 data BlockDBNamespace = Headers
@@ -79,6 +80,9 @@ instance RedisDBValuable S8.ByteString where
 
 instance RedisDBKeyable Keccak256 where
     toKey = S8.pack . keccak256ToHex
+
+instance RedisDBKeyable ChainMember where
+    toKey = toStrict . encode
 
 instance RedisDBValuable Keccak256 where
     toValue   = S8.pack . keccak256ToHex
@@ -149,7 +153,7 @@ newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Rea
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving newtype (Eq, Read, Show, RedisDBValuable)
 newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Show, RLPSerializable)
-newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainMembers = RedisChainMembers ChainMembers deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)

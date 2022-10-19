@@ -182,8 +182,9 @@ ChainSignatureRef
 
 ChainMemberRef
     chainInfoId ChainInfoRefId
-    name String
-    address Address
+    orgName Text 
+    orgUnit Text Maybe 
+    commonName Text Maybe 
     deriving Eq Generic Show
 
 AccountInfoRef

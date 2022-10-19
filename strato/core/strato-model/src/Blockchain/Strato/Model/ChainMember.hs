@@ -23,30 +23,18 @@ module Blockchain.Strato.Model.ChainMember (
   ChainMember(..),
   ) where
 
--- import           Control.DeepSeq (NFData)
 import           Data.Aeson             hiding (Array, String)
 import           Data.Binary        
--- import qualified Data.Binary            as BIN
 import           Data.Data
--- import           Data.Generics      as DE
 import           GHC.Generics
--- import           Data.Swagger                         hiding (Format, format, get, put)
 import           Blockchain.Data.RLP
 import qualified Data.Text                            as T
 import           Test.QuickCheck.Instances.Text        ()
 import           Text.Format
--- import           Data.Swagger                         hiding (Format, format)
--- import           Data.Functor 
 import qualified Data.Functor.Identity as DFI
 import           Generics.Deriving 
 import           Test.QuickCheck.Arbitrary
 import           Test.QuickCheck.Arbitrary.Generic
-
-
--- newtype OrgName = OrgName { unOrgName :: String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype CommonName = CommonName { unCommonName :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype Access = Access { unAccess :: Bool } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
 
 
 data BoundedData a =  LowerBound | Middle a | UpperBound deriving (Eq, Generic)
@@ -58,23 +46,11 @@ newtype MaybeIITTEXT = MaybeITexter MaybeIText
 type MaybeIText = DFI.Identity (Maybe T.Text)
 
 
--- instance GEnum Text
 instance GEnum a => GEnum (BoundedData a)
-
--- instance Bounded a => Bounded( BoundedData a) where
---   minBound =  LowerBound
---   maxBound =  UpperBound
 
 -- {- For example only
 instance Format ChainMember where
   format = show
-  -- format ChainMember{..} = unlines
-  --   [ "ChainMember"
-  --   , "--------"
-  --   , tab' $ "Org Name:   " ++ show orgName
-  --   , tab' $ "Org Unit: " ++ show orgUnit
-  --   , tab' $ "Common Name:   " ++ show commonName
-  --   ]
 
 instance Ord a => Ord (BoundedData a) where
   LowerBound `compare` LowerBound = EQ
@@ -84,9 +60,6 @@ instance Ord a => Ord (BoundedData a) where
   (Middle a) `compare` (Middle b) = a `compare` b
   (Middle _) `compare` LowerBound = GT
   (Middle _) `compare` UpperBound = LT
-  -- LowerBound `compare` (Middle _) = GT
-  -- UpperBound `compare` (Middle _) = LT
--- -}
 
 
 data ChainMemberF f = ChainMemberF
@@ -210,18 +183,3 @@ instance Arbitrary ChainMember where
 instance Binary (ChainMemberF DFI.Identity)
 
 instance Binary ChainMember
-
--- formatChainMemberWithoutColor::ChainMember->String
--- formatChainMemberWithoutColor x = padZeros 40 $ showHex x ""
-
--- instance Arbitrary Text where
---     arbitrary = pack <$> arbitrary
---     shrink xs = pack <$> shrink (unpack xs)
--- instance Arbitrary Text where
---   arbitrary = genericArbitrary
-
-
-
-
--- instance Generic Text where
---   type Rep Text = pack ""

@@ -62,7 +62,7 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
-import           Control.Arrow                         ((&&&), (***))
+-- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -72,6 +72,7 @@ import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                      as S
+import qualified Data.Set                              as DS
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
@@ -95,6 +96,7 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -230,12 +232,11 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
-instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (ReaderT Config m) where
+instance MonadIO m => A.Selectable ChainMember OrgNameChains (ReaderT Config m) where
   select p ip = A.selectWithDefault p ip <&> toMaybe def
   selectWithDefault _ = fmap OrgNameChains
                       . RBDB.withRedisBlockDB
                       . RBDB.getOrgNameChains
-                      . (unOrgName . fst &&& unOrgUnit . snd)
                       
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
@@ -256,8 +257,8 @@ instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT Config m) where
     ancestors <- map fromJust . filter isJust <$> getAncestorChains (Just cid)
     allChainMembers <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
     case allChainMembers of
-      [] -> pure $ ChainMembers M.empty
-      _ -> pure . ChainMembers $ foldr1 M.intersection allChainMembers
+      [] -> pure $ ChainMembers DS.empty
+      _ -> pure $ ChainMembers DS.empty
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
@@ -267,8 +268,9 @@ instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (Read
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
-instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (ReaderT Config m) where
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain ((unOrgName *** unOrgUnit) k) v
+  
+instance MonadIO m => (ChainMember `A.Alters` Word256) (ReaderT Config m) where
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain k v
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
@@ -441,7 +443,7 @@ type MonadP2P m = ( MonadIO m
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
-                       , '((OrgName, OrgUnit), OrgNameChains)
+                       , '((ChainMember), OrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
@@ -451,7 +453,7 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
-                       , '((OrgName, OrgUnit), Word256)
+                       , '(ChainMember, Word256)
                        , '(Keccak256, Proxy (Inbound WireMessage))
                        , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        ] m

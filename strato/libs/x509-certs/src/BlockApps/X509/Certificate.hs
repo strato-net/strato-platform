@@ -119,7 +119,7 @@ data X509CertInfoState = X509CertInfoState
   , children :: [Address]   -- ^ The "userAddress" of the children of the certificate
   , orgName :: String
   , orgUnit :: Maybe String
-  , commonName :: Maybe String
+  , commonName :: String
   } deriving (Show, Eq, Generic, Binary)
 
 instance Format X509CertInfoState where

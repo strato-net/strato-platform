@@ -111,6 +111,7 @@ import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -135,7 +136,8 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
   , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
-  , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
+  , _orgNameChainsRegistry :: !(Map ChainMember (Modification Word256))
+  -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB

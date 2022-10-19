@@ -138,8 +138,8 @@ instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId = void
                . RBDB.withRedisBlockDB
-               . RBDB.putChainMembers cId
-               . unChainMembers
+               . RBDB.putChainMembers cId --Uses RedisChainMembers which messes things up
+              --  . unChainMembers
                . unP2P
 
 pgPoolSize :: Int

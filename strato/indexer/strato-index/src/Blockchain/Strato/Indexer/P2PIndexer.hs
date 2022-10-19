@@ -38,7 +38,7 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     $logInfoS "p2pIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    indexP2P idxEvents
+    -- indexP2P idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 
@@ -69,7 +69,7 @@ indexP2P idxEvents = do
         "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo
       A.insert (A.Proxy @(P2P ChainInfo)) cId $ P2P cInfo
       let cMembers = members $ chainInfo cInfo
-      A.insert (A.Proxy @(P2P ChainMembers)) cId (P2P $ ChainMembers cMembers)
+      A.insert (A.Proxy @(P2P ChainMembers)) cId (P2P $ cMembers)
     _ -> return ()
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)

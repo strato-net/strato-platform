@@ -78,3 +78,4 @@ tests:
     - strato-index
     - x509-certs
     - strato-model
+    - text
