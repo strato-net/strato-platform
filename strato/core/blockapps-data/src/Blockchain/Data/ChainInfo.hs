@@ -20,7 +20,7 @@ module Blockchain.Data.ChainInfo
   , ChainSignature(..)
   , AccountInfo (..)
   , CodeInfo (..)
-  -- , ChainMember (..)
+  , ChainMember (..)
   , isAncestorChainOf
   , getAncestorChains
   , getNthAncestorChain
@@ -28,7 +28,7 @@ module Blockchain.Data.ChainInfo
   , whoSignedThisChainInfo
   ) where
 
--- import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
+import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad                     (join)
@@ -46,7 +46,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
--- import           Blockchain.TypeLits
+import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -62,7 +62,7 @@ import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
 import           Data.Word
--- import qualified Data.Set                             as S
+import qualified Data.Set                             as S
 
 import qualified GHC.Generics                         as GHCG
 import           LabeledError
@@ -291,9 +291,9 @@ instance ToSchema AccountInfo where
 instance ToSchema ChainSignature where
 instance ToSchema UnsignedChainInfo where
 instance ToSchema ChainInfo where
---  declareNamedSchema _ = return $
---    NamedSchema (Just "ChainInfo")
---      ( mempty )
+ declareNamedSchema _ = return $
+   NamedSchema (Just "ChainInfo")
+     ( mempty )
 
 instance Show UnsignedChainInfo where
   show UnsignedChainInfo{..} = unlines
@@ -326,21 +326,20 @@ instance Format ChainInfo where
     ]
 
 
+instance FromJSON ChainMember where
+  parseJSON (Object o) = do
+    on <- o .: "orgName"
+    ou <- o .: "orgUnit"
+    cmn <- o .: "commonName"
+    return $ ChainMember on ou cmn 
+  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x    
 
--- instance FromJSON ChainMember where
---   parseJSON (Object o) = do
---     on <- o .: "orgName"
---     ou <- o .: "orgUnit"
---     cmn <- o .: "commonName"
---     return $ ChainMember on ou cmn 
---   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x    
-
--- instance ToJSON ChainMember where
---   toJSON (ChainMember on ou cmn) =
---     object [ "orgName" .= on
---             ,"orgUnit" .= ou
---             ,"commonName" .=cmn
---            ]
+instance ToJSON ChainMember where
+  toJSON (ChainMember on ou cmn) =
+    object [ "orgName" .= on
+            ,"orgUnit" .= ou
+            ,"commonName" .=cmn
+           ]
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
@@ -372,23 +371,23 @@ instance ToJSON ChainInfo where
 instance Arbitrary ChainInfo where
   arbitrary = genericArbitrary
 
--- instance RLPSerializable (S.Set ChainMember) where
---   rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
---   rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
---   rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
+instance RLPSerializable (S.Set ChainMember) where
+  rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
+  rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
+  rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
 
--- instance RLPSerializable ChainMember where
---   rlpEncode (ChainMember on ou cmn) = RLPArray
---     [ rlpEncode on
---     , rlpEncode ou
---     , rlpEncode cmn
---     ]
---   rlpDecode (RLPArray [on, ou, cmn]) =
---     ChainMember
---       (rlpDecode on)
---       (rlpDecode ou)
---       (rlpDecode cmn)
---   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
+instance RLPSerializable ChainMember where
+  rlpEncode (ChainMember on ou cmn) = RLPArray
+    [ rlpEncode on
+    , rlpEncode ou
+    , rlpEncode cmn
+    ]
+  rlpDecode (RLPArray [on, ou, cmn]) =
+    ChainMember
+      (rlpDecode on)
+      (rlpDecode ou)
+      (rlpDecode cmn)
+  rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
 
 
 instance RLPSerializable UnsignedChainInfo where
@@ -447,7 +446,7 @@ accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 acctInfo :: JS.Parser AccountInfo
 acctInfo = JS.value
 
-whoSignedThisChainInfo :: ChainInfo -> Maybe Address
+whoSignedThisChainInfo :: ChainInfo -> Maybe ChainMember
 whoSignedThisChainInfo (ChainInfo _ Nothing) = Nothing
 whoSignedThisChainInfo (ChainInfo u (Just (ChainSignature r s v))) =
   let intToBSS = BSS.toShort . word256ToBytes

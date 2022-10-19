@@ -11,10 +11,10 @@
 
 
 module Blockchain.Strato.Model.ChainMember (
-  -- OrgName(..),
-  -- OrgUnit(..),
-  -- CommonName(..),
-  -- Access(..),
+  OrgName(..),
+  OrgUnit(..),
+  CommonName(..),
+  Access(..),
   getTextFromIdentity,
   getTextFromIdentity',
   toChainMemberRange,
@@ -23,47 +23,47 @@ module Blockchain.Strato.Model.ChainMember (
   ChainMember(..),
   ) where
 
--- import           Control.DeepSeq (NFData)
+import           Control.DeepSeq (NFData)
 import           Data.Aeson             hiding (Array, String)
 import           Data.Binary        
--- import qualified Data.Binary            as BIN
+import qualified Data.Binary            as BIN
 import           Data.Data
 -- import           Data.Generics      as DE
 import           GHC.Generics
--- import           Data.Swagger                         hiding (Format, format, get, put)
+import           Data.Swagger                         hiding (Format, format, get, put)
 import           Blockchain.Data.RLP
 import qualified Data.Text                            as T
 import           Test.QuickCheck.Instances.Text        ()
 import           Text.Format
--- import           Data.Swagger                         hiding (Format, format)
--- import           Data.Functor 
+import           Data.Swagger                         hiding (Format, format)
+import           Data.Functor 
 import qualified Data.Functor.Identity as DFI
-import           Generics.Deriving 
+-- import           Generics.Deriving 
 import           Test.QuickCheck.Arbitrary
 import           Test.QuickCheck.Arbitrary.Generic
 
 
--- newtype OrgName = OrgName { unOrgName :: String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype CommonName = CommonName { unCommonName :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
--- newtype Access = Access { unAccess :: Bool } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
+newtype OrgName = OrgName { unOrgName :: String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
+newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
+newtype CommonName = CommonName { unCommonName :: Maybe String } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
+newtype Access = Access { unAccess :: Bool } deriving (Show, Read, Eq, Ord, Generic, NFData, BIN.Binary, Data)
 
 
 data BoundedData a =  LowerBound | Middle a | UpperBound deriving (Eq, Generic)
 
-newtype IITTEXT = ITexter IText
+newtype IITT = Texter IText
 type IText = DFI.Identity T.Text
 
-newtype MaybeIITTEXT = MaybeITexter MaybeIText
+newtype MaybeIITT = MaybeITexter MaybeIText
 type MaybeIText = DFI.Identity (Maybe T.Text)
 
 
--- instance GEnum Text
-instance GEnum a => GEnum (BoundedData a)
+-- instance GEnum T.Text
+-- instance GEnum a => GEnum (BoundedData a)
 
--- instance Bounded a => Bounded( BoundedData a) where
---   minBound =  LowerBound
---   maxBound =  UpperBound
+instance Bounded a => Bounded( BoundedData a) where
+  minBound =  LowerBound
+  maxBound =  UpperBound
 
 -- {- For example only
 instance Format ChainMember where
@@ -86,19 +86,18 @@ instance Ord a => Ord (BoundedData a) where
   (Middle _) `compare` UpperBound = LT
   -- LowerBound `compare` (Middle _) = GT
   -- UpperBound `compare` (Middle _) = LT
--- -}
 
 
 data ChainMemberF f = ChainMemberF
   { orgName    :: f T.Text
   , orgUnit    :: f (Maybe T.Text)
   , commonName :: f (Maybe T.Text)
-  -- , access     :: f Text
+  -- , access     :: f T.Text
   } deriving (Generic)
 
 
 -- newtype ChainMemberNewType = ChainMemberNewType ChainMember
-newtype ChainMember = ChainMember {getChainMember :: ChainMemberF DFI.Identity}  deriving (Generic, Data, Show)-- ChainMember { Text, Text, Text }
+newtype ChainMember = ChainMember {getChainMember :: ChainMemberF DFI.Identity}  deriving (Generic, Data, Show)-- ChainMember { T.Text, T.Text, T.Text }
 
 instance Eq ChainMember where
   cmr1 == cmr2 = toChainMemberRange cmr1 == toChainMemberRange cmr2
@@ -150,11 +149,11 @@ isDustinInBAEngTeam =
    in isInBlockAppsEngineeringTeam me
 
 
-instance RLPSerializable (IITTEXT) where 
-  rlpEncode (ITexter (DFI.Identity a)) = rlpEncode a
+instance RLPSerializable (IText) where 
+  rlpEncode (Texter (DFI.Identity a)) = rlpEncode a
   rlpDecode = ITexter . DFI.Identity . rlpDecode
 
-instance RLPSerializable (MaybeIITTEXT) where 
+instance RLPSerializable (Maybe IText) where 
   rlpEncode (MaybeITexter (DFI.Identity a)) = rlpEncode a
   rlpDecode = MaybeITexter . DFI.Identity . rlpDecode
 
@@ -174,10 +173,10 @@ instance RLPSerializable ChainMember where
       -- (rlpDecode a)
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
 
-removeItexter :: IITTEXT -> DFI.Identity T.Text
-removeItexter (ITexter x) = x
+removeItexter :: IITText -> DFI.Identity T.Text
+removeItexter (Texter x) = x
 
-removeMaybeItexter :: MaybeIITTEXT -> DFI.Identity (Maybe T.Text)
+removeMaybeItexter :: MaybeIITT -> DFI.Identity (Maybe T.Text)
 removeMaybeItexter (MaybeITexter x) = x
 
 instance FromJSON ChainMember where
@@ -223,5 +222,5 @@ instance Binary ChainMember
 
 
 
--- instance Generic Text where
---   type Rep Text = pack ""
+-- instance Generic T.Text where
+--   type Rep T.Text = pack ""

@@ -52,13 +52,13 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
-  , _proposer :: Address
+  , _proposer :: ChainMember
   -- The total group of participants
-  , _validators :: S.Set Address
+  , _validators :: S.Set ChainMember
   -- Validators who have sent us a prepare for this round
-  , _prepared :: M.Map Address Keccak256
+  , _prepared :: M.Map ChainMember Keccak256
   -- Validators who have sent us a commitment seal for this round
-  , _committed :: M.Map Address (Keccak256, Signature)
+  , _committed :: M.Map ChainMember (Keccak256, Signature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPreprepared :: Bool
@@ -66,14 +66,14 @@ data BlockstanbulContext = BlockstanbulContext {
   , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
-  , _roundChanged :: M.Map RoundNumber (S.Set Address)
-  , _voted :: M.Map Address (M.Map Address Bool)
-  -- The address of this node
-  , _selfAddr :: Address
+  , _roundChanged :: M.Map RoundNumber (S.Set ChainMember)
+  , _voted :: M.Map ChainMember (M.Map ChainMember Bool)
+  -- The ChainMember of this node
+  , _selfAddr :: ChainMember
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
-  , _lockSender :: Maybe Address
-  , _authSenders :: M.Map Address Int
+  , _lockSender :: Maybe ChainMember
+  , _authSenders :: M.Map ChainMember Int
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
   , _lastParent :: Maybe Keccak256
@@ -90,7 +90,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer (printf "%x")
-  infoLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
+  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMember -> String) . S.toList)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
@@ -100,7 +100,7 @@ debugShowCtx = do
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/admins" authSenders show
 
-newContext :: Checkpoint -> Address -> BlockstanbulContext
+newContext :: Checkpoint -> ChainMembers -> BlockstanbulContext
 newContext (Checkpoint v pendingVotes as senderlist) addr =
   let valSet = S.fromList as
       prop = fromMaybe 0x0 . S.lookupMin $ valSet
@@ -126,7 +126,7 @@ newContext (Checkpoint v pendingVotes as senderlist) addr =
      , _validatorBehavior = True
      }
 
-generateNonceMap :: [Address] -> M.Map Address Int
+generateNonceMap :: [ChainMember] -> M.Map ChainMember Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
 
