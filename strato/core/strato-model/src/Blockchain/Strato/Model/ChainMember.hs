@@ -51,10 +51,10 @@ newtype Access = Access { unAccess :: Bool } deriving (Show, Read, Eq, Ord, Gene
 
 data BoundedData a =  LowerBound | Middle a | UpperBound deriving (Eq, Generic)
 
-newtype IITT = Texter IText
+newtype IITTEXT = Texter IText
 type IText = DFI.Identity T.Text
 
-newtype MaybeIITT = MaybeITexter MaybeIText
+newtype MaybeIITTEXT = MaybeITexter MaybeIText
 type MaybeIText = DFI.Identity (Maybe T.Text)
 
 
@@ -149,11 +149,11 @@ isDustinInBAEngTeam =
    in isInBlockAppsEngineeringTeam me
 
 
-instance RLPSerializable (IText) where 
+instance RLPSerializable (IITTEXT) where 
   rlpEncode (Texter (DFI.Identity a)) = rlpEncode a
   rlpDecode = ITexter . DFI.Identity . rlpDecode
 
-instance RLPSerializable (Maybe IText) where 
+instance RLPSerializable (Maybe IITTEXT) where 
   rlpEncode (MaybeITexter (DFI.Identity a)) = rlpEncode a
   rlpDecode = MaybeITexter . DFI.Identity . rlpDecode
 
@@ -173,10 +173,10 @@ instance RLPSerializable ChainMember where
       -- (rlpDecode a)
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
 
-removeItexter :: IITText -> DFI.Identity T.Text
+removeItexter :: IITTEXT -> DFI.Identity T.Text
 removeItexter (Texter x) = x
 
-removeMaybeItexter :: MaybeIITT -> DFI.Identity (Maybe T.Text)
+removeMaybeItexter :: MaybeIITTEXT -> DFI.Identity (Maybe T.Text)
 removeMaybeItexter (MaybeITexter x) = x
 
 instance FromJSON ChainMember where
