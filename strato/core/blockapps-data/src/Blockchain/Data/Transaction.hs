@@ -269,11 +269,12 @@ whoSignedThisTransaction tx = case tx of
           sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
 
-whoSignedThisTransactionEcrecover :: B.ByteString -> B.ByteString -> B.ByteString  -> Integer -> Maybe Address
+whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer  -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
         where
-          sig = EC.Signature (SEC.CompactRecSig (BSS.toShort $ r) (BSS.toShort $ s) (((fromInteger v) :: Word8) - 0x1b))
-          mesg = hsh
+          intToBSS = BSS.toShort . word256ToBytes . fromInteger
+          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
+          mesg = keccak256ToByteString $ hsh
 {-
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
