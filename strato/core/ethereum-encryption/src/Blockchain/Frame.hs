@@ -104,12 +104,10 @@ ethDecrypt :: MonadLogger m
            => EthCryptState
            -> ConduitM B.ByteString B.ByteString m ()
 ethDecrypt ethCryptState = do
-  -- $logInfoS "cbSafeTake16!!" $ T.pack $ ": "++ (show (cbSafeTake 16)) 
   cb <- cbSafeTake 16
-  $logInfoS "cbSafeTake16!!" $ T.pack $ show cb
+  $logInfoS "cbSafeTake16" $ T.pack $ show cb
   let headCipher = fromMaybe (throw HeadCipherTooShort) cb
-  -- headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
-  $logInfoS "cbSafeTake16!!" . T.pack $ ": " ++ show headCipher
+  $logInfoS "headCipher" . T.pack $ ": " ++ show headCipher
   headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16
 
   let (mac', expectedHeadMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
