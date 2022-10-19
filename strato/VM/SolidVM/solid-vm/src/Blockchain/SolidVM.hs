@@ -43,7 +43,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
--- import qualified Data.ByteString.UTF8                 as BSU
+import qualified Numeric                              (readHex)
 import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
@@ -2671,14 +2671,13 @@ callBuiltin ecrecover@("ecrecover") [SString h, SInteger v, SString r, SString s
     then do 
       let intHash = intBuiltin [SString h]
       bytestringHash <- encodeForReturn intHash
-      -- let bytestringHash = BSU.fromString h
-      let rIntHash = intBuiltin [SString r]
-      rByteStringHash <- encodeForReturn rIntHash
-      let sIntHash = intBuiltin [SString s]
-      sByteStringHash <- encodeForReturn sIntHash      
-      -- let rByteStringHash = BSU.fromString r
-      -- let sByteStringHash = BSU.fromString s
-      let theSignerAddress = whoSignedThisTransactionEcrecover (bytestringHash) rByteStringHash sByteStringHash v
+      rIntHash <-case Numeric.readHex r of
+        [(x, "")] -> return x
+        _ -> invalidArguments "parseHex: error parsing r: " r
+      sIntHash <- case Numeric.readHex s of
+        [(y, "")] -> return y
+        _ -> invalidArguments "parseHex: error parsing s: " s
+      let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
       let theZero ::  Integer
           theZero = 0
       case theSignerAddress of
