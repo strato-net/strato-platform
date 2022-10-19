@@ -149,9 +149,18 @@ optimizeStatements (s@(EmitStatement {}) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(RevertStatement {}) : _) = pure [s]
 optimizeStatements (s@(UncheckedStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(AssemblyStatement _ _) : ss) = (s:) <$> optimizeStatements ss
-optimizeStatements (s@(SimpleStatement _ _) : ss) = (s:) <$> optimizeStatements ss
+--optimizeStatements (s@(SimpleStatement a _) : ss) = ( ( (optimizeExpression a)) :) <$> optimizeStatements ss
+--optimizeStatements (s@(SimpleStatement a (ExpressionStatement expr)) : ss) = (SimpleStatement a (ExpressionStatement (optimizeExpression expr)) :) <$> optimizeStatements ss
+optimizeStatements (s@(SimpleStatement a b ) : ss) = do 
+  ssss <- (evalStateT (simpleStatementHelper (SimpleStatement a b )) ["xBS examplex"])  
+  pure $ (ssss :) <$> optimizeStatements ss
 
-
+ 
+simpleStatementHelper :: SimpleStatement -> SSS SimpleStatement
+simpleStatementHelper (ExpressionStatement xpr) = do 
+  x <- optimizeExpression xpr
+  pure $   ExpressionStatement x
+simpleStatementHelper a = pure $ a
 -- As of right now this is just a helper for UserDefined types.
 -- TODO alter fore all Types
 -- Also maybe a specialized UserDefined version of this
