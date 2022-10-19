@@ -30,13 +30,13 @@ import qualified Data.Binary            as BIN
 import           Data.Data
 -- import           Data.Generics      as DE
 import           GHC.Generics
-import           Data.Swagger                         hiding (Format, format, get, put)
+-- import           Data.Swagger                         hiding (Format, format, get, put)
 import           Blockchain.Data.RLP
 import qualified Data.Text                            as T
 import           Test.QuickCheck.Instances.Text        ()
 import           Text.Format
-import           Data.Swagger                         hiding (Format, format)
-import           Data.Functor 
+-- import           Data.Swagger                         hiding (Format, format)
+-- import           Data.Functor 
 import qualified Data.Functor.Identity as DFI
 -- import           Generics.Deriving 
 import           Test.QuickCheck.Arbitrary
@@ -51,7 +51,7 @@ newtype Access = Access { unAccess :: Bool } deriving (Show, Read, Eq, Ord, Gene
 
 data BoundedData a =  LowerBound | Middle a | UpperBound deriving (Eq, Generic)
 
-newtype IITTEXT = Texter IText
+newtype IITTEXT = ITexter IText
 type IText = DFI.Identity T.Text
 
 newtype MaybeIITTEXT = MaybeITexter MaybeIText
@@ -61,9 +61,9 @@ type MaybeIText = DFI.Identity (Maybe T.Text)
 -- instance GEnum T.Text
 -- instance GEnum a => GEnum (BoundedData a)
 
-instance Bounded a => Bounded( BoundedData a) where
-  minBound =  LowerBound
-  maxBound =  UpperBound
+-- instance Bounded a => Bounded( BoundedData a) where
+--   minBound =  LowerBound
+--   maxBound =  UpperBound
 
 -- {- For example only
 instance Format ChainMember where
@@ -150,10 +150,10 @@ isDustinInBAEngTeam =
 
 
 instance RLPSerializable (IITTEXT) where 
-  rlpEncode (Texter (DFI.Identity a)) = rlpEncode a
+  rlpEncode (ITexter (DFI.Identity a)) = rlpEncode a
   rlpDecode = ITexter . DFI.Identity . rlpDecode
 
-instance RLPSerializable (Maybe IITTEXT) where 
+instance RLPSerializable (MaybeIITTEXT) where 
   rlpEncode (MaybeITexter (DFI.Identity a)) = rlpEncode a
   rlpDecode = MaybeITexter . DFI.Identity . rlpDecode
 
@@ -174,7 +174,7 @@ instance RLPSerializable ChainMember where
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
 
 removeItexter :: IITTEXT -> DFI.Identity T.Text
-removeItexter (Texter x) = x
+removeItexter (ITexter x) = x
 
 removeMaybeItexter :: MaybeIITTEXT -> DFI.Identity (Maybe T.Text)
 removeMaybeItexter (MaybeITexter x) = x
