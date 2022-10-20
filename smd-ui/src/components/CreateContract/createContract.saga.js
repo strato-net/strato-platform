@@ -57,13 +57,12 @@ export function createContractApiCall(contract, src, username, address, password
     .then(function (response) {
       if (response.status === 400) {
         return response.text().then(error => {
-          throw error;
+          return error;
         })
       }
       return response.json();
     })
     .then(json => {
-      json = json[0];
       return new Promise((resolve, reject) => {
         if (json.status === "Failure") {
           reject(json.txResult.message)
@@ -130,10 +129,14 @@ export function compileContractApiCall(contractName, source, solidvm) {
 export function* createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId, action.payload.metadata);
-    yield put(createContractSuccess(response[0] || response));
-    yield put(updateToast());
-    yield put(fetchContracts());
-    yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
+    if (typeof response === "string") {
+      yield put(createContractFailure(response));
+    } else {
+      yield put(createContractSuccess(response[0] || response));
+      yield put(updateToast());
+      yield put(fetchContracts());
+      yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
+    }
   } catch (err) {
     yield put(createContractFailure(err));
   }
