@@ -252,7 +252,7 @@ contract CertificateRegistry {
 
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
-        owner = msg.sender
+        owner = msg.sender;
 
         initialized = false;
     }
