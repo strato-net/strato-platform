@@ -106,6 +106,7 @@ tests:
       - bytestring
       - conduit
       - containers
+      - crypto-pubkey-types
       - data-default
       - debugger
       - ethereum-discovery

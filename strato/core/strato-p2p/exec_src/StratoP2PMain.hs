@@ -6,6 +6,7 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
 import           BlockApps.Logging
+import           Blockchain.Context
 import           Blockchain.Options
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
@@ -23,9 +24,12 @@ main = do
   _ <- $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   wireMessagesRef <- newIORef empty
+  let runner f = do
+        cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+        runContextM cfg f
   race_
     (run 10248 $ prometheus def p2pApp)
     (runLoggingT $
       race_ (stratoP2PLoopback wireMessagesRef)
-        (race_ (stratoP2PClient wireMessagesRef)
-               (stratoP2PServer wireMessagesRef)))
+        (race_ (stratoP2PClient runner)
+               (stratoP2PServer runner)))

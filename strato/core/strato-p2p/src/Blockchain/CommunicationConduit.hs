@@ -118,15 +118,14 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m, m `Mod.Outputs` [IngestEvent])
                      => String
                      -> EthCryptState
-                     -> ([IngestEvent] -> m ())
                      -> m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx unseqSink = do
+mkEthP2PEventConduit str outCtx = do
   tid <- myThreadId
   sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $ debounceTxSendsAndUnseq unseqSink
+  return $ debounceTxSendsAndUnseq
         .| CL.iterM recordMessage
         .| CL.iterM (displayMessage Outbound str)
         .| CL.iterM (const $ petWatchdog sendWatchdog)
@@ -134,8 +133,8 @@ mkEthP2PEventConduit str outCtx unseqSink = do
         .| CL.iterM (recordTraffic Outbound)
         .| ethEncrypt outCtx
 
-debounceTxSendsAndUnseq :: MonadIO m => ([IngestEvent] -> m ()) -> ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSendsAndUnseq unseqSink = do
+debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
+debounceTxSendsAndUnseq = do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do
@@ -146,7 +145,7 @@ debounceTxSendsAndUnseq unseqSink = do
       txs <- atomically $ flushTQueue txq
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
-    Left (ToUnseq ie) -> lift $ unseqSink ie
+    Left (ToUnseq ie) -> lift $ Mod.output ie
 
 handleMsgClientConduit :: MonadP2P m
                        => Point

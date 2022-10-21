@@ -74,8 +74,8 @@ PPeer
 
 newtype AvailablePeers = AvailablePeers { unAvailablePeers :: [PPeer] }
 newtype IPAsText = IPAsText T.Text deriving (Eq, Ord)
-newtype TCPPort = TCPPort Int
-newtype UDPPort = UDPPort Int
+newtype TCPPort = TCPPort Int deriving (Show, Read, Eq, Ord)
+newtype UDPPort = UDPPort Int deriving (Show, Read, Eq, Ord)
 newtype ActivePeers = ActivePeers { unActivePeers :: [PPeer] }
 newtype PeerBondingState = PeerBondingState { unPeerBondingState :: Int }
 newtype BondedPeers = BondedPeers { unBondedPeers :: [PPeer] }
