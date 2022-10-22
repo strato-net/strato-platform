@@ -42,11 +42,8 @@ runEthServer :: (MonadUnliftIO m, MonadP2P n)
              => Int
              -> PeerRunner n m ()
              -> m a
-runEthServer listenPort runner = do
-  let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-  runGeneralTCPServer settings $ \app -> runner $ do
-    let sSource = seqEventNotificationSource $ contextKafkaState initContext
-    ethServerHandler (appSource app) (appSink app) sSource (appSockAddr app)
+runEthServer listenPort runner = runServerConnection (TCPPort listenPort) $ \c a -> runner $
+  ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
 ethServerHandler :: MonadP2P m
                  => ConduitM () B.ByteString m ()

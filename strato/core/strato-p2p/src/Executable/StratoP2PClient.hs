@@ -83,16 +83,14 @@ runPeer peer runner = do
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
-    let peerPort    = pPeerTcpPort peer
-        peerAddress = BC.pack . T.unpack $ pPeerIp peer
-    runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-      let pSource = appSource app
-          pSink = appSink app
-          sSource = seqEventNotificationSource $ contextKafkaState initContext
-          pStr = pPeerString peer -- display string will show up as dns name
-          --pStr = show $ appSockAddr app -- display string will show up as IP address
+    runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) $ \c -> do
+      let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: Maybe SomeException <- withActivePeer peer $
-        runEthClientConduit peer{pPeerPubkey=Just otherPubKey} pSource pSink sSource pStr
+        runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
+                            (c ^. peerSource)
+                            (c ^. peerSink)
+                            (c ^. seqSource)
+                            pStr
       case attempt of
         Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err

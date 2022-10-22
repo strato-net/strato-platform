@@ -110,6 +110,7 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           Blockchain.TCPClientWithTimeout
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
@@ -186,6 +187,47 @@ newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
+
+data P2pConduits m = P2pConduits
+  { _peerSource :: ConduitM () B.ByteString m ()
+  , _peerSink   :: ConduitM B.ByteString Void m ()
+  , _seqSource  :: ConduitM () P2pEvent m ()
+  } deriving (Eq, Show)
+makeLenses ''P2pConduits
+
+class RunsClient m where
+  runClientConnection :: IPAsText -> TCPPort -> (P2pConduits m -> m ()) -> m ()
+
+class RunsServer m where
+  runServerConnection :: TCPPort -> (P2pConduits m -> SockAddr -> m ()) -> m ()
+
+instance RunsClient ContextM where
+  runClientConnection (IPAsText ip) (TCPPort port) handler = do
+    let peerAddress = BC.pack $ T.unpack ip
+    runTCPClientWithConnectTimeout (clientSettings port peerAddress) 5 $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          sSource = seqEventNotificationSource $ contextKafkaState initContext
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits
+
+instance RunsServer ContextM where
+  runServerConnection (TCPPort listenPort) handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+    runGeneralTCPServer settings $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          sSource = seqEventNotificationSource $ contextKafkaState initContext
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits $ appSockAddr app
+
+runEthClientConduit :: MonadP2P m
+                    => PPeer
+                    -> ConduitM () B.ByteString m ()
+                    -> ConduitM B.ByteString Void m ()
+                    -> ConduitM () P2pEvent m ()
+                    -> String
+                    -> m (Maybe SomeException)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
