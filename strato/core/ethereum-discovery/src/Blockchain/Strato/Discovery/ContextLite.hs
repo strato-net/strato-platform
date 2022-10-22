@@ -106,6 +106,18 @@ instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
         --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
         timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
+instance MonadIO m => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (ReaderT ContextLite m) where
+  select _ (Nothing, UDPPort udpPortNum) = do
+    fmap (fmap addrAddress . listToMaybe) . liftIO $ getAddrInfo
+      (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+      Nothing
+      (Just (show udpPortNum))
+  select _ (Just (IPAsText ip), UDPPort udpPortNum) = do
+    fmap (fmap addrAddress . listToMaybe) . liftIO $ getAddrInfo
+      Nothing
+      (Just $ T.unpack ip)
+      (Just $ show udpPortNum)
+
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
 

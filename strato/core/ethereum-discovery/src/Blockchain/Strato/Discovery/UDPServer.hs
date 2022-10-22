@@ -11,6 +11,7 @@ module Blockchain.Strato.Discovery.UDPServer
      , connectMe
      ) where
 
+import           Control.Applicative                     (liftA2)
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -23,6 +24,7 @@ import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Either.Combinators
+import           Data.Foldable                           (for_)
 import           Data.Maybe                              (fromJust)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
@@ -77,6 +79,7 @@ addPeersIfNeeded :: ( HasVault m
                     , MonadFail m
                     , MonadLogger m
                     , A.Replaceable SockAddr B.ByteString m
+                    , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
                     )
                  => m ()
 addPeersIfNeeded = do
@@ -91,12 +94,13 @@ addPeersIfNeeded = do
       Right bondedPeers -> do
         peerNumber <- liftIO $ randomRIO (0, length bondedPeers - 1)
         let thePeer = bondedPeers !! peerNumber
-        (peeraddr:_) <- liftIO $ getAddrInfo Nothing (Just $ T.unpack $ pPeerIp thePeer) (Just $ show $ pPeerUdpPort thePeer)
-        time <- liftIO $ round `fmap` getPOSIXTime
-        randomBytes <- liftIO $ getEntropy 64
-        sendPacket (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
-        eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
-        whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
+        mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerIp thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
+        for_ mPeerAddr $ \peerAddr -> do
+          time <- liftIO $ round `fmap` getPOSIXTime
+          randomBytes <- liftIO $ getEntropy 64
+          sendPacket peerAddr $ FindNeighbors (NodeID randomBytes) (time + 50)
+          eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
+          whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: ( HasVault m
                , MonadIO m
@@ -105,32 +109,28 @@ attemptBond :: ( HasVault m
                , A.Replaceable SockAddr B.ByteString m
                , Mod.Accessible UDPPort m
                , Mod.Accessible TCPPort m
+               , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
                )
             => m ()
 attemptBond = do
-  udpPort@(UDPPort udpPortNum) <- Mod.access (Mod.Proxy @UDPPort)
+  udpPort <- Mod.access (Mod.Proxy @UDPPort)
   tcpPort <- Mod.access (Mod.Proxy @TCPPort)
   unbondedPeers <- liftIO getUnbondedPeers
-  when (length unbondedPeers /= 0) $
-    forM_ unbondedPeers $ \p -> do
-      (peeraddr : _) <- liftIO $ getAddrInfo
-                                   Nothing
-                                   (Just $ T.unpack $ pPeerIp p)
-                                   (Just $ show $ pPeerUdpPort p)
-      time <- liftIO $ round `fmap` getPOSIXTime
-      (serveraddr : _) <- liftIO $ getAddrInfo
-                                    (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                    Nothing
-                                    (Just (show udpPortNum))
-      ehostAddress <- return $ getHostAddress $ addrAddress serveraddr
-      case ehostAddress of
+  when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
+    let peerIpAddr = IPAsText $ pPeerIp p
+        peerUdpPort = UDPPort . fromIntegral $ pPeerUdpPort p
+    mPeerAddr <- A.select (A.Proxy @SockAddr) (Just peerIpAddr, peerUdpPort)
+    time <- liftIO $ round `fmap` getPOSIXTime
+    mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+    for_ (liftA2 (,) mPeerAddr mServerAddr) $ \(peerAddr, serverAddr) ->
+      case getHostAddress serverAddr of
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
-          sendPacket (addrAddress peeraddr) $
+          sendPacket peerAddr $
                 Ping 4
                    (Endpoint hostAddress udpPort tcpPort)
                    (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
-                             (UDPPort . fromIntegral $ pPeerUdpPort p)
+                             peerUdpPort
                              (TCPPort . fromIntegral $ pPeerTcpPort p))
                    (time+50)
 
@@ -147,6 +147,7 @@ udpHandshakeServer :: ( HasSQLDB m
                       , A.Replaceable SockAddr B.ByteString m
                       , Mod.Accessible UDPPort m
                       , Mod.Accessible TCPPort m
+                      , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
                       )
                    => m ()
 udpHandshakeServer = do
