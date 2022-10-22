@@ -98,6 +98,9 @@ newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
 newtype OrgNameChains = OrgNameChains { unOrgNameChains :: S.Set Word256 } deriving (Eq)
 
+instance Show OrgNameChains where
+  show = intercalate ", " . map show . S.toList . unOrgNameChains
+
 instance Default ChainMembers    where def = ChainMembers M.empty
 instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty
 instance Default IPChains        where def = IPChains S.empty

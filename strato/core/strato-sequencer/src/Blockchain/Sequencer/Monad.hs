@@ -54,8 +54,6 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
-  , chainInfoRegistry
-  , orgNameChainsRegistry
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -110,7 +108,6 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.Model.Address
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -134,9 +131,6 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
-  , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
-  , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
-  , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -361,12 +355,6 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
--- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
---   -- TODO: Just using this to sneak past the compiler... actually completethese these out
---   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
---   insert _ _ _ = pure ()
---   delete _ _ = pure ()
-
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
     Nothing -> pure . Just $ ParentChainId Nothing
@@ -472,9 +460,6 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
-            , _chainInfoRegistry   = M.empty
-            , _orgNameChainsRegistry = M.empty
-            , _x509certRegistry    = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

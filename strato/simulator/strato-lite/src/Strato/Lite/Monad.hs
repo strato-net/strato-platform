@@ -284,11 +284,6 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance ((OrgName, OrgUnit) `A.Alters` Word256) m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadP2PTest m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
-
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
   put p k = lift $ Mod.put p k
@@ -403,11 +398,6 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . chainIdRegistry
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
-
-instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
-  insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
-  delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -783,9 +773,6 @@ newSequencerContext bc = do
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
-      , _orgNameChainsRegistry = M.empty
-      , _chainInfoRegistry   = M.empty
-      , _x509certRegistry    = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -1005,7 +992,15 @@ createPeer privKey initialValidators name ipAddr = do
                                       for_ mEnode $ \enode -> do
                                         ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
                                         orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
-                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
+                                    AddOrgName (Right (cid, (n, u))) -> do
+                                      let org = (OrgName n, OrgUnit u)
+                                      orgNameChainsMap %= (\m -> case M.lookup org m of
+                                          Nothing -> M.insert org (OrgNameChains $ Set.singleton cid) m
+                                          Just (OrgNameChains s) -> M.insert org (OrgNameChains $ Set.insert cid s) m
+                                        )
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName cid (n, u)
+                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
+                                    RegisterCertificate (Right (_, addr, certState)) -> do x509certMap %= M.insert addr certState
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
