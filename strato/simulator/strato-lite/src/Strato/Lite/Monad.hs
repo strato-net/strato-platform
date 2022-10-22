@@ -119,6 +119,7 @@ data P2PContext = P2PContext
   , _actionTimestamp       :: ActionTimestamp
   , _peerAddr              :: PeerAddress
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
+  , _unseqSink             :: TQueue [SeqLoopEvent]
   }
 makeLenses ''P2PContext
 
@@ -128,6 +129,7 @@ instance Default P2PContext where
                    emptyActionTimestamp
                    (PeerAddress Nothing)
                    S.empty
+                   (error "P2PContext: uninitialized unseqSink")
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -738,7 +740,10 @@ instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
   output ies = unseqEvents %= (++ies)
 
 instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
-  output = lift . Mod.output
+  output ies = do
+    uSink <- use unseqSink
+    atomically . writeTQueue uSink $ UnseqEvent <$> ies
+    lift $ Mod.output ies
 
 instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.UDPPort, B.ByteString) Point (MonadP2PTest m) where
   select _ _ = error "Test peer should not be fetching public key"
@@ -1057,8 +1062,8 @@ createConnection server client = do
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client
-  serverCtx <- newIORef (def :: P2PContext)
-  clientCtx <- newIORef (def :: P2PContext)
+  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server
+  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
@@ -1066,13 +1071,13 @@ createConnection server client = do
                                     (sourceTQueue clientToServerTQueue)
                                     (sinkTQueue serverToClientTQueue)
                                     (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                    (_p2pPeerName server ++ " -> " ++ _p2pPeerName client)
+                                    ("Me: " ++ _p2pPeerName server ++ ", Them: " ++ _p2pPeerName client)
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
       rClient = runEthClientConduit (_p2pPeerPPeer server)
                                     (sourceTQueue serverToClientTQueue)
                                     (sinkTQueue clientToServerTQueue)
                                     (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                    (_p2pPeerName client ++ " -> " ++ _p2pPeerName server)
+                                    ("Me: " ++ _p2pPeerName client ++ ", Them: " ++ _p2pPeerName server)
   pure $ P2PConnection
     serverToClientTQueue
     clientToServerTQueue

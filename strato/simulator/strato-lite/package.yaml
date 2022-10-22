@@ -33,7 +33,7 @@ library:
   exposed-modules:
     - Strato.Lite
     - Strato.Lite.Options
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O2 -dynamic
   dependencies:
   - QuickCheck
   - aeson
@@ -96,6 +96,7 @@ tests:
   simulator-spec:
     source-dirs: tests/
     main: Main.hs
+    ghc-options: -Wall -Werror -dynamic
     dependencies:
       - aeson
       - debugger
