@@ -88,12 +88,12 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> String
                     -> EthCryptState
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
 --  tid <- myThreadId
 --  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
-    [ peerSource
+    [ peerSourceConduit
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages

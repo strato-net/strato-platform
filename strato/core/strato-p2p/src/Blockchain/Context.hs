@@ -28,6 +28,12 @@ module Blockchain.Context
     , Context(..)
     , Config(..)
     , ContextM
+    , P2pConduits(..)
+    , peerSource
+    , peerSink
+    , seqSource
+    , RunsClient(..)
+    , RunsServer(..)
     , ActionTimestamp(..)
     , emptyActionTimestamp
     , RemainingBlockHeaders(..)
@@ -69,6 +75,8 @@ import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import           Data.Conduit.Network
 import           Data.Default
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
@@ -93,6 +101,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
@@ -116,6 +125,8 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Network.Socket
+import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
 import qualified Strato.Strato23.Client                as VC
@@ -192,42 +203,34 @@ data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m ()
   , _peerSink   :: ConduitM B.ByteString Void m ()
   , _seqSource  :: ConduitM () P2pEvent m ()
-  } deriving (Eq, Show)
+  }
 makeLenses ''P2pConduits
 
 class RunsClient m where
   runClientConnection :: IPAsText -> TCPPort -> (P2pConduits m -> m ()) -> m ()
 
-class RunsServer m where
-  runServerConnection :: TCPPort -> (P2pConduits m -> SockAddr -> m ()) -> m ()
+class RunsServer n m where
+  runServerConnection :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> SockAddr -> n ()) -> m ()
 
 instance RunsClient ContextM where
-  runClientConnection (IPAsText ip) (TCPPort port) handler = do
+  runClientConnection (IPAsText ip) (TCPPort p) handler = do
     let peerAddress = BC.pack $ T.unpack ip
-    runTCPClientWithConnectTimeout (clientSettings port peerAddress) 5 $ \app -> do
+    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
       let pSource = appSource app
           pSink = appSink app
           sSource = seqEventNotificationSource $ contextKafkaState initContext
           conduits = P2pConduits pSource pSink sSource
       handler conduits
 
-instance RunsServer ContextM where
-  runServerConnection (TCPPort listenPort) handler = do
+instance RunsServer ContextM (LoggingT IO) where
+  runServerConnection (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-    runGeneralTCPServer settings $ \app -> do
+    runGeneralTCPServer settings $ \app -> runner $ do
       let pSource = appSource app
           pSink = appSink app
           sSource = seqEventNotificationSource $ contextKafkaState initContext
           conduits = P2pConduits pSource pSink sSource
       handler conduits $ appSockAddr app
-
-runEthClientConduit :: MonadP2P m
-                    => PPeer
-                    -> ConduitM () B.ByteString m ()
-                    -> ConduitM B.ByteString Void m ()
-                    -> ConduitM () P2pEvent m ()
-                    -> String
-                    -> m (Maybe SomeException)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader

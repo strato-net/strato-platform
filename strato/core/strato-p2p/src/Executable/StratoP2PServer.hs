@@ -18,14 +18,13 @@ import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
+import           Control.Lens                          ((^.))
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
-import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
 import           Network.Socket
-import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
 import           BlockApps.Logging
@@ -33,16 +32,15 @@ import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.P2PUtil
-import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as C
 
-runEthServer :: (MonadUnliftIO m, MonadP2P n)
+runEthServer :: (RunsServer n m, MonadP2P n)
              => Int
              -> PeerRunner n m ()
-             -> m a
-runEthServer listenPort runner = runServerConnection (TCPPort listenPort) $ \c a -> runner $
+             -> m ()
+runEthServer listenPort runner = runServerConnection (TCPPort listenPort) runner $ \c a ->
   ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
 ethServerHandler :: MonadP2P m
@@ -51,7 +49,7 @@ ethServerHandler :: MonadP2P m
                  -> ConduitM () P2pEvent m ()
                  -> SockAddr
                  -> m ()
-ethServerHandler peerSource peerSink seqSource sockAddr = do
+ethServerHandler pSource pSink seqSrc sockAddr = do
   let theSockAddr = sockAddrToIP sockAddr
       peerStr = show theSockAddr
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
@@ -65,7 +63,7 @@ ethServerHandler peerSource peerSink seqSource sockAddr = do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
           (attempt :: Maybe SomeException) <- withActivePeer p $
-            runEthServerConduit p peerSource peerSink seqSource peerStr
+            runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
             Just err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -77,21 +75,22 @@ runEthServerConduit :: MonadP2P m
                     -> ConduitM () P2pEvent m ()
                     -> String
                     -> m (Maybe SomeException)
-runEthServerConduit p peerSource peerSink seqSource peerStr = do
+runEthServerConduit p pSource pSink seqSrc peerStr = do
   myPubKey' <- getPub
   
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
-  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptAccept otherPubKey `fuseUpstream` peerSink
+  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
   
-  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
+  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
   !eventSink <- mkEthP2PEventConduit peerStr outCtx
   fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                   .| handleMsgServerConduit myPubkey p
                   .| eventSink
-                  .| peerSink
+                  .| pSink
 
-stratoP2PServer :: MonadP2P n => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
+stratoP2PServer :: (MonadP2P n, RunsServer n (LoggingT IO))
+                => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
 stratoP2PServer runner = do
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address

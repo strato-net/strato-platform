@@ -22,14 +22,13 @@ import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
+import           Control.Lens                          ((^.))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
-import           Data.Conduit.Network
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -44,7 +43,6 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
 import           Blockchain.Options
-import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -54,7 +52,7 @@ import           Blockchain.TCPClientWithTimeout
 import qualified Text.Colors                           as C
 import           Text.Format
 
-runPeer :: MonadP2P n
+runPeer :: (RunsClient n, MonadP2P n)
         => PPeer
         -> PeerRunner n m ()
         -> m ()
@@ -102,25 +100,26 @@ runEthClientConduit :: MonadP2P m
                     -> ConduitM () P2pEvent m ()
                     -> String
                     -> m (Maybe SomeException)
-runEthClientConduit peer peerSource peerSink seqSource peerStr = do
+runEthClientConduit peer pSource pSink seqSrc peerStr = do
   myPublic' <- getPub
 
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptConnect otherPubKey `fuseUpstream` peerSink
+  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
 
-  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
+  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
   !eventSink <- mkEthP2PEventConduit peerStr outCtx 
   fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                   .| handleMsgClientConduit myPublic peer
                   .| eventSink
-                  .| peerSink
+                  .| pSink
 
 
 runPeerInList :: ( MonadIO m
                  , MonadLogger m
                  , MonadUnliftIO m
                  , MonadP2P n
+                 , RunsClient n
                  )
               => PPeer
               -> PeerRunner n m ()
@@ -133,7 +132,7 @@ runPeerInList thePeer runner = do
       liftIO $ threadDelay $ 10 * 1000 * 1000
   runPeer thePeer runner
 
-stratoP2PClient :: MonadP2P m => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
 
