@@ -60,6 +60,7 @@ library:
     - json-rpc-server
     - json-rpc-client
     - lens
+    - lifted-async
     - lifted-base
     - milena
     - milena-tools
