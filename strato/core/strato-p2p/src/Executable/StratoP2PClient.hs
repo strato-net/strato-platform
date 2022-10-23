@@ -57,7 +57,7 @@ runPeer :: (RunsClient n, MonadP2P n)
         -> PeerRunner n m ()
         -> m ()
 runPeer peer runner = do
-  runner $ do
+  runner $ \sSource -> do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
 
@@ -81,7 +81,7 @@ runPeer peer runner = do
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
-    runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) $ \c -> do
+    runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: Maybe SomeException <- withActivePeer peer $
         runEthClientConduit peer{pPeerPubkey=Just otherPubKey}

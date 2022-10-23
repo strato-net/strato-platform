@@ -101,7 +101,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
-import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
@@ -207,28 +206,30 @@ data P2pConduits m = P2pConduits
 makeLenses ''P2pConduits
 
 class RunsClient m where
-  runClientConnection :: IPAsText -> TCPPort -> (P2pConduits m -> m ()) -> m ()
+  runClientConnection :: IPAsText
+                      -> TCPPort
+                      -> ConduitM () P2pEvent m ()
+                      -> (P2pConduits m -> m ())
+                      -> m ()
 
 class RunsServer n m where
   runServerConnection :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> SockAddr -> n ()) -> m ()
 
 instance RunsClient ContextM where
-  runClientConnection (IPAsText ip) (TCPPort p) handler = do
+  runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
     let peerAddress = BC.pack $ T.unpack ip
     runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
       let pSource = appSource app
           pSink = appSink app
-          sSource = seqEventNotificationSource $ contextKafkaState initContext
           conduits = P2pConduits pSource pSink sSource
       handler conduits
 
 instance RunsServer ContextM (LoggingT IO) where
   runServerConnection (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-    runGeneralTCPServer settings $ \app -> runner $ do
+    runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
           pSink = appSink app
-          sSource = seqEventNotificationSource $ contextKafkaState initContext
           conduits = P2pConduits pSource pSink sSource
       handler conduits $ appSockAddr app
 
@@ -502,7 +503,7 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   )
 
-type PeerRunner n m a = n a -> m a
+type PeerRunner n m a = (ConduitM () P2pEvent n a -> n a) -> m a
 
 getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
 getBlockHeaders = Mod.access (Proxy @[BlockData])

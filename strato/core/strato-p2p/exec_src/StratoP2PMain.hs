@@ -9,6 +9,7 @@ import           BlockApps.Logging
 import           Blockchain.Context
 import           Blockchain.Options
 import           Blockchain.Participation (p2pApp, setParticipationMode)
+import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
@@ -26,10 +27,11 @@ main = do
   wireMessagesRef <- newIORef empty
   let runner f = do
         cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-        runContextM cfg f
+        let sSource = seqEventNotificationSource $ contextKafkaState initContext
+        runContextM cfg $ f sSource
   race_
     (run 10248 $ prometheus def p2pApp)
     (runLoggingT $
-      race_ (stratoP2PLoopback wireMessagesRef)
+      race_ (stratoP2PLoopback runner)
         (race_ (stratoP2PClient runner)
                (stratoP2PServer runner)))
