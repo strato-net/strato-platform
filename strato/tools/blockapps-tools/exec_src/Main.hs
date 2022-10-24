@@ -26,7 +26,6 @@ import           FRawMP
 import           Hash
 import           InsertP2P
 import           InsertSeq
-import           VaultProxy
 import           InsertTX
 import           Kafka
 import           Privacy
@@ -90,7 +89,6 @@ data Options = State{root::String, db::String}
              | GetPrivacy { registry :: String, key :: String }
              | PutPrivacy { registry :: String, key :: String , value :: String }
              | ValidatorBehavior { valB :: Bool } 
-             | 
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
