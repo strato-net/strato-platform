@@ -16,7 +16,7 @@ module Blockchain.Event (
   handleEvents,
   handleGetChainDetails,
   checkPeerIsMember,
-  checkPeerIsMember' -- For testing
+  checkPeerIsMember', -- For testing
   checkPeerIsMember'' -- For testing
   ) where
 
