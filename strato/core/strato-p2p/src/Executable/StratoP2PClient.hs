@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PatternGuards         #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -21,17 +22,15 @@ import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
+import           Control.Lens                          ((^.))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
-import           Data.Conduit.Network
 import           Data.Either.Combinators
 import           Data.Maybe
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import           UnliftIO
@@ -44,27 +43,21 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
 import           Blockchain.Options
-import           Blockchain.P2PRPC
-import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
 
-runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-        => IORef (S.OSet Keccak256)
-        -> PPeer
-        -> BC.ByteString -- otherServiceCommHost
-        -> CommPort      -- otherServiceCommPort
+runPeer :: (RunsClient n, MonadP2P n)
+        => PPeer
+        -> PeerRunner n m ()
         -> m ()
-runPeer wireMessagesRef peer _ _ = do
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  runContextM cfg $ do
+runPeer peer runner = do
+  runner $ \sSource -> do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
 
@@ -73,7 +66,7 @@ runPeer wireMessagesRef peer _ _ = do
     otherPubKey <- case (pPeerPubkey peer) of
       Nothing -> do
         $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
-        eitherOtherPubKey <- getServerPubKey (T.unpack $ pPeerIp peer) (fromIntegral $ pPeerTcpPort peer)
+        eitherOtherPubKey <- getServerPubKey peer
         case eitherOtherPubKey of
           Right pub -> do
             $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format pub
@@ -88,19 +81,14 @@ runPeer wireMessagesRef peer _ _ = do
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
-    let peerPort    = pPeerTcpPort peer
-        peerAddress = BC.pack . T.unpack $ pPeerIp peer
-    runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-      let pSource = appSource app
-          pSink = appSink app
-          sSource = seqEventNotificationSource $ contextKafkaState initContext
-          pStr = pPeerString peer -- display string will show up as dns name
-          --pStr = show $ appSockAddr app -- display string will show up as IP address
-      uSink <- asks configUnseqSink
-      attempt :: Maybe SomeException <- withActivePeer peer $ do
-        initState <- newIORef initContext
-        local (\c -> c{configContext = initState}) $
-          runEthClientConduit peer{pPeerPubkey=Just otherPubKey} pSource pSink sSource uSink pStr
+    runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+      let pStr = pPeerString peer -- display string will show up as dns name
+      attempt :: Maybe SomeException <- withActivePeer peer $
+        runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
+                            (c ^. peerSource)
+                            (c ^. peerSink)
+                            (c ^. seqSource)
+                            pStr
       case attempt of
         Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -110,40 +98,42 @@ runEthClientConduit :: MonadP2P m
                     -> ConduitM () B.ByteString m ()
                     -> ConduitM B.ByteString Void m ()
                     -> ConduitM () P2pEvent m ()
-                    -> ([IngestEvent] -> m ())
                     -> String
                     -> m (Maybe SomeException)
-runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
+runEthClientConduit peer pSource pSink seqSrc peerStr = do
   myPublic' <- getPub
 
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptConnect otherPubKey `fuseUpstream` peerSink
+  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
 
-  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink
+  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+  !eventSink <- mkEthP2PEventConduit peerStr outCtx 
   fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                   .| handleMsgClientConduit myPublic peer
                   .| eventSink
-                  .| peerSink
+                  .| pSink
 
 
-runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-              => IORef (S.OSet Keccak256)
-              -> PPeer
-              -> BC.ByteString
-              -> CommPort
+runPeerInList :: ( MonadIO m
+                 , MonadLogger m
+                 , MonadUnliftIO m
+                 , MonadP2P n
+                 , RunsClient n
+                 )
+              => PPeer
+              -> PeerRunner n m ()
               -> m ()
-runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
+runPeerInList thePeer runner = do
   eErr <- liftIO $ nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
-  runPeer wireMessagesRef thePeer otherServiceHost otherServicePort
+  runPeer thePeer runner
 
-stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PClient wireMessagesRef = do
+stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient runner = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
@@ -169,7 +159,7 @@ stratoP2PClient wireMessagesRef = do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
             Just _  -> void . forkIO . runLoggingT $ do
-              result <- try $ runPeerInList wireMessagesRef p osch oscp
+              result <- try $ runPeerInList p runner
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 
@@ -188,6 +178,3 @@ stratoP2PClient wireMessagesRef = do
             $logErrorLS "stratoP2PClient/handleRunPeerResult" err
 
         Right _ -> return ()
-
-      osch = "localhost"
-      oscp = serverCommPort

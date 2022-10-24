@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -5,21 +6,14 @@
 module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
-import Control.Monad
 import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
-import Data.IORef
-import qualified Data.Set.Ordered as S
 import qualified Data.Text as T
-import qualified Network.Kafka                         as K
 import Prometheus
 import Text.Format
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul (WireMessage)
 import Blockchain.Context
-import Blockchain.Options
-import Blockchain.SeqEventNotify
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256
@@ -34,12 +28,10 @@ loopbackEvents = unsafeRegister
 recordEvent :: MonadIO m => T.Text -> m ()
 recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 
-stratoP2PLoopback :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PLoopback wireMessagesRef = do
+stratoP2PLoopback :: MonadP2P n => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
+stratoP2PLoopback runner = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  void . runContextM cfg $ do
-    ks <- Mod.get (Mod.Proxy @K.KafkaState)
+  runner $ \sSource -> do
     let toWireMessage = \case
           P2pBlockstanbul wm -> do
             let msgHash = rlpHash wm
@@ -55,7 +47,7 @@ stratoP2PLoopback wireMessagesRef = do
           _ -> pure Nothing
 
     runConduit $
-         seqEventNotificationSource ks
+         sSource
       .| iterMC (const $ recordEvent "in")
       .| concatMapMC toWireMessage
       .| iterMC (const $ recordEvent "out")

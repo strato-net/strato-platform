@@ -7,7 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PolyKinds             #-}
-{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
@@ -28,6 +28,12 @@ module Blockchain.Context
     , Context(..)
     , Config(..)
     , ContextM
+    , P2pConduits(..)
+    , peerSource
+    , peerSink
+    , seqSource
+    , RunsClient(..)
+    , RunsServer(..)
     , ActionTimestamp(..)
     , emptyActionTimestamp
     , RemainingBlockHeaders(..)
@@ -36,6 +42,9 @@ module Blockchain.Context
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , BestBlockNumber(..)
+    , OrgNameChains(..)
+    , ChainInfo(..)
+    , PeerRunner
     , initConfig
     , initContext
     , runContextM
@@ -51,6 +60,8 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , getPeerX509
+  
     ) where
 
 
@@ -58,9 +69,14 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
+import           Control.Arrow                         ((&&&))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import           Data.Conduit.Network
 import           Data.Default
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
@@ -72,12 +88,14 @@ import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
@@ -87,12 +105,12 @@ import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)
-                                                       , VMOutput(..)
+import           Blockchain.Stream.VMOutput            ( VMOutput(..)
                                                        , fetchLastVMOutputs
                                                        , getBestKafkaBlockNumber
                                                        , produceVMOutputsM
@@ -100,11 +118,14 @@ import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           Blockchain.TCPClientWithTimeout
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Network.Socket
+import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
 import qualified Strato.Strato23.Client                as VC
@@ -141,8 +162,6 @@ newtype Outbound a = Outbound { unOutbound :: a }
 data Config = Config
   { configSQLDB              :: SQLDB
   , configRedisBlockDB       :: RBDB.RedisConnection
-  , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
-  , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMOutput] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
   , configVaultClient        :: ClientEnv
@@ -178,6 +197,41 @@ newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
+
+data P2pConduits m = P2pConduits
+  { _peerSource :: ConduitM () B.ByteString m ()
+  , _peerSink   :: ConduitM B.ByteString Void m ()
+  , _seqSource  :: ConduitM () P2pEvent m ()
+  }
+makeLenses ''P2pConduits
+
+class RunsClient m where
+  runClientConnection :: IPAsText
+                      -> TCPPort
+                      -> ConduitM () P2pEvent m ()
+                      -> (P2pConduits m -> m ())
+                      -> m ()
+
+class RunsServer n m where
+  runServerConnection :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> SockAddr -> n ()) -> m ()
+
+instance RunsClient ContextM where
+  runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
+    let peerAddress = BC.pack $ T.unpack ip
+    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits
+
+instance RunsServer ContextM (LoggingT IO) where
+  runServerConnection (TCPPort listenPort) runner handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+    runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits $ appSockAddr app
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
@@ -223,6 +277,13 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
+instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (ReaderT Config m) where
+  select p ip = A.selectWithDefault p ip <&> toMaybe def
+  selectWithDefault _ = fmap OrgNameChains
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getOrgNameChains
+                      . (unOrgName . fst &&& unOrgUnit . snd)
+                      
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
@@ -250,6 +311,9 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
@@ -344,30 +408,26 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
   access _ = asks configSQLDB
 
-instance MonadIO m => ((T.Text, Int) `A.Alters` ActivityState) (ReaderT Config m) where
+instance MonadIO m => ((IPAsText, TCPPort) `A.Alters` ActivityState) (ReaderT Config m) where
   lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ k = void . liftIO . setPeerActiveState (fst k) (snd k)
+  insert _ (IPAsText i, TCPPort p) = void . liftIO . setPeerActiveState i p
   delete _ _ = error "lookup ActivityState undefined for ContextM"
-
-instance (MonadIO m, MonadLogger m) => Mod.Accessible (SK.UnseqSink (ReaderT Config m)) (ReaderT Config m) where
-  access _ = asks configUnseqSink
-
-instance (MonadIO m, MonadLogger m) => HasVMOutputsSink (ReaderT Config m) where
-  getVMOutputsSink = asks configVmEventsSink
 
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
   takeStack _ n = do
     vmEvents <- liftIO . fetchLastVMOutputs $ fromIntegral n
     pure [b | ChainBlock b <- vmEvents]
-  pushStack b = getVMOutputsSink >>= \sink -> sink (ChainBlock <$> b)
+  pushStack b = void . produceVMOutputsM $ ChainBlock <$> b
 
-instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
-  select _ ip = sqlQuery actions >>= \case
+instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
+  select _ (IPAsText ip) = sqlQuery actions >>= \case
         [] -> return Nothing
         lst -> return . Just . SQL.entityVal $ head lst
 
-    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+    where actions = SQL.selectList [ PPeerIp SQL.==. ip ] []
 
+instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+  output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
 
 instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
@@ -385,6 +445,8 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
     waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
 
+instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
+  select p = liftIO . A.select p
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
@@ -402,6 +464,7 @@ type MonadP2P m = ( MonadIO m
                   , MonadUnliftIO m
                   , Stacks Block m
                   , HasVault m
+                  , m `Mod.Outputs` [IngestEvent]
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]
@@ -422,18 +485,25 @@ type MonadP2P m = ( MonadIO m
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
+                       , '((OrgName, OrgUnit), OrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
+                       , '(Address, X509CertInfoState)
+                       , '((IPAsText, UDPPort, B.ByteString), Point)
+                       , '(IPAsText, PPeer)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
                        , '(Keccak256, Proxy (Inbound WireMessage))
                        , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
+                       , '((IPAsText, TCPPort), ActivityState)
                        ] m
                   )
+
+type PeerRunner n m a = (ConduitM () P2pEvent n a -> n a) -> m a
 
 getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
 getBlockHeaders = Mod.access (Proxy @[BlockData])
@@ -480,8 +550,6 @@ initConfig wireMessagesRef maxHeaders = do
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
-    , configUnseqSink = void . K.withKafkaRetry1s . SK.writeUnseqEvents
-    , configVmEventsSink = void . produceVMOutputsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
@@ -500,10 +568,17 @@ initContext = Context
   }
 
 
-getPeerByIP :: A.Selectable String PPeer m
+getPeerByIP :: A.Selectable IPAsText PPeer m
             => String
             -> m (Maybe PPeer)
-getPeerByIP = A.select (Proxy @PPeer)
+getPeerByIP = A.select (Proxy @PPeer) . IPAsText . T.pack
+
+getPeerX509 :: A.Selectable Address X509CertInfoState m
+          => PPeer 
+          -> m (Maybe X509CertInfoState)
+getPeerX509 peer = case pPeerPubkey peer of
+  Nothing -> pure Nothing
+  Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
@@ -514,12 +589,12 @@ shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Pro
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
 withActivePeer :: ( MonadUnliftIO m
-                  , ((T.Text, Int) `A.Alters` ActivityState) m
+                  , ((IPAsText, TCPPort) `A.Alters` ActivityState) m
                   )
                => PPeer -> m a -> m a
 withActivePeer p = bracket a b . const
-  where a   = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
-        b _ = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive
+  where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
+        b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

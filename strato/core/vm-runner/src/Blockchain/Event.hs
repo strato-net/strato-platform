@@ -19,6 +19,7 @@ module Blockchain.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ExecResults
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
@@ -71,6 +72,7 @@ data VmOutEvent = OutAction Action
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
+  , outExecResults  :: DL.DList ExecResults
   , outBlocks       :: DL.DList OutputBlock
   , outIndexEvents  :: DL.DList IndexEvent
   , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256)
@@ -84,6 +86,7 @@ data VmOutEventBatch = OutBatch
 
 newOutBatch :: VmOutEventBatch
 newOutBatch = OutBatch DL.empty
+                       DL.empty
                        DL.empty
                        DL.empty
                        DL.empty

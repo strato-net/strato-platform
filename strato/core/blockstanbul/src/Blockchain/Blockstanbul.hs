@@ -5,6 +5,7 @@ module Blockchain.Blockstanbul
   , sendMessages
   , sendAllMessages
   , RoundNumber
+  , ValidatorRestriction
   , SequenceNumber
   , Checkpoint(..)
   , View(..)
@@ -14,6 +15,7 @@ module Blockchain.Blockstanbul
   , InEvent(..)
   , OutEvent(..)
   , ForcedConfigChange(..)
+  , ForcedValidatorChange(..)
   , finalHash
   , currentView
   , blockstanbulRunning

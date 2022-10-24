@@ -27,6 +27,7 @@ import           Control.Monad.Reader
 import qualified Control.Monad.State                   as State
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
+import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
@@ -46,6 +47,7 @@ import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
@@ -117,6 +119,7 @@ data P2PContext = P2PContext
   , _actionTimestamp       :: ActionTimestamp
   , _peerAddr              :: PeerAddress
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
+  , _unseqSink             :: TQueue [SeqLoopEvent]
   }
 makeLenses ''P2PContext
 
@@ -126,6 +129,7 @@ instance Default P2PContext where
                    emptyActionTimestamp
                    (PeerAddress Nothing)
                    S.empty
+                   (error "P2PContext: uninitialized unseqSink")
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -141,6 +145,8 @@ data TestContext = TestContext
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
+  , _orgNameChainsMap      :: Map (OrgName, OrgUnit) OrgNameChains
+  , _x509certMap           :: Map Address X509CertInfoState
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
@@ -204,6 +210,12 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
+
+instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use orgNameChainsMap
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  select _ a = M.lookup a <$> use x509certMap
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
@@ -312,6 +324,13 @@ instance (Monad m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible Connect
 
 instance A.Selectable String DataPeer.PPeer m => A.Selectable String DataPeer.PPeer (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
+
+instance A.Selectable (OrgName, OrgUnit) OrgNameChains m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadP2PTest m) where
+  select p org = lift $ A.select p org
+
+
+instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
+  select p addr = lift $ A.select p addr
 
 instance MonadIO m => Mod.Modifiable GetChainsDB (MonadTest m) where
   get _ = use $ sequencerContext . getChainsDB
@@ -707,6 +726,29 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
 
+instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
+  output ies = unseqEvents %= (++ies)
+
+instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
+  output ies = do
+    uSink <- use unseqSink
+    atomically . writeTQueue uSink $ UnseqEvent <$> ies
+    lift $ Mod.output ies
+
+instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.UDPPort, B.ByteString) Point (MonadP2PTest m) where
+  select _ _ = error "Test peer should not be fetching public key"
+
+instance MonadIO m => A.Selectable DataPeer.IPAsText DataPeer.PPeer (MonadP2PTest m) where
+  select _ _ = error "Test peer should not be calling getPeerByIP"
+
+instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
+  select _ _ = error "Test peer should not be calling getPeerByIP"
+
+instance MonadIO m => A.Alters (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
+  lookup _ _ = error "Test peer should not be calling withActivePeer"
+  insert _ _ = error "Test peer should not be calling withActivePeer"
+  delete _ _ = error "Test peer should not be calling withActivePeer"
+
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
@@ -762,6 +804,8 @@ testContext prv candRecv vRes rNum seqCtx vmCtx = TestContext
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
+  , _orgNameChainsMap      = M.empty
+  , _x509certMap           = M.empty
   , _privateTxMap          = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
@@ -823,11 +867,10 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot
 
 createPeer :: PrivateKey
            -> [Address]
-           -> ([IngestEvent] -> TestContextM ())
            -> Text
            -> Text
            -> IO P2PPeer
-createPeer privKey initialValidators unseqSink name ipAddr = do
+createPeer privKey initialValidators name ipAddr = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -949,7 +992,15 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                       for_ mEnode $ \enode -> do
                                         ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
                                         orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
-                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
+                                    AddOrgName (Right (cid, (n, u))) -> do
+                                      let org = (OrgName n, OrgUnit u)
+                                      orgNameChainsMap %= (\m -> case M.lookup org m of
+                                          Nothing -> M.insert org (OrgNameChains $ Set.singleton cid) m
+                                          Just (OrgNameChains s) -> M.insert org (OrgNameChains $ Set.insert cid s) m
+                                        )
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName cid (n, u)
+                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
+                                    RegisterCertificate (Right (_, addr, certState)) -> do x509certMap %= M.insert addr certState
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
@@ -967,7 +1018,6 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                  )
       unseq ies = do
         atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
-        unseqSink ies
   pure $ P2PPeer
     privKey
     ppeer
@@ -1007,8 +1057,8 @@ createConnection server client = do
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client
-  serverCtx <- newIORef (def :: P2PContext)
-  clientCtx <- newIORef (def :: P2PContext)
+  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server
+  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
@@ -1016,15 +1066,13 @@ createConnection server client = do
                                     (sourceTQueue clientToServerTQueue)
                                     (sinkTQueue serverToClientTQueue)
                                     (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                    (lift . _p2pPeerUnseqSink server)
-                                    (_p2pPeerName server ++ " -> " ++ _p2pPeerName client)
+                                    ("Me: " ++ _p2pPeerName server ++ ", Them: " ++ _p2pPeerName client)
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
       rClient = runEthClientConduit (_p2pPeerPPeer server)
                                     (sourceTQueue serverToClientTQueue)
                                     (sinkTQueue clientToServerTQueue)
                                     (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                    (lift . _p2pPeerUnseqSink client)
-                                    (_p2pPeerName client ++ " -> " ++ _p2pPeerName server)
+                                    ("Me: " ++ _p2pPeerName client ++ ", Them: " ++ _p2pPeerName server)
   pure $ P2PConnection
     serverToClientTQueue
     clientToServerTQueue
@@ -1106,10 +1154,9 @@ makeLenses ''NetworkManager
 
 createNode :: Text -> Text -> ReaderT NetworkManager IO P2PPeer
 createNode nodeLabel ipAddr = do 
-  let unseqSink = (unseqEvents %=) . (++)
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
-  liftIO $ createPeer pKey vals unseqSink nodeLabel ipAddr
+  liftIO $ createPeer pKey vals nodeLabel ipAddr
 
 addNode :: Text -> Text -> ReaderT NetworkManager IO Bool
 addNode nodeLabel ipAddr = do
@@ -1168,12 +1215,11 @@ removeConnection serverLabel clientLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
-runNetwork :: [(Text, Text)] -> [(Text, Text)] -> IO (Either Text NetworkManager)
-runNetwork nodesList connectionsList = do
-  let unseqSink = (unseqEvents %=) . (++)
+runNetwork :: [(Text, Text)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
+runNetwork nodesList connectionsList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
-  let validators' = makeValidators privKeys
-  peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys nodesList
+  let validators' = makeValidators $ validatorsFilter privKeys
+  peers <- traverse (\(p,(n,i)) -> createPeer p validators' n i) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server, client) -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server) . MaybeT . pure $ M.lookup server nodesMap
@@ -1188,3 +1234,8 @@ runNetwork nodesList connectionsList = do
     networkTVar <- newTVarIO network'
     threadsTVar <- newTVarIO threadPool
     pure $ NetworkManager threadsTVar networkTVar validators'
+
+runNetworkOld :: [P2PPeer] -> [P2PConnection] -> IO ()
+runNetworkOld nodes' connections' =
+  concurrently_ (mapConcurrently runNode nodes')
+                (mapConcurrently runConnection connections')

@@ -13,8 +13,8 @@ export const fetchState = function (name, address, chainId) {
   return {
     type: FETCH_STATE_REQUEST,
     name: name,
-    address: address,
-    chainId: chainId
+    address,
+    chainId
   }
 };
 
@@ -22,8 +22,8 @@ export const fetchStateSuccess = function (name, address, state) {
   return {
     type: FETCH_STATE_SUCCESS,
     name: name,
-    address: address,
-    state: state,
+    address,
+    state,
   }
 };
 

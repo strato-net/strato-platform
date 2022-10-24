@@ -19,6 +19,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import qualified Control.Monad.Change.Modify           as Mod
+import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -33,8 +34,10 @@ import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
+import qualified Data.Map.Strict                       as M
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Void
 import           Text.Printf
 import           UnliftIO.Concurrent                   hiding (yield)
@@ -46,11 +49,13 @@ import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
+import           Blockchain.Data.ChainInfo             (UnsignedChainInfo(..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.Data.Enode
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
@@ -64,8 +69,8 @@ import           Blockchain.Watchdog
 import           BlockApps.X509
 
 -- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate 
-rootCerts' = S.fromList [rootCert] 
+rootCerts' :: S.Set X509Certificate
+rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -83,12 +88,12 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> String
                     -> EthCryptState
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
 --  tid <- myThreadId
 --  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
-    [ peerSource
+    [ peerSourceConduit
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
@@ -113,15 +118,14 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m, m `Mod.Outputs` [IngestEvent])
                      => String
                      -> EthCryptState
-                     -> ([IngestEvent] -> m ())
                      -> m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx unseqSink = do
+mkEthP2PEventConduit str outCtx = do
   tid <- myThreadId
   sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $ debounceTxSendsAndUnseq unseqSink
+  return $ debounceTxSendsAndUnseq
         .| CL.iterM recordMessage
         .| CL.iterM (displayMessage Outbound str)
         .| CL.iterM (const $ petWatchdog sendWatchdog)
@@ -129,8 +133,8 @@ mkEthP2PEventConduit str outCtx unseqSink = do
         .| CL.iterM (recordTraffic Outbound)
         .| ethEncrypt outCtx
 
-debounceTxSendsAndUnseq :: MonadIO m => ([IngestEvent] -> m ()) -> ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSendsAndUnseq unseqSink = do
+debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
+debounceTxSendsAndUnseq = do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do
@@ -141,7 +145,7 @@ debounceTxSendsAndUnseq unseqSink = do
       txs <- atomically $ flushTQueue txq
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
-    Left (ToUnseq ie) -> lift $ unseqSink ie
+    Left (ToUnseq ie) -> lift $ Mod.output ie
 
 handleMsgClientConduit :: MonadP2P m
                        => Point
@@ -231,24 +235,23 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake $ other
     awaitMsg >>= \case
         -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
+        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash , networkID=networkID', rootCerts=rcs} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+            lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
               when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-
               -- we set to 0 cause we dont necessarily know the number yet
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-              return $ Right NewStatus {
+              lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              yield $ Right NewStatus {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,
                   totalDifficulty = fromIntegral tdiff,
                   latestHash = bHash,
                   genesisHash = genHash,
                   rootCerts= rootCerts'
-              })
+              }
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do

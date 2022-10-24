@@ -4,6 +4,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
 
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
@@ -27,14 +29,17 @@ module SolidVM.Model.CodeCollection (
   module SolidVM.Model.CodeCollection.VarDef
   ) where
 
-import Control.Lens
-import Control.DeepSeq
-import Data.Aeson as A
-import Data.Map (Map)
+import           Control.Lens
+import           Control.DeepSeq
+import           Data.Aeson as A
+import           Data.Map (Map)
 import qualified Data.Map as M
-import Data.Source
-import Data.Traversable (for)
-import GHC.Generics
+import           Data.Source
+import           Data.Traversable (for)
+import           GHC.Generics
+
+import           Test.QuickCheck.Instances    ()
+import           Test.QuickCheck
 
 import           Blockchain.SolidVM.Exception
 
@@ -78,3 +83,16 @@ getParents cc c =
                         Right
   in for (c ^. parents) $ \p ->
        toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
+
+
+instance Arbitrary CodeCollection where
+  arbitrary = do 
+    contr <- arbitrary
+    oneof [return $ CodeCollection {
+    _contracts  = M.fromList [("qq", contr)]
+    , _flFuncs     = M.empty
+    , _flConstants = M.empty
+    , _flEnums     = M.empty
+    , _flStructs   = M.empty
+    , _flErrors    = M.empty
+    , _pragmas     = [("solidvm","3.4")]}]

@@ -95,7 +95,9 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Privacy
+
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
@@ -225,6 +227,10 @@ instance HasNamespace ChainHashEntry where
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
+
+instance HasNamespace OrgNameChains where
+  type NSKey OrgNameChains = Word256
+  namespace _ = "pnc:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -401,7 +407,7 @@ testPriv = fromMaybe (error "could not import private key") (importPrivateKey (L
 
 instance HasVault SequencerM where
   sign mesg = do
-    mVc <- asks vaultClient    
+    mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
@@ -414,12 +420,12 @@ waitOnVault action = do
   $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
   res <- action
   case res of
-    Left err -> do 
+    Left err -> do
       $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
-    Right val -> do 
-      $logInfoS "HasVault" "Got a signature from vault" 
+    Right val -> do
+      $logInfoS "HasVault" "Got a signature from vault"
       return val
 
 initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)

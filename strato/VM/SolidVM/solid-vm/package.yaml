@@ -34,6 +34,7 @@ library:
   - format
   - labeled-error
   - lens
+  - lrucache
   - memory
   - merkle-patricia-db
   - monad-alter
@@ -52,6 +53,7 @@ library:
   - utf8-string
   - vector
   - vm-tools
+
 
 
 executables:
@@ -100,6 +102,10 @@ tests:
       - time
       - vm-tools
       - utf8-string
+      - test-framework
+      - QuickCheck
+      - solid-vm-parser
+      - transformers
 
 benchmarks:
     codebench:

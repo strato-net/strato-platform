@@ -60,6 +60,7 @@ library:
     - json-rpc-server
     - json-rpc-client
     - lens
+    - lifted-async
     - lifted-base
     - milena
     - milena-tools
@@ -106,6 +107,7 @@ tests:
       - bytestring
       - conduit
       - containers
+      - crypto-pubkey-types
       - data-default
       - debugger
       - ethereum-discovery
@@ -113,6 +115,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - hourglass
       - labeled-error
       - lens
       - merkle-patricia-db

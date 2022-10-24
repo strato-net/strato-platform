@@ -22,6 +22,7 @@ module Blockchain.BlockChain
     , runCodeForTransaction
     , calculateIntrinsicGas'
     , compactDiffs -- For testing
+    , mkEventEntry
   ) where
 
 import           Conduit
@@ -312,7 +313,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult ->
-          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3")]
+          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3"),("solidvm","3.4")]
               findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
@@ -548,6 +549,8 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAccount erResult
       return trr{trrNewAddresses = unseen}
 
+mkEventEntry :: Maybe Word256 -> Event -> EventDB
+mkEventEntry chainId Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult :: VMBase m
                         => BlockData
@@ -573,7 +576,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
       ranBlockHash = hashFunction b
       mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-      mkEventEntry Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
       (!response, theTrace', theLogs, theEvents) =
         case result of
           Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
@@ -581,7 +583,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
             (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry <$> theLogs
-  yieldMany $ OutEvent . mkEventEntry <$> theEvents
+  yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
            TransactionResult { transactionResultBlockHash        = ranBlockHash

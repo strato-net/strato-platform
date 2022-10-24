@@ -1,0 +1,621 @@
+{
+    "family": "strato",
+    "executionRoleArn": "arn:aws:iam::406773134706:role/ecsTaskRole",
+    "containerDefinitions": [
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/smd",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "NODE_NAME",
+                    "value": "localhost"
+                },
+                {
+                    "name": "NODE_HOST",
+                    "value": "localhost"
+                }
+
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.6.0",
+            "dependsOn": [
+                {
+                    "containerName": "apex",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "postgrest",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "prometheus",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "strato",
+                    "condition": "START"
+                }
+            ],
+            "essential": true,
+            "name": "smd"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/apex",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "NODE_HOST",
+                    "value": "localhost"
+                },
+                {
+                    "name": "postgres_host",
+                    "value": "postgres"
+                },
+                {
+                    "name": "postgres_password",
+                    "value": "api"
+                },
+                {
+                    "name": "postgres_port",
+                    "value": "5432"
+                },
+                {
+                    "name": "postgres_user",
+                    "value": "postgres"
+                },
+                {
+                    "name": "prometheusHost",
+                    "value": "prometheus:9090"
+                },
+                {
+                    "name": "stratoHost",
+                    "value": "strato:3000"
+                },
+                {
+                    "name": "vaultWrapperHost",
+                    "value": "vault-wrapper:8000"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.6.0",
+            "dependsOn": [
+                {
+                    "containerName": "postgres",
+                    "condition": "HEALTHY"
+                },
+                {
+                    "containerName": "prometheus",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "strato",
+                    "condition": "START"
+                }
+            ],
+            "links": [
+                "strato",
+                "postgres"
+            ],
+            "essential": true,
+            "name": "apex"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/redis",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "redis:3.2",
+            "command": [
+                "redis-server",
+                "--appendonly",
+                "yes"
+            ],
+            "essential": true,
+            "name": "redis"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/strato",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [
+                {
+                    "hostPort": 30303,
+                    "protocol": "tcp",
+                    "containerPort": 30303
+                },
+                {
+                    "hostPort": 30303,
+                    "protocol": "udp",
+                    "containerPort": 30303
+                }
+            ],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "blockstanbul",
+                    "value": "true"
+                },
+                {
+                    "name": "gasOn",
+                    "value": "false"
+                },
+                {
+                    "name": "generateKey",
+                    "value": "true"
+                },
+                {
+                    "name": "genesis",
+                    "value": "gettingStarted"
+                },
+                {
+                    "name": "isAdmin",
+                    "value": "false"
+                },
+                {
+                    "name": "isRootNode",
+                    "value": "false"
+                },
+                {
+                    "name": "kafkaHost",
+                    "value": "kafka"
+                },
+                {
+                    "name": "kafkaPort",
+                    "value": "9092"
+                },
+                {
+                    "name": "mineBlocks",
+                    "value": "false"
+                },
+                {
+                    "name": "network",
+                    "value": "blockappsnet"
+                },
+                {
+                    "name": "networkID",
+                    "value": ""
+                },
+                {
+                    "name": "postgres_host",
+                    "value": "postgres"
+                },
+                {
+                    "name": "postgres_password",
+                    "value": "api"
+                },
+                {
+                    "name": "postgres_port",
+                    "value": "5432"
+                },
+                {
+                    "name": "postgres_slipstream_db",
+                    "value": "cirrus"
+                },
+                {
+                    "name": "postgres_user",
+                    "value": "postgres"
+                },
+                {
+                    "name": "redisHost",
+                    "value": "redis"
+                },
+                {
+                    "name": "redisPort",
+                    "value": "6379"
+                },
+                {
+                    "name": "splitinit",
+                    "value": "true"
+                },
+                {
+                    "name": "stratoHost",
+                    "value": "strato:3000"
+                },
+                {
+                    "name": "vaultWrapperHost",
+                    "value": "vault-wrapper:8000"
+                },
+                {
+                    "name": "zkHost",
+                    "value": "zookeeper"
+                },
+                {
+                    "name": "indexEVM",
+                    "value": "false"
+                },
+                {
+                    "name": "USE_OLD_STRATO_API",
+                    "value": "true"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 2048,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.6.0",
+            "dependsOn": [
+                {
+                    "containerName": "kafka",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "postgres",
+                    "condition": "HEALTHY"
+                },
+                {
+                    "containerName": "redis",
+                    "condition": "START"
+                }
+            ],
+            "links": [
+                "postgres",
+                "zookeeper",
+                "kafka"
+            ],
+            "essential": true,
+            "name": "strato"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/postgrest",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "blocHost",
+                    "value": "strato:3000"
+                },
+                {
+                    "name": "PG_ENV_POSTGRES_DB",
+                    "value": "cirrus"
+                },
+                {
+                    "name": "PG_ENV_POSTGRES_HOST",
+                    "value": "postgres"
+                },
+                {
+                    "name": "PG_ENV_POSTGRES_PASSWORD",
+                    "value": "api"
+                },
+                {
+                    "name": "PG_ENV_POSTGRES_USER",
+                    "value": "postgres"
+                },
+                {
+                    "name": "PG_PORT_5432_TCP_PORT",
+                    "value": "5432"
+                },
+                {
+                    "name": "POSTGREST_LOG_LEVEL",
+                    "value": "error"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.6.0",
+            "dependsOn": [
+                {
+                    "containerName": "postgres",
+                    "condition": "HEALTHY"
+                }
+            ],
+            "essential": true,
+            "links": [
+                "strato"
+            ],
+            "name": "postgrest"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/postgres",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "POSTGRES_PASSWORD",
+                    "value": "api"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "postgres:9.6",
+            "command": [
+                "postgres",
+                "-c",
+                "max_connections=300",
+                "-c",
+                "shared_buffers=512MB"
+            ],
+            "healthCheck": {
+                "retries": 3,
+                "command": [
+                    "CMD-SHELL",
+                    "pg_isready -U postgres -p 5432 || exit 1"
+                ],
+                "timeout": 5,
+                "interval": 30
+            },
+            "essential": true,
+            "name": "postgres"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/nginx",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [
+                {
+                    "hostPort": 80,
+                    "protocol": "tcp",
+                    "containerPort": 80
+                },
+                {
+                    "hostPort": 443,
+                    "protocol": "tcp",
+                    "containerPort": 443
+                }
+            ],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "APEX_HOST",
+                    "value": ""
+                },
+                {
+                    "name": "blockstanbul",
+                    "value": "true"
+                },
+                {
+                    "name": "OAUTH_CLIENT_ID",
+                    "value": "dev"
+                },
+                {
+                    "name": "OAUTH_CLIENT_SECRET",
+                    "value": "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f"
+                },
+                {
+                    "name": "OAUTH_DISCOVERY_URL",
+                    "value": "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
+                },
+                {
+                    "name": "OAUTH_JWT_USERNAME_PROPERTY",
+                    "value": ""
+                },
+                {
+                    "name": "OAUTH_SCOPE",
+                    "value": ""
+                },
+                {
+                    "name": "POSTGREST_HOST",
+                    "value": ""
+                },
+                {
+                    "name": "PROMETHEUS_HOST",
+                    "value": ""
+                },
+                {
+                    "name": "SMD_HOST",
+                    "value": ""
+                },
+                {
+                    "name": "STRATO_HOSTNAME",
+                    "value": ""
+                },
+                {
+                    "name": "STRATO_PORT_API",
+                    "value": ""
+                },
+                {
+                    "name": "STRATO_PORT_API2",
+                    "value": ""
+                },
+                {
+                    "name": "STRATO_PORT_LOGS",
+                    "value": ""
+                },
+                {
+                    "name": "STRATO_PORT_BLOCKSTANBUL_VOTE",
+                    "value": ""
+                },
+                {
+                    "name": "VAULT_WRAPPER_HOST",
+                    "value": ""
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.6.0",
+            "dependsOn": [
+                {
+                    "containerName": "apex",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "postgrest",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "prometheus",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "smd",
+                    "condition": "START"
+                },
+                {
+                    "containerName": "strato",
+                    "condition": "START"
+                }
+            ],
+            "links": [
+                "apex"
+            ],
+            "essential": true,
+            "name": "nginx"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/zookeeper",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "wurstmeister/zookeeper:3.4.6",
+            "essential": true,
+            "name": "zookeeper"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/kafka",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "KAFKA_ADVERTISED_HOST_NAME",
+                    "value": "kafka"
+                },
+                {
+                    "name": "KAFKA_ADVERTISED_PORT",
+                    "value": "9092"
+                },
+                {
+                    "name": "KAFKA_ZOOKEEPER_CONNECT",
+                    "value": "zookeeper:2181"
+                },
+                {
+                    "name": "KAFKA_DELETE_TOPIC_ENABLE",
+                    "value": "true"
+                },
+                {
+                    "name": "KAFKA_LOG_CLEANER_ENABLE",
+                    "value": "false"
+                },
+                {
+                    "name": "KAFKA_LOG_DIRS",
+                    "value": "/kafka/kafka-logs"
+                },                
+                {
+                    "name": "KAFKA_LOG_RETENTION_HOURS",
+                    "value": "2147483647"
+                },
+                {
+                    "name": "KAFKA_OFFSET_METADATA_MAX_BYTES",
+                    "value": "1048576"
+                },
+                {
+                    "name": "KAFKA_OFFSETS_RETENTION_MINUTES",
+                    "value": "2147483647"
+                },
+                {
+                    "name": "KAFKA_MAX_REQUEST_SIZE",
+                    "value": "100663296"
+                },
+                {
+                    "name": "KAFKA_MESSAGE_MAX_BYTES",
+                    "value": "100663296"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "wurstmeister/kafka:1.1.0",
+            "dependsOn": [
+                {
+                    "containerName": "zookeeper",
+                    "condition": "START"
+                }
+            ],
+            "links": [
+                "zookeeper"
+            ],
+            "essential": true,
+            "name": "kafka"
+        },
+        {
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/aws/ecs/prometheus",
+                    "awslogs-region": "us-east-1"
+                }
+            },
+            "portMappings": [],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "NODE_HOST",
+                    "value": "localhost"
+                }
+            ],
+            "mountPoints": [],
+            "memoryReservation": 512,
+            "volumesFrom": [],
+            "image": "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.6.0",
+            "essential": true,
+            "name": "prometheus"
+        }
+    ],
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "EC2"
+    ]
+}

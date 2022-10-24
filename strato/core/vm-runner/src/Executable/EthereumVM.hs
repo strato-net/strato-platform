@@ -211,7 +211,7 @@ processBlocksAndNewChains blocksAndChains = do
 
 insertNewChains :: VMBase m
                 => [OutputGenesis]
-                -> m [(Word256, ChainInfo, Keccak256, [Action])]
+                -> m [(Word256, ChainInfo, Keccak256, [ExecResults])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -238,17 +238,18 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
-        (sr, mAction) <-
+        (sr, mExecResults) <-
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-        Just (cId, cInfo, bHash, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
+        Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
-outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent m ()
-outputNewChains = traverse_ $ \(cId, cInfo, bHash, actions) -> do
+outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
+outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
   yield $ OutToStateDiff cId cInfo bHash
-  for_ actions $ yield . OutAction
+  for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
+  for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
 
 processBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
@@ -311,7 +312,7 @@ outputPrivateTransactions :: [OutputTx] -> [VmOutEvent]
 outputPrivateTransactions = map $ OutIndexEvent . IndexPrivateTx
 
 -- TODO: maybe move this into solid-vm?
-runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Action])
+runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [ExecResults])
 runChainConstructors cId cInfo = do
   -- We are inventing the rules of how the constructor should run when a chain is created.
   -- Since all VM runs need some environment variables passed in, we need to define what all of
@@ -341,7 +342,7 @@ runChainConstructors cId cInfo = do
       NonContract{} -> pure Nothing
       ContractNoStorage a _ ch -> resolveSrc a ch
       ContractWithStorage a _ ch _ -> resolveSrc a ch
-    fmap (join . fmap erAction) . for addrSrc $ \(addr,ms) -> SolidVM.call
+    for addrSrc $ \(addr,ms) -> SolidVM.call
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
@@ -381,12 +382,15 @@ runChainConstructors cId cInfo = do
            ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
+  -- let evs = Action._events <$> actions
+  -- $logInfoS "Events" (T.pack $ show evs)
+
   flushMemStorageDB
   Mem.flushMemAddressStateDB
   flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
-  return (sr, actions)
+  return (sr,actions) 
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m

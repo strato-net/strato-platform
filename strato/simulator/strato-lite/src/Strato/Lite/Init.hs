@@ -21,7 +21,7 @@ import           Network.Wai.Handler.Warp
 
 runStratoLite :: [(Text, Text)] -> [(Text, Text)] -> IO ()
 runStratoLite nodes' connections' = do
-  eMgr <- runNetwork nodes' connections'
+  eMgr <- runNetwork nodes' connections' id
   case eMgr of
     Left e -> error $ T.unpack e
     Right mgr -> run flags_port $ stratoLiteRestApp mgr

@@ -11,6 +11,8 @@
 module BlockApps.X509.Certificate (
   X509Certificate(..),
   X509CertInfoState(..),
+  CertificateChain(..),
+  SignedCertificate,
   Issuer(..),
   Subject(..),
   rootCert,
@@ -22,6 +24,7 @@ module BlockApps.X509.Certificate (
   verifyCertSignedBy,
   verifyBlockApps,
   verifyCertM,
+  verifyBlockAppsM,
   makeSignedCert,
   makeSignedCertSigF,
   getCertSubject,
@@ -30,6 +33,9 @@ module BlockApps.X509.Certificate (
   getCertIssuer,
   getCertIssuers,
   getParentUserAddress,
+  findNodeCert,
+  x509ToSigneds,
+  signedsToX509,
   dateTimeToString,
   getValidity
  ) where
@@ -60,6 +66,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
+import           Data.List                          (find)
 
 import           GHC.Generics
 
@@ -110,6 +117,8 @@ data X509CertInfoState = X509CertInfoState
   , certificate :: X509Certificate
   , isValid :: Bool         -- ^ Non-revoked = true, revoked = false
   , children :: [Address]   -- ^ The "userAddress" of the children of the certificate
+  , orgName :: String
+  , orgUnit :: Maybe String
   } deriving (Show, Eq, Generic, Binary)
 
 instance Format X509CertInfoState where
@@ -392,7 +401,7 @@ getValidity = do
   return (curDate, endDate)
 
 dateTimeToString :: DateTime -> String
-dateTimeToString = show . timeGetElapsed 
+dateTimeToString = show . timeGetElapsed
 
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
@@ -424,8 +433,8 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
 
 getCertValidity :: X509Certificate -> (DateTime, DateTime)
 getCertValidity (X509Certificate (CertificateChain (c:_)))= certValidity cert
-  where (Signed cert _ _) = getSigned c 
-getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate" 
+  where (Signed cert _ _) = getSigned c
+getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate"
 
 --To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
 -- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
@@ -494,6 +503,9 @@ signedBy c c' = fromMaybe False $ (\k -> verifyCertChain k [c]) . subPub <$> get
 verifyBlockApps :: X509Certificate -> Bool
 verifyBlockApps = verifyCert rootPubKey
 
+verifyBlockAppsM :: MonadIO m => m X509Certificate -> m Bool
+verifyBlockAppsM = fmap verifyBlockApps
+
 verifyCertM :: MonadIO m => PublicKey -> X509Certificate -> m Bool
 verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetails cs $> verifyCertChain pkey cs
   where printCertDetails :: MonadIO m => SignedCertificate -> m ()
@@ -513,3 +525,7 @@ verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetail
             Just subject -> do
               liftIO $ putStrLn $ format subject
               liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject)
+
+-- Find a matching pubkey in a list of signed certs
+findNodeCert :: PublicKey -> [SignedCertificate] -> Maybe SignedCertificate
+findNodeCert pk = find (\x ->  unserializeAndUnwrap (certPubKey (signedObject (getSigned x))) == Just pk)

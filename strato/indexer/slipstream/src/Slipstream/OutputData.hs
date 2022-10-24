@@ -10,6 +10,7 @@
 
 module Slipstream.OutputData (
   outputData,
+  outputData',
   OutputM,
   insertExpandEventTables,
   insertIndexTable,
@@ -149,6 +150,9 @@ cirrusInfo = PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
+dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (IORef Globals,TableName,TableColumns)) -> m ()
+dbQueryCatchError' conn (insrt, b) = handle (handlePostgresError' b) $ dbQuery conn insrt
+
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
@@ -157,11 +161,29 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
+handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (IORef Globals,TableName,TableColumns) -> SomeException -> m ()
+handlePostgresError' myStuff e =
+  case myStuff of 
+    Nothing -> handlePostgresError e
+    Just (x,y,z) -> do
+      setTableCreated x y z
+      handlePostgresError e
+      --setTableCreated globalsIORef tableName $ cols
+
+
+
 handlePostgresError :: MonadLogger m => SomeException -> m ()
 handlePostgresError e =
   if crashOnSQLError
   then error . show $ e
     else$logErrorLS "handlePGError" e
+
+outputData' :: OutputM m
+           => PGConnection
+           -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m a
+           -> m a
+outputData' conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError' conn)
+
 
 outputData :: OutputM m
            => PGConnection
@@ -273,9 +295,9 @@ createExpandHistoryTable
   => IORef Globals
   -> Contract
   -> (Text, Text, Text)
-  -> ConduitM () Text m ()
+  -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m ()
 createExpandHistoryTable g c nameParts = do
-    createHistoryTable g c nameParts
+    createHistoryTable' g c nameParts
     expandHistoryTable g c nameParts
 
 getDeferredForeignKeys :: TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
@@ -310,6 +332,28 @@ createIndexTable globalsIORef contract (o, a, n) = do
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
 
+
+createHistoryTable' :: OutputM m
+                   => IORef Globals
+                   -> Contract
+                   -> (Text, Text, Text)
+                   -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m ()
+createHistoryTable' globalsIORef contract (o, a, n) = do
+  let tableName = historyTableName o a n
+  tableExists <- isTableCreated globalsIORef tableName
+
+  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
+
+  when (not tableExists) $ do
+    incNumHistoryTables
+    yield $ ((createHistoryTableQuery contract (o, a, n)), Nothing)
+    yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (o, a, n)) 
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
+    setTableCreated globalsIORef tableName list
+
+
+
+
 createHistoryTable :: OutputM m
                    => IORef Globals
                    -> Contract
@@ -343,11 +387,55 @@ expandHistoryTable :: OutputM m =>
                       IORef Globals ->
                       Contract ->
                       (Text, Text, Text) ->
-                      ConduitM () Text m ()
+                      ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m ()
 expandHistoryTable globalsIORef contract (o, a, n) = do
   let tableName = historyTableName o a n
-  _ <- expandContractTable globalsIORef contract tableName
+  _ <- expandContractTable' globalsIORef contract tableName
   return ()
+
+expandContractTable' :: OutputM m
+                    => IORef Globals
+                    -> Contract
+                    -> TableName
+                    -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m [ForeignKeyInfo]
+expandContractTable' globalsIORef contract tableName = do
+  columns <- getTableColumns globalsIORef tableName
+  case columns of
+    Nothing -> do
+      $logErrorLS "expandTable" $ T.concat 
+          [ "Table " 
+          , (tableNameToText tableName)
+          , " does not exist, but we are trying to expand it?"
+          ]
+      return []
+    Just cols -> do
+      let list = Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
+          difference new old = filter ((`notElem` old) . fst) new
+          extras = difference list (partialParseTableColumns cols)
+          extraTableColumns = tableColumns extras
+      unless (null extraTableColumns) $ do
+        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandTable" $ T.concat
+            [ "Adding columns to "
+            , (tableNameToText tableName)
+            , " for the following new fields: "
+            , T.intercalate ", " extraTableColumns
+            ]
+        setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
+        yield $ ((expandTableQuery tableName extraTableColumns), Just (globalsIORef, tableName, cols))
+      return $
+        case tableName of
+          IndexTableName o a n ->
+            flip map
+            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
+            ForeignKeyInfo {
+              tableName = tableName,
+              columnName = colName,
+              foreignTableName = let a' = case a of; "" -> n; _ -> a
+                                 in indexTableName o a' $ labelToText foreignName
+              }
+          _ -> []
+
 
 expandContractTable :: OutputM m
                     => IORef Globals

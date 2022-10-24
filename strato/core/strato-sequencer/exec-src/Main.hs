@@ -63,6 +63,8 @@ main = do
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
+  putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
+  
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
@@ -167,7 +169,7 @@ main = do
         , vaultClient = Just clientEnv
         }
   race_ (runTheGregor gregorCfg)
-      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
+      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
       . run flags_blockstanbul_port
       . prometheus def{ prometheusInstrumentApp = False }
       . instrumentApp "blockstanbul-admin"

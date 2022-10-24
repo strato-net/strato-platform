@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
 import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
-import           Data.Maybe                         (maybeToList)
+import           Data.Maybe                         (maybeToList, fromMaybe)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -82,6 +82,27 @@ doRemoveMember chainId address = do
   lift $ removeMember chainId address
   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
+doAddOrgName :: Word256 -> (String, Maybe String) -> IContextM ()
+doAddOrgName chainId org = do
+  logF [ "Adding chain "
+       , formatChainId $ Just chainId
+       , " to org "
+       , fst org
+       , maybe "" ("/" ++) (snd org)
+       ]
+  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain org chainId
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId org]
+
+doRemoveOrgName :: Word256 -> (String, Maybe String) -> IContextM ()
+doRemoveOrgName chainId org = do
+  logF [ "Removing chain "
+       , formatChainId $ Just chainId
+       , " from org "
+       , fst org
+       , maybe "" ("/" ++) (snd org)
+       ]
+  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain org chainId
+
 doRegisterCertificate :: Account -> Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate contractAddress userAddress x509CertInfoState = do
   logF [ "Registering X.509 Certificate -- key/userAddress: "
@@ -116,6 +137,8 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
+               | AddOrgName (Either String (Word256, (String, Maybe String)))
+               | RemoveOrgName (Either String (Word256, (String, Maybe String)))
                | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
                | CertificateRevoked (Either String (Account, Address))
                | CertificateRegistryInitialized (Either String Account)
@@ -125,7 +148,7 @@ data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | PutTxResult TransactionResult
                deriving (Show, Eq)
 
-indexEventToTxrResults :: IndexEvent -> [TxrResult]
+indexEventToTxrResults :: IndexEvent -> [TxrResult] -- emit MemberAdded(address,enode);
 indexEventToTxrResults = \case
   LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
     case logDBTopic1 l of
@@ -156,14 +179,24 @@ indexEventToTxrResults = \case
       (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
+      (Just chainId, "OrganizationAdded", _) -> case eventDBArgs ev of
+        (n:u:_) -> Just . AddOrgName $ Right (chainId, (n, Just u))
+        (n:_)   -> Just . AddOrgName $ Right (chainId, (n, Nothing))
+        []      -> Just . AddOrgName . Left $ "failed to provide any arguments for OrganizationAdded event"
+      (Just chainId, "OrganizationRemoved", _) -> case eventDBArgs ev of
+        (n:u:_) -> Just . RemoveOrgName $ Right (chainId, (n, Just u))
+        (n:_)   -> Just . RemoveOrgName $ Right (chainId, (n, Nothing))
+        []      -> Just . RemoveOrgName . Left $ "failed to provide any arguments for OrganizationRemoved event"
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
+            org = maybe "" subOrg $ getCertSubject =<< eitherToMaybe cert
+            orgUnit = fromMaybe Nothing $ Just . subUnit =<< getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
+            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit})
       (Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of
@@ -181,6 +214,12 @@ txrResultHandler = \case
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RemoveMember e -> case e of
     Right (chainId, address) -> doRemoveMember chainId address
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  AddOrgName e -> case e of
+    Right (chainId, (orgName, orgUnit)) -> doAddOrgName chainId (orgName, orgUnit)
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  RemoveOrgName e -> case e of
+    Right (chainId, (orgName, orgUnit)) -> doRemoveOrgName chainId (orgName, orgUnit)
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RegisterCertificate e -> case e of
     Right (contractAddress, ua, certInfoState) -> doRegisterCertificate contractAddress ua certInfoState
