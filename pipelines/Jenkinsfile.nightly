@@ -82,15 +82,19 @@ pipeline {
         parallel (
           'Push images': {
             withCredentials([
-                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_USER_KEY_ID'),
             ]) {
-              archiveArtifacts artifacts: "strato-worktree/docker-compose.yml"
-              sh '''#!/bin/bash -le
-                set -x
-                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                cd strato-worktree
-                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
-              '''
+              dir ('strato-worktree') {
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.ecr.yml"
+                sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+                  AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
+                  docker-compose --log-level ERROR -f docker-compose.push.ecr.yml push 2>&1
+                '''
+              }
             }
           },
             
