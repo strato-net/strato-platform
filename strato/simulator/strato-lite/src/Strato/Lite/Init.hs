@@ -12,16 +12,15 @@ module Strato.Lite.Init
   ( runStratoLite
   ) where
 
-import qualified Data.Text                as T
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Data.Text                (Text)
 import           Strato.Lite.Options
 import           Strato.Lite.Rest
 import           Strato.Lite.Monad
 import           Network.Wai.Handler.Warp
 
-runStratoLite :: [(Text, Text)] -> [(Text, Text)] -> IO ()
-runStratoLite nodes' connections' = do
-  eMgr <- runNetwork nodes' connections' id
-  case eMgr of
-    Left e -> error $ T.unpack e
-    Right mgr -> run flags_port $ stratoLiteRestApp mgr
+runStratoLite :: [(Text, Text)] -> IO ()
+runStratoLite nodes' = do
+  let nodes'' = (\(a,b) -> (a, (IPAsText b, TCPPort 30303, UDPPort 30303))) <$> nodes'
+  mgr <- runNetwork nodes'' id
+  run flags_port $ stratoLiteRestApp mgr

@@ -24,14 +24,12 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
-import           Network.Socket
 import           UnliftIO
 
 import           BlockApps.Logging
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
-import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as C
@@ -40,21 +38,20 @@ runEthServer :: (RunsServer n m, MonadP2P n)
              => Int
              -> PeerRunner n m ()
              -> m ()
-runEthServer listenPort runner = runServerConnection (TCPPort listenPort) runner $ \c a ->
+runEthServer listenPort runner = runServer (TCPPort listenPort) runner $ \c a ->
   ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
 ethServerHandler :: MonadP2P m
                  => ConduitM () B.ByteString m ()
                  -> ConduitM B.ByteString Void m ()
                  -> ConduitM () P2pEvent m ()
-                 -> SockAddr
+                 -> IPAsText
                  -> m ()
-ethServerHandler pSource pSink seqSrc sockAddr = do
-  let theSockAddr = sockAddrToIP sockAddr
-      peerStr = show theSockAddr
-  ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
+ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
+  let peerStr = T.unpack i
+  ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
-  getPeerByIP theSockAddr >>= \case
+  getPeerByIP ipAsText >>= \case
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do

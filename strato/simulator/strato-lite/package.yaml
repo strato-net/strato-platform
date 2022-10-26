@@ -65,6 +65,7 @@ library:
   - data-default
   - debugger
   - ethereum-discovery
+  - ethereum-encryption
   - ethereum-rlp
   - hflags
   - hspec

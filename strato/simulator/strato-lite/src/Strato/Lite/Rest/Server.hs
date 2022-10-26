@@ -20,6 +20,7 @@ import qualified Blockchain.Data.TXOrigin          as Origin
 import           Blockchain.Sequencer.Event
 import           Strato.Lite.Rest.Api
 import           Strato.Lite.Monad
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.MicroTime
 import           Servant
 import           UnliftIO                          hiding (Handler)
@@ -40,7 +41,7 @@ getConnections mgr = liftIO . atomically $ do
     pure $ fmap (first show) mExp
 
 postAddNode :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddNode mgr label ip = liftIO $ runReaderT (addNode label ip) mgr
+postAddNode mgr label ip = liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
