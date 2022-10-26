@@ -43,6 +43,7 @@ library:
   - x509
   - x509-validation
   - deepseq
+  - QuickCheck
 
 tests:
   x509-test:

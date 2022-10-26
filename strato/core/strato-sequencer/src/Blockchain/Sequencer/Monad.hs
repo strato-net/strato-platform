@@ -112,6 +112,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
+import           BlockApps.X509.Certificate
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -139,6 +140,7 @@ data SequencerContext = SequencerContext
   , _orgNameChainsRegistry :: !(Map ChainMember (Modification Word256))
   -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
+  , _x509certInfoState   :: !(Map Address (Modification X509CertInfoState)) --map to pubkey
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -239,6 +241,10 @@ instance HasNamespace ChainIdEntry where
 instance HasNamespace OrgNameChains where
   type NSKey OrgNameChains = Word256
   namespace _ = "pnc:"
+
+instance HasNamespace X509CertInfoState where
+  type NSKey X509CertInfoState = Address
+  namespace _ = "cis:"  -- make a namespace instance for new mapping
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -349,6 +355,17 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     genericDeleteSequencer chainIdRegistry p k
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
+
+instance (Word256 `A.Alters` X509CertInfoState) SequencerM where 
+  lookup = genericLookupSequencer x509CertInfoState
+  insert p k v = do
+    genericInsertSequencer x509CertInfoState p k v
+    sz <- M.size <$> use x509CertInfoState
+    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer x509CertInfoState p k
+    sz <- M.size <$> use x509CertInfoState
+    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do
@@ -477,6 +494,7 @@ runSequencerM c mbc m = do
             , _chainInfoRegistry   = M.empty
             , _orgNameChainsRegistry = M.empty
             , _x509certRegistry    = M.empty
+            , _x509certInfoState   = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

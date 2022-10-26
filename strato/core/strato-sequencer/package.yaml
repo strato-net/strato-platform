@@ -58,6 +58,7 @@ library:
     - resourcet
     - stm-chans
     - unliftio
+    - x509-certs
 
 executables:
   strato-sequencer:

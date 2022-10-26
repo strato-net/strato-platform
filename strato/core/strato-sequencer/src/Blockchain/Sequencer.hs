@@ -623,6 +623,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       record "inevent_type_genesis" "IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETNewCertRegistered -> do
+      record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
+      yieldMany $ map (\(IENewCertRegistered c a e) -> insert c a e) events --this is where i submit to ldb
     IETNewChainMember -> do
       record "inevent_type_new_chain_member" "IngestNewChainMembers"
       yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events

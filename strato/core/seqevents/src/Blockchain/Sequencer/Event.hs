@@ -29,6 +29,8 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified GHC.Generics                              as GHCG
 
 import qualified Blockchain.Strato.Model.Address           as A
+import           Blockchain.Strato.Model.Account
+import           BlockApps.X509.Certificate
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256         (Keccak256)
@@ -110,16 +112,19 @@ instance Format SeqLoopEvent where
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
+                 | IENewCertRegistered  Account A.Address X509CertInfoState
                  | IENewChainMember Word256 A.Address Enode
                  | IENewChainOrgName Word256 ChainMember
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
-                 deriving (Eq, Show, GHCG.Generic, Data)
+                 deriving (Eq, Show, GHCG.Generic) --, Data)
+
 
 data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
+                     | IETNewCertRegistered
                      | IETNewChainMember
                      | IETNewChainOrgName
                      | IETBlockstanbul
@@ -133,6 +138,7 @@ iEventType = \case
   IEBlock{}              -> IETBlock
   IEGenesis{}            -> IETGenesis
   IENewChainMember{}     -> IETNewChainMember
+  IENewCertRegistered{}     -> IETNewCertRegistered
   IENewChainOrgName{}    -> IETNewChainOrgName
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
@@ -142,6 +148,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
+  format (IENewCertRegistered c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o

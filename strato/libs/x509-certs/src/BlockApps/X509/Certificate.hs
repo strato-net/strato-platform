@@ -85,6 +85,7 @@ import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
+import           Test.QuickCheck
 
 import           Servant.Docs
 
@@ -124,6 +125,19 @@ data X509CertInfoState = X509CertInfoState
 
 instance Format X509CertInfoState where
   format = show
+
+instance Arbitrary X509Certificate where
+  arbitrary = pure . X509Certificate $ CertificateChain []
+
+instance Arbitrary X509CertInfoState where
+  arbitrary = X509CertInfoState
+          <$> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
 
 signedsToX509 :: [SignedCertificate] -> X509Certificate
 signedsToX509 = X509Certificate . CertificateChain
