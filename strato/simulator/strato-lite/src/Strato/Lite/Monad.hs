@@ -73,8 +73,9 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
---import  BlockApps.X509.Certificate           
+--import  BlockApps.X509.Certificate          
 
+import           "strato-p2p"Blockchain.Event          (checkPeerIsMember)
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
 import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
@@ -748,6 +749,9 @@ instance MonadIO m => A.Alters (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.Ac
   lookup _ _ = error "Test peer should not be calling withActivePeer"
   insert _ _ = error "Test peer should not be calling withActivePeer"
   delete _ _ = error "Test peer should not be calling withActivePeer"
+  
+instance MonadIO (Maybe) where
+  liftIO = liftIO
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -840,6 +844,8 @@ data P2PPeer = P2PPeer
   , _p2pPeerApiIndexer     :: TestContextM ()
   , _p2pPeerP2pIndexer     :: TestContextM ()
   , _p2pPeerTxrIndexer     :: TestContextM ()
+  , _p2pPeerP2PDirect      :: TestContextM ()
+  , _p2pPeerP2PDirectException :: TVar (Maybe SomeException)
   }
 makeLenses ''P2PPeer
 
@@ -848,7 +854,8 @@ runNode p = do
   concurrently_
     (concurrently_ (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
                                   (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSeqTimerSource)))
-                   (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerVm)))
+                   (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerVm))
+                                  (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerP2PDirect))))
     (concurrently_ 
       (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerApiIndexer))
                      (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerP2pIndexer)))
@@ -881,6 +888,11 @@ createPeer privKey initialValidators name ipAddr = do
   chv <- atomically newTQueue
   cht <- atomically newTMChan
   seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
+  serverToClientTQueue <- newTQueueIO
+  clientToServerTQueue <- newTQueueIO
+  clientSeqSource <- atomically . dupTMChan $ seqP2pSource
+  clientCtx <- newIORef (def :: P2PContext)
+  clientExceptionTVar <- newTVarIO Nothing
   cache <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
@@ -1011,6 +1023,40 @@ createPeer privKey initialValidators name ipAddr = do
                                       $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
                                       pure ()
                                  )
+      p2pDirect = runConduit $ (sourceTMChan clientSeqSource)
+                            .| (awaitForever $ either (const $ pure ()) yield)
+                            .| (awaitForever $ \ev -> do
+                                  $logInfoS (name <> "/rClientDirect") . T.pack $ "Running client direct" ++ show ev
+                                  let rClientDirect :: MonadP2PTest TestContextM (Maybe SomeException)
+                                      rClientDirect = do
+                                        $logInfoS (name <> "/rClientDirect") . T.pack $ "Inside client direct" ++ show ev
+                                        case ev of
+                                          P2pNewChainMember cId _ (Enode _ ip _ _) -> do
+                                            $logInfoS (name <> "/rClientDirect") . T.pack $ "Directly connecting to peer at " ++ showIP ip
+                                            maybePeer <- getPeerByIP $ showIP ip
+                                            case maybePeer of
+                                              Just p -> do
+                                                mems <- A.selectWithDefault (Mod.Proxy @ChainMembers) cId
+                                                if (checkPeerIsMember p mems) 
+                                                  then do
+                                                    let pStr = DataPeer.pPeerString p
+                                                    runEthClientConduit p 
+                                                                        (sourceTQueue clientToServerTQueue)
+                                                                        (sinkTQueue serverToClientTQueue)
+                                                                        (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                                                        (lift . unseq)
+                                                                        (T.unpack name ++ " -> " ++ pStr)
+                                                  else pure $ Nothing
+                                              Nothing -> do
+                                                $logErrorS (name <> "/rClientDirect") $ "No matching peer found."
+                                                pure $ Nothing
+                                          _ -> do
+                                            $logInfoS (name <> "/rClientDirect") $ "Skipping non-related event."
+                                            pure $ Nothing
+                                  $logInfoS (name <> "/rClientDirect") . T.pack $ "rClientDirect was ran"
+                                  mEx <- liftIO $ runLoggingT . runResourceT $ flip runReaderT testContextTVar $ runReaderT rClientDirect clientCtx
+                                  atomically $ writeTVar clientExceptionTVar $ mEx
+                               )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
                                  , T.unpack ipAddr
@@ -1036,6 +1082,8 @@ createPeer privKey initialValidators name ipAddr = do
     apiIndexer'
     p2pIndexer'
     txrIndexer'
+    p2pDirect
+    clientExceptionTVar
 
 data P2PConnection = P2PConnection
   { _serverToClient :: TQueue B.ByteString
