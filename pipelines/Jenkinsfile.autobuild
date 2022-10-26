@@ -28,6 +28,7 @@ pipeline {
         dir ('blockapps-rest') {
           sh 'yarn install --pure-lockfile'
           sh 'yarn build'
+          sh 'Version Gamjee: ${VERSION}'
         }
       }
     }

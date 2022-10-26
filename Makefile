@@ -106,6 +106,10 @@ docker-compose:
 	@echo Creating the image-push-ready script for ecr push...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' ecr_repo_push_tpl.sh > ecr_repo_push.sh
 	chmod +x ecr_repo_push.sh
+	#cat docker-compose.push.yml
+	#@echo Creating the image-push-ready docker-compose.push.yml for in house push...
+	#sed -e 's|<ECR_REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
+	#cat docker-compose.push.ecr.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
