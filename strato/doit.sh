@@ -65,6 +65,10 @@ function newnode {
   echo "Starting Strato processes. All output is logged to $PWD/logs."
   runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
+  # echo "Starting vault-proxy"
+  # ##Logging statement are in strato_strato_1 in file logs/vault-proxy
+  # runBackgroundProcess vault-proxy  --oidcUrl=$oidcUrl --oidcContentType=$oidcContentType --oidcAuthorization=$oidcAuthorization --oidcGrantType=$oidcGrantType &>> logs/vault-proxy
+
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
