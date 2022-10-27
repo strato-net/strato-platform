@@ -162,7 +162,7 @@ pipeline {
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
-              AWS_ACCESS_KEY_ID=${AWS_USER_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
+              AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker-compose --log-level ERROR -f docker-compose.push.ecr.yml push 2>&1
             '''
 
