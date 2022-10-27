@@ -4,12 +4,34 @@ import qualified Network.Socket               as S
 
 import           BlockApps.Init
 import           BlockApps.Logging
+import           Blockchain.EthConf
+import           Blockchain.Strato.Discovery.ContextLite
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.UDPServer
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Resource
+import qualified Data.Text                    as T
 import           Executable.EthereumDiscovery
-import           Executable.Options()
+import           Executable.Options
 import           HFlags
+import qualified Text.Colors                  as CL
+import           UnliftIO
 
 main :: IO ()
 main = do
   blockappsInit "ethereum-discovery"
   _ <- $initHFlags "ethereum-discover"
-  S.withSocketsDo $ runLoggingT ethereumDiscovery
+
+  let runner f = do
+        $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ flags_vaultWrapperUrl
+        let port' = discoveryPort $ discoveryConfig ethConf
+            udpPort = UDPPort port'
+            tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
+        cxt <- initContextLite flags_vaultWrapperUrl udpPort tcpPort
+        runResourceT . flip runReaderT cxt $
+          bracket
+            (connectMe udpPort)
+            (liftIO . S.close)
+            (\s -> local (\c -> c{sock = s}) f)
+  S.withSocketsDo . runLoggingT $ ethereumDiscovery runner

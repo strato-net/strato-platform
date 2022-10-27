@@ -16,9 +16,7 @@ import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
 import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
@@ -34,7 +32,6 @@ import           System.Random
 
 import           BlockApps.Logging
 import           Blockchain.Data.PubKey
-import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
@@ -47,21 +44,12 @@ import qualified Text.Colors                             as CL
 import           Text.Format
 
 
-runEthUDPServer :: ( MonadIO m
-                   , MonadFail m
-                   , MonadCatch m
-                   , MonadThrow m
-                   , MonadLogger m
-                   , MonadUnliftIO m
-                   )
-                => ContextLite
-                -> m ()
-runEthUDPServer ctx =
-  void . runResourceT $ runReaderT (do 
-    pub <- getPub
-    $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
-    $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
-    udpHandshakeServer) ctx
+runEthUDPServer :: MonadDiscovery m => m ()
+runEthUDPServer = do
+  pub <- getPub
+  $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
+  $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
+  udpHandshakeServer
 
 connectMe :: (MonadIO m, MonadFail m, MonadLogger m)
           => UDPPort -> m Socket
@@ -74,14 +62,7 @@ connectMe (UDPPort port') = do
 
   return sock
 
-addPeersIfNeeded :: ( HasVault m
-                    , MonadIO m
-                    , MonadFail m
-                    , MonadLogger m
-                    , A.Replaceable SockAddr B.ByteString m
-                    , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
-                    )
-                 => m ()
+addPeersIfNeeded :: MonadDiscovery m => m ()
 addPeersIfNeeded = do
   numAvailablePeers <- liftIO getNumAvailablePeers
   let minPeers = minAvailablePeers (discoveryConfig ethConf)
@@ -102,16 +83,7 @@ addPeersIfNeeded = do
           eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
           whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
-attemptBond :: ( HasVault m
-               , MonadIO m
-               , MonadFail m
-               , MonadLogger m
-               , A.Replaceable SockAddr B.ByteString m
-               , Mod.Accessible UDPPort m
-               , Mod.Accessible TCPPort m
-               , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
-               )
-            => m ()
+attemptBond :: MonadDiscovery m => m ()
 attemptBond = do
   udpPort <- Mod.access (Mod.Proxy @UDPPort)
   tcpPort <- Mod.access (Mod.Proxy @TCPPort)
@@ -134,22 +106,7 @@ attemptBond = do
                              (TCPPort . fromIntegral $ pPeerTcpPort p))
                    (time+50)
 
-udpHandshakeServer :: ( HasSQLDB m
-                      , HasVault m
-                      , MonadFail m
-                      , MonadCatch m
-                      , MonadThrow m
-                      , MonadLogger m
-                      , MonadUnliftIO m
-                      , A.Selectable IPAsText ClosestPeers m
-                      , A.Selectable () (B.ByteString, SockAddr) m
-                      , A.Replaceable IPAsText PPeer m
-                      , A.Replaceable SockAddr B.ByteString m
-                      , Mod.Accessible UDPPort m
-                      , Mod.Accessible TCPPort m
-                      , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
-                      )
-                   => m ()
+udpHandshakeServer :: MonadDiscovery m => m ()
 udpHandshakeServer = do
     _ <- addPeersIfNeeded
     _ <- attemptBond
@@ -174,18 +131,7 @@ udpHandshakeServer = do
       let validOtherPubKey = secPubKeyToPoint otherPubkey
       return (packet, validOtherPubKey, UDPPort $ fromIntegral otherUdpPort)
 
-handleValidPacket :: ( HasSQLDB m
-                     , HasVault m
-                     , MonadCatch m
-                     , MonadThrow m
-                     , MonadLogger m
-                     , MonadUnliftIO m -- TODO(tim): Remove when redundant with HasSQLDB
-                     , A.Selectable IPAsText ClosestPeers m
-                     , A.Replaceable IPAsText PPeer m
-                     , A.Replaceable SockAddr B.ByteString m
-                     , Mod.Accessible UDPPort m
-                     , Mod.Accessible TCPPort m
-                     )
+handleValidPacket :: MonadDiscovery m
                   => SockAddr
                   -> UDPPort
                   -> NodeDiscoveryPacket

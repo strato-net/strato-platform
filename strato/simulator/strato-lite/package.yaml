@@ -75,6 +75,7 @@ library:
   - merkle-patricia-db
   - monad-alter
   - mtl
+  - network
   - nibblestring
   - ordered-containers
   - raw-strings-qq

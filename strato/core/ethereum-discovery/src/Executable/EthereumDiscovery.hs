@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
@@ -5,35 +6,16 @@ module Executable.EthereumDiscovery (
   ethereumDiscovery
   ) where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import qualified Data.Text                               as T
-import qualified Network.Socket                          as S
-import           UnliftIO.Exception
 
 import           BlockApps.Logging
-import           Blockchain.EthConf
 import           Blockchain.Strato.Discovery.ContextLite
-import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDPServer
-import           Executable.Options
 
 import qualified Text.Colors                             as CL
 
-ethereumDiscovery :: LoggingT IO ()
-ethereumDiscovery = do
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ flags_vaultWrapperUrl
-  _ <- runResourceT $ do
-    let port' = discoveryPort $ discoveryConfig ethConf
-        udpPort = UDPPort port'
-        tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
-    cxt <- initContextLite flags_vaultWrapperUrl udpPort tcpPort
-
-    bracket
-      (connectMe udpPort)
-      (liftIO . S.close)
-      (\s -> runEthUDPServer cxt{sock = s})
-
-  return ()
+ethereumDiscovery :: MonadDiscovery m => DiscoveryRunner m (LoggingT IO) () -> LoggingT IO ()
+ethereumDiscovery runner = do
+  $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
+  $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
+  runner runEthUDPServer

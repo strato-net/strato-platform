@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds                #-}
 {-# LANGUAGE FlexibleContexts               #-}
 {-# LANGUAGE FlexibleInstances              #-}
 {-# LANGUAGE GADTs                          #-}
@@ -15,6 +16,8 @@ module Blockchain.Strato.Discovery.ContextLite
   ( ContextLite(..)
   , initContextLite
   , addPeer
+  , DiscoveryRunner
+  , MonadDiscovery
   ) where
 
 
@@ -27,7 +30,9 @@ import           Blockchain.Strato.Discovery.UDP       (processDataStream')
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Concurrent                    (threadDelay)
 import           Control.Exception
+import           Control.Monad.Catch                   hiding (bracket)
 import qualified Control.Monad.Change.Alter            as A
+import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Change.Modify           (Accessible(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
@@ -138,6 +143,23 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m)
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
 
   getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
+
+type DiscoveryRunner n m a = n a -> m a
+
+type MonadDiscovery m = ( HasVault m
+                        , MonadFail m
+                        , MonadCatch m
+                        , MonadThrow m
+                        , MonadLogger m
+                        , MonadUnliftIO m
+                        , A.Selectable IPAsText ClosestPeers m
+                        , A.Selectable () (B.ByteString, SockAddr) m
+                        , A.Replaceable IPAsText PPeer m
+                        , A.Replaceable SockAddr B.ByteString m
+                        , Mod.Accessible UDPPort m
+                        , Mod.Accessible TCPPort m
+                        , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
+                        )
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
