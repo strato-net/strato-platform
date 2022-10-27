@@ -76,6 +76,7 @@ library:
   - monad-alter
   - monadIO
   - mtl
+  - network
   - nibblestring
   - ordered-containers
   - raw-strings-qq

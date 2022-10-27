@@ -348,7 +348,7 @@ instance MonadIO m => A.Selectable DataPeer.IPAsText DataPeer.PPeer (MonadP2PTes
   select _ _ = error "Test peer should not be calling getPeerByIP"
 
 instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
-  select _ _ = error "Test peer should not be calling getPeerByIP"
+  select _ _ = error "Test peer should not be calling withActivePeer"
 
 instance MonadIO m => A.Alters (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
   lookup _ _ = error "Test peer should not be calling withActivePeer"

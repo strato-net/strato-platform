@@ -16,6 +16,7 @@ library:
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.ContextLite
     - Blockchain.Strato.Discovery.UDP
+    - Blockchain.Strato.Discovery.UDPServer
     - Blockchain.Strato.Discovery.P2PUtil
     - Executable.EthereumDiscovery
     - Executable.EthDiscoverySetup
@@ -66,7 +67,13 @@ executables:
       - blockapps-init
       - common-log
       - ethereum-discovery
+      - format
       - hflags
+      - mtl
+      - resourcet
+      - strato-conf
+      - text
+      - unliftio
 
 tests:
   ethereum-discover-test:

@@ -101,6 +101,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
@@ -124,7 +125,6 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
-import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
@@ -213,7 +213,7 @@ class RunsClient m where
                       -> m ()
 
 class RunsServer n m where
-  runServerConnection :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> SockAddr -> n ()) -> m ()
+  runServer :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> IPAsText -> n ()) -> m ()
 
 instance RunsClient ContextM where
   runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
@@ -225,13 +225,14 @@ instance RunsClient ContextM where
       handler conduits
 
 instance RunsServer ContextM (LoggingT IO) where
-  runServerConnection (TCPPort listenPort) runner handler = do
+  runServer (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
-      handler conduits $ appSockAddr app
+          ip = IPAsText . T.pack . sockAddrToIP $ appSockAddr app
+      handler conduits ip
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
@@ -569,9 +570,9 @@ initContext = Context
 
 
 getPeerByIP :: A.Selectable IPAsText PPeer m
-            => String
+            => IPAsText
             -> m (Maybe PPeer)
-getPeerByIP = A.select (Proxy @PPeer) . IPAsText . T.pack
+getPeerByIP = A.select (Proxy @PPeer)
 
 getPeerX509 :: A.Selectable Address X509CertInfoState m
           => PPeer 

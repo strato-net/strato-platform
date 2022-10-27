@@ -85,7 +85,7 @@ getAddress mgr nodeLabel = liftIO $ atomically $ do
   pure $ res
 
 postAddNode :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddNode mgr label ip = liftIO $ runReaderT (addNode label ip) mgr
+postAddNode mgr label ip = liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr

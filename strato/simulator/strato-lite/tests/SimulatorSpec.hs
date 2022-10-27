@@ -44,6 +44,7 @@ import  BlockApps.X509.Certificate
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
+import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
@@ -69,6 +70,11 @@ instance HasVault IO where
   sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
+
+createPeer' :: PrivateKey -> [Address] -> T.Text -> T.Text -> IO P2PPeer
+createPeer' pk as n ip = do
+  inet <- newTVarIO preAlGoreInternet
+  createPeer pk as inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303)
                           
 spec :: Spec
 spec = do
@@ -77,9 +83,9 @@ spec = do
       serverPKey <- newPrivateKey
       clientPKey <- newPrivateKey
       let validatorAddresses = makeValidators [serverPKey, clientPKey]
-      server <- createPeer serverPKey validatorAddresses "server" "1.2.3.4"
-      client <- createPeer clientPKey validatorAddresses "client" "5.6.7.8"
-      connection <- createConnection server client
+      server' <- createPeer' serverPKey validatorAddresses "server" "1.2.3.4"
+      client' <- createPeer' clientPKey validatorAddresses "client" "5.6.7.8"
+      connection <- createConnection server' client'
       let clearChainId tx = case tx of
             MessageTX{} -> tx{transactionChainId = Nothing}
             ContractCreationTX{} -> tx{transactionChainId = Nothing}
@@ -87,10 +93,10 @@ spec = do
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
       let runForTwoSeconds = timeout 2000000
           run = runForTwoSeconds $ runConnection connection
-          postTxEvent = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server) (Right $ P2pTx otx))
+          postTxEvent = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server') (Right $ P2pTx otx))
       concurrently_ run postTxEvent
-      serverCtx <- readTVarIO $ server ^. p2pTestContext
-      clientCtx <- readTVarIO $ client ^. p2pTestContext
+      serverCtx <- readTVarIO $ server' ^. p2pTestContext
+      clientCtx <- readTVarIO $ client' ^. p2pTestContext
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
       clientTxs `shouldBe` [otBaseTx otx]
@@ -99,7 +105,7 @@ spec = do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..7]
       let validatorsPrivKeys' = take 2 privKeys
           validatorAddresses = makeValidators validatorsPrivKeys'
-      peers <- traverse (\(p,(n,i)) -> createPeer p validatorAddresses n i) $ zip privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer' p validatorAddresses n i) $ zip privKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -136,7 +142,7 @@ spec = do
           primaryValidatorsPrivKeys = [head validatorsPrivKeys']
           primaryValidatorAddresses = makeValidators primaryValidatorsPrivKeys
           validatorAddresses = makeValidators validatorsPrivKeys'
-      peers <- traverse (\(p,(n,i)) -> createPeer p primaryValidatorAddresses n i) $ zip privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer' p primaryValidatorAddresses n i) $ zip privKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -177,7 +183,7 @@ spec = do
     it "can add a new node to a chain" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer p validators' n i) $ zip privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -242,7 +248,7 @@ contract A {
     it "can sync a new node to a chain after running multiple transactions on that chain" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer p validators' n i) $ zip privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -418,7 +424,7 @@ contract B {
       cInfo2 <- readIORef cInfo2Ref
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 1 then Nothing else Just cInfo2)
       --privKey4 <- newPrivateKey
-      --peer4 <- createPeer privKey4 validators' "node4" "13.14.15.16"
+      --peer4 <- createPeer' privKey4 validators' "node4" "13.14.15.16"
       --let peers' = peers ++ [peer4]
       --connections4 <- traverse (uncurry createConnection)
       --  [ (peers' !! 0, peers' !! 3)
@@ -432,7 +438,7 @@ contract B {
       let globalAdmin = privKeys !! 0
           orgAdmin = privKeys !! 1
           validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer p validators' n i) $ zip privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         ]
@@ -491,7 +497,7 @@ contract RegisterCert {
     it "can add an organization to a private chain" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
         let validators' = makeValidators privKeys
-        peers <- traverse (\(p,(n,i)) -> createPeer p validators' n i) $ zip privKeys
+        peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
           [ ("node1", "1.2.3.4")
           , ("node2", "5.6.7.8")
           , ("node3", "9.10.11.12")
