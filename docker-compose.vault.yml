@@ -14,7 +14,7 @@ services:
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
-    image: ${VAULTWRAPPER_IMAGE:-vault-wrapper:7.8.0-ac2653850}
+    image: ${VAULTWRAPPER_IMAGE:-vault-wrapper:7.8.0-878aeb22e}
     restart: unless-stopped
     logging:
       driver: "json-file"

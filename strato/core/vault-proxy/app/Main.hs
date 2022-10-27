@@ -8,19 +8,23 @@ module Main (main) where
 import BlockApps.Init
 import Control.Monad
 -- import Control.Monad.IO.Class
+-- import Data.ByteString                   as BS
+import Data.ByteString.UTF8              (toString)
 import qualified Data.Text               as T
+import Debug.Trace
 import Lib
 import HFlags
 -- import Control.Concurrent
 -- import Control.Concurrent.STM
--- import Control.Lens
+import Control.Lens
 import Network.HTTP.Client
 import Network.HTTP.Conduit
 -- import Servant
 import Servant.Client
+import URI.ByteString
 -- import Servant.Client.Core
 
-
+ 
 --Default is that the OAUTH is enabled
 defineFlag "OAUTH_ENABLED" (True :: Bool) "Enable OAuth2"
 defineFlag "OAUTH_DISCOVERY_URL" ("" :: T.Text) "OAuth2 Discovery URL"
@@ -45,14 +49,22 @@ main = do
     --Store the raw oauthToken, not just the access token
     mngr <- newManager tlsManagerSettings --Not sure if this is the right manager due to large use of HTTPS connections
     -- extraTokenStuff :: [ (ByteString, ByteString) ]
-    let extraTokenStuff :: BlockAppsTokenRequest
-        extraTokenStuff = [("grant_type", flags_oidcGrantType)]
-    url <- (parseBaseUrl $ T.unpack flags_oidcUrl)
+    -- let extraTokenStuff :: BlockAppsTokenRequest
+        -- extraTokenStuff = [("grant_type", flags_oidcGrantType)]
+    -- url <- (parseBaseUrl $ T.unpack flags_oidcUrl)
+    ourl <- (parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL)
+    rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
+    noErrorOauth <- case rawOauthInfo of
+        Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
+        Right val -> return val
+    let virginToken = getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth --Might decide to add flags_OAUTH_DISCOVERY_URL back to the mix later
     --Save the access token in a TVar
-    res <- runClientM 
-            (connectToken flags_oidcUrl flags_oidcAuthorization extraTokenStuff)
-            (mkClientEnv mngr url)
-    print res
+    traceM "virgin"
+    traceM $ toString $ virginToken ^. pathL
+        -- res <- runClientM 
+        --         (connectToken flags_oidcUrl flags_oidcAuthorization extraTokenStuff)
+        --         (mkClientEnv mngr url)
+        -- print res
     -- oauthTokenWithTime <- atomically $ newTVar (
     --     runClientM 
     --         (connectToken flags_oidcUrl flags_oidcAuthorization extraTokenStuff)

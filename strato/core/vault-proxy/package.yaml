@@ -27,10 +27,12 @@ dependencies:
 - bytestring
 - clock
 - hflags
+- hoauth2
 - http-client
 - http-client-tls
 - http-conduit
 - lens
+- network-uri
 - scientific
 - servant
 - servant-client
@@ -39,6 +41,8 @@ dependencies:
 - stm
 - text
 - time
+- uri-bytestring
+- utf8-string
 
 ghc-options:
 - -Wall
