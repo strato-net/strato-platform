@@ -1,10 +1,10 @@
 name:                vault-proxy
 version:             0.1.0.0
-github:              "githubuser/vault-proxy"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2022 Author name here"
+github:              "blockapps/strato-platform"
+license:             Propietary
+author:              "Steven Glasford"
+maintainer:          "steven_glasford@blockapps.net"
+copyright:           "2022 Blockapps, Inc"
 
 extra-source-files:
 - README.md
@@ -17,13 +17,32 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/vault-proxy#readme>
+description:         This is where strato nodes communicate to the foreign shared vault
 
 dependencies:
-- base >= 4.7 && < 5
+- base
+- aeson
+- aeson-casing
+- blockapps-init
+- bytestring
+- clock
+- hflags
+- http-client
+- http-client-tls
+- http-conduit
+- lens
+- scientific
+- servant
+- servant-client
+- servant-client-core
+- servant-server
+- stm
+- text
+- time
 
 ghc-options:
 - -Wall
+- -O2
 - -Wcompat
 - -Widentities
 - -Wincomplete-record-updates
@@ -35,6 +54,9 @@ ghc-options:
 
 library:
   source-dirs: src
+  dependencies: 
+  - time
+  - bytestring
 
 executables:
   vault-proxy-exe:
