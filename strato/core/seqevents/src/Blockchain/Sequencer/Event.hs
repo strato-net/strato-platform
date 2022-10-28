@@ -211,6 +211,7 @@ data VmEvent =
   | VmCreateBlockCommand
   | VmVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
   | VmPrivateTx OutputTx
+  | VmValidatorList [A.Address]
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where

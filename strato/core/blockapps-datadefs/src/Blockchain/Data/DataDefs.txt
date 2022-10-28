@@ -16,6 +16,10 @@ BlockData
     mixHash Keccak256
     deriving Eq Read Show Generic Data
 
+ValidatorRef
+    address Address
+    deriving Eq Read Show
+
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
