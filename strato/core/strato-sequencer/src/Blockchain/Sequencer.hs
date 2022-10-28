@@ -25,7 +25,7 @@ import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
 
--- import           Control.Monad.State                       (put)
+import           Control.Monad.State
 import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
@@ -39,6 +39,7 @@ import           Text.Printf
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.StateMachine (validators)
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -255,6 +256,7 @@ checkForUnseq inEvents = do
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
+  _ <- get >>= (\sequencerContext -> traverse_  (\x -> writeSeqVmEvents [VmValidatorList (S.toList $ x ^. validators) ])  (_blockstanbulContext  sequencerContext) )-- add first validator to validators DB
   createFirstTimer
 
 blockstanbulSend :: ( MonadLogger m
@@ -299,7 +301,7 @@ blockstanbulSend' msg = do
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
-           ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
+           ++ [VmVoteToMake r d s| PendingVote r d s <- resp] ++ [VmValidatorList val | ListOfValidators val<- resp] -- Bad Haskell Code, make better
       p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]

@@ -22,11 +22,13 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           BlockApps.Logging
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class      (blockHash)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -47,6 +49,7 @@ indexAPI :: ( MonadLogger m
             , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
             , (Keccak256 `A.Alters` API OutputBlock) m
+            , ([Address] `A.Alters` API ValidatorRef) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
@@ -54,7 +57,11 @@ indexAPI idxEvents = do
       chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
       blocks = [b | RanBlock b <- idxEvents]
       insertCount = length blocks
-
+      validatorAddresses = concat [ls | ValidatorsG ls <- idxEvents]
+   
+  _ <- if validatorAddresses == [] 
+    then  pure  ()
+    else  forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) [x] ( (API (ValidatorRef (Address 0))))) 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
 

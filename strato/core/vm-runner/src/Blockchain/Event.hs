@@ -44,10 +44,11 @@ data VmInEventBatch = InBatch
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
   , privateTxs         :: [OutputTx]
+  , validators         :: [Address]
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] [] 0 [] 0 False []
+newInBatch = InBatch [] [] [] 0 [] 0 False [] []
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -58,6 +59,7 @@ insertInBatch e b = case e of
   VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
   VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
+  VmValidatorList  ls -> b{ validators = ls } -- : validators b - Dustin Suggested I append from behind a
 
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
@@ -69,6 +71,7 @@ data VmOutEvent = OutAction Action
                 | OutTXR TransactionResult
                 | OutASM (Map Account AddressStateModification)
                 | OutJSONRPC String B.ByteString
+                | OutValidators [Address]
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
@@ -82,10 +85,12 @@ data VmOutEventBatch = OutBatch
   , outTXRs         :: DL.DList TransactionResult
   , outASMs         :: DL.DList (Map Account AddressStateModification)
   , outJSONRPCs     :: DL.DList (String, B.ByteString)
+  , vals            :: DL.DList IndexEvent
   }
 
 newOutBatch :: VmOutEventBatch
 newOutBatch = OutBatch DL.empty
+                       DL.empty
                        DL.empty
                        DL.empty
                        DL.empty
@@ -109,4 +114,4 @@ insertOutBatch e b = case e of
   OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
   OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
   OutJSONRPC x y       -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
-
+  OutValidators a      -> b{ vals = vals b `DL.snoc` (ValidatorsG a) }        

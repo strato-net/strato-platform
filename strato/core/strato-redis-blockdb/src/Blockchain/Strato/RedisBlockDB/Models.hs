@@ -43,6 +43,7 @@ data BlockDBNamespace = Headers
                       | PrivateIPChains
                       | PrivateOrgIdChains
                       | PrivateOrgNameChains
+                      | Validators
                       | X509Certificates
                       | X509Initialized
     deriving (Eq, Read, Show)
@@ -154,6 +155,9 @@ newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
+
+
 
 instance RLPSerializable RedisIPChains where
   rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
@@ -195,7 +199,8 @@ displayForNamespace ns input = case ns of
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
     PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-    X509Certificates -> format (fromValue input :: Address)
-    X509Initialized -> format input
+    Validators           -> format (fromValue input :: [Address])
+    X509Certificates     -> format (fromValue input :: Address)
+    X509Initialized      -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
