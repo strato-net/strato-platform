@@ -786,9 +786,6 @@ instance (MonadIO m, (String `A.Alters` PPeer) m) => (IPAsText `A.Alters` PPeer)
   insert _ (IPAsText ip) p = A.insert (A.Proxy @PPeer) (T.unpack ip) p
   delete _ (IPAsText ip)   = A.delete (A.Proxy @PPeer) $ T.unpack ip
 
-instance (MonadIO m, (String `A.Alters` PPeer) m) => A.Selectable (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
-  select = A.lookup
-
 toActivityState :: Int -> ActivityState
 toActivityState 1 = Active
 toActivityState _ = Inactive
@@ -797,9 +794,12 @@ fromActivityState :: ActivityState -> Int
 fromActivityState Active = 1
 fromActivityState Inactive = 0
 
-instance (MonadIO m, (String `A.Alters` PPeer) m) => A.Alters (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
-  lookup _ (ip, _)   = fmap (toActivityState . pPeerActiveState) <$> A.lookup (A.Proxy @PPeer) ip
-  insert _ (ip, _) a = A.adjust_ (A.Proxy @PPeer) ip $ \p -> pure p{pPeerActiveState = fromActivityState a}
+instance (MonadIO m, State.MonadState TestContext m) => A.Selectable (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
+  select = A.lookup
+
+instance (MonadIO m, State.MonadState TestContext m) => A.Alters (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
+  lookup _ (IPAsText t, _)   = fmap (fmap $ toActivityState . pPeerActiveState) . lift . use $ stringPPeerMap . at (T.unpack t)
+  insert _ (IPAsText t, _) a = lift $ stringPPeerMap . at (T.unpack t) . _Just %= \p -> p{pPeerActiveState = fromActivityState a}
   delete _ _         = error "Test peer should not be deleting activity states"
 
 instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP2PTest m) where
