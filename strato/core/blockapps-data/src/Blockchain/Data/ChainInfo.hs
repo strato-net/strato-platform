@@ -20,7 +20,6 @@ module Blockchain.Data.ChainInfo
   , ChainSignature(..)
   , AccountInfo (..)
   , CodeInfo (..)
-  -- , ChainMember (..)
   , isAncestorChainOf
   , getAncestorChains
   , getNthAncestorChain
@@ -28,7 +27,6 @@ module Blockchain.Data.ChainInfo
   , whoSignedThisChainInfo
   ) where
 
--- import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad                     (join)
@@ -38,11 +36,11 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Test.QuickCheck.Arbitrary.Generic
 import           Test.QuickCheck.Instances.Text        ()
 
-import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
@@ -326,22 +324,6 @@ instance Format ChainInfo where
     ]
 
 
-
--- instance FromJSON ChainMember where
---   parseJSON (Object o) = do
---     on <- o .: "orgName"
---     ou <- o .: "orgUnit"
---     cmn <- o .: "commonName"
---     return $ ChainMember on ou cmn 
---   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x    
-
--- instance ToJSON ChainMember where
---   toJSON (ChainMember on ou cmn) =
---     object [ "orgName" .= on
---             ,"orgUnit" .= ou
---             ,"commonName" .=cmn
---            ]
-
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
     l <- o .: "label"
@@ -371,24 +353,6 @@ instance ToJSON ChainInfo where
 
 instance Arbitrary ChainInfo where
   arbitrary = genericArbitrary
-
--- instance RLPSerializable (S.Set ChainMember) where
---   rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
---   rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
---   rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
-
--- instance RLPSerializable ChainMember where
---   rlpEncode (ChainMember on ou cmn) = RLPArray
---     [ rlpEncode on
---     , rlpEncode ou
---     , rlpEncode cmn
---     ]
---   rlpDecode (RLPArray [on, ou, cmn]) =
---     ChainMember
---       (rlpDecode on)
---       (rlpDecode ou)
---       (rlpDecode cmn)
---   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
 
 
 instance RLPSerializable UnsignedChainInfo where

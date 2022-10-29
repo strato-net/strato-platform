@@ -10,11 +10,9 @@ module Blockchain.Data.Enode
   ( Enode(..)
   , IPAddress(..)
   , OrgId(..)
-  , ChainMembers(..)
   , ChainTxsInBlock(..)
   , IPChains(..)
   , OrgIdChains(..)
-  , OrgNameChains(..)
   , showEnode
   , readEnode
   , showIP
@@ -23,7 +21,6 @@ module Blockchain.Data.Enode
 
 
 import           Control.DeepSeq
--- import           Control.Lens
 import           Data.Aeson
 import           Data.Bits
 import           Data.Binary
@@ -36,7 +33,6 @@ import           Data.List
 import           Database.Persist.Sql
 import qualified Data.Map.Strict             as M
 import qualified Data.Set                    as S
--- import qualified Data.Functor.Identity       as DFI
 import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                   as T
 import qualified GHC.Generics                as GHCG
@@ -49,12 +45,8 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Text.Regex
 
 import           Blockchain.Data.RLP
--- import           Blockchain.Data.DataDefs              
--- import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.ChainMember
-
 
 import qualified LabeledError
 
@@ -73,16 +65,6 @@ instance RLPSerializable OrgId where
   rlpEncode (OrgId bs) = rlpEncode bs
   rlpDecode = OrgId . rlpDecode
 
-instance RLPSerializable (S.Set ChainMember) where
-  rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
-  rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
-  rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
-
-instance RLPSerializable ChainMembers where
-  rlpEncode (ChainMembers cms) = rlpEncode cms
-  rlpDecode x = ChainMembers(rlpDecode x)
-  -- rlpDecode x = error $ "rlpDecode for ChainMembers Set failed: expected RLPArray, got " ++ show x
-
 instance ToSchema OrgId where
   declareNamedSchema _ = return $
     NamedSchema (Just "OrgId")
@@ -91,17 +73,6 @@ instance ToSchema OrgId where
 instance Arbitrary OrgId where
   arbitrary = genericArbitrary
 
--- instance Arbitrary OrgName where
---   arbitrary = genericArbitrary
-
--- instance Arbitrary OrgUnit where
---   arbitrary = genericArbitrary
-
--- instance Arbitrary CommonName where
---   arbitrary = genericArbitrary
-
--- instance Arbitrary Access where
---   arbitrary = genericArbitrary
 
 instance ToSchema IPAddress where
   
@@ -113,27 +84,19 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
--- instance Arbitrary ((GHCG.Generic (ChainMemberF DFI.Identity))) where
---   arbitrary = genericArbitrary
 
 instance ToSchema Enode where
 
-instance ToSchema ChainMembers where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "ChainMembers") mempty
 
-newtype ChainMembers = ChainMembers { unChainMembers :: S.Set ChainMember } deriving(GHCG.Generic, Eq, Data, Show)
 newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [Keccak256] } deriving (Eq)
 newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
-newtype OrgNameChains = OrgNameChains { unOrgNameChains :: S.Set Word256 } deriving (Eq)
 
 
-instance Default ChainMembers     where def = ChainMembers S.empty
+
 instance Default ChainTxsInBlock  where def = ChainTxsInBlock M.empty
 instance Default IPChains         where def = IPChains S.empty
 instance Default OrgIdChains     where def = OrgIdChains S.empty
-instance Default OrgNameChains   where def = OrgNameChains S.empty
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =
@@ -144,23 +107,6 @@ instance RLPSerializable Enode where
 
   rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
 
-
-instance Arbitrary ChainMembers where
-  arbitrary = genericArbitrary
-
-instance FromJSON ChainMembers where
-  parseJSON (Object o) = do
-    cm <- o .: "cm"
-    return $ ChainMembers cm
-  parseJSON x = fail $ "couldn't parse JSON for chain members info: " ++ show x  
-
--- instance ToJSON ChainMember where
---   toJSON (ChainMember on ou cmn) =
---     object [ "orgName" .= on
---             ,"orgUnit" .= ou
---             ,"commonName" .=cmn
---            ]
-
 instance FromJSON Enode where
   parseJSON (String str) =
     case readEnodeOrFail $ T.unpack str of
@@ -170,11 +116,6 @@ instance FromJSON Enode where
 
 instance ToJSON Enode where
   toJSON enode = String (T.pack $ showEnode enode)
-
-instance ToJSON ChainMembers where
-  toJSON (ChainMembers cm) =
-    object [ "cm" .= cm
-           ]
 
 instance Arbitrary Enode where
   arbitrary = Enode
