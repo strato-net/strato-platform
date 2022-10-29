@@ -104,7 +104,7 @@ runPeer wireMessagesRef peer _ _ = do
           runEthClientConduit peer{pPeerPubkey=Just otherPubKey} pSource pSink sSource uSink pStr
       case attempt of
         Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
-        Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+        Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully" ++ show err
 
 runEthClientConduit :: MonadP2P m
                     => PPeer
@@ -145,24 +145,21 @@ runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
 
 stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
 stratoP2PClient wireMessagesRef = do
-  $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-
-  -- activePeersSem <- liftIO (SSem.new flags_maxConn)
+  -- $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- liftIO getAvailablePeers
-    traceM "%%%%%%%%%%%%%%%%%%%%%%%"
-    traceShowM ePeers
+    -- traceM "check the status of ePeers"
+    --traceShowM ePeers
     case ePeers of
       Left err -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        traceM "+++++++++++++++"
-        traceShowM peers
+        --traceM "Check number of active peers"
+        --traceShowM peers
         --Check number of active peers, add more peers to semaphore if number of peers is less than flags_maxConn
-          --For the maxPeers list I am not sure where to remove peers
         multiThreadedClient peers activePeersSem
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
@@ -173,8 +170,8 @@ stratoP2PClient wireMessagesRef = do
         liftIO $ threadDelay 10000000
       multiThreadedClient peers sem = liftIO . void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
-        traceM "***********************"
-        traceShowM p
+        --traceM "Check number of active peers"
+        --traceShowM p
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
@@ -187,7 +184,7 @@ stratoP2PClient wireMessagesRef = do
       handleRunPeerResult thePeer = \case
         Left e | Just (ErrorCall x) <- fromException e -> error x
         Left e -> do
-          $logInfoS "stratoP2PClient/handleRunPeerResultTESTING!" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
+          $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
           recordException thePeer e
           eErr <- liftIO $ case e of
                    e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
