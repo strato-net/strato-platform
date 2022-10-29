@@ -131,6 +131,22 @@ instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextL
     sock' <- asks sock
     liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
 
+
+instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT ContextLite m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT ContextLite m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState(ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
     vc <- asks vaultClient
@@ -144,7 +160,7 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m)
 
   getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
 
-type DiscoveryRunner n m a = n a -> m a
+type DiscoveryRunner n m a = (Int -> n a) -> m a
 
 type MonadDiscovery m = ( HasVault m
                         , MonadFail m
@@ -159,6 +175,11 @@ type MonadDiscovery m = ( HasVault m
                         , Mod.Accessible UDPPort m
                         , Mod.Accessible TCPPort m
                         , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
+                        , Mod.Accessible AvailablePeers m
+                        , Mod.Accessible BondedPeersForUDP m
+                        , A.Replaceable PPeer UdpEnableTime m
+                        , Mod.Accessible UnbondedPeers m
+                        , A.Replaceable (IPAsText, UDPPort) PeerBondingState m
                         )
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b

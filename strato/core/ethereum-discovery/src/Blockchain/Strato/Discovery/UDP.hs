@@ -260,7 +260,7 @@ getServerPubKey peer = do
         tcpPort = TCPPort $ pPeerTcpPort peer
         (theType, theRLP) =
             ndPacketToRLP $
-            Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (timestamp + 50)
+            Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . T.unpack $ pPeerIp peer) udpPort tcpPort) (timestamp + 50)
         theData = rlpSerialize theRLP
         theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
     

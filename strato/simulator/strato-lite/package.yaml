@@ -88,6 +88,7 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
+  - time
   - transformers
   - unliftio
   - vm-runner

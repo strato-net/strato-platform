@@ -32,7 +32,6 @@ import           System.Random
 
 import           BlockApps.Logging
 import           Blockchain.Data.PubKey
-import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -44,12 +43,12 @@ import qualified Text.Colors                             as CL
 import           Text.Format
 
 
-runEthUDPServer :: MonadDiscovery m => m ()
-runEthUDPServer = do
+runEthUDPServer :: MonadDiscovery m => Int -> m ()
+runEthUDPServer minPeers = do
   pub <- getPub
   $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
   $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
-  udpHandshakeServer
+  udpHandshakeServer minPeers
 
 connectMe :: (MonadIO m, MonadFail m, MonadLogger m)
           => UDPPort -> m Socket
@@ -62,13 +61,12 @@ connectMe (UDPPort port') = do
 
   return sock
 
-addPeersIfNeeded :: MonadDiscovery m => m ()
-addPeersIfNeeded = do
-  numAvailablePeers <- liftIO getNumAvailablePeers
-  let minPeers = minAvailablePeers (discoveryConfig ethConf)
+addPeersIfNeeded :: MonadDiscovery m => Int -> m ()
+addPeersIfNeeded minPeers = do
+  numAvailablePeers <- getNumAvailablePeers
   $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
   when (numAvailablePeers < minPeers) $ do
-    eBondedPeers <- liftIO getBondedPeersForUDP
+    eBondedPeers <- getBondedPeersForUDP
     case eBondedPeers of
       Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
       Right [] -> $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
@@ -80,14 +78,14 @@ addPeersIfNeeded = do
           time <- liftIO $ round `fmap` getPOSIXTime
           randomBytes <- liftIO $ getEntropy 64
           sendPacket peerAddr $ FindNeighbors (NodeID randomBytes) (time + 50)
-          eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
+          eErr <- disableUDPPeerForSeconds thePeer 10
           whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: MonadDiscovery m => m ()
 attemptBond = do
   udpPort <- Mod.access (Mod.Proxy @UDPPort)
   tcpPort <- Mod.access (Mod.Proxy @TCPPort)
-  unbondedPeers <- liftIO getUnbondedPeers
+  unbondedPeers <- getUnbondedPeers
   when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
     let peerIpAddr = IPAsText $ pPeerIp p
         peerUdpPort = UDPPort . fromIntegral $ pPeerUdpPort p
@@ -106,9 +104,9 @@ attemptBond = do
                              (TCPPort . fromIntegral $ pPeerTcpPort p))
                    (time+50)
 
-udpHandshakeServer :: MonadDiscovery m => m ()
-udpHandshakeServer = do
-    _ <- addPeersIfNeeded
+udpHandshakeServer :: MonadDiscovery m => Int -> m ()
+udpHandshakeServer minPeers = do
+    _ <- addPeersIfNeeded minPeers
     _ <- attemptBond
     -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
     maybePacketData <- A.select (A.Proxy @(B.ByteString, SockAddr)) ()
@@ -117,7 +115,7 @@ udpHandshakeServer = do
       Just (msg, addr) -> do
         _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
         catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> (T.pack $ show e)
-    udpHandshakeServer
+    udpHandshakeServer minPeers
   where
     handler msg addr = case argValidator msg addr of
       Left msgErr -> $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
@@ -144,7 +142,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
         sendPacket addr $ Pong ep 4 (time+50)
 
     Pong{} -> do
-        eErr <- liftIO $ setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
+        eErr <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
         whenLeft eErr $ \ err -> do
             $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
             throwM err

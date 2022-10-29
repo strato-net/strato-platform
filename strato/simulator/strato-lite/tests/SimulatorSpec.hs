@@ -74,7 +74,7 @@ instance HasVault IO where
 createPeer' :: PrivateKey -> [Address] -> T.Text -> T.Text -> IO P2PPeer
 createPeer' pk as n ip = do
   inet <- newTVarIO preAlGoreInternet
-  createPeer pk as inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303)
+  createPeer pk as inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
                           
 spec :: Spec
 spec = do

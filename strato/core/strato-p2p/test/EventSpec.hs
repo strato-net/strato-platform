@@ -32,7 +32,9 @@ import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
-import           Data.Text (Text)
+import           Data.Text                             (Text)
+import qualified Data.Text                             as T
+import           Data.Time.Clock
 import           Text.Printf
 
 import           BlockApps.Logging
@@ -52,7 +54,7 @@ import "strato-p2p" Blockchain.Event
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Sequencer.Event
 
-import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -100,7 +102,7 @@ data TestContext = TestContext
   , _shaOutputBlockMap     :: Map Keccak256 OutputBlock
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
-  , _stringPPeerMap        :: Map String DataPeer.PPeer
+  , _stringPPeerMap        :: Map String PPeer
   , _pbftMessages          :: S.OSet Keccak256
   , _unseqEvents           :: [IngestEvent]
   }
@@ -108,7 +110,7 @@ makeLenses ''TestContext
 
 data P2PPeer = P2PPeer
   { _p2pPeerPrivKey        :: PrivateKey
-  , _p2pPeerPPeer          :: DataPeer.PPeer
+  , _p2pPeerPPeer          :: PPeer
   , _p2pPeerName           :: String
   , _p2pTestContext        :: TVar TestContext
   }
@@ -227,7 +229,7 @@ instance MonadIO m => Mod.Accessible PeerAddress (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible ConnectionTimeout (MonadTest m) where
   access _ = use connectionTimeout
 
-instance MonadIO m => A.Selectable String DataPeer.PPeer (MonadTest m) where
+instance MonadIO m => A.Selectable String PPeer (MonadTest m) where
   select _ tx = M.lookup tx <$> use stringPPeerMap
 
 instance (Monad m, Stacks Block m) => Stacks Block (MonadP2PTest m) where
@@ -287,7 +289,7 @@ instance (Monad m, Mod.Accessible BestBlockNumber m) => Mod.Accessible BestBlock
 instance (Monad m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible ConnectionTimeout (MonadP2PTest m) where
   access p = lift $ Mod.access p
 
-instance A.Selectable String DataPeer.PPeer m => A.Selectable String DataPeer.PPeer (MonadP2PTest m) where
+instance A.Selectable String PPeer m => A.Selectable String PPeer (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
 
 instance MonadIO m => HasVault (MonadTest m) where
@@ -341,19 +343,84 @@ instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
 instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
   output = lift . Mod.output
 
-instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.UDPPort, B.ByteString) Point (MonadP2PTest m) where
+instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (MonadP2PTest m) where
   select _ _ = error "Test peer should not be fetching public key"
 
-instance MonadIO m => A.Selectable DataPeer.IPAsText DataPeer.PPeer (MonadP2PTest m) where
+instance MonadIO m => A.Selectable IPAsText PPeer (MonadP2PTest m) where
   select _ _ = error "Test peer should not be calling getPeerByIP"
 
-instance MonadIO m => A.Selectable (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
+instance MonadIO m => A.Selectable (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
   select _ _ = error "Test peer should not be calling withActivePeer"
 
-instance MonadIO m => A.Alters (DataPeer.IPAsText, DataPeer.TCPPort) DataPeer.ActivityState (MonadP2PTest m) where
+instance MonadIO m => A.Alters (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
   lookup _ _ = error "Test peer should not be calling withActivePeer"
   insert _ _ = error "Test peer should not be calling withActivePeer"
   delete _ _ = error "Test peer should not be calling withActivePeer"
+
+instance MonadIO m => Mod.Accessible AvailablePeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    AvailablePeers . filter ((< currentTime) . pPeerEnableTime). M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible AvailablePeers m) => Mod.Accessible AvailablePeers (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => Mod.Accessible BondedPeersForUDP (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime
+    BondedPeersForUDP . filter f . M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible BondedPeersForUDP m) => Mod.Accessible BondedPeersForUDP (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => A.Replaceable PPeer UdpEnableTime (MonadTest m) where
+  replace _ peer' (UdpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime})
+
+instance (Monad m, A.Replaceable PPeer UdpEnableTime m) => A.Replaceable PPeer UdpEnableTime (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer TcpEnableTime (MonadTest m) where
+  replace _ peer' (TcpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime})
+
+instance (Monad m, A.Replaceable PPeer TcpEnableTime m) => A.Replaceable PPeer TcpEnableTime (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime
+    BondedPeers . filter f . M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible BondedPeers m) => Mod.Accessible BondedPeers (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => Mod.Accessible UnbondedPeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    let f p = pPeerBondState p == 0 && pPeerEnableTime p < currentTime
+    UnbondedPeers . filter f . M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText t, _) (PeerBondingState s) = do
+    let ip = T.unpack t
+    stringPPeerMap . at ip . _Just %= (\p -> p{pPeerBondState = s})
+
+instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
+  replace _ peer' d = case d of
+    ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
+      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
+    SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
+      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+
+instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
@@ -383,8 +450,8 @@ testContext prv = TestContext
   , _unseqEvents           = []
   }
 
-testPeer :: DataPeer.PPeer
-testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
+testPeer :: PPeer
+testPeer = buildPeer (Nothing, "0.0.0.0", 1212)
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot MP.NodeData)) where
   lookup _ k   = M.lookup k <$> State.gets snd
@@ -398,7 +465,7 @@ createPeer :: PrivateKey
 createPeer privKey name ipAddr = do
   testContextTVar <- newTVarIO $ testContext privKey
   let pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
-      ppeer = DataPeer.buildPeer ( Just pubkeystr
+      ppeer = buildPeer ( Just pubkeystr
                                  , ipAddr
                                  , 30303
                                  )
@@ -490,11 +557,11 @@ spec = do
 
         shouldAccept :: AuthorizationMode -> (String, String) -> IO ()
         shouldAccept mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert1 (OrgNameChains $ Set.singleton (0xabcdef :: Word256)))
+          buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert1 (OrgNameChains $ Set.singleton (0xabcdef :: Word256)))
 
         shouldReject :: AuthorizationMode -> (String, String) -> IO ()
         shouldReject mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert2 (OrgNameChains Set.empty))
+          buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert2 (OrgNameChains Set.empty))
 
     describe "IPOnly" $ do
       it "should reject the wrong ip" $ IPOnly `shouldReject` (key1, ip4)
