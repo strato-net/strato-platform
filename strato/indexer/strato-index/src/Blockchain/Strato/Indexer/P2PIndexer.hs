@@ -20,7 +20,6 @@ import           Network.Kafka.Protocol
 import           BlockApps.Logging
 import           Blockchain.Data.Block              (BestBlock(..), Private(..))
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode              (ChainMembers(..))
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 
 import           Blockchain.Sequencer.Event
@@ -30,6 +29,7 @@ import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember (ChainMembers(..))
 
 import           Text.Format
 

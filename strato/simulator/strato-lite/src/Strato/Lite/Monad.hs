@@ -142,7 +142,8 @@ data TestContext = TestContext
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
-  , _orgNameChainsMap      :: Map ChainMember OrgNameChains
+  , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
+  , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
   , _x509certMap           :: Map Address X509CertInfoState
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
@@ -205,8 +206,11 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance MonadIO m => A.Selectable ChainMember OrgNameChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgNameChainsMap
+instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use trueOrgNameChainsMap
+
+instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select _ a = M.lookup a <$> use x509certMap
@@ -278,7 +282,7 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance (ChainMember `A.Alters` Word256) m => (ChainMember `A.Alters` Word256) (MonadP2PTest m) where
+instance (ChainMembers `A.Alters` Word256) m => (ChainMembers `A.Alters` Word256) (MonadP2PTest m) where
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
@@ -324,9 +328,11 @@ instance (Monad m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible Connect
 instance A.Selectable String DataPeer.PPeer m => A.Selectable String DataPeer.PPeer (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
 
-instance A.Selectable ChainMember OrgNameChains m => A.Selectable ChainMember OrgNameChains (MonadP2PTest m) where
+instance A.Selectable ChainMembers TrueOrgNameChains m => A.Selectable ChainMembers TrueOrgNameChains (MonadP2PTest m) where
   select p org = lift $ A.select p org
 
+instance A.Selectable ChainMembers FalseOrgNameChains m => A.Selectable ChainMembers FalseOrgNameChains (MonadP2PTest m) where
+  select p org = lift $ A.select p org
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
   select p addr = lift $ A.select p addr
@@ -398,7 +404,7 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
-instance MonadIO m => (ChainMember `A.Alters` Word256) (MonadTest m) where
+instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
   insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
   delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
@@ -782,7 +788,8 @@ testContext prv seqCtx vmCtx = TestContext
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
-  , _orgNameChainsMap      = M.empty
+  , _trueOrgNameChainsMap  = M.empty
+  , _falseOrgNameChainsMap = M.empty
   , _x509certMap           = M.empty
   , _privateTxMap          = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash

@@ -20,7 +20,6 @@ import           Test.QuickCheck.Arbitrary.Generic
 import qualified Blockchain.Data.Block                     as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode
 import           Blockchain.Data.Json
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
@@ -110,8 +109,8 @@ instance Format SeqLoopEvent where
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
-                 | IENewChainMember Word256 A.Address Enode
-                 | IENewChainOrgName Word256 ChainMember
+                --  | IENewChainMember Word256 A.Address Enode
+                 | IENewChainOrgName Word256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -120,7 +119,7 @@ data IngestEvent = IETx Timestamp IngestTx
 data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
-                     | IETNewChainMember
+                    --  | IETNewChainMember
                      | IETNewChainOrgName
                      | IETBlockstanbul
                      | IETForcedConfigChange
@@ -132,7 +131,7 @@ iEventType = \case
   IETx{}                 -> IETTransaction
   IEBlock{}              -> IETBlock
   IEGenesis{}            -> IETGenesis
-  IENewChainMember{}     -> IETNewChainMember
+  -- IENewChainMember{}     -> IETNewChainMember
   IENewChainOrgName{}    -> IETNewChainOrgName
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
@@ -142,7 +141,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
+  -- format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
@@ -185,8 +184,8 @@ data P2pEvent =
   | P2pGenesis OutputGenesis
   | P2pGetChain [Word256]
   | P2pGetTx [Keccak256]
-  | P2pNewChainMember Word256 A.Address Enode
-  | P2pNewOrgName Word256 ChainMember
+  -- | P2pNewChainMember Word256 A.Address Enode
+  | P2pNewOrgName Word256 ChainMemberParsedSet
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
   | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
@@ -199,7 +198,7 @@ instance Format P2pEvent where
   format (P2pGenesis o)            = show o
   format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
+  -- format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x

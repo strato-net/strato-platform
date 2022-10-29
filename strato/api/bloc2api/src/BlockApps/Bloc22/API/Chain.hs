@@ -20,7 +20,6 @@ import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import qualified Data.Set                           as S
-import qualified Data.Functor.Identity as DFI
 import           Data.Map.Strict                    (Map)
 import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
@@ -36,7 +35,6 @@ import           BlockApps.Solidity.ArgValue
 
 import           Blockchain.Data.AlternateTransaction ()
 import           Blockchain.Data.ArbitraryInstances ()
-import           Blockchain.Data.Enode
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -107,11 +105,11 @@ exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJO
 --                       30303
 --                       (Just 30303)
 
-exampleChainMember1 :: ChainMember
-exampleChainMember1 = ChainMember (ChainMemberF (DFI.Identity "BlockApps") (DFI.Identity (Just "Engineering")) (DFI.Identity (Just "David Nallapu")))
+exampleChainMember1 :: ChainMemberParsedSet
+exampleChainMember1 = CommonName "BlockApps" "Engineering" "David Nallapu" True
                      
-exampleChainMember2 :: ChainMember
-exampleChainMember2 = ChainMember (ChainMemberF (DFI.Identity "BlockApps") (DFI.Identity (Just "Engineering")) (DFI.Identity (Just "Dustin Norwood")))
+exampleChainMember2 :: ChainMemberParsedSet
+exampleChainMember2 = CommonName "BlockApps" "Engineering" "Dustin Norwood" True
                             
 exChainInput :: ChainInput
 exChainInput = ChainInput

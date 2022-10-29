@@ -4,21 +4,16 @@ module Blockchain.Sequencer.BinaryInstances() where
 import           Data.Binary
 
 import qualified Blockchain.Data.ChainInfo   as CI
-import qualified Blockchain.Data.Enode       as E
 import           Blockchain.Data.TXOrigin    ()
 import           GHC.Generics                ()
 
 import           Blockchain.Strato.Model.Address   ()
 import           Blockchain.Strato.Model.Keccak256 ()
 import           Blockchain.Strato.Model.ExtendedWord ()
--- import           Blockchain.Strato.Model.ChainMember as CM
-
 import           Data.ByteString             ()
 
 instance Binary CI.ChainSignature where
 instance Binary CI.UnsignedChainInfo where
-instance Binary E.ChainMembers where
--- instance Binary CM.ChainMember where
 instance Binary CI.ChainInfo where
 instance Binary CI.CodeInfo where
 
