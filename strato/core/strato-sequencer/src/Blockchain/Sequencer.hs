@@ -301,7 +301,7 @@ blockstanbulSend' msg = do
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
-           ++ [VmVoteToMake r d s| PendingVote r d s <- resp] ++ [VmValidatorList val | ListOfValidators val<- resp] -- Bad Haskell Code, make better
+           ++ [VmVoteToMake r d s| PendingVote r d s <- resp] ++ [VmValidatorList val | ListOfValidators val<- resp]
       p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
