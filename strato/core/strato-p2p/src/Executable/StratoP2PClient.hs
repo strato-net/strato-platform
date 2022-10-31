@@ -62,8 +62,8 @@ runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
         -> m ()
-runPeer wireMessagesRef peer _ _ = do
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+runPeer wireMessagesRef peer _ _ cfg = do
+  --cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runContextM cfg $ do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
@@ -144,6 +144,7 @@ runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
 
 stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
 stratoP2PClient wireMessagesRef = do
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
