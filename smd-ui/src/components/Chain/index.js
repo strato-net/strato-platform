@@ -31,10 +31,66 @@ class Chain extends Component {
     } else {
       return (
         <tr>
-          <td colSpan="2"> No Members</td>
+          <td colSpan="2"> No Memberzzz</td>
         </tr>
       )
     }
+  };
+
+  showMembers2(chain) {
+    // this.forceUpdate();
+    if (chain){
+      if(chain.info){
+        if(chain.info.members){
+      const members = chain.info.members;
+
+
+        members.map((member) => {
+          return (
+            <tr >
+              <td>{member.orgName}</td>
+              <td>{member.orgUnit}</td>
+              <td>{member.commonName}</td>
+            </tr>
+          )
+        })
+        }
+        else{
+          return(<tr>
+          <td colSpan="2"> No chain info members whatsoever</td>
+        </tr>)
+        }
+      }
+      else{
+        return(<tr>
+        <td colSpan="2"> No chain info whatsoever</td>
+      </tr>)
+      }
+    }else{
+      return (<tr>
+      <td colSpan="2"> No chain whatsoever</td>
+    </tr>)
+    }
+    // if (chain) {
+    //   const members = chain.info.members;
+
+
+    //     members.map((member) => {
+    //       return (
+    //         <tr >
+    //           <td>{member.orgName}</td>
+    //           <td>{member.orgUnit}</td>
+    //           <td>{member.commonName}</td>
+    //         </tr>
+    //       )
+    //     })
+    // } else {
+    //   return (
+    //     <tr>
+    //       <td colSpan="2"> No Memberzzz2</td>
+    //     </tr>
+    //   )
+    // }
   };
 
   render() {
@@ -44,6 +100,8 @@ class Chain extends Component {
       chain
     } = this.props;
 
+    console.log(`========= chain? ${JSON.stringify(chain)}`)
+
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
@@ -51,6 +109,7 @@ class Chain extends Component {
             <h5>
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h5>
+            <h4>{chain}</h4>
           </div>
         </div>
 
@@ -63,6 +122,19 @@ class Chain extends Component {
           </thead>
           <tbody>
             {this.showMembers(chain)}
+          </tbody>
+        </table>
+
+        <table className="pt-table pt-str chain-detail">
+          <thead>
+            <tr>
+              <th>Org Name</th>
+              <th>Org Unit</th>
+              <th>Common Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            {this.showMembers2(chain)}
           </tbody>
         </table>
       </div>

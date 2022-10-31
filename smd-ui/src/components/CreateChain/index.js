@@ -64,7 +64,7 @@ class CreateChain extends Component {
         });
         balances.push({
           "balance": member.balance,
-          "address": '100'
+          "address": '0000000000000000000000000000000000000100'
         });
       });
 
@@ -109,7 +109,7 @@ class CreateChain extends Component {
     const addresses = [];
 
     curMembers.forEach(function (member) {
-      addresses.push('100');
+      addresses.push('0000000000000000000000000000000000000100');
     });
 
     if (!addresses.includes(state.address)) {

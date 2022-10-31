@@ -90,7 +90,7 @@ data ChainMemberParsedSet =
   Everyone Bool
   | Org Text Bool
   | OrgUnit Text Text Bool
-  | CommonName Text Text Text Bool deriving(Generic, Eq, Data, Show, Ord, Read, ToJSON)
+  | CommonName Text Text Text Bool deriving(Generic, Eq, Data, Show, Ord, Read)
 
 
 type ChainMemberBounded = ChainMemberF BoundedData
@@ -418,6 +418,11 @@ instance FromJSON ChainMembers where
   parseJSON (A.Array xs) = ChainMembers . S.fromList <$> traverse parseJSON (V.toList xs)
   parseJSON x = fail $ "couldn't parse JSON for chain members info: " ++ show x  
 
+instance ToJSON ChainMembers where
+  toJSON (ChainMembers xs) = toJSON (S.toList xs)
+    -- traverse A.Array V.fromList 
+    --  V.fromList <$> traverse A.Array toJSON 
+
 
 instance FromJSON ChainMemberParsedSet where
   parseJSON (A.String s) = pure $ Org s True
@@ -437,10 +442,21 @@ instance FromJSON ChainMemberParsedSet where
               Just name -> pure $ CommonName org unit name a
   parseJSON o = fail $ "parseJSON ChainMembersParsedSet failed: expected object, got: " ++ show o
 
-instance ToJSON ChainMembers where
-  toJSON (ChainMembers cm) =
-    object [ "cm" .= cm
-           ]
+
+instance ToJSON ChainMemberParsedSet where
+  toJSON (Everyone a) = object["access" .= a]
+  toJSON (Org o a) = object["orgName".= o, "access" .= a]
+  toJSON (OrgUnit o u a) = object["orgName".= o, "orgUnit".= u,"access" .= a]
+  toJSON (CommonName o u c a) = object["orgName".= o, "orgUnit".= u, "commonName".=c, "access" .= a]
+
+
+
+    
+    -- A.Array (  <$> traverse parseJSON  (S.toList  xs))
+  --   ChainMembers . S.fromList <$> traverse parseJSON (V.toList xs)
+  -- toJSON (ChainMembers cm) =
+  --   object [ "cm" .= cm
+  --          ]
 
 instance D.Default ChainMembers  where def = ChainMembers S.empty
 
