@@ -52,7 +52,7 @@ handleEvents :: (MonadP2P m , RunsClient m)
              -> m ()
 handleEvents ev sSource = case ev of
   P2pNewChainMember cId _ (Enode _ ip _ _) -> do
-    maybePeer <- getPeerByIP $ showIP ip
+    maybePeer <- getPeerByIP $ (IPAsText . T.pack . showIP) ip
     case maybePeer of
       Just peer -> do
         ender <- toIO . $logInfoS "stratoP2PClientDirect/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
