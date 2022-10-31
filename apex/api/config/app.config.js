@@ -1,7 +1,7 @@
 module.exports = {
   domainWhiteList: [
     'http://localhost:3000',
-    'http://localhost:3002',
+    'http://localhost:3009',
     'http://localhost',
   ],
   passwordSaltRounds: 10,
