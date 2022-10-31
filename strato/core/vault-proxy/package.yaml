@@ -1,7 +1,7 @@
 name:                vault-proxy
 version:             0.1.0.0
 github:              "blockapps/strato-platform"
-license:             Propietary
+license:             AllRightsReserved
 author:              "Steven Glasford"
 maintainer:          "steven_glasford@blockapps.net"
 copyright:           "2022 Blockapps, Inc"
@@ -59,6 +59,7 @@ ghc-options:
 
 library:
   source-dirs: src
+  other-modules: []
   exposed-modules:
   - VaultProxyLib
   dependencies: 
@@ -69,6 +70,7 @@ executables:
   vault-proxy-exe:
     main:                VaultProxy.hs
     source-dirs:         app
+    other-modules: []
     ghc-options:
     - -threaded
     - -rtsopts
@@ -77,12 +79,14 @@ executables:
     - vault-proxy
 
 tests:
-  vault-proxy-test:
+  vault-proxy-spec:
     main:                Spec.hs
-    source-dirs:         test
+    source-dirs:         test/
+    other-modules: []
     ghc-options:
     - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+    
     dependencies:
     - vault-proxy
+    - hspec
+    - QuickCheck

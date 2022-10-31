@@ -12,7 +12,7 @@ import Control.Monad
 import Data.ByteString.UTF8              (toString)
 import qualified Data.Text               as T
 import Debug.Trace
-import Lib
+import VaultProxyLib
 import HFlags
 -- import Control.Concurrent
 -- import Control.Concurrent.STM

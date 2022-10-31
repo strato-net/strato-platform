@@ -79,7 +79,7 @@ data RawOauth = RawOauth {
     -- _end_session_endpoint :: T.Text,
     -- _jwks_uri :: T.Text,
     -- _check_session_iframe :: T.Text
-} deriving (Show, Generic)
+} deriving (Show, Generic, Eq)
 makeLenses ''RawOauth
 
 instance FromJSON RawOauth where

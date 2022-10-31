@@ -66,8 +66,8 @@ library:
 
 tests:
   strato-model-tests:
-    source-dirs: test/
     main: Spec.hs
+    source-dirs: test/
     ghc-options: -dynamic # this flag is the result of two weeks I spent trying to link secp256k1_ecdh
     dependencies:
       - aeson

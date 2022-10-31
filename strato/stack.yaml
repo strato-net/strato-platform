@@ -5,7 +5,6 @@ packages:
 - api/ethereum-jsonrpc
 - api/strato-api
 - api2/strato-api2
-# - api/vaultProxy
 
 - core/blockapps-data
 - core/blockapps-datadefs
