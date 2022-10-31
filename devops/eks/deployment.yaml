@@ -25,7 +25,7 @@ spec:
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/apex:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/apex:7.9.0-91915c295
         name: apex
         env:
         - name: NODE_HOST
