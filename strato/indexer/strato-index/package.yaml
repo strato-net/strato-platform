@@ -79,3 +79,5 @@ tests:
     - x509-certs
     - strato-model
     - text
+    - containers
+

@@ -180,11 +180,9 @@ ChainSignatureRef
     v Word8
     deriving Eq Generic Show
 
-ChainMemberRef
+ChainMemberParsedRef
     chainInfoId ChainInfoRefId
-    orgName Text 
-    orgUnit Text Maybe 
-    commonName Text Maybe 
+    chainMember ChainMemberParsedSet
     deriving Eq Generic Show
 
 AccountInfoRef

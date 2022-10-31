@@ -46,11 +46,11 @@ import           BlockApps.XAbiConverter                    (xAbiToContract)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Enode
 import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
@@ -69,13 +69,14 @@ governanceAddress :: Address
 governanceAddress = Address 0x100
 
 -- TODO: use Value instead of ArgValue here
+-- Will not bbe used anymore due to new Chain Member type
 -- replaceMembers :: Struct
 --                -> ChainMembers
 --                -> Map.Map Text ArgValue
 --                -> Map.Map Text ArgValue
 -- replaceMembers Struct{..} cms m =
 --   let tag = "__members__"
---       members = ArgArray . V.fromList $ map (ArgString . Text.pack . formatAddressWithoutColor) cms
+--       members = ArgArray . V.fromList $ map (ArgString . Text.pack) (map chainMemberParsedSetToString (S.toList $ unChainMembers cms))
 --       m' = Map.alter (const $ Just members) tag m
 --    in case OMap.lookup tag fields of
 --         Nothing -> m'

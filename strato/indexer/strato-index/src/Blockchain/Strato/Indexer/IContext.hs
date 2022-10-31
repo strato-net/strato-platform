@@ -38,7 +38,6 @@ import           Blockchain.Data.Block           (BestBlock(..), Private(..))
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB     (putChainInfo)
-import           Blockchain.Data.Enode           (ChainMembers(..))
 import           Blockchain.Data.Transaction     (insertTX)
 import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
@@ -54,6 +53,7 @@ import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember (ChainMembers(..))
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 

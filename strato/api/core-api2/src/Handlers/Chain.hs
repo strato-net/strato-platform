@@ -47,13 +47,13 @@ import           Servant.Client
 import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
-import           Blockchain.Data.Enode
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.TypeLits
 import           Control.Monad.Composable.SQL
 import           SQLM

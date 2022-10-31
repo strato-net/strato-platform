@@ -64,6 +64,9 @@ library:
     - text
     - time
     - transformers
+    - vector
+    - Ranged-sets
+    - generic-random
 
 tests:
   strato-model-tests:

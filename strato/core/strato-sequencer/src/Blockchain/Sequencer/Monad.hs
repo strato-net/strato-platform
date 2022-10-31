@@ -97,7 +97,6 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode
 import           Blockchain.Privacy
 
 import           Blockchain.Sequencer.CablePackage
@@ -137,7 +136,7 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
   , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
-  , _orgNameChainsRegistry :: !(Map ChainMember (Modification Word256))
+  , _orgNameChainsRegistry :: !(Map ChainMembers (Modification Word256))
   -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _x509certInfoState   :: !(Map Address (Modification X509CertInfoState)) --map to pubkey
@@ -238,9 +237,13 @@ instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
 
-instance HasNamespace OrgNameChains where
-  type NSKey OrgNameChains = Word256
-  namespace _ = "pnc:"
+instance HasNamespace TrueOrgNameChains where
+  type NSKey TrueOrgNameChains = Word256
+  namespace _ = "pnct:"
+
+instance HasNamespace FalseOrgNameChains where
+  type NSKey FalseOrgNameChains = Word256
+  namespace _ = "pncf:"
 
 instance HasNamespace X509CertInfoState where
   type NSKey X509CertInfoState = Address

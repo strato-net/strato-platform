@@ -15,7 +15,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Indexer.TxrIndexer
-import           Data.Functor.Identity              as DFI
+-- import qualified Data.Set                           as S
 
 spec :: Spec
 spec = do
@@ -71,19 +71,19 @@ spec = do
             let cId   = fromInteger 0x42069
                 event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId,  ChainMember (ChainMemberF (DFI.Identity $ T.pack  "BlockApps") (DFI.Identity Nothing) (DFI.Identity Nothing)))] 
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId,  ( (Org (T.pack "BlockApps") True) )) ] 
         it "Index EventDBEntry for OrganizationAdded (two arguments)" $
             let cId   = fromInteger 0x22222
                 event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps", "sales"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ChainMember (ChainMemberF (DFI.Identity $ T.pack  "BlockApps") (DFI.Identity $ Just $ T.pack  "Sales") (DFI.Identity Nothing)))] 
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ( (OrgUnit (T.pack "BlockApps") (T.pack "Sales") True)))] 
         it "Index EventDBEntry for OrganizationRemoved (one argument)" $
             let cId   = fromInteger 0x33333
                 event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId,  ChainMember (ChainMemberF (DFI.Identity $ T.pack "BlockApps") (DFI.Identity Nothing) (DFI.Identity Nothing)))] 
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId,  ((Org (T.pack "BlockApps") False)))] 
         it "Index EventDBEntry for OrganizationRemoved (two arguments)" $
             let cId   = fromInteger 0x11111
                 event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps", "engineering"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ChainMember (ChainMemberF (DFI.Identity $ T.pack "Blockapps") (DFI.Identity $ Just $ T.pack "Engineering") (DFI.Identity Nothing)))] 
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ((OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)))] 

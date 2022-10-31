@@ -18,12 +18,11 @@ import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
 import           Data.Maybe                         (maybeToList, fromMaybe)
 import qualified Data.Text                          as T
+import qualified Data.Set                           as S
 -- import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
-
-import qualified Data.Functor.Identity as DFI
 
 import           BlockApps.X509.Certificate
 import           BlockApps.Logging
@@ -84,7 +83,7 @@ logF = $logInfoS "txrIndexer" . T.pack . concat
 --        ]
 --   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
-doAddOrgName :: Word256 -> ChainMember -> IContextM ()
+doAddOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
 doAddOrgName chainId cm = do
   logF [ "Adding chain "
        , formatChainId $ Just chainId
@@ -92,10 +91,10 @@ doAddOrgName chainId cm = do
        , format cm
        ]
   lift $ addMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain cm chainId
+  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain (ChainMembers $ S.singleton cm) chainId
   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
-doRemoveOrgName :: Word256 -> ChainMember -> IContextM ()
+doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
 doRemoveOrgName chainId cm = do
   logF [ "Removing chain "
        , formatChainId $ Just chainId
@@ -103,7 +102,7 @@ doRemoveOrgName chainId cm = do
        , format cm
        ]
   lift $ removeMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain cm chainId
+  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain (ChainMembers $ S.singleton cm) chainId
 
 doRegisterCertificate :: Account -> Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate contractAddress userAddress x509CertInfoState = do
@@ -137,11 +136,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
   where process = awaitForever $ yieldMany . indexEventToTxrResults
         output = awaitForever $ lift . txrResultHandler
 
+
 data TxrResult = 
   -- AddMember (Either String (Word256, Address, Enode))
               --  | RemoveMember (Either String (Word256, Address))
-                AddOrgName (Either String (Word256, ChainMember))
-               | RemoveOrgName (Either String (Word256, ChainMember))
+                AddOrgName (Either String (Word256, ChainMemberParsedSet))
+               | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
                | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
                | CertificateRevoked (Either String (Account, Address))
                | CertificateRegistryInitialized (Either String Account)
@@ -183,14 +183,16 @@ indexEventToTxrResults = \case
       --   Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
       --   Just address -> Just . RemoveMember $ Right (chainId, address)
       (Just chainId, "OrganizationAdded", _) -> case eventDBArgs ev of
-        (n:u:c:_)-> Just . AddOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity (Just $ T.pack u)) (DFI.Identity (Just $ T.pack c))))
-        (n:u:_)  -> Just . AddOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity (Just $ T.pack u)) (DFI.Identity Nothing)))
-        (n:_)    -> Just . AddOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity Nothing) (DFI.Identity Nothing)))
+        (o:u:c:_) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) True))
+        (o:u:_) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) True))
+        (o:_) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) True))
+        -- (_) -> Just . AddOrgName $ Right (chainId, (Everyone True))
         []       -> Just . AddOrgName . Left $ "failed to provide any arguments for OrganizationAdded event"
       (Just chainId, "OrganizationRemoved", _) -> case eventDBArgs ev of
-        (n:u:c:_)-> Just . RemoveOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity (Just $ T.pack u)) (DFI.Identity (Just $ T.pack c))))
-        (n:u:_)  -> Just . RemoveOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity (Just $ T.pack u)) (DFI.Identity Nothing)))
-        (n:_)    -> Just . RemoveOrgName $ Right (chainId, ChainMember (ChainMemberF (DFI.Identity $ T.pack n) (DFI.Identity Nothing) (DFI.Identity Nothing)))
+        (o:u:c:_) -> Just . RemoveOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
+        (o:u:_) -> Just . RemoveOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
+        (o:_) -> Just . RemoveOrgName $ Right (chainId, (Org (T.pack o) False))
+        -- (_) -> Just . RemoveOrgName $ Right (chainId, (Everyone True))
         []       -> Just . RemoveOrgName . Left $ "failed to provide any arguments for OrganizationRemoved event"
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString

@@ -1,18 +1,19 @@
 const AutoApprove = `
 contract AutoApprove { 
-  event MemberAdded (address member, string enode); 
-  event MemberRemoved (address member); 
-  
+  event OrganizationAdded (string orgName, string orgUnit, string commonName); 
+  event OrganizationRemoved (string orgName, string orgUnit, string commonName);
+ 
   constructor() {}
-  
-  function voteToAdd(address m, string e) { 
-    emit MemberAdded(m,e); 
+
+  function voteToAdd(string o, string u, string c) { 
+    emit OrganizationAdded(o,u,c); 
   } 
  
-  function voteToRemove(address m) { 
-    emit MemberRemoved(m); 
+  function voteToRemove(string o, string u, string c) { 
+    emit OrganizationRemoved(o,u,c); 
   } 
 }`
+
 
 const AdminOnly = ` 
 contract AdminOnly {  

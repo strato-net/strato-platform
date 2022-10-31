@@ -27,7 +27,7 @@ export function createChainApiCall(label, members, balances, src, args, vm) {
       method: 'POST',
       credentials: "include",
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json' 
       },
       body: JSON.stringify({
         "args": args,
