@@ -6,7 +6,7 @@
 
 
 --This is where most of the functions exist for the vault proxy
-module Lib
+module VaultProxyLib
     ( 
     --   accessToken,
     --   expiresIn,

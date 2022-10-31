@@ -28,6 +28,7 @@ dependencies:
 - clock
 - hflags
 - hoauth2
+- hspec
 - http-client
 - http-client-tls
 - http-conduit
@@ -58,13 +59,15 @@ ghc-options:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - VaultProxyLib
   dependencies: 
   - time
   - bytestring
 
 executables:
   vault-proxy-exe:
-    main:                Main.hs
+    main:                VaultProxy.hs
     source-dirs:         app
     ghc-options:
     - -threaded
