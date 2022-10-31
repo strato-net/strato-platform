@@ -11,7 +11,7 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/app
 
-EXPOSE 3001
+EXPOSE 3002
 
 COPY package*.json  /usr/src/app/
 
