@@ -118,7 +118,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
-                 deriving (Eq, Show, GHCG.Generic) --, Data)
+                 deriving (Eq, Show, GHCG.Generic)
 
 
 data IngestEventType = IETTransaction

@@ -41,7 +41,7 @@ module BlockApps.X509.Certificate (
  ) where
 
 
-
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
@@ -75,6 +75,7 @@ import           Data.Swagger.Internal.Schema
 
 import qualified Data.Set                           as S
 import           Data.Functor
+import qualified Data.Functor.Identity              as DFI
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
@@ -144,6 +145,22 @@ signedsToX509 = X509Certificate . CertificateChain
 
 x509ToSigneds :: X509Certificate -> [SignedCertificate]
 x509ToSigneds (X509Certificate (CertificateChain cs)) = cs
+
+chainMemberToX509 :: ChainMember -> X509CertInfoState ->  Maybe Address 
+chainMemberToX509 (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cnm))) (X509CertInfoState ua cert isval child onx oux cnmx) = 
+  if on == T.pack onx && ou == T.pack oux && cnm == T.pack cnmx 
+    then Just ua 
+    else Nothing  
+--I may need to map trough all the x509certinfostates , May need to make the function take in a list of x509certs or map trough chainmembers
+--ChainMemberF instead of ChainMember? 
+--Do i already have a mapping built out from pubkey->Address ?
+
+x509ToChainMember :: X509CertInfoState -> ChainMember -> Maybe ChainMember
+x509ToChainMember (X509CertInfoState ua cert isval child onx oux cnmx) (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cnm))) = 
+  if T.pack onx == on && T.pack oux == ou && T.pack cnmx == cnm 
+    then Just ChainMember 
+    else Nothing 
+
 
 data Issuer = Issuer
   {

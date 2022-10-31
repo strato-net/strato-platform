@@ -19,10 +19,12 @@ module Blockchain.Strato.Model.ChainMember (
   getTextFromIdentity',
   toChainMemberRange,
   isDustinInBAEngTeam,
+  emptyChainMember,
   ChainMemberF(..),
   ChainMember(..),
   ) where
 
+import           Control.DeepSeq
 import           Data.Aeson             hiding (Array, String)
 import           Data.Binary        
 import           Data.Data
@@ -31,7 +33,8 @@ import           Blockchain.Data.RLP
 import qualified Data.Text                            as T
 import           Test.QuickCheck.Instances.Text        ()
 import           Text.Format
-import qualified Data.Functor.Identity as DFI
+import           Text.Printf
+import qualified Data.Functor.Identity                as DFI
 import           Generics.Deriving 
 import           Test.QuickCheck.Arbitrary
 import           Test.QuickCheck.Arbitrary.Generic
@@ -73,6 +76,9 @@ data ChainMemberF f = ChainMemberF
 -- newtype ChainMemberNewType = ChainMemberNewType ChainMember
 newtype ChainMember = ChainMember {getChainMember :: ChainMemberF DFI.Identity}  deriving (Generic, Data, Show)-- ChainMember { Text, Text, Text }
 
+instance NFData ChainMember where
+  rnf (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cn))) = on `seq` ou `seq` cn `seq` ()
+
 instance Eq ChainMember where
   cmr1 == cmr2 = toChainMemberRange cmr1 == toChainMemberRange cmr2
 
@@ -93,6 +99,8 @@ instance Ord (ChainMemberF BoundedData) where
     y -> y
 
 
+emptyChainMember :: ChainMember
+emptyChainMember =  ChainMember (ChainMemberF (DFI.Identity " ") (DFI.Identity Nothing) (DFI.Identity Nothing))
 
 getTextFromIdentity :: IText -> T.Text
 getTextFromIdentity (DFI.Identity a ) = a
@@ -170,6 +178,10 @@ instance ToJSON ChainMember where
             -- ,"access" .=a
            ]
 
+instance ToJSONKey ChainMember
+
+instance FromJSONKey ChainMember
+
 deriving instance Data (ChainMemberF DFI.Identity)  
 
 deriving instance Show (ChainMemberF DFI.Identity)
@@ -183,3 +195,6 @@ instance Arbitrary ChainMember where
 instance Binary (ChainMemberF DFI.Identity)
 
 instance Binary ChainMember
+
+instance PrintfArg ChainMember where
+  formatArg = formatString . show

@@ -7,6 +7,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
@@ -38,6 +39,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Secp256k1
 import qualified Text.Colors as CL
 import Text.Format
+import Blockchain.Strato.Model.ChainMember
 
 type ValidatorRestriction = Bool
 
@@ -59,7 +61,7 @@ instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s 
 
 data MsgAuth = MsgAuth {
-  sender :: Address,
+  sender :: ChainMember,
   signature :: Signature
 } deriving (Eq, Show, Generic, Binary, NFData, Data)
 
@@ -141,7 +143,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
-             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
+             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMember, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
              deriving (Eq, Show)
@@ -164,12 +166,12 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
-              | GapFound {have :: Integer, require :: Integer, peer :: Address}
-              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
+              | GapFound {have :: Integer, require :: Integer, peer :: ChainMember}
+              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMember}
               -- A PendingVote should be authenticated by blockstanbul, but applied
               -- by a Bagger monad. This is so that the stateroot is computed after
               -- the coinbase is modified to hold the vote.
-              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
+              | PendingVote { pendingRecipient :: ChainMember, pendingVotingDir :: Bool, pendingVoteSender :: ChainMember}
               | VoteResponse HA.VoteResult
               | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
@@ -319,9 +321,9 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
                 { checkpointView :: View
-                , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
-                , checkpointValidators :: [Address]
-                , checkpointAdmins :: [Address]
+                , checkpointVoteRecord :: M.Map ChainMember (M.Map ChainMember Bool)
+                , checkpointValidators :: [ChainMember]
+                , checkpointAdmins :: [ChainMember]
                 } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
 instance Default Checkpoint where

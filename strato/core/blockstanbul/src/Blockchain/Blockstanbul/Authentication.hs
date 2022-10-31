@@ -20,6 +20,7 @@ import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
 
+import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.StateMachine
@@ -142,11 +143,14 @@ signMessage tm = do
   return $ OMsg (MsgAuth addr sig) $ tm
 
 authenticate :: InEvent -> Bool
-authenticate (IMsg (MsgAuth addr sig) tm) =
+-- change this to derriving the address from the the sig
+--and then get cert info for address, and then compare it to address (now chain member) 
+authenticate (IMsg (MsgAuth chainmem sig) tm) =
   let msgHash = getHash tm
-      mKey = recoverPub sig msgHash
-      mAddress = fromPublicKey <$> mKey
-  in mAddress == Just addr
+      mKey = recoverPub sig msgHash --recover pub key
+      mAddress = fromPublicKey <$> mKey --getting the address of sender
+      mCertInfo = mAddress $ x509ToChainMember
+  in mCertInfo == Just chainMember 
 authenticate _ = True -- Non-messages are trusted implicitly
 
 replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
