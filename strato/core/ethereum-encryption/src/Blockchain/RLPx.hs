@@ -22,9 +22,6 @@ import qualified       Data.ByteString.Lazy              as BL
 import                 Data.Conduit
 import qualified       Data.Conduit.Binary               as CB
 import                 Data.Maybe
-
---import qualified       Data.Text                         as T
-import Data.Text() 
 import qualified       Blockchain.AESCTR                 as AES
 import                 Blockchain.Data.PubKey
 import                 Blockchain.Data.RLP
@@ -36,9 +33,6 @@ import                 Blockchain.Handshake
 import                 Blockchain.Strato.Model.ExtendedWord
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import                 Blockchain.Strato.Model.Secp256k1
-
---import           BlockApps.Logging
-
 
 
 bXor :: B.ByteString
@@ -59,7 +53,6 @@ ethCryptConnect otherPubKey = do
 
   handshakeReplyBytes <- CB.take 210
   when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes!!" 
-  -- $logInfoS "handshake debug!!" $ T.pack $ "handshakeReplyBytes:" ++ (show (BL.length handshakeReplyBytes)) --210 bytes
   eAckBS <- ECIES.decrypt handshakeReplyBytes B.empty
 
   let ackMsg = bytesToAckMsg $ either (error . ("error in ethCryptConnect"++)) id eAckBS 

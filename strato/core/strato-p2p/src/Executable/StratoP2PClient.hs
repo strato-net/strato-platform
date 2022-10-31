@@ -34,7 +34,6 @@ import           Data.Maybe
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
-import           Debug.Trace
 import           UnliftIO
 
 import           BlockApps.Logging
@@ -145,21 +144,15 @@ runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
 
 stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
 stratoP2PClient wireMessagesRef = do
-  -- $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- liftIO getAvailablePeers
-    -- traceM "check the status of ePeers"
-    --traceShowM ePeers
     case ePeers of
       Left err -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        --traceM "Check number of active peers"
-        --traceShowM peers
-        --Check number of active peers, add more peers to semaphore if number of peers is less than flags_maxConn
         multiThreadedClient peers activePeersSem
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
@@ -170,8 +163,6 @@ stratoP2PClient wireMessagesRef = do
         liftIO $ threadDelay 10000000
       multiThreadedClient peers sem = liftIO . void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
-        --traceM "Check number of active peers"
-        --traceShowM p
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()

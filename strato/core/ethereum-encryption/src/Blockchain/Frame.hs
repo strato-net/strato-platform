@@ -26,7 +26,6 @@ import              Data.Conduit
 import qualified    Data.Conduit.Binary               as CB
 import              Data.Maybe
 import qualified    Data.Text                         as T
---import Data.Text() 
 
 bXor :: B.ByteString->B.ByteString->B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
