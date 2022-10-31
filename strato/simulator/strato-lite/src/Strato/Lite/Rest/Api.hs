@@ -10,6 +10,7 @@
 
 module Strato.Lite.Rest.Api
   ( ThreadResultMap
+  , AddNodeParams(..)
   , PostTxParams(..)
   , StratoLiteRestAPI
   , stratoLiteRestAPI
@@ -29,6 +30,7 @@ type StratoLiteRestAPI = GetNodes
                     :<|> GetChainInfo
                     :<|> GetEnode
                     :<|> GetAddress
+                    :<|> GetPeers
                     :<|> PostAddNode
                     :<|> PostRemoveNode
                     :<|> PostAddConnection
@@ -38,6 +40,7 @@ type StratoLiteRestAPI = GetNodes
                     :<|> PostBootChain
 
 type GetNodes = "nodes" :> Get '[JSON] ThreadResultMap
+type GetPeers = "nodes" :> Capture "nodeLabel" T.Text :> "peers" :> Get '[JSON] [T.Text]
 type GetConnections = "connections" :> Get '[JSON] ThreadResultMap
 type GetChainInfo = "chainInfo" :> Capture "nodeLabel" T.Text
                                 :> Get '[JSON] ThreadResultMap
@@ -47,7 +50,7 @@ type GetAddress = "address" :> Capture "nodeLabel" T.Text
                         :> Get '[JSON] ThreadResultMap
 type PostAddNode = "node" :> Capture "nodeLabel" T.Text 
                           :> "add"
-                          :> ReqBody '[JSON] T.Text
+                          :> ReqBody '[JSON] AddNodeParams
                           :> Post '[JSON] Bool
 type PostRemoveNode = "node" :> Capture "nodeLabel" T.Text
                              :> "remove"
@@ -61,6 +64,11 @@ type PostRemoveConnection = "connection" :> Capture "server" T.Text
                                          :> "remove"
                                          :> Post '[JSON] Bool
 type PostTimeout = "timeout" :> ReqBody '[JSON] Int :> Post '[JSON] ()
+
+data AddNodeParams = AddNodeParams
+  { _ip :: T.Text
+  , _bootNodes :: [T.Text]
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 data PostTxParams = PostTxParams
   { _tx :: UnsignedTransaction

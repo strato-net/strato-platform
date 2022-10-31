@@ -84,8 +84,16 @@ getAddress mgr nodeLabel = liftIO $ atomically $ do
       res = M.singleton nodeLabel $ (Just . Left) peaKey
   pure $ res
 
-postAddNode :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddNode mgr label ip = liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303)) mgr
+getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
+getPeers mgr label = do
+  mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
+  mCtx <- liftIO $ traverse (readTVarIO . _p2pTestContext) mPeer
+  let peers = maybe [] (map T.pack . M.keys . _stringPPeerMap) mCtx
+  pure peers
+
+postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
+postAddNode mgr label (AddNodeParams ip bootNodes) =
+  liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
@@ -179,6 +187,7 @@ stratoLiteRestServer mgr =
   :<|> getChainInfo mgr
   :<|> getEnode mgr
   :<|> getAddress mgr
+  :<|> getPeers mgr
   :<|> postAddNode mgr
   :<|> postRemoveNode mgr
   :<|> postAddConnection mgr

@@ -449,6 +449,30 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
 
+instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT Config m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT Config m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer TcpEnableTime (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => Mod.Accessible BondedPeers (ReaderT Config m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
+  access = liftIO . Mod.access
+
+instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
   res <- action
@@ -477,6 +501,7 @@ type MonadP2P m = ( MonadIO m
                        , ConnectionTimeout
                        , GenesisBlockHash
                        , BestBlockNumber
+                       , AvailablePeers
                        ] m
                   , All '[Mod.Modifiable]
                       '[ BestBlock
@@ -494,6 +519,10 @@ type MonadP2P m = ( MonadIO m
                        , '(Address, X509CertInfoState)
                        , '((IPAsText, UDPPort, B.ByteString), Point)
                        , '(IPAsText, PPeer)
+                       ] m
+                  , All2 '[A.Replaceable]
+                      '[ '(PPeer, TcpEnableTime)
+                       , '(PPeer, PeerDisable)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
@@ -535,10 +564,7 @@ runContextM :: MonadUnliftIO m
             -> m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: ( MonadLogger m
-              , MonadUnliftIO m
-              )
-           => IORef (S.OSet Keccak256) -> Int -> m Config
+initConfig :: MonadUnliftIO m => IORef (S.OSet Keccak256) -> Int -> m Config
 initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)

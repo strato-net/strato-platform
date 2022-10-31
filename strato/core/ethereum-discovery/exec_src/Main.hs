@@ -28,10 +28,11 @@ main = do
         let port' = discoveryPort $ discoveryConfig ethConf
             udpPort = UDPPort port'
             tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
+            minPeers = minAvailablePeers (discoveryConfig ethConf)
         cxt <- initContextLite flags_vaultWrapperUrl udpPort tcpPort
         runResourceT . flip runReaderT cxt $
           bracket
             (connectMe udpPort)
             (liftIO . S.close)
-            (\s -> local (\c -> c{sock = s}) f)
+            (\s -> local (\c -> c{sock = s}) $ f minPeers)
   S.withSocketsDo . runLoggingT $ ethereumDiscovery runner

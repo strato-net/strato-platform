@@ -179,6 +179,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
       Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
+    $logInfoS "evm/loop/newBlock" "about to evaluate shouldOutputBlocks"
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"

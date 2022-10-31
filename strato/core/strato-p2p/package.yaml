@@ -133,6 +133,7 @@ tests:
       - strato-p2p
       - strato-sequencer
       - text
+      - time
       - unliftio
       - vm-runner
       - vm-tools

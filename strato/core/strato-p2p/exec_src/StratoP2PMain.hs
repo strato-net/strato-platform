@@ -22,10 +22,9 @@ main = do
   _ <- $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   wireMessagesRef <- newIORef empty
-  let runner f = do
-        cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-        let sSource = seqEventNotificationSource $ contextKafkaState initContext
-        runContextM cfg $ f sSource
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+  let sSource = seqEventNotificationSource $ contextKafkaState initContext
+      runner f = runContextM cfg $ f sSource
   race_
     (run 10248 $ prometheus def p2pApp)
     (stratoP2P runner)
