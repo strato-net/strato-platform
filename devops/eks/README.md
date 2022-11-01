@@ -19,6 +19,6 @@ kubectl apply -f deployment.yaml
 * We are using old strato api by setting USE_OLD_STRATO_API as true. New strato api is using [hardcoded](https://github.com/blockapps/strato-platform/blob/develop/strato/api/strato-api/app/StratoAPIInit.hs#L26) postgres service. [STRATO-2805](https://blockapps.atlassian.net/browse/STRATO-2805) has been created for the fix.
 * Vault-wrapper password needs to be set within strato container
 Jump onto the starto container:
-`kubectl exec -it strato-platform-75549fd986-648jw -c strato -- bash`
+`kubectl exec -it <pod_name> -c strato -- bash`
 Setting the password:
 `curl -s -H "Content-Type: application/json" -d @- localhost:8000/strato/v2.3/password <<< \"hello\"`
