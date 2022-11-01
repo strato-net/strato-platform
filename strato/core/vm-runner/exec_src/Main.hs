@@ -26,7 +26,7 @@ main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
   mDebugger <- initializeSolidVMDebuggerSimple
-  let metricsRunner = run 8000 metricsApp
+  let metricsRunner = run 8009 metricsApp
       debugSettings = fst <$> mDebugger
       helpers = case snd <$> mDebugger of
         Nothing -> metricsRunner
