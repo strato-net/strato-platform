@@ -727,7 +727,7 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) wher
   delete _ _   = pure ()
   insert _ _ _ = pure ()
 
-instance MonadIO m => ([Address] `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
+instance MonadIO m => (([Address], [Address])  `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
   lookup _ _   = pure Nothing
   delete _ _   = pure ()
   insert _ _ _ = pure ()

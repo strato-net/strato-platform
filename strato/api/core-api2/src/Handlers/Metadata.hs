@@ -44,7 +44,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Strato.Strato23.Client   hiding (verifyPassword)
 import           Strato.Strato23.API.Types 
---import           Strato.Strato23.Server.Password  (verifyPassword)
 import           Strato.Strato23.Monad (VaultWrapperError)
 import           Servant
 import           Servant.Client
@@ -73,31 +72,11 @@ getMetaDataClient = client (Proxy @API)
 server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
 server = getMetaData
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
-                    ClientM x -> m x
-blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
-  resultEither <-
-    liftIO $ runClientM client' (mkClientEnv mgr url)
-  either (blocError . VaultWrapperError) return resultEither
-----------------------------------------
-
-
-
-
 instance HasSQL m => Accessible [Address] m where 
     access _ = do
         txrs <-  fmap (map E.entityVal) $  sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
         pure $  (\(ValidatorRef x) -> x ) <$> txrs
 instance ToSchema MetadataResponse
-
-getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError Address)
-getPubKey mAccessToken =
-  case mAccessToken of
-    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header"
-    Just accessToken  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  accessToken Nothing
-
 
 getMetaData :: (  MonadIO m
                 , MonadLogger m
@@ -116,6 +95,23 @@ getMetaData token =
     Left  _      -> pure $ (MetadataResponse " "  "Error" validators False False) 
     Right pubKey -> pure $ (MetadataResponse " "  (show pubKey) validators  isSynced True)
 
+
+
+
+blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+                    ClientM x -> m x
+blocVaultWrapper client' = do
+  logInfoCS callStack "Querying Vault Wrapper"
+  VaultData url mgr <- access Proxy
+  resultEither <-
+    liftIO $ runClientM client' (mkClientEnv mgr url)
+  either (blocError . VaultWrapperError) return resultEither
+
+getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError Address)
+getPubKey mAccessToken =
+  case mAccessToken of
+    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header"
+    Just accessToken  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  accessToken Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
 checkIsSynced = (runStratoRedisIO getSyncStatus) >>= \case Nothing -> pure False; Just c ->pure  c; 

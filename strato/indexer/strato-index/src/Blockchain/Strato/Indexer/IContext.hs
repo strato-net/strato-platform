@@ -96,10 +96,10 @@ instance (Word256 `A.Alters` API ChainInfo) IContextM where
   delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
 
-instance ([Address] `A.Alters` API ValidatorRef) IContextM where
+instance (([Address], [Address]) `A.Alters` API ValidatorRef) IContextM where
   lookup _ _               = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
   delete _ _               = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
-  insert _ addr _    = void . lift $ addRemoveValidator (True, addr) 
+  insert _ addrs _    = void . lift $ addRemoveValidator addrs
 
 instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
   lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"

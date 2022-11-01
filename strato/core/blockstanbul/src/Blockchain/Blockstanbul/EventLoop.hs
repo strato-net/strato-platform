@@ -144,9 +144,10 @@ nextRound nt = do
   --update validators list
   val <- uses validators S.toList
   vot <- use voted
-  let newVals = (updateValidator val vot)
+  let (newVals, toDrop, toAdd) = (updateValidator val vot)
+  validators .= S.fromList newVals
   when (val /= newVals) $ do
-    yieldR $ ListOfValidators newVals 
+    yieldR $ ListOfValidators toDrop toAdd
   $logInfoS "blockstanbul/voting" . T.pack $
                  "nextRound: voted map" ++ show vot
   valNew <- use validators

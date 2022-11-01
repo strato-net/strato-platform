@@ -49,7 +49,7 @@ indexAPI :: ( MonadLogger m
             , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
             , (Keccak256 `A.Alters` API OutputBlock) m
-            , ([Address] `A.Alters` API ValidatorRef) m
+            , (([Address],[Address]) `A.Alters` API ValidatorRef) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
@@ -57,11 +57,12 @@ indexAPI idxEvents = do
       chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
       blocks = [b | RanBlock b <- idxEvents]
       insertCount = length blocks
-      validatorAddresses = concat [ls | ValidatorsG ls <- idxEvents]
+      validatorAddresses =  [ x | ValidatorsG x <- idxEvents]
    
-  _ <- if validatorAddresses == [] 
+  _ <- if validatorAddresses == []
     then  pure  ()
-    else  forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) [x] ( (API (ValidatorRef (Address 0))))) 
+    else  
+      forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
 

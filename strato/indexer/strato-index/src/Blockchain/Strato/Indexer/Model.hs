@@ -21,7 +21,7 @@ data IndexEvent = RanBlock OutputBlock
                 | IndexTransaction Timestamp OutputTx
                 | EventDBEntry EventDB
                 | IndexPrivateTx OutputTx
-                | ValidatorsG [Address]
+                | ValidatorsG ([Address], [Address])
                 deriving (Eq, Show)
 
 instance Binary LogDB
@@ -43,7 +43,7 @@ instance Binary IndexEvent where
             6 -> IndexTransaction <$> get <*> get
             7 -> EventDBEntry <$> get
             8 -> IndexPrivateTx <$> get
-            9 -> ValidatorsG    <$> get
+            9 -> ValidatorsG    <$> get -- <*> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
     put (RanBlock b)           = putWord8 0 >> put b
@@ -55,4 +55,4 @@ instance Binary IndexEvent where
     put (IndexTransaction t x) = putWord8 6 >> put t >> put x
     put (EventDBEntry e)       = putWord8 7 >> put e 
     put (IndexPrivateTx x)     = putWord8 8 >> put x
-    put (ValidatorsG x)        = putWord8 9 >> put x
+    put (ValidatorsG x)        = putWord8 9 >> put x -- >> put y

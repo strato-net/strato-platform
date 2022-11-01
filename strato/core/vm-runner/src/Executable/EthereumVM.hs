@@ -474,7 +474,7 @@ logEventSummaries events = do
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmVoteToMake _ _ _) = "VoteToMake"
     getNames (VmPrivateTx _) = "PrivateTx"
-    getNames (VmValidatorList _) = "VmValidatorList"
+    getNames (VmValidatorList _ _) = "VmValidatorList"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
