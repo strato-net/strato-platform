@@ -406,10 +406,10 @@ setEnv verifyBlocks false
 setEnv instantMining true
 setEnv lazyBlocks true
 setEnv addBootnodes false
-setEnv numMinPeers 0
+setEnv numMinPeers 100
 setEnv useSyncMode false
 setEnv minQuorumSize 1
-setEnv maxConn 20
+setEnv maxConn 1000
 setEnv difficultyBomb false
 
 setEnv sqlDiff ${sqlDiff:-true}
