@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module VaultProxy (main) where
+module Main (main) where
 
 import BlockApps.Init
 import Control.Monad

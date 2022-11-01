@@ -1,5 +1,5 @@
-module VaultProxySpec (spec) where
-
+module VaultProxySpec (
+  spec) where
 
 
 import VaultProxyLib
@@ -13,7 +13,6 @@ import Servant.Client
 import Test.Hspec
 import qualified Data.Text               as T
 
-
 spec :: Spec
 spec = do
   describe "Vault proxy library" $ do
@@ -26,3 +25,6 @@ spec = do
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
       noErrorOauth `shouldBe` RawOauth (T.pack "Hello") (T.pack "World")
+    -- it "can get the exchange token." $ do
+    --   let exchangeToken = "exchangeToken"
+    --   exchangeToken `shouldBe` "exchangeToken"

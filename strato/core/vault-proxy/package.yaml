@@ -68,7 +68,7 @@ library:
 
 executables:
   vault-proxy-exe:
-    main:                VaultProxy.hs
+    main:                Main.hs
     source-dirs:         app
     other-modules: []
     ghc-options:
@@ -80,9 +80,8 @@ executables:
 
 tests:
   vault-proxy-spec:
-    main:                Spec.hs
+    main:                Main.hs
     source-dirs:         test/
-    other-modules: []
     ghc-options:
     - -threaded
     
