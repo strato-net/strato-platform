@@ -18,14 +18,14 @@ spec:
         app: strato-platform
     spec:
       containers:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/smd:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.9.0-06add5a8b
         name: smd
         env:
         - name: NODE_NAME
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/apex:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.9.0-06add5a8b
         name: apex
         env:
         - name: NODE_HOST
@@ -105,7 +105,7 @@ spec:
           value : "true"
         - name: validatorBehavior
           value: "true"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/postgrest:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.9.0-06add5a8b
         name: postgrest
         env:
         - name: blocHost
@@ -129,14 +129,14 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/nginx:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-06add5a8b
         name: nginx
         ports:
           - containerPort: 80
           - containerPort: 443
         env:
         - name: APEX_HOST
-          value: "localhost:3001"
+          value: "localhost:3009"
         - name: blockstanbul
           value: "true"
         - name: DOCS_HOST
@@ -196,12 +196,12 @@ spec:
           value: "100663296"
         - name: KAFKA_MESSAGE_MAX_BYTES
           value: "100663296"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/prometheus:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.9.0-06add5a8b
         name: prometheus
         env:
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/vault-wrapper:7.8.0-a106528ca
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.9.0-06add5a8b
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout
