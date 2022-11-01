@@ -136,7 +136,7 @@ spec:
           - containerPort: 443
         env:
         - name: APEX_HOST
-          value: "localhost:3001"
+          value: "localhost:3009"
         - name: blockstanbul
           value: "true"
         - name: DOCS_HOST
