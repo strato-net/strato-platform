@@ -63,7 +63,8 @@ runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
         -> CommPort      -- otherServiceCommPort
         -> Config
         -> m ()
-runPeer _ peer _ _ cfg = do
+runPeer _ peer _ _ cfg = do -- runs a single connection
+  --move cfg to StratoP2PClient
   --cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runContextM cfg $ do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
@@ -128,7 +129,6 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
                   .| eventSink
                   .| peerSink
 
-
 runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
               => IORef (S.OSet Keccak256)
               -> PPeer
@@ -144,7 +144,7 @@ runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort cfg = do
       liftIO $ threadDelay $ 10 * 1000 * 1000
   runPeer wireMessagesRef thePeer otherServiceHost otherServicePort cfg
 
-stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO () -- outer function to manage connections
 stratoP2PClient wireMessagesRef = do
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   activePeersSem <- liftIO (SSem.new flags_maxConn)
