@@ -472,8 +472,9 @@ processTheMessages env sqlEnv conn g messages = do
 
                 deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
+-- mark
                 when hasHistoryTable $
-                  outputData conn $ createExpandHistoryTable g c nameParts
+                  outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn . createEventTables g $ contractToEventTables nameParts c
 
@@ -547,3 +548,4 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+  

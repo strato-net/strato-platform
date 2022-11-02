@@ -201,10 +201,12 @@ function newnode {
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   
   echo "Starting strato-api"
-  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
+  # Leave the +RTS -N1, it is important
+  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"
+      # Leave the +RTS -N1, it is important
       runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
@@ -404,10 +406,10 @@ setEnv verifyBlocks false
 setEnv instantMining true
 setEnv lazyBlocks true
 setEnv addBootnodes false
-setEnv numMinPeers 0
+setEnv numMinPeers 100
 setEnv useSyncMode false
 setEnv minQuorumSize 1
-setEnv maxConn 20
+setEnv maxConn 1000
 setEnv difficultyBomb false
 
 setEnv sqlDiff ${sqlDiff:-true}

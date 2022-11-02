@@ -12,6 +12,8 @@ ifeq ($(REPO_URL),EMPTY)
   $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
+REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
+$(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
@@ -39,23 +41,23 @@ build_all: strato apex nginx postgrest prometheus smd vault-wrapper
 
 apex:
 	@echo Now building apex...
-	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
+	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
 
 nginx:
 	@echo Now building nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/
+	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
 
 postgrest:
 	@echo Now building postgrest...
-	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} make --directory=postgrest-packager/
+	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION} make --directory=postgrest-packager/
 
 prometheus:
 	@echo Now building prometheus...
-	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} make --directory=prometheus-packager/
+	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION} make --directory=prometheus-packager/
 
 smd:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
 
 get_solcs:
 	@echo checking solcs and pulling them if required...
@@ -93,18 +95,22 @@ strato: build_common
 	cp -fr strato/licenses ${STRATODIR}
 	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
 vault-wrapper: build_common
 	@echo Now building vault-wrapper...
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}vault-wrapper:${VERSION} ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION}
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
+	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
 
 docker-build:
 	cp -fr strato/licenses ${STRATODIR}
