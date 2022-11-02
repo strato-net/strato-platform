@@ -32,13 +32,15 @@ module VaultProxyLib
     ) where
 
 -- import           Control.Concurrent.STM
+-- import           Control.Arrow
 import           Control.Lens
 -- import           Control.Monad
+import           Control.Monad.Except
 -- import           Control.Monad.IO.Class
 import           Data.Aeson  
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
--- import           Data.ByteString         as Bytes
+-- import           Data.ByteString         as BS
 -- import           Data.Cache             as Cache
 -- import           Data.Int
 import           Data.Proxy
@@ -49,13 +51,15 @@ import           Data.Text.Encoding      as TE
 -- import           Data.Time.Clock.System
 import           GHC.Generics
 -- import           HFlags
--- import           Network.HTTP.Client     hiding (Proxy)
+import           Network.HTTP.Client     hiding (Proxy)
 -- import           Network.HTTP.Client.TLS
 import           Network.OAuth.OAuth2    as OA  hiding (error)
+import           Network.OAuth.OAuth2.Internal as OAI hiding (error)
 -- import           Network.URI
 import           Servant.API
 import           Servant.Client
 import           URI.ByteString          as UB
+import           Data.ByteString.Base64
 -- import           System.Clock
 -- import           System.Environment
 
@@ -207,27 +211,46 @@ type BlockAppsTokenAPI =
   :> ReqBody '[JSON] BlockAppsTokenRequest
   :> Get '[JSON] VaultToken
 
-getVirginToken :: T.Text -> T.Text -> RawOauth -> UB.URI --OAuth2Token ---Might need to include the discovery URL later
-getVirginToken clientId clientSecret additionalOauth = authUrl --virginToken
+--This will get a fresh brand new, minty fresh clean token from the OAuth provider,
+--User never really needs to use this function, it is mostly called by getAwesomeToken 
+getVirginToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token --OAuth2Token ---Might need to include the discovery URL later
+getVirginToken manny clientId clientSecret additionalOauth = oat --virginToken
     where 
-        local_place = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ T.pack "http://localhost:8080") of
-            Left _ -> error "Could not parse the Vault Proxy endpoint."
-            Right x -> x
+        -- local_place = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ T.pack "http://localhost:8080") of
+        --     Left _ -> error "Could not parse the Vault Proxy endpoint."
+        --     Right x -> x
         authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. authorization_endpoint) of 
             Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
             Right uri -> uri
         tokenEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. token_endpoint) of 
             Left _ -> error "Could not parse the token endpoint, This is probably a fault of the token provider, please contact your network administration."
             Right uri -> uri
+        -- quered = QueryParam [(BS.pack )]
         oa = OAuth2 {
             oauthClientId = clientId,
             oauthClientSecret = Just clientSecret,
             oauthOAuthorizeEndpoint = authEnd,
             oauthAccessTokenEndpoint = tokenEnd,
-            oauthCallback = Just local_place
+            oauthCallback = Nothing
         }
-        authUrl = OA.authorizationUrl oa
-        --additionalOAuthinfo = getOAuthInfo authorizationUrl
+        exchangeToken = ExchangeToken $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        oat = getAccessToken manny oa exchangeToken
+
+--This is the actual function that gets the token, use getVirginToken instead
+getAccessToken :: MonadIO m => Manager -> OAuth2 -> ExchangeToken -> m OAI.OAuth2Token
+getAccessToken manny oa exchangeToken = do
+    super <- runExceptT $ liftIO $ OA.fetchAccessToken manny oa exchangeToken
+    --13
+    attttttttttttt <- case super of 
+            Left _ -> error "Had some difficulty connecting to the OAuth Provider, it is likely a network problem."
+            Right tok -> case tok of
+                Left err -> error ("Had some difficulty connecting to the OAuth Provider, likely administative." ++ show err)
+                Right toks -> pure toks
+    pure attttttttttttt
+
+--This will get the 
+-- getAwesomeToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m VaultToken
+
 
 --------------------------------------------------------------------------------
 --Functions

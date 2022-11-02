@@ -65,6 +65,8 @@ library:
   dependencies: 
   - time
   - bytestring
+  - base64
+  - mtl
 
 executables:
   vault-proxy-exe:
@@ -86,6 +88,8 @@ tests:
     - -threaded
     
     dependencies:
+    # - hxt-unicode
     - vault-proxy
     - hspec
     - QuickCheck
+    - base64

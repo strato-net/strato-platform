@@ -9,19 +9,19 @@ import BlockApps.Init
 import Control.Monad
 -- import Control.Monad.IO.Class
 -- import Data.ByteString                   as BS
-import Data.ByteString.UTF8              (toString)
+-- import Data.ByteString.UTF8              (toString)
 import qualified Data.Text               as T
 import Debug.Trace
 import VaultProxyLib
 import HFlags
 -- import Control.Concurrent
 -- import Control.Concurrent.STM
-import Control.Lens
+-- import Control.Lens
 import Network.HTTP.Client
 import Network.HTTP.Conduit
 -- import Servant
 import Servant.Client
-import URI.ByteString
+-- import URI.ByteString
 -- import Servant.Client.Core
 
  
@@ -57,10 +57,10 @@ main = do
     noErrorOauth <- case rawOauthInfo of
         Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
         Right val -> return val
-    let virginToken = getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth --Might decide to add flags_OAUTH_DISCOVERY_URL back to the mix later
+    virginToken <- getVirginToken mngr flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth --Might decide to add flags_OAUTH_DISCOVERY_URL back to the mix later
     --Save the access token in a TVar
     traceM "virgin"
-    traceM $ toString $ virginToken ^. pathL
+    traceShowM virginToken 
         -- res <- runClientM 
         --         (connectToken flags_oidcUrl flags_oidcAuthorization extraTokenStuff)
         --         (mkClientEnv mngr url)
