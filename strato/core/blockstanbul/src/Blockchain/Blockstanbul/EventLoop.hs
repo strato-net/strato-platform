@@ -65,11 +65,11 @@ authorize = \case
 isAuthorized :: (StateMachineM m) => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  let authenticated = authenticate iev
+  let authenticated = authenticate iev $ lift
       raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason
-  unless authenticated $ do
+  unless authenticated $ do               -- Remove m context m bool -> bool
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
   case iev of

@@ -53,13 +53,13 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
-  , _proposer :: ChainMember
+  , _proposer :: ChainMemberParsedSet
   -- The total group of participants
-  , _validators :: S.Set ChainMember
+  , _validators :: S.Set ChainMemberParsedSet
   -- Validators who have sent us a prepare for this round
-  , _prepared :: M.Map ChainMember Keccak256
+  , _prepared :: M.Map ChainMemberParsedSet Keccak256
   -- Validators who have sent us a commitment seal for this round
-  , _committed :: M.Map ChainMember (Keccak256, Signature)
+  , _committed :: M.Map ChainMemberParsedSet (Keccak256, Signature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPreprepared :: Bool
@@ -67,14 +67,14 @@ data BlockstanbulContext = BlockstanbulContext {
   , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
-  , _roundChanged :: M.Map RoundNumber (S.Set ChainMember)
-  , _voted :: M.Map ChainMember (M.Map ChainMember Bool)
+  , _roundChanged :: M.Map RoundNumber (S.Set ChainMemberParsedSet)
+  , _voted :: M.Map ChainMemberParsedSet (M.Map ChainMemberParsedSet Bool)
   -- The address of this node
-  , _selfAddr :: ChainMember
+  , _selfAddr :: ChainMemberParsedSet
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
-  , _lockSender :: Maybe ChainMember
-  , _authSenders :: M.Map ChainMember Int
+  , _lockSender :: Maybe ChainMemberParsedSet
+  , _authSenders :: M.Map ChainMemberParsedSet Int
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
   , _lastParent :: Maybe Keccak256
@@ -91,7 +91,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer (printf "%x")
-  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMember -> String) . S.toList)
+  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMemberParsedSet -> String) . S.toList)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
@@ -101,7 +101,7 @@ debugShowCtx = do
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/admins" authSenders show
 
-newContext :: Checkpoint -> ChainMember -> BlockstanbulContext
+newContext :: Checkpoint -> ChainMemberParsedSet -> BlockstanbulContext
 newContext (Checkpoint v pendingVotes as senderlist) chainm =
   let valSet = S.fromList as
       prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
@@ -127,12 +127,16 @@ newContext (Checkpoint v pendingVotes as senderlist) chainm =
      , _validatorBehavior = True
      }
 
-generateNonceMap :: [ChainMember] -> M.Map ChainMember Int
+generateNonceMap :: [ChainMemberParsedSet] -> M.Map ChainMemberParsedSet Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
 
 poolSize :: (StateMachineM m) => m Int
 poolSize = uses validators S.size
+  --do 
+  --vals <- validators
+
+  --uses (validators >>= (\x -> (unChainMembers x)  S.size)) 
 
 clearLock :: (StateMachineM m) => m ()
 clearLock = do

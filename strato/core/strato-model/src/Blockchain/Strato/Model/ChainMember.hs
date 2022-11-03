@@ -16,6 +16,7 @@ module Blockchain.Strato.Model.ChainMember (
   getTextFromIdentity,
   getTextFromIdentity',
   cmBoundedToRSet,
+  emptyChainMember,
   removeChainMember,
   addChainMember,
   getRangeFromBounds,
@@ -66,7 +67,6 @@ import qualified Generic.Random                     as GR
 import qualified LabeledError
 import           Blockchain.Strato.Model.ExtendedWord
 
-
 -- import           Test.QuickCheck
 
 data BoundedData a =  LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
@@ -84,6 +84,15 @@ newtype ChainMemberRSet = ChainMemberRSet {getChainMemberRSet :: (RSet ChainMemb
 
 newtype ChainMembers = ChainMembers { unChainMembers :: S.Set ChainMemberParsedSet } deriving(Generic, Eq, Data, Show, Ord)
 
+instance NFData ChainMembers
+
+instance ToJSONKey ChainMembers
+
+instance FromJSONKey ChainMembers
+
+instance Format ChainMembers where
+  format = show
+
 newtype TrueOrgNameChains = TrueOrgNameChains { unTrueOrgNameChains :: S.Set Word256 } deriving (Eq)
 
 newtype FalseOrgNameChains = FalseOrgNameChains { unFalseOrgNameChains :: S.Set Word256 } deriving (Eq)
@@ -94,6 +103,16 @@ data ChainMemberParsedSet =
   | OrgUnit Text Text Bool
   | CommonName Text Text Text Bool deriving(Generic, Eq, Data, Show, Ord, Read, ToJSON)
 
+instance ToJSONKey ChainMemberParsedSet
+
+instance FromJSONKey ChainMemberParsedSet
+
+instance PrintfArg ChainMemberParsedSet where
+  formatArg = formatString . (\case
+    Everyone a -> "EVERYONE" ++ (show a)
+    Org o a-> "ORG" ++ T.unpack o ++ (show a) 
+    OrgUnit o u a-> "ORGUNIT" ++ T.unpack o ++ T.unpack u  ++ (show a)
+    CommonName o u c a -> "COMMONNAME" ++ T.unpack o ++ T.unpack u  ++ T.unpack c ++ (show a))
 
 type ChainMemberBounded = ChainMemberF BoundedData
 
@@ -231,11 +250,15 @@ instance (DiscreteOrdered (Range ChainMemberBounded)) where
   adjacent _ _= False
   adjacentBelow = const Nothing
 
-instance NFData ChainMember where
-  rnf (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cn))) = on `seq` ou `seq` cn `seq` ()
+instance NFData ChainMemberParsedSet where
+  -- rnf (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cn))) = on `seq` ou `seq` cn `seq` ()
+  rnf (Everyone a)= a`seq` ()
+  rnf (Org a b) = b `seq` a`seq` ()
+  rnf (OrgUnit a b c) = c `seq` b `seq` a`seq` ()
+  rnf (CommonName a b c d) = d `seq` c `seq` b `seq` a`seq` ()
 
-instance Eq ChainMember where
-  cmr1 == cmr2 = toChainMemberRange cmr1 == toChainMemberRange cmr2
+-- instance Eq ChainMemberParsedSet where
+--   cmr1 == cmr2 = toChainMemberRange cmr1 == toChainMemberRange cmr2
 
 
 
@@ -255,8 +278,8 @@ deriving instance Show (ChainMemberF DFI.Identity)
 
 instance Binary a => Binary (BoundedData a) where
 
-emptyChainMember :: ChainMember
-emptyChainMember =  ChainMember (ChainMemberF (DFI.Identity " ") (DFI.Identity Nothing) (DFI.Identity Nothing))
+emptyChainMember :: ChainMemberParsedSet
+emptyChainMember =  (Everyone False) --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
 
 instance Binary ChainMemberBounded where
 
@@ -385,9 +408,9 @@ instance RLPSerializable ChainMemberParsedSet where
   rlpDecode _ = error ("Error in rlpDecode for ChainMemberParsedSet: bad RLPObject")
 
 
-instance ToJSONKey ChainMember
+-- instance ToJSONKey ChainMember
 
-instance FromJSONKey ChainMember
+-- instance FromJSONKey ChainMember
 
 instance RLPSerializable (S.Set ChainMemberParsedSet) where
   rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)

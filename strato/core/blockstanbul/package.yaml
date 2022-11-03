@@ -37,6 +37,8 @@ library:
   - text
   - transformers
   - unliftio
+  - monad-alter
+  - x509-certs
 
 executables:
   blockstanbul-vote:

@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Authentication
   ( module Blockchain.Blockstanbul.Authentication
@@ -10,6 +11,7 @@ module Blockchain.Blockstanbul.Authentication
 
 import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
+import qualified Control.Monad.Change.Alter        as A
 import Control.Lens as L
 import Data.Binary
 import Data.List (intercalate)
@@ -19,6 +21,7 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
+
 
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages
@@ -142,16 +145,18 @@ signMessage tm = do
   sig <- sign mesg
   return $ OMsg (MsgAuth addr sig) $ tm
 
-authenticate :: InEvent -> Bool
--- change this to derriving the address from the the sig
---and then get cert info for address, and then compare it to address (now chain member) 
-authenticate (IMsg (MsgAuth chainmem sig) tm) =
+authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
+authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
-      mKey = recoverPub sig msgHash --recover pub key
+      mKey = recoverPub sig msgHash     --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
-      mCertInfo = mAddress $ x509ToChainMember
-  in mCertInfo == Just chainMember 
-authenticate _ = True -- Non-messages are trusted implicitly
+  res <- case mAddress of 
+    Nothing -> return Nothing
+    Just a -> A.select (A.Proxy @X509CertInfoState) a
+  let cmAddress = getAddressFromCM cm =<< res
+  return (mAddress == cmAddress)
+authenticate _ = return True 
+
 
 replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
 replayHistoricBlock realValidators seqNo blk = do
