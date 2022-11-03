@@ -7,6 +7,7 @@ import { fetchChainDetail } from '../Chains/chains.actions';
 
 class Chain extends Component {
 
+
   componentWillReceiveProps(nextProps) {
     if (!Object.getOwnPropertyNames(nextProps.chain).length) {
       nextProps.fetchChainDetail(nextProps.label, nextProps.id);
@@ -14,17 +15,15 @@ class Chain extends Component {
   }
 
   showMembers(chain) {
-    if (chain && chain.info && chain.info.balances && chain.info.balances.length > 0) {
-      const balances = chain.info.balances;
-
-      return balances.filter((balance) => {
-        return balance.address !== '0000000000000000000000000000000000000100'
-      })
-        .map((balance, index) => {
+    if (chain && chain.info && chain.info.balances && chain.info.balances.length > 0) { 
+      const members = chain.info.members;
+      return members.map((member) => {
           return (
-            <tr key={index}>
-              <td>{balance.address}</td>
-              <td>{balance.balance}</td>
+            <tr>
+              <td>{member.orgName}</td>
+              <td>{member.orgUnit}</td>
+              <td>{member.commonName}</td>
+              <td>{member.access.toString()}</td>
             </tr>
           )
         })
@@ -35,63 +34,9 @@ class Chain extends Component {
         </tr>
       )
     }
+
   };
 
-  showMembers2(chain) {
-    // this.forceUpdate();
-    if (chain){
-      if(chain.info){
-        if(chain.info.members){
-      const members = chain.info.members;
-
-
-        members.map((member) => {
-          return (
-            <tr >
-              <td>{member.orgName}</td>
-              <td>{member.orgUnit}</td>
-              <td>{member.commonName}</td>
-            </tr>
-          )
-        })
-        }
-        else{
-          return(<tr>
-          <td colSpan="2"> No chain info members whatsoever</td>
-        </tr>)
-        }
-      }
-      else{
-        return(<tr>
-        <td colSpan="2"> No chain info whatsoever</td>
-      </tr>)
-      }
-    }else{
-      return (<tr>
-      <td colSpan="2"> No chain whatsoever</td>
-    </tr>)
-    }
-    // if (chain) {
-    //   const members = chain.info.members;
-
-
-    //     members.map((member) => {
-    //       return (
-    //         <tr >
-    //           <td>{member.orgName}</td>
-    //           <td>{member.orgUnit}</td>
-    //           <td>{member.commonName}</td>
-    //         </tr>
-    //       )
-    //     })
-    // } else {
-    //   return (
-    //     <tr>
-    //       <td colSpan="2"> No Memberzzz2</td>
-    //     </tr>
-    //   )
-    // }
-  };
 
   render() {
     const {
@@ -100,8 +45,9 @@ class Chain extends Component {
       chain
     } = this.props;
 
-    console.log(`========= chain? ${JSON.stringify(chain)}`)
+    
 
+    console.log(`========= chain? ${JSON.stringify(chain)}`)
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
@@ -109,34 +55,23 @@ class Chain extends Component {
             <h5>
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h5>
-            <h4>{chain}</h4>
           </div>
         </div>
 
-        <table className="pt-table pt-str chain-detail">
-          <thead>
-            <tr>
-              <th>Member Address</th>
-              <th>Member Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {this.showMembers(chain)}
-          </tbody>
-        </table>
-
-        <table className="pt-table pt-str chain-detail">
+        <div key ={chain}>
+        <table className="pt-table pt-str chain-detail" >
           <thead>
             <tr>
               <th>Org Name</th>
               <th>Org Unit</th>
               <th>Common Name</th>
+              <th>Access</th>
             </tr>
           </thead>
           <tbody>
-            {this.showMembers2(chain)}
+            {this.showMembers(chain)}
           </tbody>
-        </table>
+        </table></div>
       </div>
     );
   }

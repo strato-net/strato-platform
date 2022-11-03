@@ -59,7 +59,8 @@ class CreateChain extends Component {
         members.push({
           "orgName": member.orgName,
           "orgUnit": member.orgUnit,
-          "commonName": member.commonName
+          "commonName": member.commonName,
+          "access": member.access
 
         });
         balances.push({
@@ -119,6 +120,7 @@ class CreateChain extends Component {
           orgName: state.orgName,
           orgUnit: state.orgUnit,
           commonName: state.commonName,
+          access: state.access,
           balance: parseInt(state.balance, 10)
         })
       });

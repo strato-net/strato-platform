@@ -66,6 +66,12 @@ class AddMember extends Component {
     });
   }
 
+  handleAccessChange(event) {
+    this.setState({
+      access: Boolean(event.target.value)
+    });
+  }
+
   // handleEnodeChange(event) {
   //   this.setState({
   //     enode: event.target.value
@@ -149,6 +155,7 @@ class AddMember extends Component {
       orgName: this.state.orgName,
       orgUnit: this.state.orgUnit,
       commonName: this.state.commonName,
+      access: this.state.access,
       balance: this.state.balance
     }
     
@@ -208,6 +215,7 @@ class AddMember extends Component {
                               balance: 0,
                               orgUnit: '',
                               commonName: '',
+                              access: '',
                               errors: null
                             };
                           });
@@ -232,6 +240,7 @@ class AddMember extends Component {
                               orgUnit: '',
                               balance: 0,
                               commonName: ``,
+                              access: '',
                               errors: null
                             };
                           });
@@ -342,6 +351,29 @@ class AddMember extends Component {
                       required
                     />
                     <br /><span className="error-text">{this.errorMessageFor('commonName')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Access:
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="form-width">
+                    <Field
+                      name="access"
+                      component="input"
+                      type="text"
+                      placeholder="Access"
+                      value={this.state.access}
+                      className="pt-input form-width"
+                      onChange={(e) => this.handleAccessChange(e)}
+                      required
+                    />
+                    <br /><span className="error-text">{this.errorMessageFor('access')}</span>
                   </div>
                 </div>
               </div>
