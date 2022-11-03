@@ -242,10 +242,14 @@ spec:
         - name: prometheus-data
           hostPath:
         - name: kafka-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: kafka-pv-claim
         - name: redis-data
-          hostPath:
-        - name: strato-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: redis-pv-claim
         - name: zookeeper-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: zookeeper-pv-claim
+        - name: strato-data
+          persistentVolumeClaim:
+            claimName: strato-pv-claim
