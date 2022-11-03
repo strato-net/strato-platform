@@ -10,6 +10,7 @@ import Control.Monad
 -- import Control.Monad.IO.Class
 -- import Data.ByteString                   as BS
 -- import Data.ByteString.UTF8              (toString)
+import Data.Cache
 import qualified Data.Text               as T
 import Debug.Trace
 import VaultProxyLib

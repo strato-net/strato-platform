@@ -31,8 +31,9 @@ module VaultProxyLib
       connectRawOauth
     ) where
 
--- import           Control.Concurrent.STM
 -- import           Control.Arrow
+import           Control.Concurrent.STM
+import           Data.Cache
 import           Control.Lens
 -- import           Control.Monad
 import           Control.Monad.Except
@@ -41,7 +42,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
 -- import           Data.ByteString         as BS
--- import           Data.Cache             as Cache
+import           Data.Cache             as Cache
 -- import           Data.Int
 import           Data.Proxy
 import qualified Data.Scientific         as Scientific
@@ -200,8 +201,43 @@ getVirginToken manny clientId clientSecret additionalOauth = do --virginToken
                 Right toks -> pure toks
     pure attttttttttttt
 
---This will get the 
--- getAwesomeToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m VaultToken
+--This will get the correct token and will get a cached token if it is still valid
+getAwesomeToken :: MonadIO STM m => Maybe STM (Cache k (OAuth2Token)) -> Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token
+getAwesomeToken oldToken manny clientId clientSecret additionalOauth = do
+    --Make a new token if needed TODO: Fix the types, ensure both are of the STM variety
+    --Used to initilize the token if needed
+    newToken <- case oldToken of 
+        Nothing <- getVirginToken manny clientId clientSecret additionalOauth
+        Just o <- o
+    --Get the token from the cache
+    token <- readTVar oldToken
+    --Retrieve the token if it is still valid, eagerly destroy if it is not valid
+    otoken <- lookupSTM True clientId token (getTime Monotonic)
+    finalToken <- case otoken of 
+        --return the token if it is still valid
+        Just tok -> pure tok
+        --Make a token and 
+        Nothing -> do 
+            --Get a new token from OAuth provider
+            newToken <- getVirginToken manny clientId clientSecret additionalOauth
+            --Set the expry time to the current time + the expry time from the OAuth provider,
+            --then minus 10 seconds to ensure freshness of the token
+            expry <- fromNanoSecs (TimeSpec(getTime) + (newToken ^. expiresIn - 10) * 1000000000)
+            --Insert the fresh token into the cache with the set expriration time
+            Cache.insertSTM clientId newToken (Cache clientId newToken) (Just expry)
+            --Return the new Token, the item in cache can be referenced else where.
+            pure newToken
+
+    pure finalToken
+    --Check if the token is still valid
+    -- validToken <- case token of
+    --     Nothing -> pure False
+    --     Just tok -> do
+    --         let expTime = tok ^. OA.tokenExpiresIn
+    --         currentTime <- liftIO $ getCurrentTime
+    --         pure $ expTime > currentTime
+    -- pure validToken 
+    --If the token is not valid, get a new one
 
 
 --------------------------------------------------------------------------------
