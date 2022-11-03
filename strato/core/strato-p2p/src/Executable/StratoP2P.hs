@@ -16,7 +16,8 @@ stratoP2P :: ( MonadP2P n
              )
           => PeerRunner n (LoggingT IO) () -> IO ()
 stratoP2P runner = runLoggingT $
-  race_ (stratoP2PLoopback runner)
+  concurrently_
+  (race_ (stratoP2PLoopback runner)
     (race_ (stratoP2PClient runner)
-           (race (stratoP2PServer runner)
-                 (stratoP2PClientDirect runner)))
+           (stratoP2PServer runner)))
+  (stratoP2PClientDirect runner)
