@@ -623,12 +623,12 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       record "inevent_type_genesis" "IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
-    IETNewChainMember -> do
-      record "inevent_type_new_chain_member" "IngestNewChainMembers"
-      yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
+    -- IETNewChainMember -> do
+    --   record "inevent_type_new_chain_member" "IngestNewChainMembers"
+    --   yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
-      yieldMany $ map (\(IENewChainOrgName c (n, u)) -> ToP2p $ P2pNewOrgName c (n, u)) events
+      yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events

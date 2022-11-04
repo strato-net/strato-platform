@@ -34,6 +34,7 @@ library:
   - strato-model
   - text
   - x509-certs
+  - Ranged-sets
   
 # I am removing this executable because the package `diagrams-html5` has not been upgraded, and
 # won't work with newer stack lts' versions.

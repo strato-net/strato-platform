@@ -5,13 +5,24 @@ export function validate(values, userSelected) {
     errors.username = 'required';
   }
 
-  if (!values.address) {
-    errors.address = 'required';
+  if (!values.orgName) {
+    errors.orgName = 'required';
   }
 
-  if (!values.enode) {
-    errors.enode = 'required';
+  if (!values.orgUnit) {
+    errors.orgUnit = 'required';
   }
+
+  if (!values.commonName) {
+    errors.commonName = 'required';
+  }
+
+  if (values.access==null) {
+    errors.access = 'required';
+  }
+  // if (!values.enode) {
+  //   errors.enode = 'required';
+  // }
 
   return errors;
 }

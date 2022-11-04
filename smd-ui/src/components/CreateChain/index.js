@@ -57,12 +57,15 @@ class CreateChain extends Component {
 
       this.state.members.forEach(function (member, index) {
         members.push({
-          "address": member.address,
-          "enode": member.enode
+          "orgName": member.orgName,
+          "orgUnit": member.orgUnit,
+          "commonName": member.commonName,
+          "access": member.access
+
         });
         balances.push({
           "balance": member.balance,
-          "address": member.address
+          "address": '0000000000000000000000000000000000000100'
         });
       });
 
@@ -107,15 +110,17 @@ class CreateChain extends Component {
     const addresses = [];
 
     curMembers.forEach(function (member) {
-      addresses.push(member.address);
+      addresses.push('0000000000000000000000000000000000000100');
     });
 
     if (!addresses.includes(state.address)) {
       this.setState({
         members: curMembers.concat({
           username: state.username,
-          address: state.address,
-          enode: state.enode,
+          orgName: state.orgName,
+          orgUnit: state.orgUnit,
+          commonName: state.commonName,
+          access: state.access,
           balance: parseInt(state.balance, 10)
         })
       });

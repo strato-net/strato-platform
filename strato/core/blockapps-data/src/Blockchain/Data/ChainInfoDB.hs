@@ -11,12 +11,12 @@
 
 module Blockchain.Data.ChainInfoDB where
 
-import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
 import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 import qualified Data.Text                          as T
+import qualified Data.Set                           as S
 
 import qualified Database.Esqueleto.Legacy          as E
 import           Database.Persist                   hiding (get)
@@ -26,10 +26,10 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Enode
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+
 
 getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
 getChainInfo (ChainId chainId) = do
@@ -43,7 +43,7 @@ getChainInfo (ChainId chainId) = do
           let chainInfoRefId = entityKey cInfo
           let ChainInfoRef{..} = entityVal cInfo
           members <- E.select . E.from $ \mRef -> do
-            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+            E.where_ (mRef E.^. ChainMemberParsedRefChainInfoId E.==. E.val chainInfoRefId)
             return mRef
           --accts <- E.select . E.from $ \abRef -> do
             --E.where_ (abRef E.^. ChainAccountBalanceRefChainInfoId E.==. E.val chainInfoRefId)
@@ -67,7 +67,8 @@ getChainInfo (ChainId chainId) = do
                  (T.pack chainInfoRefChainLabel)
                  (map ai aInfos)
                  (map ci cInfos)
-                 (M.fromList (map makePairs members))
+                 (ChainMembers $ S.fromList (map cm members))
+                --  (M.fromList (map makePairs members))
                  chainInfoRefParentChain
                  chainInfoRefCreationBlock
                  chainInfoRefChainNonce
@@ -75,7 +76,11 @@ getChainInfo (ChainId chainId) = do
                )
                (fmap csig sig)
             )
-          where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
+          where 
+                cm = \cmInfo ->
+                              let ChainMemberParsedRef{..} = entityVal cmInfo
+                                in chainMemberParsedRefChainMember
+                                    
                 ai = \aInfo ->
                         let AccountInfoRef{..} = entityVal aInfo
                             acc | isNothing accountInfoRefCodeHash
@@ -139,7 +144,7 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
     cirId <- E.insert chainInfoRef
     insertMany_ $ map (parseAInfo cirId) accountInfo
     insertMany_ $ map (parseCInfo cirId) codeInfo
-    insertMany_ $ map (parseMember cirId) (M.toList members)
+    insertMany_ $ map (parseMember cirId) (S.toList (unChainMembers members))
     insertMany_ $ map (parseMetadata cirId) (M.toList chainMetadata)
     traverse_ insert_ $ fmap (parseSignature cirId) csig
     return cirId
@@ -151,8 +156,8 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
         parseCInfo ch (CodeInfo bc cc cn)  =
           CodeInfoRef ch bc (T.unpack cc) (fmap T.unpack cn)
-        parseMember chi (ad, en) =
-          ChainMemberRef chi (showEnode en) ad
+        parseMember chi cmps  =
+          ChainMemberParsedRef chi cmps
         parseMetadata chi (k, v) =
           ChainMetadataRef chi (T.unpack k) (T.unpack v)
         parseSignature chi ChainSignature{..} =
@@ -162,8 +167,8 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
             (toInteger chainS)
             chainV
 
-addMember :: HasSQLDB m => Word256 -> Address -> String -> m ()
-addMember chainId address enode = do
+addMember :: HasSQLDB m => Word256 -> ChainMemberParsedSet -> m ()
+addMember chainId cmps = do
   sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -172,14 +177,10 @@ addMember chainId address enode = do
       []  -> return ()
       (cInfo:_) -> do
           let chainInfoRefId = entityKey cInfo
-          members <- E.select . E.from $ \mRef -> do
-            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
-            return mRef
-          when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
-            insertMany_ [ChainMemberRef chainInfoRefId enode address]
+          insertMany_ [ChainMemberParsedRef chainInfoRefId cmps]
 
-removeMember :: HasSQLDB m => Word256 -> Address -> m ()
-removeMember chainId address = do
+removeMember :: HasSQLDB m => Word256 -> ChainMemberParsedSet -> m ()
+removeMember chainId cmps = do
   sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -189,8 +190,9 @@ removeMember chainId address = do
       (cInfo:_) -> do
           let chainInfoRefId = entityKey cInfo
           member <- E.select . E.from $ \mRef -> do
-            E.where_ ((mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
-                      E.&&. (mRef E.^. ChainMemberRefAddress E.==. E.val address))
+            E.where_ ((mRef E.^. ChainMemberParsedRefChainInfoId E.==. E.val chainInfoRefId)
+                       E.&&. (mRef E.^. ChainMemberParsedRefChainMember E.==. E.val cmps)
+                      )
             return mRef
           when (not $ null member) $ do
             delete . entityKey $ head member

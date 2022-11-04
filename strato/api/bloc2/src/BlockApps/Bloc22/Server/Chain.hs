@@ -18,24 +18,25 @@ import           Control.Monad                     (when, unless)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Composable.Vault
 import           Crypto.Random.Entropy
-import qualified Data.Map.Ordered                  as OMap
+-- import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
 import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
+-- import qualified Data.Set                         as S
 import           Data.Text.Encoding                (encodeUtf8)
-import qualified Data.Vector                       as V
+-- import qualified Data.Vector                       as V
 import qualified Database.Esqueleto.Legacy as E
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
-import           BlockApps.Solidity.ArgValue
+-- import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
-import           BlockApps.Solidity.Struct
-import           BlockApps.Solidity.Type
+-- import           BlockApps.Solidity.Struct
+-- import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
@@ -49,6 +50,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
@@ -67,20 +69,21 @@ governanceAddress :: Address
 governanceAddress = Address 0x100
 
 -- TODO: use Value instead of ArgValue here
-replaceMembers :: Struct
-               -> [Address]
-               -> Map.Map Text ArgValue
-               -> Map.Map Text ArgValue
-replaceMembers Struct{..} addrs m =
-  let tag = "__members__"
-      members = ArgArray . V.fromList $ map (ArgString . Text.pack . formatAddressWithoutColor) addrs
-      m' = Map.alter (const $ Just members) tag m
-   in case OMap.lookup tag fields of
-        Nothing -> m'
-        Just (Left _, _) -> m
-        Just (_, ty) -> case ty of
-          TypeArrayDynamic (SimpleType TypeAccount) -> m'
-          _ -> m
+-- Will not bbe used anymore due to new Chain Member type
+-- replaceMembers :: Struct
+--                -> ChainMembers
+--                -> Map.Map Text ArgValue
+--                -> Map.Map Text ArgValue
+-- replaceMembers Struct{..} cms m =
+--   let tag = "__members__"
+--       members = ArgArray . V.fromList $ map (ArgString . Text.pack) (map chainMemberParsedSetToString (S.toList $ unChainMembers cms))
+--       m' = Map.alter (const $ Just members) tag m
+--    in case OMap.lookup tag fields of
+--         Nothing -> m'
+--         Just (Left _, _) -> m
+--         Just (_, ty) -> case ty of
+--           TypeArrayDynamic (SimpleType TypeAccount) -> m'
+--           _ -> m
 
 createChainInfo :: ( MonadIO m
                    , A.Selectable Account AddressState m
@@ -92,7 +95,7 @@ createChainInfo :: ( MonadIO m
                    )
                 => Text -> Keccak256 -> ChainInput -> m ChainInfo
 createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
-  when (null members) $ throwIO $ UserError "Private chains must include at least one member"
+  when (null (unChainMembers members)) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
   let md = fromMaybe Map.empty mmd
@@ -107,16 +110,16 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
       Nothing -> return ([],[], md)
       Just ContractDetails{..} -> do
           contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
-          let argValues = replaceMembers
-                            (mainStruct contract)
-                            (nmap1' members)
-                            chaininputArgs
+          -- let argValues = replaceMembers
+          --                   (mainStruct contract)
+          --                   (members)
+          --                   chaininputArgs
           storage <- case theVM of
             "EVM" -> fmap Map.toList . either (throwIO . UserError) return $ encodeValues
                        (typeDefs contract)
                        (mainStruct contract)
                        0
-                       (Map.toList argValues)
+                       (Map.toList chaininputArgs)
             _ -> pure []
           let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
@@ -135,7 +138,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
           md' <- case theVM of
               "SolidVM" -> do
                 let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-                (_, argsAsSource) <- constructArgValuesAndSource (Just argValues) xabiArgs
+                (_, argsAsSource) <- constructArgValuesAndSource (Just chaininputArgs) xabiArgs
                 pure $ (at "args" ?~ argsAsSource) md
               _ -> pure md
           return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
@@ -148,7 +151,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
         (UnsignedChainInfo lbl
                            acctInfo
                            codeInfo
-                           (Map.fromList $ unNamedTuple @"address" @"enode" <$> members)
+                           members
                            pChain
                            creationBlockHash
                            nonce
@@ -253,5 +256,5 @@ getChainInfo chainIds lim off = do
                                     ContractNoStorage a b _ -> (a, b)
                                     ContractWithStorage a b _ _ -> (a, b)
         let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
-            mems = map (NamedTuple @"address" @"enode") . Map.toList $ members chinfo
+            mems = members chinfo
         NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput

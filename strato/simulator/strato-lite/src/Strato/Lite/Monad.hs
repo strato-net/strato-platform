@@ -41,7 +41,7 @@ import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (fromJust, fromMaybe, isJust)
 import qualified Data.NibbleString                     as N
-import qualified Data.Set                              as Set
+-- import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
@@ -106,6 +106,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Wei
 import qualified Blockchain.TxRunResultCache           as TRC
 
@@ -171,7 +172,8 @@ data TestContext = TestContext
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
-  , _orgNameChainsMap      :: Map (OrgName, OrgUnit) OrgNameChains
+  , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
+  , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
   , _x509certMap           :: Map Address X509CertInfoState
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
@@ -237,8 +239,11 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgNameChainsMap
+instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use trueOrgNameChainsMap
+
+instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select _ a = M.lookup a <$> use x509certMap
@@ -319,6 +324,11 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
+instance (ChainMembers `A.Alters` Word256) m => (ChainMembers `A.Alters` Word256) (MonadP2PTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
   put p k = lift $ Mod.put p k
@@ -365,9 +375,11 @@ instance (MonadIO m, (String `A.Alters` PPeer) m) => (String `A.Alters` PPeer) (
   insert p ip = lift . A.insert p ip
   delete p ip = lift $ A.delete p ip
 
-instance A.Selectable (OrgName, OrgUnit) OrgNameChains m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadP2PTest m) where
+instance A.Selectable ChainMembers TrueOrgNameChains m => A.Selectable ChainMembers TrueOrgNameChains (MonadP2PTest m) where
   select p org = lift $ A.select p org
 
+instance A.Selectable ChainMembers FalseOrgNameChains m => A.Selectable ChainMembers FalseOrgNameChains (MonadP2PTest m) where
+  select p org = lift $ A.select p org
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
   select p addr = lift $ A.select p addr
@@ -438,6 +450,11 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . chainIdRegistry
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
+
+instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
+  insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
+  delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -1054,7 +1071,8 @@ testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
-  , _orgNameChainsMap      = M.empty
+  , _trueOrgNameChainsMap  = M.empty
+  , _falseOrgNameChainsMap = M.empty
   , _x509certMap           = M.empty
   , _privateTxMap          = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash
@@ -1248,32 +1266,24 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
                                     $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
-                                    AddMember (Right (cId, addr, enode)) -> do
-                                      chainMembersMap %= (\m -> case M.lookup cId m of
-                                        Nothing -> M.insert cId (ChainMembers $ M.singleton addr enode) m
-                                        Just (ChainMembers cm) -> M.insert cId (ChainMembers $ M.insert addr enode cm) m)
-                                      ipAddressIpChainsMap %= (\m -> case M.lookup (ipAddress enode) m of
-                                        Nothing -> M.insert (ipAddress enode) (IPChains $ Set.singleton cId) m
-                                        Just (IPChains s) -> M.insert (ipAddress enode) (IPChains $ Set.insert cId s) m)
-                                      orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
-                                        Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
-                                        Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
-                                    RemoveMember (Right (cId, addr)) -> do
-                                      mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
-                                      chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
-                                      for_ mEnode $ \enode -> do
-                                        ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
-                                        orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
-                                    AddOrgName (Right (cid, (n, u))) -> do
-                                      let org = (OrgName n, OrgUnit u)
-                                      orgNameChainsMap %= (\m -> case M.lookup org m of
-                                          Nothing -> M.insert org (OrgNameChains $ Set.singleton cid) m
-                                          Just (OrgNameChains s) -> M.insert org (OrgNameChains $ Set.insert cid s) m
-                                        )
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName cid (n, u)
-                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    RegisterCertificate (Right (_, addr, certState)) -> do x509certMap %= M.insert addr certState
+                                    -- AddMember (Right (cId, addr, enode)) -> do
+                                    --   chainMembersMap %= (\m -> case M.lookup cId m of
+                                    --     Nothing -> M.insert cId (ChainMembers $ M.singleton addr enode) m
+                                    --     Just (ChainMembers cm) -> M.insert cId (ChainMembers $ M.insert addr enode cm) m)
+                                    --   ipAddressIpChainsMap %= (\m -> case M.lookup (ipAddress enode) m of
+                                    --     Nothing -> M.insert (ipAddress enode) (IPChains $ Set.singleton cId) m
+                                    --     Just (IPChains s) -> M.insert (ipAddress enode) (IPChains $ Set.insert cId s) m)
+                                    --   orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
+                                    --     Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
+                                    --     Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
+                                    --   atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
+                                    -- RemoveMember (Right (cId, addr)) -> do
+                                    --   mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
+                                    --   chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
+                                    --   for_ mEnode $ \enode -> do
+                                    --     ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
+                                    --     orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
+                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
