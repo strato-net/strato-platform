@@ -806,13 +806,22 @@ callWrapper from to mContract functionName isRCC argExps  = do
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
-  -- grab the org for this contract
-  org <- getOrg to (contract ^. CC.vmVersion)
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+  -- grab the org for this codeAddress
+  when (not isRCC) $ do
+    org <- getOrg to (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
-  liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-        " in app " ++ (show parentName) ++ " of org " ++ show org
+--  grab the org from the senders account and set it to the codeAddress
+  when (isRCC) $ do
+    org <- getOrg from (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
