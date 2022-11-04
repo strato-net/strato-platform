@@ -69,7 +69,7 @@ class Chain extends Component {
             </tr>
           </thead>
           <tbody>
-            {this.showMembers(chain)}
+             {this.showMembers(chain)}
           </tbody>
         </table></div>
       </div>
