@@ -25,7 +25,9 @@ dependencies:
 - aeson-casing
 - blockapps-init
 - bytestring
+- cache
 - clock
+- ghc-bignum
 - hflags
 - hoauth2
 - hspec

@@ -58,7 +58,6 @@ spec = do
       let encoded = encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, T.pack ":", clientSecret]
       encoded `shouldBe` T.pack "ZGV2OmZlMmQ1OWM4LTgzNzgtNGE1Ny04Yzg2LTQ1YmY5NzJmYTAyOA=="
     
-    it "can properly store the OAuth Token" $ do
-      --Create a new cache 🐿️
-      let cache = newCacheSTM getCurrentTime
-      
+    -- it "can properly store the OAuth Token" $ do
+    --   --Create a new cache 🐿️
+    --   let cache = newCacheSTM getCurrentTime

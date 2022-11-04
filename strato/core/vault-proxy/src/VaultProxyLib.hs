@@ -33,7 +33,7 @@ module VaultProxyLib
 
 -- import           Control.Arrow
 import           Control.Concurrent.STM
-import           Data.Cache
+import           Data.Cache               as C
 import           Control.Lens
 -- import           Control.Monad
 import           Control.Monad.Except
@@ -42,8 +42,9 @@ import           Data.Aeson
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
 -- import           Data.ByteString         as BS
-import           Data.Cache             as Cache
+import           Data.Cache
 -- import           Data.Int
+import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Scientific         as Scientific
 import qualified Data.Text               as T
@@ -51,6 +52,7 @@ import           Data.Text.Encoding      as TE
 -- import           Data.Time.Clock
 -- import           Data.Time.Clock.System
 import           GHC.Generics
+import           GHC.Num.Integer
 -- import           HFlags
 import           Network.HTTP.Client     hiding (Proxy)
 -- import           Network.HTTP.Client.TLS
@@ -61,7 +63,7 @@ import           Servant.API
 import           Servant.Client
 import           URI.ByteString          as UB
 import           Data.ByteString.Base64
--- import           System.Clock
+import           System.Clock
 -- import           System.Environment
 
 
@@ -102,7 +104,7 @@ data VaultToken = VaultToken {
     _sessionState :: T.Text,
     _scope :: T.Text
 } deriving (Eq, Show, Generic)
--- makeLenses ''VaultToken
+makeLenses ''VaultToken
 
 instance FromJSON VaultToken where
   parseJSON (Object o) = do
@@ -173,15 +175,21 @@ type BlockAppsTokenAPI =
   :> ReqBody '[JSON] BlockAppsTokenRequest
   :> Get '[JSON] VaultToken
 
+type OauthCache = Cache T.Text OAuth2Token
+
+--------------------------------------------------------------------------------
+--Functions
+--------------------------------------------------------------------------------
+
 --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
 --User never really needs to use this function, it is mostly called by getAwesomeToken 
 getVirginToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token --OAuth2Token ---Might need to include the discovery URL later
 getVirginToken manny clientId clientSecret additionalOauth = do --virginToken
 
-    let authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. authorization_endpoint) of 
+    let authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 (additionalOauth ^. authorization_endpoint)) of 
             Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
             Right uri -> uri
-        tokenEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. token_endpoint) of 
+        tokenEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 (additionalOauth ^. token_endpoint)) of 
             Left _ -> error "Could not parse the token endpoint, This is probably a fault of the token provider, please contact your network administration."
             Right uri -> uri
         oa = OAuth2 {
@@ -202,33 +210,53 @@ getVirginToken manny clientId clientSecret additionalOauth = do --virginToken
     pure attttttttttttt
 
 --This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: MonadIO STM m => Maybe STM (Cache k (OAuth2Token)) -> Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token
-getAwesomeToken oldToken manny clientId clientSecret additionalOauth = do
+getAwesomeToken :: MonadIO m => Maybe OauthCache -> Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token
+getAwesomeToken squirrel manny clientId clientSecret additionalOauth = do
     --Make a new token if needed TODO: Fix the types, ensure both are of the STM variety
     --Used to initilize the token if needed
-    newToken <- case oldToken of 
-        Nothing <- getVirginToken manny clientId clientSecret additionalOauth
-        Just o <- o
-    --Get the token from the cache
-    token <- readTVar oldToken
+    oToken <- case squirrel of 
+        Nothing -> getVirginToken manny clientId clientSecret additionalOauth
+        Just o -> atomically $ do 
+            r <- lookupSTM True clientId squirrel (getTime Monotonic)
+            case r of 
+                --Cache is deleted if expired, make new cache and new token
+                Nothing -> atomically $ do
+                    newToken <- getVirginToken manny clientId clientSecret additionalOauth
+                    insertSTM clientId newToken squirrel
+                    pure newToken
+
     --Retrieve the token if it is still valid, eagerly destroy if it is not valid
-    otoken <- lookupSTM True clientId token (getTime Monotonic)
-    finalToken <- case otoken of 
-        --return the token if it is still valid
+    finalToken <- case stmCache of 
+        --return the token if it is still valid, it is purged for us automatically if it is not valid
         Just tok -> pure tok
-        --Make a token and 
+        --Mint a new token from the OAuth provider if the old one is not valid
         Nothing -> do 
             --Get a new token from OAuth provider
             newToken <- getVirginToken manny clientId clientSecret additionalOauth
             --Set the expry time to the current time + the expry time from the OAuth provider,
-            --then minus 10 seconds to ensure freshness of the token
-            expry <- fromNanoSecs (TimeSpec(getTime) + (newToken ^. expiresIn - 10) * 1000000000)
+            --then minus 13 seconds to ensure freshness of the token
+            expry <- makeExrpy newToken
             --Insert the fresh token into the cache with the set expriration time
-            Cache.insertSTM clientId newToken (Cache clientId newToken) (Just expry)
-            --Return the new Token, the item in cache can be referenced else where.
-            pure newToken
+            atomically $ do 
+                C.insertSTM clientId newToken squirrel (Just expry)
+                --Return the new Token, the item in cache can be referenced else where.
+                pure newToken
 
     pure finalToken
+
+--This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
+makeExpry :: MonadIO m => m TimeSpec 
+--Make the expry negative if the token does not have the expiresIn field set, this will force a new token to be made always
+    --Not sure if this will really occur, but it is a good safety net 🕸️
+makeExpry token = do 
+    timey <- liftIO $ getTime Monotonic
+    let tim :: Integer
+        tim = toNanoSecs (timey)
+        tokenExpry :: Integer
+        tokenExpry = integerFromInt $ fromMaybe 0 (OA.expiresIn token)
+        expry :: TimeSpec
+        expry = fromNanoSecs ( tim + (tokenExpry - 13) * 1000000000)
+    pure expry
     --Check if the token is still valid
     -- validToken <- case token of
     --     Nothing -> pure False
