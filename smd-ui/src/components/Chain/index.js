@@ -47,7 +47,6 @@ class Chain extends Component {
 
     
 
-    console.log(`========= chain? ${JSON.stringify(chain)}`)
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
