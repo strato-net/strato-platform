@@ -102,7 +102,7 @@ export function postMethodCall(payload) {
 export function* methodCall(action) {
   try {
     const response = yield call(postMethodCall, action.payload);
-    yield put(fetchState(action.payload.contractName, action.payload.contractAddress));
+    yield put(fetchState(action.payload.contractName, action.payload.contractAddress, action.payload.chainId));
     yield put(methodCallSuccess(action.key, JSON.stringify(response, null, 2)));
   }
   catch (err) {
