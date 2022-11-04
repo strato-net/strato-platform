@@ -819,7 +819,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
     org <- getOrg from (contract ^. CC.vmVersion)
     Mod.modifyStatefully_ (Mod.Proxy @Action) $
       Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-    -- (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
     liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
           " in app " ++ (show parentName) ++ " of org " ++ show org
 
