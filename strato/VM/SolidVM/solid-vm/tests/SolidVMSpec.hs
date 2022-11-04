@@ -67,6 +67,7 @@ import Data.ByteString (putStr)
 import GHC.TypeLits (ErrorMessage(Text))
 import qualified Control.Exception as Blockchain.SolidVM
 import qualified LabeledError
+import Blockchain.Strato.Model.Gas
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -267,7 +268,7 @@ runArgsWithSenderBeef acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Just 0xfeedbeef
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -303,7 +304,7 @@ runArgsWithSender acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -338,7 +339,7 @@ runArgsWithOrigin orig acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -381,7 +382,7 @@ runCall funcName callArgs bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
@@ -426,7 +427,7 @@ call2 funcName callArgs contractAddress = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
@@ -6780,3 +6781,36 @@ contract A {
   uint x = type(B).name;
 
 }|]) `shouldThrow` anyTypeError
+
+  it "cant infinite loop" $ (runTest $
+    runBS [r|
+pragma solidvm 3.4;
+contract qq {
+  uint x = 3;
+  constructor() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
+
+  it "cant infinite loop through a different contract" $ (runTest $
+    runBS [r|
+pragma solidvm 3.4;
+
+contract A {
+  uint x = 3;
+  function f() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}
+
+contract qq {
+  constructor() public returns () {
+    A a = new A();
+    a.f();
+    return;
+  }
+}   |]) `shouldThrow` anyTooMuchGasError

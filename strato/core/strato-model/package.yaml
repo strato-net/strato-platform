@@ -43,6 +43,7 @@ library:
     - fast-keccak256
     - format
     - generic-arbitrary
+    - generic-deriving
     - hashable
     - http-api-data
     - integer-gmp
@@ -63,6 +64,9 @@ library:
     - text
     - time
     - transformers
+    - vector
+    - Ranged-sets
+    - generic-random
 
 tests:
   strato-model-tests:

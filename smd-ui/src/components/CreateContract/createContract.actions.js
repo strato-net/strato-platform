@@ -82,7 +82,7 @@ export const createContractFailure = function(error) {
     spinning: false,
     isOpen: false,
     toasts: true,
-    toastsMessage: 'Contract creation failed'
+    toastsMessage: `Contract creation failed: ${error}`
   }
 }
 
