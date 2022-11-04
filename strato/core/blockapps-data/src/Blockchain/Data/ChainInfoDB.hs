@@ -11,7 +11,7 @@
 
 module Blockchain.Data.ChainInfoDB where
 
-import           Control.Monad                      (when)
+-- import           Control.Monad                      (when)
 import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
@@ -189,13 +189,7 @@ removeMember chainId cmps = do
       []  -> return ()
       (cInfo:_) -> do
           let chainInfoRefId = entityKey cInfo
-          member <- E.select . E.from $ \mRef -> do
-            E.where_ ((mRef E.^. ChainMemberParsedRefChainInfoId E.==. E.val chainInfoRefId)
-                       E.&&. (mRef E.^. ChainMemberParsedRefChainMember E.==. E.val cmps)
-                      )
-            return mRef
-          when (not $ null member) $ do
-            delete . entityKey $ head member
+          insertMany_ [ChainMemberParsedRef chainInfoRefId cmps]
 
 terminateChain :: MonadLogger m => Word256 -> m ()
 terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
