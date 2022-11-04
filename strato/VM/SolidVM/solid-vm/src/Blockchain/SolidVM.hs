@@ -224,6 +224,11 @@ solidVMBreakpoint ann = do
 
 -- end debugger-related code
 
+requireOriginCert :: MonadSM m => Account -> m ()
+requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
+  originHasCert <- A.exists (A.Proxy @X509Certificate) $ acct ^. accountAddress
+  unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
+
 create :: SolidVMBase m
        => Bool
        -> Bool
@@ -265,6 +270,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
+    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -415,6 +421,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' chainId' $ do
+    requireOriginCert origin'
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
@@ -3663,8 +3670,10 @@ solidityExceptionHandler catchBlockMap ex = do
     (GeneralMetaProgrammingError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 28 generalMetaProgrammingError
       return res
+    (MissingCertificate s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 missingCertificate
+      return res
     _ -> error "unhandled solid exception" (show ex)
-
 
 
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
