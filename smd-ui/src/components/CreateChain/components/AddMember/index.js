@@ -68,7 +68,7 @@ class AddMember extends Component {
 
   handleAccessChange(event) {
     this.setState({
-      access: Boolean(event.target.value)
+      access: event.target.value
     });
   }
 
@@ -358,21 +358,39 @@ class AddMember extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Access:
+                    Access
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <div className="form-width">
-                    <Field
-                      name="access"
+                  <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
                       component="input"
-                      type="text"
-                      placeholder="Access"
-                      value={this.state.access}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleAccessChange(e)}
-                      required
-                    />
+                      type="radio"
+                      value={true}
+                      label='Add'
+                      checked={this.state.access === true}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:true };
+                        });
+                      }}
+                    /> Add
+                  <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={false}
+                      label='Remove'
+                      checked={this.state.access === false}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:false };
+                        });
+                      }}
+                    /> Remove
                     <br /><span className="error-text">{this.errorMessageFor('access')}</span>
                   </div>
                 </div>

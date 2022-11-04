@@ -17,7 +17,7 @@ export function validate(values, userSelected) {
     errors.commonName = 'required';
   }
 
-  if (!values.access) {
+  if (values.access==null) {
     errors.access = 'required';
   }
   // if (!values.enode) {
