@@ -26,14 +26,18 @@ dependencies:
 - blockapps-init
 - bytestring
 - clock
+- exceptions
 - hflags
 - hoauth2
 - hspec
 - http-client
 - http-client-tls
 - http-conduit
+- json
 - lens
+- modern-uri
 - network-uri
+- req
 - scientific
 - servant
 - servant-client
@@ -44,6 +48,7 @@ dependencies:
 - time
 - uri-bytestring
 - utf8-string
+- yesod-core
 
 ghc-options:
 - -Wall

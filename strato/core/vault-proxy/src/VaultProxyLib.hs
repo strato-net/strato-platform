@@ -13,7 +13,7 @@ module VaultProxyLib
     --   refreshToken,
     --   notBeforePolicy,
     --   sessionState,
-    --   scope,
+    --   scone,
       RawOauth(..),
       authorization_endpoint,
       token_endpoint,
@@ -27,7 +27,7 @@ module VaultProxyLib
     --   getVaultToken,
       getVirginToken,
     --   getAccessToken,
-      connectToken,
+    --   connectToken,
       connectRawOauth
     ) where
 
@@ -35,14 +35,17 @@ module VaultProxyLib
 -- import           Control.Arrow
 import           Control.Lens
 -- import           Control.Monad
-import           Control.Monad.Except
--- import           Control.Monad.IO.Class
+import           Control.Monad.Catch
+-- import           Control.Monad.Except
+import           Control.Monad.IO.Class
 import           Data.Aeson  
+-- import           Data.Aeson.Lens
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
 -- import           Data.ByteString         as BS
 -- import           Data.Cache             as Cache
 -- import           Data.Int
+import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Scientific         as Scientific
 import qualified Data.Text               as T
@@ -51,15 +54,21 @@ import           Data.Text.Encoding      as TE
 -- import           Data.Time.Clock.System
 import           GHC.Generics
 -- import           HFlags
-import           Network.HTTP.Client     hiding (Proxy)
+import           Network.HTTP.Client     as HTC hiding (Proxy)
+import           Network.HTTP.Req        as R
+-- import           Network.Wreq            as W
 -- import           Network.HTTP.Client.TLS
-import           Network.OAuth.OAuth2    as OA  hiding (error)
+-- import           Network.OAuth.OAuth2    as OA  hiding (error)
 -- import           Network.OAuth.OAuth2.Internal as OAI hiding (error)
 -- import           Network.URI
-import           Servant.API
+import           Servant.API             as SA
 import           Servant.Client
-import           URI.ByteString          as UB
+-- import           Text.JSON               as J
+import           Text.URI                as URI
+-- import           URI.ByteString          as UB
 import           Data.ByteString.Base64
+import           Yesod.Core.Types        as YC
+-- import           Yesod.Core.Content      as YCC
 -- import           System.Clock
 -- import           System.Environment
 
@@ -158,47 +167,84 @@ instance FromJSON VaultToken where
 --------------------------------------------------------------------------------
 --Types
 --------------------------------------------------------------------------------
-type ContentType = T.Text
+type ContentType' = T.Text
 type Authorization = T.Text
 type BlockAppsTokenRequest = [(T.Text, T.Text)]
 -- type AccessToken = (ClientM VaultToken, Int64)
 
 type InitialCallForTokenLinkAPI =
-    Get '[JSON] RawOauth
+    Get '[SA.JSON] RawOauth
 
 type BlockAppsTokenAPI = 
-  Header "Content-Type" ContentType
-  :> Header "Authorization" Authorization
-  :> ReqBody '[JSON] BlockAppsTokenRequest
-  :> Get '[JSON] VaultToken
+  SA.Header "Content-Type" ContentType'
+  :> SA.Header "Authorization" Authorization
+  :> ReqBody '[SA.JSON] BlockAppsTokenRequest
+  :> Get '[SA.JSON] VaultToken
 
 --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
 --User never really needs to use this function, it is mostly called by getAwesomeToken 
-getVirginToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token --OAuth2Token ---Might need to include the discovery URL later
-getVirginToken manny clientId clientSecret additionalOauth = do --virginToken
+getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> m VaultToken --OAuth2Token ---Might need to include the discovery URL later
+getVirginToken clientId clientSecret additionalOauth = do --virginToken
+    uri <- URI.mkURI $ additionalOauth ^. token_endpoint
+    let (url, _) = fromJust (useHttpsURI $ uri)
+        -- authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. authorization_endpoint) of 
+        --     Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
+        --     Right uri -> uri
+        
+        -- oa = OAuth2 {
+        --     oauthClientId = clientId,
+        --     oauthClientSecret = Just clientSecret,
+        --     oauthOAuthorizeEndpoint = authEnd,
+        --     oauthAccessTokenEndpoint = tokenEnd,
+        --     oauthCallback = Nothing
+        -- }
+        -- exchangeToken = ExchangeToken $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+    -- super <- runExceptT $ liftIO $ OA.fetchAccessToken manny oa exchangeToken
+    --Make a req call to the server
+    let authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        contType = header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
+        urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
+        -- reqBody = 
+    -- let reqBody = [ ("grant_type", "client_credentials") ]
+    -- let vaulty :: VaultToken
+    --     vaulty = VaultToken "access_token" 0 0 "refresh_token" "token_type" 0 "session_state" "scope"
+    
 
-    let authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. authorization_endpoint) of 
-            Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
-            Right uri -> uri
-        tokenEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. token_endpoint) of 
-            Left _ -> error "Could not parse the token endpoint, This is probably a fault of the token provider, please contact your network administration."
-            Right uri -> uri
-        oa = OAuth2 {
-            oauthClientId = clientId,
-            oauthClientSecret = Just clientSecret,
-            oauthOAuthorizeEndpoint = authEnd,
-            oauthAccessTokenEndpoint = tokenEnd,
-            oauthCallback = Nothing
-        }
-        exchangeToken = ExchangeToken $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-    super <- runExceptT $ liftIO $ OA.fetchAccessToken manny oa exchangeToken
+    -- request <- parseUrlThrow ("POST " additionalOauth ^. token_endpoint
+    -- response <- urlEncodedBody [(, )] rlll
+    -- finalReq <- reqBody response
+    -- let tttt :: T.Text
+    --     tttt =  R.req R.POST url NoReqBody (jsonResponse) (authHeadr <> contType ) 
+    re1 <- runReq defaultHttpConfig $ do
+        response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
+        pure response
+    let deq1 = HTC.responseBody $ toVanillaResponse re1
+    
+    pure deq1
+    -- urll :: String 
+    -- req <- 
+    -- r <- W.post urll (toJSON)
+    -- let deqRes :: VaultToken
+    --     aatt = response ^. R.responseBody . key "access_token" . _String
+    --     eei = response ^. R.responseBody . key "expires_in" . _Integer
+    --     rrei = response ^. R.responseBody . key "refresh_expires_in" . _Integer
+    --     rrtt = response ^. R.responseBody . key "refresh_token" . _String
+    --     tttt = response ^. R.responseBody . key "token_type" . _String
+    --     nbpp = response ^. R.responseBody . key "not-before-policy" . _Integer
+    --     sstt = response ^. R.responseBody . key "session_state" . _String
+    --     scc = response ^. R.responseBody . key "scope" . _String
+    --     deqRes = VaultToken aatt eei rrei rrtt tttt nbpp sstt scc
+            
+    -- pure deqRes
+        
     --13
-    attttttttttttt <- case super of 
-            Left _ -> error "Had some difficulty connecting to the OAuth Provider, it is likely a network problem."
-            Right tok -> case tok of
-                Left err -> error ("Had some difficulty connecting to the OAuth Provider, likely administative." ++ show err)
-                Right toks -> pure toks
-    pure attttttttttttt
+    -- attttttttttttt <- case super of 
+    --         Left _ -> error "Had some difficulty connecting to the OAuth Provider, it is likely a network problem."
+    --         Right tok -> case tok of
+    --             Left err -> error ("Had some difficulty connecting to the OAuth Provider, likely administative." ++ show err)
+    --             Right toks -> pure toks
+
+
 
 --This will get the 
 -- getAwesomeToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m VaultToken
@@ -216,14 +262,14 @@ blockappsTokenApi = Proxy
 getRawOauth :: ClientM RawOauth
 getRawOauth = client rawOAuthAPI
 
-getToken :: Maybe T.Text -> Maybe T.Text -> [(T.Text, T.Text)] -> ClientM VaultToken
-getToken = client blockappsTokenApi
+-- getToken :: Maybe T.Text -> Maybe T.Text -> [(T.Text, T.Text)] -> ClientM VaultToken
+-- getToken = client blockappsTokenApi
 
 connectRawOauth :: ClientM RawOauth
 connectRawOauth = getRawOauth
 
-connectToken :: ContentType -> Authorization -> BlockAppsTokenRequest -> ClientM VaultToken
-connectToken ct a bt = getToken ct' a' bt
-    where
-        ct' = Just ct
-        a' = Just a
+-- connectToken :: ContentType -> T.Text -> BlockAppsTokenRequest -> ClientM VaultToken
+-- connectToken ct a bt = getToken ct' a' bt
+--     where
+--         ct' = Just ct
+--         a' = Just a

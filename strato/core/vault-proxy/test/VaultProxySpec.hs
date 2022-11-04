@@ -21,11 +21,11 @@ import Test.Hspec
 -- import URI.ByteString           as UB
 
 discoveryUrl :: String
-discoveryUrl = "https://keycloak.blockapps.net/auth/realms/fti/.well-known/openid-configuration" 
+discoveryUrl = "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration" 
 clientId :: T.Text
 clientId     = T.pack "dev"
 clientSecret :: T.Text
-clientSecret = T.pack "fe2d59c8-8378-4a57-8c86-45bf972fa028"
+clientSecret = T.pack "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f"
 
 spec :: Spec
 spec = do
@@ -46,7 +46,7 @@ spec = do
       noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
-      authyUrl <- getVirginToken mngr clientId clientSecret noErrorOauth
+      authyUrl <- liftIO $ getVirginToken clientId clientSecret noErrorOauth
       let adam = TE.encodeUtf8 $ T.pack "https://keycloak.blockapps.net/auth/realms/fti/protocol/openid-connect/auth?client_id=dev&redirect_uri=http%3A%2F%2Flocalhost%3A8080&response_type=code&scope=openid"
           resultant = authyUrl
       show (resultant) `shouldBe` show adam
