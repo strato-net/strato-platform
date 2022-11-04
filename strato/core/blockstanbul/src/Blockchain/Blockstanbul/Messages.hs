@@ -143,7 +143,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
-             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMembers, Bool,Int)}
+             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMemberParsedSet, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
              deriving (Eq, Show)

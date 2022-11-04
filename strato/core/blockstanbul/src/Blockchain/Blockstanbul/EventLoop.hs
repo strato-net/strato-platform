@@ -23,6 +23,7 @@ import Text.Printf
 
 import Blockapps.Crossmon
 import BlockApps.Logging
+import BlockApps.X509.Certificate
 
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
@@ -65,19 +66,21 @@ authorize = \case
 isAuthorized :: (StateMachineM m) => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  let authenticated = authenticate iev $ lift
-      raiseInProd reason = when doAuthn $ do
-        $logWarnS "blockstanbul/auth" . T.pack $ reason
+  authenticated <- authenticate iev
+  let raiseInProd reason = when doAuthn $ do
+        $logWarnS "blockstanbul/auth" . T.pack $ reason 
         throwE reason
-  unless authenticated $ do               -- Remove m context m bool -> bool
+  unless authenticated $ do               
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
   case iev of
     NewBeneficiary (MsgAuth addr sig) (benf, dir, nonc) -> do
+      
       -- Check nonce for replay attack
+      let convertedAddr = getAddressFromCM addr
       slist <- use authSenders
-      let ifAuthMember = M.member addr slist
-          nonceAuth = Just nonc > M.lookup addr slist
+      let ifAuthMember = M.member convertedAddr slist
+          nonceAuth = Just nonc > M.lookup convertedAddr slist
           signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sig
 
       unless ifAuthMember $
