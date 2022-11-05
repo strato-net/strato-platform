@@ -82,7 +82,7 @@ import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
 import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
--- import           Blockchain.Options                    (AuthorizationMode(..))
+import           Blockchain.Options                    ()
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
@@ -1678,67 +1678,6 @@ contract RegisterCert {
             `L.shouldReturn` [Left TXQueueTimeout]
 
   describe "Private Chain Authorization" $ do
-    let ip1 = "172.20.44.53"
-        ip2 = "33.4.2.1"
-        ip3 = "5.9.150.40"
-        ip4 = "127.0.0.1"
-        key1 = "3414c01c19aa75a34f2dbd2f8d0898dc79d6b219ad77f8155abf1a287ce2ba60f14998a3a98c0cf14915eabfdacf914a92b27a01769de18fa2d049dbf4c17694"
-        key2 = "f4642fa65af50cfdea8fa7414a5def7bb7991478b768e296f5e4a54e8b995de102e0ceae2e826f293c481b5325f89be6d207b003382e18a8ecba66fbaf6416c0"
-        key3 = "a4de274d3a159e10c2c9a68c326511236381b84c9ec52e72ad732eb0b2b1a2277938f78593cdbe734e6002bf23114d434a085d260514ab336d4acdc312db671b"
-        key4 = "a979fb575495b8d6db44f750317d0f4622bf4c2aa3365d6af7c284339968eef29b69ad0dce72a4d8db5ebb4968de0e3bec910127f134779fbcb0cb6d3331163c"
-        -- cert1 = Just X509CertInfoState {
-        --   userAddress = 0x1234 :: Address,
-        --   certificate = X509Certificate (CertificateChain []),
-        --   isValid = True,
-        --   BlockApps.X509.Certificate.children = [],
-        --   BlockApps.X509.Certificate.orgName = "Blockapps",
-        --   BlockApps.X509.Certificate.orgUnit = Just "engineering"
-        -- }
-        -- cert2 = Just X509CertInfoState {
-        --   userAddress = 0x33beef44 :: Address,
-        --   certificate = X509Certificate (CertificateChain []),
-        --   isValid = False,
-        --   BlockApps.X509.Certificate.children = [],
-        --   BlockApps.X509.Certificate.orgName = "Red Bull Racing",
-        --   BlockApps.X509.Certificate.orgUnit = Nothing
-        -- }
-        -- mkEnode :: String -> String -> Enode
-        -- mkEnode key ip = readEnode $ printf "enode://%s@%s:30303" key ip
-        -- chainMembers = M.fromList
-        --    [ (0xdeadbeef, mkEnode key1 ip1)
-        --    , (0xddba11, mkEnode key2 ip2)
-        --    , (0x888, mkEnode key3 ip3)
-        --    ]
-
-        shouldAccept :: (String, String) -> IO ()
-        shouldAccept  (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\_ -> True) --DONT FORGET THIS> MUST BE CHANGED
-
-        shouldReject ::  (String, String) -> IO ()
-        shouldReject  (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\_->True) --DONT FORGET THIS> MUST BE CHANGED
-
-    describe "IPOnly" $ do
-      it "should reject the wrong ip" $ shouldReject (key1, ip4)
-      it "should accept the right ip with the wrong key" $ shouldAccept (key4, ip2)
-
-    describe "PubkeyOnly" $ do
-      it "should reject the wrong key" $  shouldReject (key4, ip1)
-      it "should accept the right key with the wrong ip" $ shouldAccept (key2, ip4)
-
-    describe "X509Only" $ do
-      it "should reject a revoked cert" $  shouldReject (key1, ip1)
-      it "should approve a valid cert" $  shouldAccept (key2, ip2)
-
-    describe "StrongAuth" $ do
-      it "should reject a mismatched ip, key pair" $  shouldReject (key3, ip2)
-      it "should accept a matching ip, key pair" $  shouldAccept (key3, ip3)
-
-    describe "FlexibleAuth" $ do
-      it "should reject a wrong ip and wrong key" $  shouldReject (key4, ip4)
-      it "should accept a matching ip" $  shouldAccept (key4, ip1)
-      it "should accept a matching key" $  shouldAccept (key2, ip4)
-
     describe "X.509 Private Chain exchange" $ do
       it "can add an organization to a private chain" $ do
           let unseqSink = (unseqEvents %=) . (++)

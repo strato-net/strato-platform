@@ -574,7 +574,7 @@ shouldSendGossip peer txo = recordGossipFinal
 --   => PPeer
 --   -> ChainMembers
 --   -> m Bool
--- checkPeerIsMember = checkPeerIsMember' flags_privateChainAuthorizationMode
+-- checkPeerIsMember = checkPeerIsMember'
 
 checkPeerIsMember :: (MonadLogger m, Selectable Address X509CertInfoState m )
   => PPeer

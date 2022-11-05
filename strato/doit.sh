@@ -92,9 +92,6 @@ function newnode {
   if [ -n "${averageTxsPerBlock}" ]; then
     atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
   fi
-  if [ -n "${privateChainAuthorizationMode}" ]; then
-    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
-  fi
   if [ -n "${participationMode}" ]; then
     pmFlag="--participationMode=${participationMode}"
   fi
