@@ -59,7 +59,8 @@ class CreateChain extends Component {
         members.push({
           "orgName": member.orgName,
           "orgUnit": member.orgUnit,
-          "commonName": member.commonName
+          "commonName": member.commonName,
+          "access": member.access
 
         });
       });
@@ -112,7 +113,8 @@ class CreateChain extends Component {
       members: curMembers.concat({
         orgName: state.orgName,
         orgUnit: state.orgUnit,
-        commonName: state.commonName
+        commonName: state.commonName,
+        access: state.access
       })
     });
   }
@@ -137,10 +139,10 @@ class CreateChain extends Component {
               <span>{member.orgName
                        ? member.orgUnit
                          ? member.commonName
-                           ? `${member.commonName} from ${member.orgUnit} at ${member.orgName}`
-                           : `Everyone from ${member.orgUnit} at ${member.orgName}`
-                         : `Everyone at ${member.orgName}`
-                       : 'Everyone'
+                           ? `${member.access ? 'Include' : 'Exclude'} ${member.commonName} from ${member.orgUnit} at ${member.orgName}`
+                           : `${member.access ? 'Include' : 'Exclude'} everyone from ${member.orgUnit} at ${member.orgName}`
+                         : `${member.access ? 'Include' : 'Exclude'} everyone at ${member.orgName}`
+                       : `${member.access ? 'Include' : 'Exclude'} everyone`
               }</span>
             </div>
             <div className="col-sm-2">

@@ -18,6 +18,7 @@ class AddMember extends Component {
       orgName: ``,
       orgUnit: ``,
       commonName: ``,
+      access: true,
       errors: null
     }
   }
@@ -48,6 +49,12 @@ class AddMember extends Component {
     });
   }
 
+  handleAccessChange(event) {
+    this.setState({
+      access: event.target.value
+    });
+  }
+
   errorMessageFor(fieldName) {
     if (this.state.errors && this.state.errors[fieldName]) {
       return this.state.errors[fieldName];
@@ -59,7 +66,8 @@ class AddMember extends Component {
     let data = {
       orgName: this.state.orgName,
       orgUnit: this.state.orgUnit,
-      commonName: this.state.commonName
+      commonName: this.state.commonName,
+      access: this.state.access
     }
     
     let errors = validate(data);
@@ -160,6 +168,46 @@ class AddMember extends Component {
                       required
                     />
                     <br /><span className="error-text">{this.errorMessageFor('commonName')}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Access
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="form-width">
+                  <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={true}
+                      label='Add'
+                      checked={this.state.access === true}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:true };
+                        });
+                      }}
+                    /> Add
+                  <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={false}
+                      label='Remove'
+                      checked={this.state.access === false}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:false };
+                        });
+                      }}
+                    /> Remove
+                    <br /><span className="error-text">{this.errorMessageFor('access')}</span>
                   </div>
                 </div>
               </div>

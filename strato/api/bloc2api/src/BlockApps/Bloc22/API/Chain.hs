@@ -109,7 +109,19 @@ exampleChainMember1 :: ChainMemberParsedSet
 exampleChainMember1 = CommonName "BlockApps" "Engineering" "David Nallapu" True
                      
 exampleChainMember2 :: ChainMemberParsedSet
-exampleChainMember2 = CommonName "BlockApps" "Engineering" "Dustin Norwood" True
+exampleChainMember2 = CommonName "BlockApps" "Engineering" "Dustin Norwood" False
+
+exampleChainMember3 :: ChainMemberParsedSet
+exampleChainMember3 = Org "BlockApps" True
+                    
+exampleChainMember4 :: ChainMemberParsedSet
+exampleChainMember4 = Org "Bayer"  False
+
+exampleChainMember5 :: ChainMemberParsedSet
+exampleChainMember5 = OrgUnit "BlockApps" "Engineering" True
+                     
+exampleChainMember6 :: ChainMemberParsedSet
+exampleChainMember6 = OrgUnit "BlockApps" "Product" False
                             
 exChainInput :: ChainInput
 exChainInput = ChainInput
@@ -118,14 +130,18 @@ exChainInput = ChainInput
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map (NamedTuple @"address" @"balance") [
-         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
+        (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+      , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
+      , (Address 0x93fdd1d21502c4f87395771253f5b71d897d911c, (999999 :: Integer))
+      , (Address 0x93fdd1d21502c4f87495771253f5b71d897d911c, (999999 :: Integer))
+      , (Address 0x93fdd1d21502c4f87595771253f5b71d897d911c, (999999 :: Integer))
+      , (Address 0x93fdd1d21502c4f87695771253f5b71d897d911c, (999999 :: Integer))
        ]
     , chaininputArgs = Map.fromList [
          ("addRule", ArgString "AUTO_APPROVE")
        , ("removeRule", ArgString "AUTO_APPROVE")
        ]
-    , chaininputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2])
+    , chaininputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2, exampleChainMember3, exampleChainMember4, exampleChainMember5, exampleChainMember6])
     , chaininputParentChain = Nothing
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
     , chaininputAsync = Nothing
@@ -169,8 +185,12 @@ exChainOutput = ChainOutput
   , chainoutputBalances = map (NamedTuple @"address" @"balance") [
       (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
     , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
+    , (Address 0x93fdd1d21502c4f87395771253f5b71d897d911c, (999999 :: Integer))
+    , (Address 0x93fdd1d21502c4f87495771253f5b71d897d911c, (999999 :: Integer))
+    , (Address 0x93fdd1d21502c4f87595771253f5b71d897d911c, (999999 :: Integer))
+    , (Address 0x93fdd1d21502c4f87695771253f5b71d897d911c, (999999 :: Integer))
     ]
-  , chainoutputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2])
+  , chainoutputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2, exampleChainMember3, exampleChainMember4, exampleChainMember5, exampleChainMember6])
   }
 
 instance ToSample ChainOutput where
