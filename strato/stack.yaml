@@ -86,6 +86,7 @@ extra-deps:
 - bytestring-arbitrary-0.1.3@sha256:14db64d4fe126fbad2eb8d3601bfd80a693f3131e2db0e76891feffe44f10df8,1773
 - global-lock-0.1@sha256:b7affe140763f53f17fd9c937dfe9b8023c7d209216fb3793933957e49a7446f,1327
 - hflags-0.4.3@sha256:f6b85fc7cbd170787f49225646e62d5589e5dd75abe6f26d16287e5fff3e678e,3121
+- json-0.10@sha256:d9fc6b07ce92b8894825a17d2cf14799856767eb30c8bf55962baa579207d799,3210
 - json-rpc-client-0.2.5.0@sha256:f1ba95a8c8eb25865d34e7d8cc0eca33447e34d114d8b28ea8ece1bde23b6ea7,5343
 - json-rpc-server-0.2.6.0@sha256:be5f936ab08e837fc17de6fc6ea0766e6e6b40676707e63333f3caf7e459e231,3585
 - json-stream-0.4.4.1@sha256:272cd4aed5d0d9c97978620c1435cd91acaa39c8bddb28cbace9284f58ddc364,4985
@@ -96,7 +97,6 @@ extra-deps:
 - servant-multipart-client-0.12.1@sha256:fdaeea6a7e3b5459321520606a5dc0be55e16ebc3abe245fddb14df8a34a08cb,1976
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - servant-swagger-tags-0.1.0.1@sha256:2d743e9ad1cfcca537acc99e0b97e0e4feda3b5c842937dbf5895261e3105bf1,1094
-- ghc-bignum-1.2@sha256:5a5725f5aeff2d6ddd0022a009bb3a87d6ac4bbfd02e88dcd93ded2b13e1475b,2788
 
 
 #- git: https://github.com/blockapps/milena

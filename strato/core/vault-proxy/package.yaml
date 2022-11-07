@@ -27,16 +27,19 @@ dependencies:
 - bytestring
 - cache
 - clock
-- ghc-bignum
+- exceptions
 - hflags
 - hoauth2
 - hspec
 - http-client
 - http-client-tls
 - http-conduit
+- json
 - lens
+- modern-uri
 - network-uri
 - old-time
+- req
 - scientific
 - servant
 - servant-client
@@ -47,6 +50,7 @@ dependencies:
 - time
 - uri-bytestring
 - utf8-string
+- yesod-core
 
 ghc-options:
 - -Wall

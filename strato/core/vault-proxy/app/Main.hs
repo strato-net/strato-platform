@@ -5,23 +5,23 @@
 
 module Main (main) where
 
-import BlockApps.Init
-import Control.Monad
+-- import BlockApps.Init
+-- import Control.Monad
 -- import Control.Monad.IO.Class
 -- import Data.ByteString                   as BS
 -- import Data.ByteString.UTF8              (toString)
 import Data.Cache
 import qualified Data.Text               as T
-import Debug.Trace
-import VaultProxyLib
+-- import Debug.Trace
+-- import VaultProxyLib
 import HFlags
 -- import Control.Concurrent
 -- import Control.Concurrent.STM
 -- import Control.Lens
-import Network.HTTP.Client
-import Network.HTTP.Conduit
+-- import Network.HTTP.Client
+-- import Network.HTTP.Conduit
 -- import Servant
-import Servant.Client
+-- import Servant.Client
 -- import URI.ByteString
 -- import Servant.Client.Core
 
@@ -40,28 +40,30 @@ defineFlag "oidcGrantType" ("client_credentials" :: T.Text) "The grant type for 
 main :: IO ()
 --initialize the vault proxy with the new flags
 main = do 
-    blockappsInit "vault-proxy"
-    _ <- $initHFlags "Vault Proxy"
+    pure undefined
+    -- blockappsInit "vault-proxy"
+    -- _ <- $initHFlags "Vault Proxy"
     --Throw error when the OAUTH is not enabled, not totally sure what to do when that happens
-    unless flags_OAUTH_ENABLED $ error "OAUTH is not enabled"
-    --open a new network manager connection as we are in a new executable
-    --ntmgr <- newManager defaultManagerSettings
-    --Make an STM variable to allow for many processes to obtain the same token
-    --Store the raw oauthToken, not just the access token
-    mngr <- newManager tlsManagerSettings --Not sure if this is the right manager due to large use of HTTPS connections
-    -- extraTokenStuff :: [ (ByteString, ByteString) ]
-    -- let extraTokenStuff :: BlockAppsTokenRequest
-        -- extraTokenStuff = [("grant_type", flags_oidcGrantType)]
-    -- url <- (parseBaseUrl $ T.unpack flags_oidcUrl)
-    ourl <- (parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL)
-    rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
-    noErrorOauth <- case rawOauthInfo of
-        Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
-        Right val -> return val
-    virginToken <- getVirginToken mngr flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth --Might decide to add flags_OAUTH_DISCOVERY_URL back to the mix later
-    --Save the access token in a TVar
-    traceM "virgin"
-    traceShowM virginToken 
+    -- unless flags_OAUTH_ENABLED $ error "OAUTH is not enabled"
+    -- --open a new network manager connection as we are in a new executable
+    -- --ntmgr <- newManager defaultManagerSettings
+    -- --Make an STM variable to allow for many processes to obtain the same token
+    -- --Store the raw oauthToken, not just the access token
+    -- mngr <- newManager tlsManagerSettings --Not sure if this is the right manager due to large use of HTTPS connections
+    -- -- extraTokenStuff :: [ (ByteString, ByteString) ]
+    -- -- let extraTokenStuff :: BlockAppsTokenRequest
+    --     -- extraTokenStuff = [("grant_type", flags_oidcGrantType)]
+    -- -- url <- (parseBaseUrl $ T.unpack flags_oidcUrl)
+    -- ourl <- (parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL)
+    -- rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
+    -- noErrorOauth <- case rawOauthInfo of
+    --     Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
+    --     Right val -> return val
+
+    -- virginToken <- getVirginToken mngr flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth --Might decide to add flags_OAUTH_DISCOVERY_URL back to the mix later
+    -- --Save the access token in a TVar
+    -- traceM "virgin"
+    -- traceShowM virginToken 
         -- res <- runClientM 
         --         (connectToken flags_oidcUrl flags_oidcAuthorization extraTokenStuff)
         --         (mkClientEnv mngr url)

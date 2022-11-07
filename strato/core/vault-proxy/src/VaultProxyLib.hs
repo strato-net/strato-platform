@@ -13,7 +13,7 @@ module VaultProxyLib
     --   refreshToken,
     --   notBeforePolicy,
     --   sessionState,
-    --   scope,
+    --   scone,
       RawOauth(..),
       authorization_endpoint,
       token_endpoint,
@@ -27,7 +27,7 @@ module VaultProxyLib
     --   getVaultToken,
       getVirginToken,
     --   getAccessToken,
-      connectToken,
+    --   connectToken,
       connectRawOauth
     ) where
 
@@ -36,9 +36,11 @@ import           Control.Concurrent.STM
 import           Data.Cache               as C
 import           Control.Lens
 -- import           Control.Monad
-import           Control.Monad.Except
--- import           Control.Monad.IO.Class
+import           Control.Monad.Catch
+-- import           Control.Monad.Except
+import           Control.Monad.IO.Class
 import           Data.Aeson  
+-- import           Data.Aeson.Lens
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
 -- import           Data.ByteString         as BS
@@ -52,18 +54,25 @@ import           Data.Text.Encoding      as TE
 -- import           Data.Time.Clock
 -- import           Data.Time.Clock.System
 import           GHC.Generics
-import           GHC.Num.Integer
+-- import           GHC.Num.Integer
 -- import           HFlags
-import           Network.HTTP.Client     hiding (Proxy)
+import           Network.HTTP.Client     as HTC hiding (Proxy)
+import           Network.HTTP.Req        as R
+-- import           Network.Wreq            as W
 -- import           Network.HTTP.Client.TLS
-import           Network.OAuth.OAuth2    as OA  hiding (error)
+-- import           Network.OAuth.OAuth2    as OA  hiding (error)
 -- import           Network.OAuth.OAuth2.Internal as OAI hiding (error)
 -- import           Network.URI
-import           Servant.API
+import           Servant.API             as SA
 import           Servant.Client
-import           URI.ByteString          as UB
+-- import           Text.JSON               as J
+import           Text.URI                as URI
+-- import           URI.ByteString          as UB
 import           Data.ByteString.Base64
 import           System.Clock
+import           Yesod.Core.Types        as YC
+-- import           Yesod.Core.Content      as YCC
+-- import           System.Clock
 -- import           System.Environment
 
 
@@ -96,11 +105,11 @@ instance FromJSON RawOauth where
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
     _accessToken :: T.Text,
-    _expiresIn :: Integer,
-    _refreshExpiresIn :: Integer,
+    _expiresIn :: Int,
+    _refreshExpiresIn :: Int,
     _refreshToken :: T.Text,
     _tokenType :: T.Text,
-    _notBeforePolicy :: Integer,
+    _notBeforePolicy :: Int,
     _sessionState :: T.Text,
     _scope :: T.Text
 } deriving (Eq, Show, Generic)
@@ -161,21 +170,21 @@ instance FromJSON VaultToken where
 --------------------------------------------------------------------------------
 --Types
 --------------------------------------------------------------------------------
-type ContentType = T.Text
+type ContentType' = T.Text
 type Authorization = T.Text
 type BlockAppsTokenRequest = [(T.Text, T.Text)]
 -- type AccessToken = (ClientM VaultToken, Int64)
 
 type InitialCallForTokenLinkAPI =
-    Get '[JSON] RawOauth
+    Get '[SA.JSON] RawOauth
 
 type BlockAppsTokenAPI = 
-  Header "Content-Type" ContentType
-  :> Header "Authorization" Authorization
-  :> ReqBody '[JSON] BlockAppsTokenRequest
-  :> Get '[JSON] VaultToken
+  SA.Header "Content-Type" ContentType'
+  :> SA.Header "Authorization" Authorization
+  :> ReqBody '[SA.JSON] BlockAppsTokenRequest
+  :> Get '[SA.JSON] VaultToken
 
-type OauthCache = Cache T.Text OAuth2Token
+type VaultCache = Cache T.Text VaultToken
 
 --------------------------------------------------------------------------------
 --Functions
@@ -183,34 +192,24 @@ type OauthCache = Cache T.Text OAuth2Token
 
 --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
 --User never really needs to use this function, it is mostly called by getAwesomeToken 
-getVirginToken :: MonadIO m => Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token --OAuth2Token ---Might need to include the discovery URL later
-getVirginToken manny clientId clientSecret additionalOauth = do --virginToken
-
-    let authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 (additionalOauth ^. authorization_endpoint)) of 
-            Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
-            Right uri -> uri
-        tokenEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 (additionalOauth ^. token_endpoint)) of 
-            Left _ -> error "Could not parse the token endpoint, This is probably a fault of the token provider, please contact your network administration."
-            Right uri -> uri
-        oa = OAuth2 {
-            oauthClientId = clientId,
-            oauthClientSecret = Just clientSecret,
-            oauthOAuthorizeEndpoint = authEnd,
-            oauthAccessTokenEndpoint = tokenEnd,
-            oauthCallback = Nothing
-        }
-        exchangeToken = ExchangeToken $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-    super <- runExceptT $ liftIO $ OA.fetchAccessToken manny oa exchangeToken
-    --13
-    attttttttttttt <- case super of 
-            Left _ -> error "Had some difficulty connecting to the OAuth Provider, it is likely a network problem."
-            Right tok -> case tok of
-                Left err -> error ("Had some difficulty connecting to the OAuth Provider, likely administative." ++ show err)
-                Right toks -> pure toks
-    pure attttttttttttt
+getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> m VaultToken --OAuth2Token ---Might need to include the discovery URL later
+getVirginToken clientId clientSecret additionalOauth = do --virginToken
+    --Conver the token endpoint to a URI
+    uri <- URI.mkURI $ additionalOauth ^. token_endpoint
+    --Encode all of the parameters, get ready to send to server
+    let (url, _) = fromJust (useHttpsURI $ uri)
+        authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        contType = header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
+        urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
+    --Connect to the server
+    makeHttpCall <- runReq defaultHttpConfig $ do
+        response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
+        pure response
+    --Convert the server response to the VaultToken type
+    pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 --This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: MonadIO m => Maybe OauthCache -> Manager -> T.Text -> T.Text -> RawOauth -> m OAuth2Token
+getAwesomeToken :: (STM m, MonadIO m) => Maybe VaultCache -> Manager -> T.Text -> T.Text -> RawOauth -> m VaultToken
 getAwesomeToken squirrel manny clientId clientSecret additionalOauth = do
     --Make a new token if needed TODO: Fix the types, ensure both are of the STM variety
     --Used to initilize the token if needed
@@ -245,28 +244,18 @@ getAwesomeToken squirrel manny clientId clientSecret additionalOauth = do
     pure finalToken
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
-makeExpry :: MonadIO m => m TimeSpec 
+makeExpry :: MonadIO m => VaultToken -> m TimeSpec 
 --Make the expry negative if the token does not have the expiresIn field set, this will force a new token to be made always
     --Not sure if this will really occur, but it is a good safety net 🕸️
 makeExpry token = do 
-    timey <- liftIO $ getTime Monotonic
-    let tim :: Integer
-        tim = toNanoSecs (timey)
+    whatTimeIsIt <- liftIO $ getTime Monotonic
+    let nanoTime :: Integer
+        nanoTime = toNanoSecs (whatTimeIsIt)
         tokenExpry :: Integer
-        tokenExpry = integerFromInt $ fromMaybe 0 (OA.expiresIn token)
+        tokenExpry = integerFromInt $ fromMaybe 0 (token ^. expiresIn)
         expry :: TimeSpec
-        expry = fromNanoSecs ( tim + (tokenExpry - 13) * 1000000000)
+        expry = fromNanoSecs ( nanoTime + (tokenExpry - 13) * 1000000000)
     pure expry
-    --Check if the token is still valid
-    -- validToken <- case token of
-    --     Nothing -> pure False
-    --     Just tok -> do
-    --         let expTime = tok ^. OA.tokenExpiresIn
-    --         currentTime <- liftIO $ getCurrentTime
-    --         pure $ expTime > currentTime
-    -- pure validToken 
-    --If the token is not valid, get a new one
-
 
 --------------------------------------------------------------------------------
 --Functions
@@ -280,14 +269,14 @@ blockappsTokenApi = Proxy
 getRawOauth :: ClientM RawOauth
 getRawOauth = client rawOAuthAPI
 
-getToken :: Maybe T.Text -> Maybe T.Text -> [(T.Text, T.Text)] -> ClientM VaultToken
-getToken = client blockappsTokenApi
+-- getToken :: Maybe T.Text -> Maybe T.Text -> [(T.Text, T.Text)] -> ClientM VaultToken
+-- getToken = client blockappsTokenApi
 
 connectRawOauth :: ClientM RawOauth
 connectRawOauth = getRawOauth
 
-connectToken :: ContentType -> Authorization -> BlockAppsTokenRequest -> ClientM VaultToken
-connectToken ct a bt = getToken ct' a' bt
-    where
-        ct' = Just ct
-        a' = Just a
+-- connectToken :: ContentType -> T.Text -> BlockAppsTokenRequest -> ClientM VaultToken
+-- connectToken ct a bt = getToken ct' a' bt
+--     where
+--         ct' = Just ct
+--         a' = Just a
