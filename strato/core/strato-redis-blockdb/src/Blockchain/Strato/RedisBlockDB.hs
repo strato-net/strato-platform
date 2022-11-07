@@ -115,7 +115,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateIPChains      -> "pic:"
             PrivateOrgIdChains   -> "poc:"
             PrivateOrgNameChains -> "pnc:"
-            Validators           -> "v:"
+            -- Validators           -> "v:"
             X509Certificates     -> "x509:"
             X509Initialized      -> "x509init:"
 
@@ -128,7 +128,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
-  "v" -> Validators
+  -- "v" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
