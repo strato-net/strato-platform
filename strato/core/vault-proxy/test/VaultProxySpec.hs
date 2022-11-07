@@ -81,5 +81,5 @@ spec = do
     it "can properly expire a token and retreive a new one." $ do 
       True `shouldBe` True
     
-    it "can properly give someone the token if requested." $ do
+    it "can properly give something the token if requested." $ do
       True `shouldBe` True
