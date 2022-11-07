@@ -110,8 +110,8 @@ blocVaultWrapper client' = do
 getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError Address)
 getPubKey mAccessToken =
   case mAccessToken of
-    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header"
-    Just accessToken  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  accessToken Nothing
+    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" -- This may not be needed
+    Just _  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  "nodekey" Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
 checkIsSynced = (runStratoRedisIO getSyncStatus) >>= \case Nothing -> pure False; Just c ->pure  c; 

@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds         #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
     , indexAPI
@@ -53,16 +54,11 @@ indexAPI :: ( MonadLogger m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
-  let txs = [tx | IndexTransaction _ tx <- idxEvents]
-      chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
-      blocks = [b | RanBlock b <- idxEvents]
+  let (txs, chainInfos, blocks, validatorAddresses) = filterHelper idxEvents ([],[],[],[])
       insertCount = length blocks
-      validatorAddresses =  [ x | ValidatorsG x <- idxEvents]
-   
   _ <- if validatorAddresses == []
     then  pure  ()
-    else  
-      forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
+    else  forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
 
@@ -70,6 +66,17 @@ indexAPI idxEvents = do
   when (insertCount > 0) $ do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
     A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
+  where
+
+    filterHelper :: [IndexEvent] -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])]) -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])])
+    filterHelper (indxEv:xs) (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs) = 
+      case indxEv of  
+        IndexTransaction _ tx  -> filterHelper xs  (tx : indexTransactions,  newChainInfos, ranBlocksLs, validatorLs)
+        NewChainInfo cId cInfo -> filterHelper xs  (indexTransactions,  (cId, cInfo) : newChainInfos, ranBlocksLs, validatorLs)
+        RanBlock b             -> filterHelper xs  (indexTransactions,  newChainInfos, b : ranBlocksLs, validatorLs)
+        ValidatorsG x          -> filterHelper xs  (indexTransactions,  newChainInfos, ranBlocksLs, x:validatorLs)
+        _ -> filterHelper xs (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs)
+    filterHelper [] a = a
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")

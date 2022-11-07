@@ -1,4 +1,4 @@
-#strato-version:7.9.0-0de4affbb
+#strato-version:7.9.0-6280c1b58
 #strato-getting-started-min-version:2.7
 version: "3"
 volumes:
@@ -25,7 +25,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - NODE_NAME=${NODE_NAME}
     - ssl=${ssl:-false}
-    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.9.0-0de4affbb}
+    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.9.0-6280c1b58}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -51,7 +51,7 @@ services:
     - STATS_SUBMIT_CONTRACT_TYPES_ENABLED=${STATS_SUBMIT_CONTRACT_TYPES_ENABLED}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
-    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.9.0-0de4affbb}
+    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.9.0-6280c1b58}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -80,7 +80,7 @@ services:
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
-    image: ${VAULTWRAPPER_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.9.0-0de4affbb}
+    image: ${VAULTWRAPPER_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.9.0-6280c1b58}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -167,7 +167,7 @@ services:
     - zkHost=zookeeper
     - EVM_COMPATIBLE=${EVM_COMPATIBLE}
     - indexEVM=${indexEVM:-false}
-    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.9.0-0de4affbb}
+    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.9.0-6280c1b58}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -190,7 +190,7 @@ services:
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
-    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.9.0-0de4affbb}
+    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.9.0-6280c1b58}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -253,7 +253,7 @@ services:
     - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     - vmDebug=${vmDebug}
-    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-0de4affbb}
+    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-6280c1b58}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
@@ -312,7 +312,7 @@ services:
   prometheus:
     environment:
       - NODE_HOST=${NODE_HOST}
-    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.9.0-0de4affbb}
+    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.9.0-6280c1b58}
     volumes:
     - prometheusdata:/prometheus
     restart: unless-stopped
