@@ -304,10 +304,6 @@ blockstanbulSend' msg = do
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
            ++ vms
-      -- p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-      --       ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
-      --       ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
-      -- ckpts = [ck | NewCheckpoint ck <- resp]
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -330,9 +326,9 @@ blockstanbulSend' msg = do
       case x of 
          ListOfValidators toDrop toAdd -> (VmValidatorList toDrop toAdd : vms, p2ps, ctxs)
          PendingVote r d s             -> (VmVoteToMake r d s : vms, p2ps, ctxs)
-         OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m):  p2ps  , ctxs)
-         GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p) :  p2ps  , ctxs) 
-         LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p) :  p2ps  , ctxs)
+         OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m) : p2ps, ctxs)
+         GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
+         LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
          NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
          _                             -> (vms,  p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([],[], [])
