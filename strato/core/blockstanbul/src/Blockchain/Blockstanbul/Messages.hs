@@ -161,7 +161,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
-              | ListOfValidators [Address] [Address] --Let is remove right is add to current validator list
+              | ListOfValidators [Address] [Address] --Left list is remove right list is add to current validator list
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
