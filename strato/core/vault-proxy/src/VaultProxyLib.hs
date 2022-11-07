@@ -187,62 +187,15 @@ getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> 
 getVirginToken clientId clientSecret additionalOauth = do --virginToken
     uri <- URI.mkURI $ additionalOauth ^. token_endpoint
     let (url, _) = fromJust (useHttpsURI $ uri)
-        -- authEnd = case (UB.parseURI UB.strictURIParserOptions $ TE.encodeUtf8 $ additionalOauth ^. authorization_endpoint) of 
-        --     Left _ -> error "Could not parse the authorization endpoint, This is probably a fault of the token provider, please contact your network administration."
-        --     Right uri -> uri
-        
-        -- oa = OAuth2 {
-        --     oauthClientId = clientId,
-        --     oauthClientSecret = Just clientSecret,
-        --     oauthOAuthorizeEndpoint = authEnd,
-        --     oauthAccessTokenEndpoint = tokenEnd,
-        --     oauthCallback = Nothing
-        -- }
-        -- exchangeToken = ExchangeToken $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-    -- super <- runExceptT $ liftIO $ OA.fetchAccessToken manny oa exchangeToken
-    --Make a req call to the server
     let authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
         contType = header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
-        -- reqBody = 
-    -- let reqBody = [ ("grant_type", "client_credentials") ]
-    -- let vaulty :: VaultToken
-    --     vaulty = VaultToken "access_token" 0 0 "refresh_token" "token_type" 0 "session_state" "scope"
-    
 
-    -- request <- parseUrlThrow ("POST " additionalOauth ^. token_endpoint
-    -- response <- urlEncodedBody [(, )] rlll
-    -- finalReq <- reqBody response
-    -- let tttt :: T.Text
-    --     tttt =  R.req R.POST url NoReqBody (jsonResponse) (authHeadr <> contType ) 
-    re1 <- runReq defaultHttpConfig $ do
+    makeHttpCall <- runReq defaultHttpConfig $ do
         response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
         pure response
-    let deq1 = HTC.responseBody $ toVanillaResponse re1
     
-    pure deq1
-    -- urll :: String 
-    -- req <- 
-    -- r <- W.post urll (toJSON)
-    -- let deqRes :: VaultToken
-    --     aatt = response ^. R.responseBody . key "access_token" . _String
-    --     eei = response ^. R.responseBody . key "expires_in" . _Integer
-    --     rrei = response ^. R.responseBody . key "refresh_expires_in" . _Integer
-    --     rrtt = response ^. R.responseBody . key "refresh_token" . _String
-    --     tttt = response ^. R.responseBody . key "token_type" . _String
-    --     nbpp = response ^. R.responseBody . key "not-before-policy" . _Integer
-    --     sstt = response ^. R.responseBody . key "session_state" . _String
-    --     scc = response ^. R.responseBody . key "scope" . _String
-    --     deqRes = VaultToken aatt eei rrei rrtt tttt nbpp sstt scc
-            
-    -- pure deqRes
-        
-    --13
-    -- attttttttttttt <- case super of 
-    --         Left _ -> error "Had some difficulty connecting to the OAuth Provider, it is likely a network problem."
-    --         Right tok -> case tok of
-    --             Left err -> error ("Had some difficulty connecting to the OAuth Provider, likely administative." ++ show err)
-    --             Right toks -> pure toks
+    pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 
 
