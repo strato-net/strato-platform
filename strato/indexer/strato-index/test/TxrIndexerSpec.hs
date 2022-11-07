@@ -52,7 +52,7 @@ spec = do
                 parsedCert = fromRight (error "Couldn't parse certString") $ bsToCert $ C8.pack $ certString
                 addr = fromInteger 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[], BlockApps.X509.Certificate.orgName="BlockApps", BlockApps.X509.Certificate.orgUnit=Just "Engineering", BlockApps.X509.Certificate.commonName= "David N"})]
+                `shouldBe` [PutEventDB event, RegisterCertificate $ Right ((Account 0xdeadbeef Nothing), addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[], BlockApps.X509.Certificate.orgName="BlockApps", BlockApps.X509.Certificate.orgUnit=Just "Engineering", BlockApps.X509.Certificate.commonName= "Admin"})]
         it "Index EventDB for CertificateRevoked" $
             let userAddr = fromInteger 0x489384
                 event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRevoked" [show userAddr]
@@ -69,21 +69,21 @@ spec = do
                 `shouldBe` [PutEventDB event]
         it "Index EventDBEntry for OrganizationAdded (one argument)" $
             let cId   = fromInteger 0x42069
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["BlockApps"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, AddOrgName $ Right (cId,  ( (Org (T.pack "BlockApps") True) )) ] 
         it "Index EventDBEntry for OrganizationAdded (two arguments)" $
             let cId   = fromInteger 0x22222
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["blockapps", "sales"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["BlockApps", "Sales"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ( (OrgUnit (T.pack "BlockApps") (T.pack "Sales") True)))] 
         it "Index EventDBEntry for OrganizationRemoved (one argument)" $
             let cId   = fromInteger 0x33333
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["BlockApps"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId,  ((Org (T.pack "BlockApps") False)))] 
         it "Index EventDBEntry for OrganizationRemoved (two arguments)" $
             let cId   = fromInteger 0x11111
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["blockapps", "engineering"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["BlockApps", "Sales"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ((OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)))] 

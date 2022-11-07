@@ -140,7 +140,7 @@ data TestContext = TestContext
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
-  , _chainMembersMap       :: Map Word256 ChainMembers
+  , _chainMembersMap       :: Map Word256 ChainMemberRSet
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
   , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
@@ -218,7 +218,7 @@ instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (MonadTest m) where
+instance MonadIO m => A.Selectable Word256 ChainMemberRSet (MonadTest m) where
   select _ cid = M.lookup cid <$> use chainMembersMap
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
@@ -307,7 +307,7 @@ instance A.Selectable OrgId OrgIdChains m => A.Selectable OrgId OrgIdChains (Mon
 instance A.Selectable Keccak256 ChainTxsInBlock m => A.Selectable Keccak256 ChainTxsInBlock (MonadP2PTest m) where
   select p sha = lift $ A.select p sha
 
-instance A.Selectable Word256 ChainMembers m => A.Selectable Word256 ChainMembers (MonadP2PTest m) where
+instance A.Selectable Word256 ChainMemberRSet m => A.Selectable Word256 ChainMemberRSet (MonadP2PTest m) where
   select p cid = lift $ A.select p cid
 
 instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (MonadP2PTest m) where
@@ -734,7 +734,7 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainInfo) (MonadTest m) where
 instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
-  insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
+  insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}

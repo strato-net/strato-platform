@@ -91,7 +91,7 @@ doAddOrgName chainId cm = do
        , format cm
        ]
   lift $ addMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain (ChainMembers $ S.singleton cm) chainId
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId (ChainMembers $ S.singleton cm)
   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
 doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
