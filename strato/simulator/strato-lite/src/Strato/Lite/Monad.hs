@@ -931,7 +931,6 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                         atomically $ do
                           writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
                           writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
-                          --writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                           writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                           traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
                      )
