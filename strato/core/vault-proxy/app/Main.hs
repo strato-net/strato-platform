@@ -10,7 +10,7 @@ module Main (main) where
 -- import Control.Monad.IO.Class
 -- import Data.ByteString                   as BS
 -- import Data.ByteString.UTF8              (toString)
-import Data.Cache
+-- import Data.Cache
 import qualified Data.Text               as T
 -- import Debug.Trace
 -- import VaultProxyLib
@@ -32,6 +32,7 @@ defineFlag "OAUTH_DISCOVERY_URL" ("" :: T.Text) "OAuth2 Discovery URL"
 defineFlag "OAUTH_JWT_USERNAME_PROPERTY" ("" :: T.Text) "OAuth2 JWT Username Property"
 defineFlag "OAUTH_CLIENT_ID" ("" :: T.Text) "OAuth2 Client ID"
 defineFlag "OAUTH_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Client Secret"
+defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
 defineFlag "oidcUrl" ("https://keycloak.blockapps.net/auth/realms/strato-devel/protocol/openid-connect/token" :: T.Text) "Url to get the open id connect token from"
 defineFlag "oidcContentType" ("application/x-www-form-urlencoded" :: T.Text) "The type of the connection from the oidc"
 defineFlag "oidcAuthorization" ("Basic ZGV2OmQ1ZTY3YjhjLTRmYmYtNDJjNi1hOGQ5LTI5YTRkZDEzNTc1Zg==" :: T.Text) "The long string used to authenticate the user from the open id connect"

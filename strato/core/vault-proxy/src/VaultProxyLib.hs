@@ -8,12 +8,14 @@
 --This is where most of the functions exist for the vault proxy
 module VaultProxyLib
     ( 
-    --   accessToken,
-    --   expiresIn,
-    --   refreshToken,
-    --   notBeforePolicy,
-    --   sessionState,
-    --   scone,
+      accessToken,
+      expiresIn,
+      refreshExpiresIn,
+      refreshToken,
+      tokenType,
+      notBeforePolicy,
+      sessionState,
+      scone,
       RawOauth(..),
       authorization_endpoint,
       token_endpoint,
@@ -23,9 +25,11 @@ module VaultProxyLib
       Authorization,
       ContentType,
       blockappsTokenApi,
+      VaultCache,
       VaultToken(..),
     --   getVaultToken,
       getVirginToken,
+      getAwesomeToken,
     --   getAccessToken,
     --   connectToken,
       connectRawOauth
@@ -33,7 +37,7 @@ module VaultProxyLib
 
 -- import           Control.Arrow
 import           Control.Concurrent.STM
-import           Data.Cache               as C
+
 import           Control.Lens
 -- import           Control.Monad
 import           Control.Monad.Catch
@@ -44,7 +48,8 @@ import           Data.Aeson
 import           Data.Aeson.Types
 -- import           Data.Aeson.Casing  
 -- import           Data.ByteString         as BS
-import           Data.Cache
+import           Data.Cache               as C
+import           Data.Cache.Internal      as C
 -- import           Data.Int
 import           Data.Maybe
 import           Data.Proxy
@@ -105,13 +110,13 @@ instance FromJSON RawOauth where
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
     _accessToken :: T.Text,
-    _expiresIn :: Int,
-    _refreshExpiresIn :: Int,
+    _expiresIn :: Integer,
+    _refreshExpiresIn :: Integer,
     _refreshToken :: T.Text,
     _tokenType :: T.Text,
-    _notBeforePolicy :: Int,
+    _notBeforePolicy :: Integer,
     _sessionState :: T.Text,
-    _scope :: T.Text
+    _scone :: T.Text
 } deriving (Eq, Show, Generic)
 makeLenses ''VaultToken
 
@@ -155,7 +160,7 @@ instance FromJSON VaultToken where
         (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"session_state\", but got something different."
     --can't call it scope, so I called it scone, bon appetit
-    scone <- case sc of
+    sconce <- case sc of
         (String s) -> pure s
         (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
@@ -164,7 +169,7 @@ instance FromJSON VaultToken where
         refresh_expires_in  = Scientific.coefficient refreshexin
         expires_in          = Scientific.coefficient exprin
 --   parseJSON wat = typeMismatch "Spec" wat
-    return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state scone
+    return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
   parseJSON wat = typeMismatch "Spec" wat
 
 --------------------------------------------------------------------------------
@@ -209,52 +214,84 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
     pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 --This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: (STM m, MonadIO m) => Maybe VaultCache -> Manager -> T.Text -> T.Text -> RawOauth -> m VaultToken
-getAwesomeToken squirrel manny clientId clientSecret additionalOauth = do
-    --Make a new token if needed TODO: Fix the types, ensure both are of the STM variety
-    --Used to initilize the token if needed
-    oToken <- case squirrel of 
-        Nothing -> getVirginToken manny clientId clientSecret additionalOauth
-        Just o -> atomically $ do 
-            r <- lookupSTM True clientId squirrel (getTime Monotonic)
-            case r of 
-                --Cache is deleted if expired, make new cache and new token
-                Nothing -> atomically $ do
-                    newToken <- getVirginToken manny clientId clientSecret additionalOauth
-                    insertSTM clientId newToken squirrel
-                    pure newToken
+getAwesomeToken :: (MonadIO m, MonadThrow m) => VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
+    cache <- liftIO . atomically $ do 
+        now <- C.nowSTM
+        cash <- lookupSTM True clientId squirrel now
+        pure cash
 
-    --Retrieve the token if it is still valid, eagerly destroy if it is not valid
-    finalToken <- case stmCache of 
-        --return the token if it is still valid, it is purged for us automatically if it is not valid
-        Just tok -> pure tok
-        --Mint a new token from the OAuth provider if the old one is not valid
+    vaultToken <- case cache of 
+        Just c -> pure c
         Nothing -> do 
-            --Get a new token from OAuth provider
-            newToken <- getVirginToken manny clientId clientSecret additionalOauth
-            --Set the expry time to the current time + the expry time from the OAuth provider,
-            --then minus 13 seconds to ensure freshness of the token
-            expry <- makeExrpy newToken
-            --Insert the fresh token into the cache with the set expriration time
-            atomically $ do 
-                C.insertSTM clientId newToken squirrel (Just expry)
-                --Return the new Token, the item in cache can be referenced else where.
-                pure newToken
+            -- Get the Token from the provider
+            let vToken = getVirginToken clientId clientSecret additionalOauth
+            virToken <- vToken
+            --Calculate the time that the token will expire
+            exTime <- makeExpry virToken reserveTime
+            -- bitcoin <- newCacheSTM clientId virToken exTime
+            --Insert the token into the STM cache
+            liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
+            pure virToken
+    pure vaultToken
+    -- --Get the current time
+    -- now' <- liftIO $ getTime Monotonic
+    -- --Peak inside of the cache, and save it
+    -- -- cacheValue <- readTVarIO squirrel
+    -- --Destroy the cache if it is past the expry time
+    -- r <- atomically $ lookupSTM True clientId squirrel now'
+    -- --If the cache is empty, then it means that the cache expired, so make a new token
+    -- vaultToken <- case r of
 
-    pure finalToken
+    -- pure vaultToken
+
+    -- --Make a new token if needed TODO: Fix the types, ensure both are of the STM variety
+    -- --Used to initilize the token if needed
+    -- vaultToken <- case squirrel of 
+    --     Nothing -> pure $ getVirginToken clientId clientSecret additionalOauth
+    --     --Just get the value inside of the cache, don't make too much of a fuss and don't record in the transaction log
+    --         --readTVarIO just gets the value in the TVar, no need to record in the transaction log
+    --     Just o -> do
+
+    -- pure vaultToken
+
+                -- case r of 
+                -- --Cache is deleted if expired, make new cache and new token
+                --     Nothing -> atomically $ do
+                --         newToken <- getVirginToken manny clientId clientSecret additionalOauth
+                --         insertSTM clientId newToken squirrel
+                --         pure newToken
+    -- --Retrieve the token if it is still valid, eagerly destroy if it is not valid
+    -- finalToken <- case stmCache of 
+    --     --return the token if it is still valid, it is purged for us automatically if it is not valid
+    --     Just tok -> pure tok
+    --     --Mint a new token from the OAuth provider if the old one is not valid
+    --     Nothing -> do 
+    --         --Get a new token from OAuth provider
+    --         newToken <- getVirginToken manny clientId clientSecret additionalOauth
+    --         --Set the expry time to the current time + the expry time from the OAuth provider,
+    --         --then minus 13 seconds to ensure freshness of the token
+    --         expry <- makeExrpy newToken
+    --         --Insert the fresh token into the cache with the set expriration time
+    --         atomically $ do 
+    --             C.insertSTM clientId newToken squirrel (Just expry)
+    --             --Return the new Token, the item in cache can be referenced else where.
+    --             pure newToken
+
+    -- pure finalToken
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
-makeExpry :: MonadIO m => VaultToken -> m TimeSpec 
+makeExpry :: MonadIO m => VaultToken -> Int -> m TimeSpec 
 --Make the expry negative if the token does not have the expiresIn field set, this will force a new token to be made always
     --Not sure if this will really occur, but it is a good safety net 🕸️
-makeExpry token = do 
+makeExpry token reserveTime = do 
     whatTimeIsIt <- liftIO $ getTime Monotonic
     let nanoTime :: Integer
         nanoTime = toNanoSecs (whatTimeIsIt)
         tokenExpry :: Integer
-        tokenExpry = integerFromInt $ fromMaybe 0 (token ^. expiresIn)
+        tokenExpry =  token ^. expiresIn
         expry :: TimeSpec
-        expry = fromNanoSecs ( nanoTime + (tokenExpry - 13) * 1000000000)
+        expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
 --------------------------------------------------------------------------------
