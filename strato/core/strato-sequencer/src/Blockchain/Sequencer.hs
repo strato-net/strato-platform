@@ -299,13 +299,15 @@ blockstanbulSend' msg = do
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+  let (vms, p2pevs, ckpts) = vmEvenP2pCheckptFilterHelper resp
+  
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
-           ++ [VmVoteToMake r d s| PendingVote r d s <- resp] ++ [VmValidatorList toDrop toAdd | ListOfValidators toDrop toAdd <- resp]
-      p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-            ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
-            ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
-      ckpts = [ck | NewCheckpoint ck <- resp]
+           ++ vms
+      -- p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+      --       ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
+      --       ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
+      -- ckpts = [ck | NewCheckpoint ck <- resp]
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -321,6 +323,19 @@ blockstanbulSend' msg = do
   yieldMany $ ToP2p <$> p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldMany $ ToVm <$> vmevs
+  where 
+    vmEvenP2pCheckptFilterHelper :: [OutEvent] ->  ([VmEvent], [P2pEvent], [Checkpoint])
+    vmEvenP2pCheckptFilterHelper (x:xs) = do
+      let (vms, p2ps, ctxs) = vmEvenP2pCheckptFilterHelper xs
+      case x of 
+         ListOfValidators toDrop toAdd -> (VmValidatorList toDrop toAdd : vms, p2ps, ctxs)
+         PendingVote r d s             -> (VmVoteToMake r d s : vms, p2ps, ctxs)
+         OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m):  p2ps  , ctxs)
+         GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p) :  p2ps  , ctxs) 
+         LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p) :  p2ps  , ctxs)
+         NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
+         _                             -> (vms,  p2ps, ctxs)
+    vmEvenP2pCheckptFilterHelper [] = ([],[], [])
 
 privateWitnessableHash :: Keccak256 -> Keccak256 -> Keccak256
 privateWitnessableHash tHash cHash =
