@@ -83,6 +83,7 @@ tests:
       - integer-gmp
       - labeled-error
       - persistent
+      - Ranged-sets
       - secp256k1-haskell
       - strato-model
       - text

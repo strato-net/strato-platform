@@ -224,10 +224,7 @@ instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m)
   select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
 
 instance (MonadLogger m, MonadIO m) => A.Selectable Address X509CertInfoState (MonadTest m) where
-  select _ a = do
-    m <- use x509certMap
-    $logInfoS "x509certMap" . T.pack $ show m
-    pure $ M.lookup a m
+  select _ a = M.lookup a <$> use x509certMap
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
