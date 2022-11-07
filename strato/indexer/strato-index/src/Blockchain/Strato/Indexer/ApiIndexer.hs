@@ -56,18 +56,18 @@ indexAPI :: ( MonadLogger m
 indexAPI idxEvents = do
   let (txs, chainInfos, blocks, validatorAddresses) = filterHelper idxEvents ([],[],[],[])
       insertCount = length blocks
-  _ <- if validatorAddresses == []
-    then  pure  ()
-    else  forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
+
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
+
+  when (length validatorAddresses > 0) $ do forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
 
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $ do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
     A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
+  
   where
-
     filterHelper :: [IndexEvent] -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])]) -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])])
     filterHelper (indxEv:xs) (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs) = 
       case indxEv of  
