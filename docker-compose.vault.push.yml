@@ -1,7 +1,4 @@
 version: "3"
-volumes:
-  vaultpgdata:
-    driver: local
 services:
   vault-wrapper:
     depends_on:
@@ -15,7 +12,7 @@ services:
     - postgres_vault_wrapper_db=oauth
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
-    image: ${VAULTWRAPPER_IMAGE:-vault-wrapper:7.8.0-218161dc4}
+    image: ${VAULTWRAPPER_IMAGE:-vault-wrapper:7.8.0-6c913dfbf}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -29,7 +26,7 @@ services:
       - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
-      - vaultpgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     command:
       - "postgres"
       - "-c"

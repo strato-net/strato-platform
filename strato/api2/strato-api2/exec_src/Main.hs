@@ -44,7 +44,7 @@ hoistCoreServer sqlEnv = hoistServer (Proxy :: Proxy API) (convertErrors runM) s
     runM f =
       runLoggingT .
         runSQLMUsingEnv sqlEnv .
-        runVaultM "http://vault-wrapper:8000/strato/v2.3" $ f
+        runVaultM "http://vault-proxy:8000/strato/v2.3" $ f
 
 api :: Proxy API
 api = Proxy

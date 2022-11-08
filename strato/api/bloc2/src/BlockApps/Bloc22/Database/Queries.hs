@@ -368,8 +368,8 @@ instance FromField SecretBox.Nonce where
 
 instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
-instance Default ToFields UserName (Column PGText) where
-  def = lmap getUserName def
+instance Default ToFields JwtToken (Column PGText) where
+  def = lmap getJwtToken def
 
 instance Default ToFields StateMutability (Column PGText) where
   def = lmap tShow def

@@ -189,14 +189,14 @@ postChainInfo :: ( MonadIO m
                  , HasVault m
                  )
               => Maybe Text -> ChainInput -> m ChainId
-postChainInfo mUserName chainInput = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
-  Just userName -> withLastBlockHash $ \bHash -> do
+postChainInfo mJwtToken chainInput = case mJwtToken of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+  Just jwtToken -> withLastBlockHash $ \bHash -> do
     evmCompatibleOn <- fmap evmCompatible getBlocEnv
     if evmCompatibleOn
         then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
     else do
-        chainInfo' <- createChainInfo userName bHash chainInput
+        chainInfo' <- createChainInfo jwtToken bHash chainInput
         chainId <- CORE.postChain chainInfo'
         let isAsync = fromMaybe False $ chaininputAsync chainInput
         unless isAsync $ waitForChainInfo chainId
@@ -212,8 +212,8 @@ postChainInfos :: ( MonadIO m
                   , HasVault m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]
-postChainInfos mUserName chainInputs = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+postChainInfos mJwtToken chainInputs = case mJwtToken of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     chainIds <- postChains chainInfos

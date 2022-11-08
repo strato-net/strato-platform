@@ -24,7 +24,7 @@ import           BlockApps.X509.Certificate
 import           BlockApps.X509.Keys
 
 type CreateCertificate = "x509" :> "createCert"
-              :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+              :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
               :> ReqBody '[JSON] CreateCertEndpoint
               :> Get '[JSON] X509Certificate
 

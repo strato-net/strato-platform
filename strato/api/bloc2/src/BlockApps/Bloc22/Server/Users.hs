@@ -43,7 +43,7 @@ postUsersFill :: ( HasCoreAPI m
                  , HasSQL m
                  , HasBlocEnv m
                  )
-              => UserName  -> Address -> Bool -> m BlocTransactionResult
+              => JwtToken  -> Address -> Bool -> m BlocTransactionResult
 postUsersFill _ addr resolve = do
   shouldPost <- fmap gasOn getBlocEnv
   if shouldPost

@@ -23,7 +23,7 @@ ethereumDiscovery :: LoggingT IO ()
 ethereumDiscovery = do
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ flags_vaultWrapperUrl
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-proxy at " ++ flags_vaultWrapperUrl
   _ <- runResourceT $ do
     cxt <- initContextLite flags_vaultWrapperUrl
 
