@@ -1,27 +1,18 @@
 module VaultProxySpec (
   spec) where
 
-
 import VaultProxyLib
 
--- import Test.QuickCheck
--- import Control.Exception (evaluate)
--- import Control.Lens
 import Control.Concurrent.STM
 import Control.Monad.IO.Class
--- import Data.ByteString          as BS
 import Data.Cache
--- import Data.String.UTF8
-import qualified Data.Text               as T
+import qualified Data.Text      as T
 import Data.ByteString.Base64
 import Data.Text.Encoding       as TE
 import Network.HTTP.Client
 import Network.HTTP.Conduit
--- import Network.OAuth.OAuth2     as OA  hiding (error)
 import Servant.Client
--- import System.Clock
 import Test.Hspec
--- import URI.ByteString           as UB
 
 discoveryUrl :: String
 discoveryUrl = "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration" 
@@ -78,8 +69,40 @@ spec = do
             (T.pack "bearer") 0 (T.pack "51a04e75-0d2e-48e9-bcb5-4cfdd4da07af") (T.pack "email profile")
       madison `shouldBe` clinton
     
-    it "can properly expire a token and retreive a new one." $ do 
+    it "can properly store a token in the cache, without trying to request a new one.s" $ do 
+      mngr <- liftIO $ newManager tlsManagerSettings
+      ourl <- parseBaseUrl discoveryUrl
+      rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
+      noErrorOauth <- case rawOauthInfo of
+          Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
+          Right val -> return val
+      -- vToken <- liftIO $ getVirginToken clientId clientSecret noErrorOauth
+      initialCache <- atomically $ newCacheSTM Nothing
+      madison <- liftIO $ getAwesomeToken initialCache clientId clientSecret reserveSeconds noErrorOauth
+      --try to see if the cache is working and the old token is saved right away
+      clinton <- liftIO $ getAwesomeToken initialCache clientId clientSecret reserveSeconds noErrorOauth
+      madison `shouldBe` clinton
+    
+    it "can properly do getPing from shared vault." $ do
       True `shouldBe` True
     
-    it "can properly give something the token if requested." $ do
+    it "can properly do getKey from shared vault." $ do
+      True `shouldBe` True
+
+    it "can properly do postKey from shared vault." $ do
+      True `shouldBe` True
+
+    it "can properly do getSharedKey from shared vault." $ do
+      True `shouldBe` True
+
+    it "can properly do getUsers from shared vault." $ do
+      True `shouldBe` True
+
+    it "can properly do postSignature from shared vault." $ do
+      True `shouldBe` True
+    
+    it "can properly do postPassword from shared vault." $ do
+      True `shouldBe` True
+
+    it "can properly do verifyPassword from shared vault." $ do
       True `shouldBe` True

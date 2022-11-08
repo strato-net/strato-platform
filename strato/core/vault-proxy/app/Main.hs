@@ -33,10 +33,7 @@ defineFlag "OAUTH_JWT_USERNAME_PROPERTY" ("" :: T.Text) "OAuth2 JWT Username Pro
 defineFlag "OAUTH_CLIENT_ID" ("" :: T.Text) "OAuth2 Client ID"
 defineFlag "OAUTH_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Client Secret"
 defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
-defineFlag "oidcUrl" ("https://keycloak.blockapps.net/auth/realms/strato-devel/protocol/openid-connect/token" :: T.Text) "Url to get the open id connect token from"
-defineFlag "oidcContentType" ("application/x-www-form-urlencoded" :: T.Text) "The type of the connection from the oidc"
-defineFlag "oidcAuthorization" ("Basic ZGV2OmQ1ZTY3YjhjLTRmYmYtNDJjNi1hOGQ5LTI5YTRkZDEzNTc1Zg==" :: T.Text) "The long string used to authenticate the user from the open id connect"
-defineFlag "oidcGrantType" ("client_credentials" :: T.Text) "The grant type for the open id connection"
+defineFlag "VAULT_URL" ("" :: T.Text) "The place where I go to visit THE VAULT 🔒."
 
 main :: IO ()
 --initialize the vault proxy with the new flags
