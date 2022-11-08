@@ -67,23 +67,33 @@ spec = do
                 event = EventDB (Account 0xdeadbeef Nothing) (Just chainId) "NotSpecial" ["48193"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event]
-        it "Index EventDBEntry for OrganizationAdded (one argument)" $
+        it "Index EventDBEntry for OrgAdded (one argument)" $
             let cId   = fromInteger 0x42069
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["BlockApps"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrgAdded" ["BlockApps"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, AddOrgName $ Right (cId,  ( (Org (T.pack "BlockApps") True) )) ] 
-        it "Index EventDBEntry for OrganizationAdded (two arguments)" $
+        it "Index EventDBEntry for OrgUnitAdded (two arguments)" $
             let cId   = fromInteger 0x22222
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationAdded" ["BlockApps", "Sales"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrgUnitAdded" ["BlockApps", "Sales"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ( (OrgUnit (T.pack "BlockApps") (T.pack "Sales") True)))] 
-        it "Index EventDBEntry for OrganizationRemoved (one argument)" $
+        it "Index EventDBEntry for CommonNameAdded (three arguments)" $
+            let cId   = fromInteger 0x22222
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "CommonNameAdded" ["BlockApps", "Sales", "Kieren James-Lubin"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ( (CommonName (T.pack "BlockApps") (T.pack "Sales") (T.pack "Kieren James-Lubin") True)))] 
+        it "Index EventDBEntry for OrgRemoved (one argument)" $
             let cId   = fromInteger 0x33333
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["BlockApps"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrgRemoved" ["BlockApps"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId,  ((Org (T.pack "BlockApps") False)))] 
-        it "Index EventDBEntry for OrganizationRemoved (two arguments)" $
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId,  ((Org (T.pack "BlockApps") False)))] 
+        it "Index EventDBEntry for OrgUnitRemoved (two arguments)" $
             let cId   = fromInteger 0x11111
-                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrganizationRemoved" ["BlockApps", "Sales"]
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "OrgUnitRemoved" ["BlockApps", "Sales"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ((OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)))] 
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ((OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)))] 
+        it "Index EventDBEntry for CommonNameRemoved (three arguments)" $
+            let cId   = fromInteger 0x22222
+                event = EventDB (Account 0xdeadbeef Nothing) (Just cId) "CommonNameRemoved" ["BlockApps", "Sales", "Kieren James-Lubin"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ( (CommonName (T.pack "BlockApps") (T.pack "Sales") (T.pack "Kieren James-Lubin") False)))] 

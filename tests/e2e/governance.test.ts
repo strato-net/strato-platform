@@ -85,7 +85,7 @@ describe("Create Chain", function() {
     const addName = 'voteToAdd';
     const removeName = 'voteToRemove';
     const gov = { name: 'Governance', address: '0000000000000000000000000000000000000100' }
-    const args = { m: '00000000000000000000000000000000deadbeef', e: 'enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.6:30303?discport=30303' }
+    const args = { o: 'Amazon' }
 
     await rest.call(alice, {contract: gov, method: addName, args, chainid: chainId}, options);
 
@@ -102,7 +102,7 @@ describe("Create Chain", function() {
     await util.until(removePredicate, action, options)
     const chainInfo2 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo2);
-    assert.deepEqual(chainInfo2.info.members.length, 2, "member should be removed");
+    assert.deepEqual(chainInfo2.info.members.length, 4, "member should be removed");
 
   });
 
