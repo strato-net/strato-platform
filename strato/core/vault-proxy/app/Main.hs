@@ -5,25 +5,11 @@
 
 module Main (main) where
 
--- import BlockApps.Init
--- import Control.Monad
--- import Control.Monad.IO.Class
--- import Data.ByteString                   as BS
--- import Data.ByteString.UTF8              (toString)
 -- import Data.Cache
 import qualified Data.Text               as T
--- import Debug.Trace
--- import VaultProxyLib
+import VaultProxyLib
 import HFlags
--- import Control.Concurrent
--- import Control.Concurrent.STM
--- import Control.Lens
--- import Network.HTTP.Client
--- import Network.HTTP.Conduit
--- import Servant
--- import Servant.Client
--- import URI.ByteString
--- import Servant.Client.Core
+
 
  
 --Default is that the OAUTH is enabled
@@ -78,4 +64,21 @@ main = do
     --Pass the token into the awesome function, this will take care of everything and will return just the acess information
     madison <- liftIO $ getAwesomeToken initialCache clientId clientSecret reserveSeconds noErrorOauth
 
-    run (vaultConnection ^. vaultPort) (appVaultProxy env)
+    run (vaultConnection ^. vaultPort) (appVaultProxy vaultConnection)
+
+appVaultProxy :: VaultConnection -> Application
+appVaultProxy connexion = 
+    prometheus def{
+        prometheusEndPoint = ["strato", "vault-proxy", "metrics"],
+        prometheusInstrumentApp = False
+    }
+    . instrumentApp "vault-proxy"
+    . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
+    . cors (const $ Just policy)
+    . provideOptions (Proxy @ VaultProxyAPI)
+    . serve (Proxy @ ("strato" :> "vault-proxy" :> VaultProxyAPI))
+    $ serverVaultProxy connexion
+        :<|> return vaultProxySwagger
+    where 
+        --TODO: ensure this is the most secure method of doing this
+        policy = simpleCorsResourcePolicy { corsRequestHeaders = ["Content-Type"]}
