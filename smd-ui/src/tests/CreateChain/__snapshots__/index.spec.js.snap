@@ -62,10 +62,10 @@ Object {
 exports[`CreateChain: index remove members 1`] = `
 Array [
   Object {
-    "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
-    "balance": 1000,
-    "enode": "enode://",
-    "username": "tanuj1000",
+    "access": undefined,
+    "commonName": undefined,
+    "orgName": undefined,
+    "orgUnit": undefined,
   },
 ]
 `;

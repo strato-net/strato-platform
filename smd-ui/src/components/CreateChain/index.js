@@ -57,11 +57,10 @@ class CreateChain extends Component {
 
       this.state.members.forEach(function (member) {
         members.push({
-          "orgName": member.orgName,
-          "orgUnit": member.orgUnit,
-          "commonName": member.commonName,
+          "orgName": member.orgName && member.orgName !== '' ? member.orgName : undefined,
+          "orgUnit": member.orgUnit && member.orgUnit !== '' ? member.orgUnit : undefined,
+          "commonName": member.commonName && member.commonName !== '' ? member.commonName : undefined,
           "access": member.access
-
         });
       });
 

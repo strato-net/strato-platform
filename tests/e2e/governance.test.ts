@@ -25,22 +25,20 @@ let options:Options={config}
 const label = 'My chain label';
 const src = `contract Governance {
   enum Rule { NOTHING, AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES }
-  event MemberAdded(address member, string enode);
-  event MemberRemoved(address member);
-  function voteToAdd(address m, string e) { 
-    emit MemberAdded(m,e);
+  event OrgAdded(string orgName);
+  event OrgRemoved(string orgName);
+  function voteToAdd(string o) { 
+    emit OrgAdded(o);
   }
-  function voteToRemove(address m) {
-    emit MemberRemoved(m);
+  function voteToRemove(string o) {
+    emit OrgRemoved(o);
   }
 }`;
 const args = {addRule: 'AUTO_APPROVE', removeRule: 'AUTO_APPROVE'};
 const members = [{
-    address: "00000000000000000000000000000000deadbeef"
-  , enode: "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
+    orgName: "BlockApps"
   }, {
-    address: "0000000000000000000000000000000012345678"
-  , enode: "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+    orgName: "Microsoft"
   }];
 const balances = [
            { address: "00000000000000000000000000000000deadbeef"
@@ -76,9 +74,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const mems = [{address: alice.address, enode: members[0].enode}
-                 ,{address: bob.address, enode: members[1].enode}
-		 ];
+    const mems = members;
     chainId = await rest.createChain(alice, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     await promiseTimeout(1000);
     const chainInfo = await rest.getChain(ouser1, chainId, options);
