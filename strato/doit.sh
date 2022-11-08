@@ -394,7 +394,7 @@ then
 else
     setEnv networkID -1
 fi
-setEnv requireCerts false
+setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000
