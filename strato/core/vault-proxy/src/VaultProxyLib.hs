@@ -29,6 +29,11 @@ module VaultProxyLib
       getVirginToken,
       getAwesomeToken,
       connectRawOauth
+      checkIfAlive,
+      VaultConnection(..),
+      vaultUrl,
+      vaultPassword,
+      vaultPort
     ) where
 
 import           Control.Concurrent.STM
@@ -146,6 +151,13 @@ instance FromJSON VaultToken where
     return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
   parseJSON wat = typeMismatch "Spec" wat
 
+data VaultConnection = VaultConnection {
+    _vaultUrl :: T.Text,
+    _vaultPassword :: T.Text,
+    _vaultPort :: Int
+} deriving (Eq, Show, Generic)
+makeLenses ''VaultConnection
+
 --------------------------------------------------------------------------------
 --Types
 --------------------------------------------------------------------------------
@@ -163,9 +175,11 @@ type BlockAppsTokenAPI =
   :> ReqBody '[SA.JSON] BlockAppsTokenRequest
   :> Get '[SA.JSON] VaultToken
 
+type VaultCache = Cache T.Text VaultToken
+
 --Need to talk to the vault now
 
-type VaultCache = Cache T.Text VaultToken
+
 
 --------------------------------------------------------------------------------
 --Functions
@@ -229,6 +243,10 @@ makeExpry token reserveTime = do
 
 -- makeJWTPayload :: VaultToken -> T.Text -> T.Text
 -- makeJWTPayload token payload = "Hello World" ++ show token ++ show payload
+checkIfAlive :: VaultToken -> Bool
+checkIfAlive token = do
+    let expry = token ^. expiresIn
+    if expry > 0 then True else False
 
 --------------------------------------------------------------------------------
 --API functions
@@ -244,3 +262,4 @@ getRawOauth = client rawOAuthAPI
 
 connectRawOauth :: ClientM RawOauth
 connectRawOauth = getRawOauth
+
