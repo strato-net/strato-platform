@@ -32,7 +32,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
--- import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
@@ -143,7 +143,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
-             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMemberParsedSet, Bool,Int)}
+             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
              deriving (Eq, Show)

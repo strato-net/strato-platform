@@ -24,6 +24,7 @@ import Text.Printf
 
 
 import BlockApps.X509.Certificate
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.StateMachine
@@ -50,13 +51,13 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens scrubConsensus
 
-addValidators :: S.Set Address -> Block -> Block
+addValidators :: ChainMembers -> Block -> Block
 addValidators vs = over extraLens $
     uncookRawExtra
-  . set istanbul (Just (IstanbulExtra (S.toList vs) Nothing []))
+  . set istanbul (Just (IstanbulExtra vs Nothing []))
   . cookRawExtra
 
-getValidatorList :: Block -> [Address]
+getValidatorList :: Block -> ChainMembers
 getValidatorList x = L.view (istanbul . _Just . validatorList) (cookRawExtra $ L.view extraLens x )
 
 getProposerSeal :: Block -> Maybe Signature
@@ -158,8 +159,8 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
 authenticate _ = return True 
 
 
-replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
-replayHistoricBlock realValidators seqNo blk = do
+replayHistoricBlock :: ChainMembers  -> Word256 -> Block -> Either String (Word256, Address)
+replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = do
   let ExtraData{..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra{..} <- case _istanbul of
     Nothing -> Left "no istanbul metadata"
@@ -171,16 +172,16 @@ replayHistoricBlock realValidators seqNo blk = do
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
   unless (seqNo + 1 == blockNo) $
     Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
-  unless (realValidators == S.fromList _validatorList) $
+  unless (realValidators == _validatorList) $
     Left "mismatched validators"
   prop <- maybe (Left "invalid proposer seal") Right mProp
-  unless (prop `S.member` realValidators) $
+  unless (prop `S.member` chainWorkAround) $
     Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
-  unless (signers `S.isSubsetOf` realValidators) $ do
-    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ realValidators
+  unless (signers `S.isSubsetOf` chainWorkAround) $ do
+    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ chainWorkAround
     Left $ "unknown signers: " ++ unexplained
-  unless (3 * S.size signers > 2 * S.size realValidators) $
-    Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
+  unless (3 * S.size signers > 2 * S.size chainWorkAround) $
+    Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size chainWorkAround)
   Right (fromIntegral $ seqNo + 1, prop)
 
 isHistoricBlock :: Block -> Bool

@@ -157,6 +157,13 @@ getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cn
   if on == T.pack onx  && ou == T.pack (fromMaybe " " oux) && cmn == T.pack cnmx then Just ua else Nothing
 
 
+addressTox509 ::(A.Selectable Address X509CertInfoState m) => Address-> Maybe X509CertInfoState
+addressToX509  addr = do
+  let x509 = case M.lookup addr of
+    just x -> X509CertInfoState (addr _ _ _ _ _)
+    Nothing -> Nothing
+
+
 
 data Issuer = Issuer
   {

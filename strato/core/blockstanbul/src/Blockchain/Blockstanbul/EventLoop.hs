@@ -3,12 +3,15 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
+
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Extra (whenM)
+import qualified Control.Monad.Change.Alter        as A
 import Control.Monad.Trans.Except
 import Control.Monad.State.Class
 import Crypto.Random.Entropy (getEntropy)
@@ -63,26 +66,31 @@ authorize = \case
   _ -> return ()
 
 
-isAuthorized :: (StateMachineM m) => InEvent -> m AuthResult
+isAuthorized :: (StateMachineM m, (A.Selectable Address X509CertInfoState m)) => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev
+  authenticated <- authenticate iev    --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason 
-        throwE reason
+        throwE reason                  --debug statement?
   unless authenticated $ do               
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
-  case iev of
+  case iev of                         -- cases of valid and non valid input (for approval of messages and tx's?)
     NewBeneficiary (MsgAuth addr sig) (benf, dir, nonc) -> do
-      
       -- Check nonce for replay attack
-      let convertedAddr = getAddressFromCM addr
-      slist <- use authSenders
-      let ifAuthMember = M.member convertedAddr slist
-          nonceAuth = Just nonc > M.lookup convertedAddr slist
-          signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sig
-
+      -- let convertedAddr = getAddressFromCM addr <- this doesn't work
+      slist <- use authSenders    -- authSenders::generateNonceMap senderlist
+      let ifAuthMember = M.member addr slist
+          nonceAuth = Just nonc > M.lookup addr slist
+          benAddress = verifyBenfInfo (benf,dir,nonc) sig
+      res <- case benAddress of 
+        Nothing -> return Nothing
+        Just a -> A.select (A.Proxy @X509CertInfoState) a
+      let signAuth = (getAddressFromCM addr =<< res) == benAddress
+     --conflict benf being cmps verifybenfinfo takes in address and signature (rewritting needed)
+     --should i eliminate this function and just use authenticate (authentication.hs to verify benf info)
+     -- only used twice
       unless ifAuthMember $
         raiseInProd $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
                    ++ " is not a authorized sender" ++ show slist
@@ -94,11 +102,11 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
                    ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sig))
     -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
     -- but with incorrect extraData.
-    IMsg _ (Preprepare _ pp) -> do
-      vals <- use validators
-      let payloadVals = S.fromList (getValidatorList pp)
-          validatorsMatch = vals == payloadVals
-          signatory = verifyProposerSeal pp =<< getProposerSeal pp
+    IMsg _ (Preprepare _ pp) -> do     
+      vals <- use validators            -- this is _validators from bloctanbul context?
+      let payloadVals = S.fromList (getValidatorList pp)  -- getvalslsit::Block -> [Address]
+          validatorsMatch = vals == payloadVals           -- if validators match perform getvalslist
+          signatory = verifyProposerSeal pp =<< getProposerSeal pp  -- same convention getProposerSeal :: Block -> Maybe Signature
           signerExists = signatory `S.member` S.map Just vals
       unless signerExists $
         raiseInProd $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
@@ -111,6 +119,8 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
       let ret = Just addr == verifyCommitmentSeal di seal
       unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
+
+-- I need to change most of the authentication.hs file becase it either uses block -> address or address -> signature
 
 assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
