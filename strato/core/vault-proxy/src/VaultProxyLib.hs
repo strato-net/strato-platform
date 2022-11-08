@@ -227,8 +227,11 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
+-- makeJWTPayload :: VaultToken -> T.Text -> T.Text
+-- makeJWTPayload token payload = "Hello World" ++ show token ++ show payload
+
 --------------------------------------------------------------------------------
---Functions
+--API functions
 --------------------------------------------------------------------------------
 rawOAuthAPI :: Proxy InitialCallForTokenLinkAPI
 rawOAuthAPI = Proxy

@@ -34,6 +34,8 @@ defineFlag "OAUTH_CLIENT_ID" ("" :: T.Text) "OAuth2 Client ID"
 defineFlag "OAUTH_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Client Secret"
 defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
 defineFlag "VAULT_URL" ("" :: T.Text) "The place where I go to visit THE VAULT 🔒."
+defineFlag "VAULT_PORT" (1313 :: Int) "This is the place that the vault proxy will attempt to connect and will also communicate with. Same port is used for post and gets, just to let you know."
+defineFlag "VAULT_PASSWORD" ("" :: T.Text) "This is the password that is used to log into the shared vault."
 
 main :: IO ()
 --initialize the vault proxy with the new flags
