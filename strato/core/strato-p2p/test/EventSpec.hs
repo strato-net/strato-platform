@@ -1383,9 +1383,9 @@ contract Certificate {
       let privChainSrc = [r|
 pragma solidvm 3.2;
 contract A {
-  event OrganizationAdded(string orgName);
+  event OrgAdded(string orgName);
   function addMember(string _orgName) {
-    emit OrganizationAdded(_orgName);
+    emit OrgAdded(_orgName);
   }
 }
 |]
@@ -1813,12 +1813,12 @@ contract RegisterCert {
               src = [r|
                     pragma solidvm 3.2;
                     contract A {
-                      event OrganizationAdded(string name, string unit);
+                      event OrgUnitAdded(string name, string unit);
 
                       constructor() {}
 
                       function addOrg(string _name, string _unit) {
-                        emit OrganizationAdded(_name, _unit);
+                        emit OrgUnitAdded(_name, _unit);
                       }
                     }
                     |]
