@@ -237,11 +237,11 @@ class AddMember extends Component {
 export function mapStateToProps(state) {
   return {
     isOpen: state.createChain.isAddMemberModalOpen,
-    accounts: state.accounts.accounts,
     initialValues: {
       orgName: "",
       orgUnit: "",
-      commonName: ""
+      commonName: "",
+      access: true
     }
   };
 }
