@@ -705,6 +705,11 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) wher
   delete _ _   = pure ()
   insert _ _ _ = pure ()
 
+instance MonadIO m => (([Address],[Address]) `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
 instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
@@ -844,14 +849,14 @@ createPeer :: PrivateKey
            -> Text
            -> IO P2PPeer
 createPeer privKey initialValidators unseqSink name ipAddr = do
-  unseqSource <- newTQueueIO
-  seqP2pSource <- newBroadcastTMChanIO
-  seqVmSource <- newTQueueIO
+  unseqSource      <- newTQueueIO
+  seqP2pSource     <- newBroadcastTMChanIO
+  seqVmSource      <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   txrIndexerSource <- newTQueueIO
   seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
-  cache <- TRC.new 64
+  cache  <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do

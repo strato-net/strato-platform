@@ -148,6 +148,9 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $ uncurry OutJSONRPC <$> rpcResps
+  _ <- case ValidatorsG validators of
+    ValidatorsG ([], []) -> pure ()
+    _        -> yieldMany $  [OutIndexEvent $ ValidatorsG validators]
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
@@ -473,6 +476,7 @@ logEventSummaries events = do
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmVoteToMake _ _ _) = "VoteToMake"
     getNames (VmPrivateTx _) = "PrivateTx"
+    getNames (VmValidatorList _ _) = "VmValidatorList"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
