@@ -25,7 +25,8 @@ const initialState = {
   createDisabled: true,
   filename: undefined,
   isToasts: false,
-  toastsMessage: ''
+  toastsMessage: '',
+  error: ''
 };
 
 const reducer = function (state = initialState, action) {
