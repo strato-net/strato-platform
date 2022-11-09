@@ -91,7 +91,7 @@ describe("Create Chain", function() {
 
     const action = (opts) => rest.getChain(ouser1, chainId, opts);
     const addPredicate = (ci) => ci.info.members.length === 3
-    const removePredicate = (ci) => ci.info.members.length === 3
+    const removePredicate = (ci) => ci.info.members.length === 4
     await util.until(addPredicate, action, options)
     const chainInfo1 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo1);
@@ -102,7 +102,7 @@ describe("Create Chain", function() {
     await util.until(removePredicate, action, options)
     const chainInfo2 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo2);
-    assert.deepEqual(chainInfo2.info.members.length, 3, "member should be removed");
+    assert.deepEqual(chainInfo2.info.members.length, 4, "member should be removed");
 
   });
 
