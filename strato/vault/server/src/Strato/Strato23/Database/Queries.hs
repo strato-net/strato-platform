@@ -34,19 +34,19 @@ import           Strato.Strato23.Database.Tables
 
 countUsers :: T.Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
-  (_, name, _, _, _, _, _) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, _, _) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
 
 
 getUserKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
-  (_, name, salt, nonce, _, encSecPrvKey, address) <- selectTable usersTable -< ()
+  (_, name, _, salt, nonce, _, encSecPrvKey, address) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecPrvKey, address)
 
 getUserByAddress :: Address -> Query (Column PGText)
 getUserByAddress qaddr = proc () -> do
-  (_, name, _, _, _, _, taddr) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, _, taddr) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< name
 
@@ -54,13 +54,13 @@ getUserAddresses :: Maybe Int -> Maybe Int -> Query (Column PGText, Column PGByt
 getUserAddresses mOffset mLimit = maybe id limit mLimit
                                 . maybe id offset mOffset
                                 $ proc () -> do
-  (_, name, _, _, _, _, addr) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, _, addr) <- selectTable usersTable -< ()
   returnA -< (name, addr)
 
 postUserKeyQuery :: T.Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do
   (userIds :: [Int32]) <- runSelect conn $ proc () -> do
-    (userId,name,_,_,_,_,_) <- selectTable usersTable -< ()
+    (userId,name, _, _,_,_,_,_) <- selectTable usersTable -< ()
     restrict -< name .== toFields userName
     returnA -< userId
   case listToMaybe userIds of
@@ -70,6 +70,7 @@ postUserKeyQuery userName KeyStore{..} conn = do
         iTable=usersTable,
         iRows=[
             ( Nothing
+            , toFields userName
             , toFields userName
             , toFields keystoreSalt
             , toFields keystoreAcctNonce

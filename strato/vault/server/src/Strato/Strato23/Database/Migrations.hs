@@ -36,6 +36,7 @@ migrations = [ (Throw, createTables)
              , (Throw, insertSecPrvKey)
              , (Throw, insertPublicKey)
              , (Throw, removePublicKey)
+             , (Throw, insertOauthProvider)
              ]
 
 getSchemaVersion :: Query
@@ -58,3 +59,6 @@ insertPublicKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS pub_key bytea
 
 removePublicKey :: Query
 removePublicKey = [sql| ALTER TABLE users DROP COLUMN IF EXISTS pub_key; |]
+
+insertOauthProvider :: Query
+insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL; |]
