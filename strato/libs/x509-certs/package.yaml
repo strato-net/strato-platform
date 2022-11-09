@@ -29,9 +29,11 @@ library:
   - cryptonite
   - deepseq
   - ethereum-rlp
+  - ethereum-encryption
   - hourglass
   - lens
   - memory
+  - monad-alter
   - pem
   - text
   - format

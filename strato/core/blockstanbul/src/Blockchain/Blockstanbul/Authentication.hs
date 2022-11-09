@@ -11,13 +11,16 @@ module Blockchain.Blockstanbul.Authentication
 
 import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
+--import Control.Monad.Trans.Except
+import Control.Monad.Except
 import qualified Control.Monad.Change.Alter        as A
 import Control.Lens as L
 import Data.Binary
 import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe,fromMaybe, fromJust, isJust)
+import Data.Either.Extra
 import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
@@ -159,30 +162,35 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
 authenticate _ = return True 
 
 
-replayHistoricBlock :: ChainMembers  -> Word256 -> Block -> Either String (Word256, Address)
-replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = do
+replayHistoricBlock ::(A.Selectable Address X509CertInfoState m) => ChainMembers  -> Word256 -> Block -> m (Either String (Word256, Address))
+replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = runExceptT $ do
   let ExtraData{..} = cookRawExtra . L.view extraLens $ blk
-  IstanbulExtra{..} <- case _istanbul of
-    Nothing -> Left "no istanbul metadata"
-    Just ist -> Right ist
+  IstanbulExtra{..} <- liftEither $ maybeToEither  "no istanbul metadata"   _istanbul
+    -- Just ist -> Right ist
   let mProp = verifyProposerSeal blk =<< _proposedSig
       signers = S.fromList
               . mapMaybe (verifyCommitmentSeal (blockHash blk))
               $ _commitment
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
+      noAddress = S.toList $ S.map getX509FromAddress signers
+
+  unless (all  (== True) (map isJust noAddress ))  $ liftEither $ Left $ printf "No address realated to singers"
+  
+  signerRes <- getChainMemberFromX509 <$>  noAddress
   unless (seqNo + 1 == blockNo) $
-    Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
+    liftEither $ Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == _validatorList) $
-    Left "mismatched validators"
+    liftEither $ Left "mismatched validators"
   prop <- maybe (Left "invalid proposer seal") Right mProp
-  unless (prop `S.member` chainWorkAround) $
-    Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
-  unless (signers `S.isSubsetOf` chainWorkAround) $ do
-    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ chainWorkAround
-    Left $ "unknown signers: " ++ unexplained
-  unless (3 * S.size signers > 2 * S.size chainWorkAround) $
-    Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size chainWorkAround)
-  Right (fromIntegral $ seqNo + 1, prop)
+  propRes <- getChainMemberFromX509 <$> (getX509FromAddress prop)
+  unless (propRes `S.member` chainWorkAround) $
+    liftEither $ Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+  unless (signerRes `S.isSubsetOf` chainWorkAround) $ do
+    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signerRes S.\\ chainWorkAround
+    liftEither $ Left $ "unknown signers: " ++ unexplained
+  unless (3 * S.size signerRes > 2 * S.size chainWorkAround) $
+    liftEither $ Left $ printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size chainWorkAround)
+  liftEither $ Right (fromIntegral $ seqNo + 1, prop)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = (> 32) . B.length . L.view extraLens

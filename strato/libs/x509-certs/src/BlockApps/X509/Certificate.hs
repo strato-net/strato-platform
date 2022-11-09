@@ -1,11 +1,13 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric      #-}
--- {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase            #-}
 
 
 module BlockApps.X509.Certificate (
@@ -38,10 +40,13 @@ module BlockApps.X509.Certificate (
   signedsToX509,
   dateTimeToString,
   getValidity,
-  getAddressFromCM
+  getAddressFromCM,
+  getX509FromAddress,
+  getChainMemberFromX509
  ) where
 
 
+import qualified Control.Monad.Change.Alter         as A
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
@@ -91,6 +96,7 @@ import           Test.QuickCheck
 
 import           Servant.Docs
 
+-- import           Blockchain.Data.PubKey
 -- import           Data.ASN1.Encoding
 -- import           Data.ASN1.BinaryEncoding
 -- import           Data.ASN1.Types
@@ -157,11 +163,13 @@ getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cn
   if on == T.pack onx  && ou == T.pack (fromMaybe " " oux) && cmn == T.pack cnmx then Just ua else Nothing
 
 
-addressTox509 ::(A.Selectable Address X509CertInfoState m) => Address-> Maybe X509CertInfoState
-addressToX509  addr = do
-  let x509 = case M.lookup addr of
-    just x -> X509CertInfoState (addr _ _ _ _ _)
-    Nothing -> Nothing
+getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
+getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName  (T.pack $ on) (T.pack(fromMaybe " " ou)) (T.pack $ cname) True)
+
+getX509FromAddress :: A.Selectable Address X509CertInfoState m
+          => Address 
+          -> m (Maybe (X509CertInfoState))
+getX509FromAddress addr = (A.select (A.Proxy @X509CertInfoState)addr)
 
 
 
