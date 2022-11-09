@@ -1431,11 +1431,11 @@ contract A {
             let ietx = IETx tsNow $ IngestTx Origin.API tx
             flip postEvent (peers !! 0) $ UnseqEvent ietx
           routine = do
-            threadDelay 200000
+            threadDelay 1000000
             for_ peers $ postEvent (TimerFire 0)
-            threadDelay 200000
+            threadDelay 1000000
             for_ peers $ postEvent (TimerFire 1)
-            threadDelay 200000
+            threadDelay 1000000
             for_ peers $ postEvent (TimerFire 2)
             threadDelay 500000
             tsNowMain <- liftIO getCurrentMicrotime
@@ -1449,7 +1449,7 @@ contract A {
             let ietx = IETx tsNow $ IngestTx Origin.API tx'
             flip postEvent (peers !! 0) $ UnseqEvent ietx
 
-      runForSeconds 5 $ concurrently_ (runNetwork peers connections) routine
+      runForSeconds 10 $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
@@ -1768,7 +1768,7 @@ contract RegisterCert {
           dt <- liftIO dateCurrent
           cIdRef <- newIORef undefined
           cInfoRef <- newIORef undefined
-          let runForThreeSeconds = void . timeout 3000000
+          let runForNineSeconds = void . timeout 9000000
               -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
               chainMember1 :: ChainMembers
               chainMember1 = (ChainMembers $ Set.singleton $ (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True))
@@ -1870,7 +1870,7 @@ contract RegisterCert {
                 threadDelay 200000
                 flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId -- Add organization to private chain
 
-          runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
+          runForNineSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
           testCid <- readIORef cIdRef
 
