@@ -50,6 +50,7 @@ pipeline {
             export OAUTH_CLIENT_ID=dev
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
+            export requireCerts=false
             ./strato --single
             docker ps
             # Few quick tests

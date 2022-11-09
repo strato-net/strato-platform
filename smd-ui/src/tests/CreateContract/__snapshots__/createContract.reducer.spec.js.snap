@@ -168,7 +168,7 @@ Object {
   "isOpen": true,
   "isToasts": true,
   "response": "Error Uploading Contract...: error",
-  "toastsMessage": "Contract creation failed",
+  "toastsMessage": "Contract creation failed: error",
   "toster": false,
   "tosterMessage": "",
   "username": "",

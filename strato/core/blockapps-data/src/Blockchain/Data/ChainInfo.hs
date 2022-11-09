@@ -36,15 +36,15 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Test.QuickCheck.Arbitrary.Generic
 import           Test.QuickCheck.Instances.Text        ()
 
-import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
-import           Blockchain.TypeLits
+-- import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -60,6 +60,7 @@ import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
 import           Data.Word
+-- import qualified Data.Set                             as S
 
 import qualified GHC.Generics                         as GHCG
 import           LabeledError
@@ -268,14 +269,12 @@ data UnsignedChainInfo = UnsignedChainInfo
   { chainLabel     :: T.Text
   , accountInfo    :: [AccountInfo]
   , codeInfo       :: [CodeInfo]
-  , members        :: (M.Map Address Enode)
+  , members        :: ChainMembers
   , parentChain    :: (Maybe Word256)
   , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, GHCG.Generic, Data)
-
-
 
 instance Arbitrary UnsignedChainInfo where
   arbitrary = genericArbitrary
@@ -324,12 +323,13 @@ instance Format ChainInfo where
     , tab' $ format chainInfo
     ]
 
+
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
     l <- o .: "label"
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
-    ms <- M.fromList . map (unNamedTuple @"address" @"enode") <$> (o .: "members")
+    ms <- o .: "members"
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
     cn <- o .: "nonce"
@@ -343,7 +343,7 @@ instance ToJSON ChainInfo where
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= (NamedTuple @"address" @"enode" <$> M.toList ms)
+           , "members" .= ms
            , "parentChain" .= pc
            , "creationBlock" .= cb
            , "nonce" .= cn
@@ -353,6 +353,7 @@ instance ToJSON ChainInfo where
 
 instance Arbitrary ChainInfo where
   arbitrary = genericArbitrary
+
 
 instance RLPSerializable UnsignedChainInfo where
   rlpEncode UnsignedChainInfo{..} = RLPArray

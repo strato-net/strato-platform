@@ -92,9 +92,6 @@ function newnode {
   if [ -n "${averageTxsPerBlock}" ]; then
     atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
   fi
-  if [ -n "${privateChainAuthorizationMode}" ]; then
-    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
-  fi
   if [ -n "${participationMode}" ]; then
     pmFlag="--participationMode=${participationMode}"
   fi
@@ -196,7 +193,7 @@ function newnode {
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
                          --debugPort=$debugPort --debugWSPort=$debugWSPort \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
-                         ${networkFlag} --networkID=$networkID \
+                         ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   
@@ -397,6 +394,7 @@ then
 else
     setEnv networkID -1
 fi
+setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000

@@ -15,5 +15,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  void $ $initHFlags "solid vm spec"
+  void $ $initHFlagsDependentDefaults "solid vm spec" (const $ const $ const $ [("requireCerts", "False")])
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec

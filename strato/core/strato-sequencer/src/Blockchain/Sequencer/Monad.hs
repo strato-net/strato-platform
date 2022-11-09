@@ -97,7 +97,6 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode
 import           Blockchain.Privacy
 
 import           Blockchain.Sequencer.CablePackage
@@ -111,6 +110,7 @@ import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -135,7 +135,8 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
   , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
-  , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
+  , _orgNameChainsRegistry :: !(Map ChainMembers (Modification Word256))
+  -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
@@ -234,9 +235,13 @@ instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
 
-instance HasNamespace OrgNameChains where
-  type NSKey OrgNameChains = Word256
-  namespace _ = "pnc:"
+instance HasNamespace TrueOrgNameChains where
+  type NSKey TrueOrgNameChains = Word256
+  namespace _ = "pnct:"
+
+instance HasNamespace FalseOrgNameChains where
+  type NSKey FalseOrgNameChains = Word256
+  namespace _ = "pncf:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
