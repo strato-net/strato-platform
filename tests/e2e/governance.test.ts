@@ -91,7 +91,7 @@ describe("Create Chain", function() {
 
     const action = (opts) => rest.getChain(ouser1, chainId, opts);
     const addPredicate = (ci) => ci.info.members.length === 3
-    const removePredicate = (ci) => ci.info.members.length === 2
+    const removePredicate = (ci) => ci.info.members.length === 3
     await util.until(addPredicate, action, options)
     const chainInfo1 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo1);
