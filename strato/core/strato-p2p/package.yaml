@@ -71,6 +71,7 @@ library:
     - persistent
     - prometheus-client
     - random
+    - Ranged-sets
     - resourcet
     - seqevents
     - servant-client
@@ -121,6 +122,7 @@ tests:
       - mtl
       - nibblestring
       - ordered-containers
+      - Ranged-sets
       - raw-strings-qq
       - secp256k1-haskell
       - seqevents

@@ -11,6 +11,7 @@ import qualified Crypto.Secp256k1                as SEC
 import           Data.Aeson
 import           Data.Aeson                      as Ae
 import           Data.Aeson.Diff
+import qualified Data.Binary                     as Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy.Char8      as C8
 import qualified Data.ByteString.Short           as BSS
@@ -35,6 +36,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
@@ -89,6 +91,9 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
   describe "Data round trips" $ do
     enodeRLP
     enodeJSON
+    chainMembersRLP
+    chainMembersJSON
+    chainMembersBinary
     accountRLP
     accountJSON
     codePtrRLP
@@ -181,6 +186,12 @@ jsonRT =  either (error . ("Failed jsonRT: " ++ )) id . Ae.eitherDecode . Ae.enc
 jsonCheck :: (Eq a, Show a, ToJSON a, FromJSON a) => a -> Expectation
 jsonCheck x = jsonRT x `shouldBe` x
 
+binaryRT :: Binary.Binary a => a -> a
+binaryRT = Binary.decode  . Binary.encode
+
+binaryCheck :: (Eq a, Show a, Binary.Binary a) => a -> Expectation
+binaryCheck x = binaryRT x `shouldBe` x
+
 enodeRLP :: Spec
 enodeRLP = do
   it "should convert an Enode address to and from its RLP encoding" $ property $
@@ -190,6 +201,21 @@ enodeJSON :: Spec
 enodeJSON = do
   it "should convert an Enode address to and from its JSON encoding" $ property $
     (\x -> jsonCheck (x :: Enode))
+
+chainMembersRLP :: Spec
+chainMembersRLP = do
+  it "should convert an ChainMembers address to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: ChainMembers))
+
+chainMembersJSON :: Spec
+chainMembersJSON = do
+  it "should convert an ChainMembers address to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: ChainMembers))
+
+chainMembersBinary :: Spec
+chainMembersBinary = do
+  it "should convert an ChainMembers address to and from its Binary encoding" $ property $
+    (\x -> binaryCheck (x :: ChainMembers))
 
 accountRLP :: Spec
 accountRLP = do

@@ -39,7 +39,6 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB     (putChainInfo)
-import           Blockchain.Data.Enode           (ChainMembers(..))
 import           Blockchain.Data.Transaction     (insertTX)
 import           Blockchain.Data.ValidatorRef
 import           Blockchain.DBM
@@ -57,6 +56,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember (ChainMembers(..))
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
@@ -146,8 +146,8 @@ instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId = void
                . RBDB.withRedisBlockDB
-               . RBDB.putChainMembers cId
-               . unChainMembers
+               . RBDB.putChainMembers cId --Uses RedisChainMembers which messes things up
+              --  . unChainMembers
                . unP2P
 --TODO
 -- instance (Word256 `A.Alters` P2P Address) IContextM where

@@ -27,7 +27,7 @@ export function createChainApiCall(label, members, balances, src, args, vm) {
       method: 'POST',
       credentials: "include",
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json' 
       },
       body: JSON.stringify({
         "args": args,
@@ -43,6 +43,11 @@ export function createChainApiCall(label, members, balances, src, args, vm) {
   )
     .then(handleErrors)
     .then(function (response) {
+      if (response.status !== 200) {
+        return response.text().then(error => {
+          throw error
+        })
+      }
       return response;
     })
     .catch(function (error) {
@@ -60,7 +65,7 @@ export function* createChain(action) {
       yield put(fetchChains());
       yield put(fetchChainIds())
     } else {
-      yield put(createChainFailure(response.statusText));
+      yield put(createChainFailure(response));
     }
   }
   catch (err) {
