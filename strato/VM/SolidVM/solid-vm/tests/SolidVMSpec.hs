@@ -67,6 +67,7 @@ import Data.ByteString (putStr)
 import GHC.TypeLits (ErrorMessage(Text))
 import qualified Control.Exception as Blockchain.SolidVM
 import qualified LabeledError
+import Blockchain.Strato.Model.Gas
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -213,8 +214,10 @@ devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
 runTest :: ContextM a -> IO ()
-runTest f = do
-  let timeout = 5000000
+runTest = runTestWithTimeout 5000000
+
+runTestWithTimeout :: Int -> ContextM a -> IO ()
+runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
@@ -267,7 +270,7 @@ runArgsWithSenderBeef acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Just 0xfeedbeef
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -303,7 +306,7 @@ runArgsWithSender acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -338,7 +341,7 @@ runArgsWithOrigin orig acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -381,7 +384,7 @@ runCall funcName callArgs bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
@@ -426,7 +429,7 @@ call2 funcName callArgs contractAddress = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
@@ -6780,3 +6783,36 @@ contract A {
   uint x = type(B).name;
 
 }|]) `shouldThrow` anyTypeError
+
+  it "cant infinite loop" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+pragma solidvm 3.4;
+contract qq {
+  uint x = 3;
+  constructor() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
+
+  it "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+pragma solidvm 3.4;
+
+contract A {
+  uint x = 3;
+  function f() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}
+
+contract qq {
+  constructor() public returns () {
+    A a = new A();
+    a.f();
+    return;
+  }
+}   |]) `shouldThrow` anyTooMuchGasError

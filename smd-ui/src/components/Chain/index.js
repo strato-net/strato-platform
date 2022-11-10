@@ -15,7 +15,7 @@ class Chain extends Component {
   }
 
   showMembers(chain) {
-    if (chain && chain.info && chain.info.balances && chain.info.balances.length > 0) { 
+    if (chain && chain.info && chain.info.members && chain.info.members.length > 0) { 
       const members = chain.info.members;
       return members.map((member) => {
           return (
@@ -30,7 +30,7 @@ class Chain extends Component {
     } else {
       return (
         <tr>
-          <td colSpan="2"> No Memberzzz</td>
+          <td colSpan="2"> No members</td>
         </tr>
       )
     }
@@ -47,7 +47,6 @@ class Chain extends Component {
 
     
 
-    console.log(`========= chain? ${JSON.stringify(chain)}`)
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">

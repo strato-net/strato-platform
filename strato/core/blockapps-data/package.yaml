@@ -81,6 +81,7 @@ tests:
       - aeson
       - aeson-diff
       - base16-bytestring
+      - binary
       - blockapps-data
       - blockapps-datadefs
       - bytestring

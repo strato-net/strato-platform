@@ -38,7 +38,7 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     $logInfoS "p2pIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    -- indexP2P idxEvents
+    indexP2P idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 

@@ -86,7 +86,6 @@ export function* getChainsIds() {
 export function* getChainDetail(action) {
   try {
     const response = yield call(getChainDetailApi, action.id);
-    console.log(`============== action after getChainDetail - ${JSON.stringify(action)}`)
     yield put(fetchChainDetailSuccess(action.label, action.id, response));
   }
   catch (err) {

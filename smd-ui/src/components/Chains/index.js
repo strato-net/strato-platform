@@ -79,7 +79,7 @@ class Chains extends Component {
         if (this.state.selected === uniqueKey && chainIds.length > 0) {
           labelClasseName = ' selected';
           chainIds.map((chainid, key) =>
-            selectedChains.push(<Chain label={label} id={chainid} key={key} />)
+            selectedChains.push(<Chain label={label} id={chainid} chain={key} />)
           );
         }
 

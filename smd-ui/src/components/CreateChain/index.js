@@ -55,18 +55,18 @@ class CreateChain extends Component {
       let members = [];
       let balances = [];
 
-      this.state.members.forEach(function (member, index) {
+      this.state.members.forEach(function (member) {
         members.push({
-          "orgName": member.orgName,
-          "orgUnit": member.orgUnit,
-          "commonName": member.commonName,
+          "orgName": member.orgName && member.orgName !== '' ? member.orgName : undefined,
+          "orgUnit": member.orgUnit && member.orgUnit !== '' ? member.orgUnit : undefined,
+          "commonName": member.commonName && member.commonName !== '' ? member.commonName : undefined,
           "access": member.access
+        });
+      });
 
-        });
-        balances.push({
-          "balance": member.balance,
-          "address": '0000000000000000000000000000000000000100'
-        });
+      balances.push({
+        "balance": 1000000000000000,
+        "address": '0000000000000000000000000000000000000100'
       });
 
       const args = {};
@@ -107,24 +107,15 @@ class CreateChain extends Component {
 
   updateMembers(state) {
     const curMembers = this.state.members;
-    const addresses = [];
 
-    curMembers.forEach(function (member) {
-      addresses.push('0000000000000000000000000000000000000100');
+    this.setState({
+      members: curMembers.concat({
+        orgName: state.orgName,
+        orgUnit: state.orgUnit,
+        commonName: state.commonName,
+        access: state.access
+      })
     });
-
-    if (!addresses.includes(state.address)) {
-      this.setState({
-        members: curMembers.concat({
-          username: state.username,
-          orgName: state.orgName,
-          orgUnit: state.orgUnit,
-          commonName: state.commonName,
-          access: state.access,
-          balance: parseInt(state.balance, 10)
-        })
-      });
-    }
   }
 
   removeMember(member) {
@@ -144,7 +135,14 @@ class CreateChain extends Component {
           <div className="row smd-margin-8 member smd-vertical-center" key={index}>
             <div className="col-sm-1"></div>
             <div className="col-sm-9">
-              <span>{member.username ? member.username + ' (' + member.address + ')' : member.address}</span>
+              <span>{member.orgName
+                       ? member.orgUnit
+                         ? member.commonName
+                           ? `${member.access ? 'Include' : 'Exclude'} ${member.commonName} from ${member.orgUnit} at ${member.orgName}`
+                           : `${member.access ? 'Include' : 'Exclude'} everyone from ${member.orgUnit} at ${member.orgName}`
+                         : `${member.access ? 'Include' : 'Exclude'} everyone at ${member.orgName}`
+                       : `${member.access ? 'Include' : 'Exclude'} everyone`
+              }</span>
             </div>
             <div className="col-sm-2">
               <Button

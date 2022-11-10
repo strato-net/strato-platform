@@ -83,8 +83,8 @@ import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
+import           Data.Ranged
 import qualified Data.Set.Ordered                      as S
-import qualified Data.Set                              as DS
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
@@ -268,19 +268,6 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
 instance MonadIO m => A.Selectable Integer (Canonical BlockData) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance MonadIO m => A.Selectable IPAddress IPChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ = fmap IPChains
-                      . RBDB.withRedisBlockDB
-                      . RBDB.getIPChains
-
-instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ = fmap OrgIdChains
-                      . RBDB.withRedisBlockDB
-                      . RBDB.getOrgIdChains
-                      . unOrgId
-
 instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (ReaderT Config m) where
   select p ip = A.selectWithDefault p ip <&> toMaybe def
   selectWithDefault _ = fmap TrueOrgNameChains
@@ -307,14 +294,14 @@ instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (ReaderT Config
     mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
     pure $ mCInfo <&> ParentChainId . parentChain . chainInfo
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT Config m) where
-  select p cid = A.selectWithDefault p cid <&> toMaybe def
+instance MonadIO m => A.Selectable Word256 ChainMemberRSet (ReaderT Config m) where
+  select p cid = Just <$> A.selectWithDefault p cid
   selectWithDefault _ cid = do
-    ancestors <- map fromJust . filter isJust <$> getAncestorChains (Just cid)
-    allChainMembers <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
-    case allChainMembers of
-      [] -> pure $ ChainMembers DS.empty
-      _ -> pure $ ChainMembers DS.empty
+    ancestors <- catMaybes <$> getAncestorChains (Just cid)
+    allRSets <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
+    pure $ case allRSets of
+      [] -> ChainMemberRSet rSetEmpty
+      rsets -> foldr1 (\(ChainMemberRSet a) (ChainMemberRSet b) -> ChainMemberRSet $ rSetIntersection a b) rsets
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
@@ -535,12 +522,10 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   , All2 '[A.Selectable]
                       '[ '(Integer, Canonical BlockData)
-                       , '(IPAddress, IPChains)
-                       , '(OrgId, OrgIdChains)
                        , '(ChainMembers, TrueOrgNameChains)
                        , '(ChainMembers, FalseOrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
-                       , '(Word256, ChainMembers)
+                       , '(Word256, ChainMemberRSet)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
                        , '(Address, X509CertInfoState)

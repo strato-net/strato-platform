@@ -1,30 +1,49 @@
 const AutoApprove = `
 contract AutoApprove { 
-  event OrganizationAdded (string orgName, string orgUnit, string commonName, bool access); 
-  event OrganizationRemoved (string orgName, string orgUnit, string commonName, bool access);
+  event OrgAdded (string orgName); 
+  event OrgUnitAdded (string orgName, string orgUnit); 
+  event CommonNameAdded (string orgName, string orgUnit, string commonName); 
+  event OrgRemoved (string orgName); 
+  event OrgUnitRemoved (string orgName, string orgUnit); 
+  event CommonNameRemoved (string orgName, string orgUnit, string commonName); 
  
   constructor() {}
 
-  function voteToAdd(string o, string u, string c, bool a ) { 
-    emit OrganizationAdded(o,u,c,a); 
+  function addOrg(string orgName) { 
+    emit OrgAdded(orgName); 
   } 
- 
-  function voteToRemove(string o, string u, string c, bool a) { 
-    emit OrganizationRemoved(o,u,c,a); 
+
+  function addOrgUnit(string orgName, string orgUnit) { 
+    emit OrgUnitAdded(orgName, orgUnit); 
+  } 
+
+  function addCommonName(string orgName, string orgUnit, string commonName) { 
+    emit CommonNameAdded(orgName, orgUnit, commonName); 
+  } 
+
+  function removeOrg(string orgName) { 
+    emit OrgRemoved(orgName); 
+  } 
+
+  function removeOrgUnit(string orgName, string orgUnit) { 
+    emit OrgUnitRemoved(orgName, orgUnit); 
+  } 
+
+  function removeCommonName(string orgName, string orgUnit, string commonName) { 
+    emit CommonNameRemoved(orgName, orgUnit, commonName); 
   } 
 }`
 
 
 const AdminOnly = ` 
 contract AdminOnly {
-  event OrganizationAdded(string orgName, string orgUnit, string commonName, bool access);
-  event OrganizationRemoved(string orgName, string orgUnit, string commonName, bool access);
+  event CommonNameAdded(string orgName, string orgUnit, string commonName);
+  event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
   struct chainMember {
     string o,
     string u,
-    string c,
-    string a 
+    string c
   }
 
   chainMember admin; 
@@ -32,22 +51,22 @@ contract AdminOnly {
   constructor(chainMember _admin) {
     admin = _admin;
   }
-  function voteToAdd(string o, string u, string c, bool a) {
+  function voteToAdd(string o, string u, string c) {
     require(msg.sender == admin, "You do not have permission to vote");
-    emit OrganizationAdded(o, u, c, a); 
+    emit CommonNameAdded(o, u, c); 
   } 
 
-  function voteToRemove(string o, string u, string c, bool a) {
+  function voteToRemove(string o, string u, string c) {
     require(msg.sender == admin, "You do not have permission to vote");
-    emit OrganizationRemoved(o, u, c, a); 
+    emit CommonNameRemoved(o, u, c); 
   } 
 }`
 
 const MajorityRules = `pragma solidvm 3.2; 
  
 contract MajorityRules { 
-  event OrganizationAdded(string orgName, string orgUnit, string commonName, bool access);
-  event OrganizationRemoved(string orgName, string orgUnit, string commonName, bool access);
+  event CommonNameAdded(string orgName, string orgUnit, string commonName);
+  event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
   mapping(chainMember => uint) addVotes; 
   mapping(chainMember => uint) removeVotes; 
@@ -55,15 +74,14 @@ contract MajorityRules {
   struct chainMember {
     string o,
     string u,
-    string c,
-    string a 
+    string c
   }
 
   }
   chainMember[] __members__; 
 
-  function voteToAdd(string o, string u, string c, bool a) {
-    m = chainMember(o, u, c, a) 
+  function voteToAdd(string o, string u, string c) {
+    chainMember m = chainMember(o, u, c); 
 
     uint votes = addVotes[m] + 1; 
     uint mlen = __members__.length; 
@@ -78,7 +96,7 @@ contract MajorityRules {
       } 
       if (!found) { 
         __members__.push(m); 
-        emit OrganizationAdded(o, u, c, a); 
+        emit CommonNameAdded(o, u, c); 
       } 
     } 
     else { 
@@ -86,8 +104,8 @@ contract MajorityRules {
     } 
   } 
 
-  function voteToRemove(string o, string u, string c, bool a) { 
-    m = chainMember(o, u, c, a) 
+  function voteToRemove(string o, string u, string c) { 
+    chainMember m = chainMember(o, u, c); 
     uint votes = removeVotes[m] + 1; 
     uint mlen = __members__.length; 
     if (votes > mlen / 2) { 
@@ -97,7 +115,7 @@ contract MajorityRules {
           __members__[i] = __members__[mlen - 1]; 
           delete __members__[mlen - 1]; 
           __members__.length--; 
-          emit OrganizationRemoved(o,u,c,a); 
+          emit CommonNameRemoved(o,u,c); 
           i = mlen; 
         } 
       } 
@@ -111,8 +129,8 @@ contract MajorityRules {
 const TwoIn = `
  
 contract TwoIn { 
-  event OrganizationAdded(string orgName, string orgUnit, string commonName, bool access);
-  event OrganizationRemoved(string orgName, string orgUnit, string commonName, bool access);
+  event CommonNameAdded(string orgName, string orgUnit, string commonName);
+  event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
   mapping(chainMember => uint) addVotes; 
   mapping(chainMember => uint) removeVotes; 
@@ -120,15 +138,14 @@ contract TwoIn {
   struct chainMember {
     string o,
     string u,
-    string c,
-    string a 
+    string c
   }
 
-  function voteToAdd(string o, string u, string c, bool a) {
-    m = chainMember(o, u, c, a) 
+  function voteToAdd(string o, string u, string c) {
+    chainMember m = chainMember(o, u, c); 
     uint votes = addVotes[m] + 1; 
     if (votes >= 2) { 
-      emit OrganizationAdded(o, u, c, a); 
+      emit CommonNameAdded(o, u, c); 
       addVotes[m] = 0; 
     } 
     else { 
@@ -136,10 +153,11 @@ contract TwoIn {
     } 
   } 
 
-  function voteToRemove(string o, string u, string c, bool a) { 
+  function voteToRemove(string o, string u, string c) { 
+    chainMember m = chainMember(o, u, c); 
     uint votes = removeVotes[m] + 1; 
     if (votes >= 2) { 
-      emit OrganizationRemoved(o,u,c,a); 
+      emit CommonNameRemoved(o,u,c); 
       removeVotes[m] = 0; 
     } 
     else { 
