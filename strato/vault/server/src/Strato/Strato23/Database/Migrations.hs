@@ -65,5 +65,5 @@ insertOauthProvider :: Query
 insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
 
 modifytOauthProvider :: Query
-modifytOauthProvider = [sql| ALTER TABLE users ALTER COLUMN auth_provider_id DROP DEFAULT; |]
+modifytOauthProvider = [sql| ALTER TABLE users ALTER COLUMN auth_provider_id DROP DEFAULT; |] -- TODO combine this with insertOauthProvider to make one function
 

@@ -82,4 +82,8 @@ instance ToSchema MsgHash where
 data User = User
   { username :: T.Text
   , address :: Address
+  } | UserNew
+  { username      :: T.Text
+  , oauthProvider :: T.Text
+  , address       :: Address
   } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)

@@ -16,3 +16,9 @@ type PostSignature = "signature"
                    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
                    :> ReqBody '[JSON] MsgHash
                    :> Post '[JSON] Signature
+
+type PostSignature' = "signature"
+                    :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+                    :> Header' '[Required, Strict] "X-OAUTH-PROVIDER"    Text
+                    :> ReqBody '[JSON] MsgHash
+                    :> Post '[JSON] Signature

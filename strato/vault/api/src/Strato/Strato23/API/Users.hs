@@ -20,3 +20,11 @@ type GetUsers = "users"
               :> QueryParam "limit" Int
               :> QueryParam "offset" Int
               :> Get '[JSON] [User]
+
+type GetUsers' = "users"
+              :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+              :> Header' '[Required, Strict] "X-OAUTH-PROVIDER"    Text
+              :> QueryParam "address" Address
+              :> QueryParam "limit" Int
+              :> QueryParam "offset" Int
+              :> Get '[JSON] [User]
