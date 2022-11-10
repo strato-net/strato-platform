@@ -61,4 +61,8 @@ removePublicKey :: Query
 removePublicKey = [sql| ALTER TABLE users DROP COLUMN IF EXISTS pub_key; |]
 
 insertOauthProvider :: Query
-insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL; |]
+insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
+
+-- modifytOauthProvider :: Query
+-- modyOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
+

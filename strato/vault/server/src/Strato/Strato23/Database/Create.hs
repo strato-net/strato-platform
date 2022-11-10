@@ -45,4 +45,3 @@ createTables = mconcat
   , usersTable
   , messageTable
   ]
---   -- 
