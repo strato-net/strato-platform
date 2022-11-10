@@ -18,31 +18,31 @@ schemaVersionTable = Table "vault_wrapper_schema_version" $ p2
 usersTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
   , Column PGText
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGText
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
   , Column PGText
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
   )
 usersTable = Table "users" $ p8
   ( optionalTableField "id"
   , requiredTableField "x_user_unique_name"
-  , requiredTableField "auth_provider_id"
   , requiredTableField "salt"
   , requiredTableField "nonce"
   , requiredTableField "enc_sec_key"
   , requiredTableField "enc_sec_prv_key"
   , requiredTableField "address"
+  , requiredTableField "auth_provider_id"
   )
 
 messageTable :: Table

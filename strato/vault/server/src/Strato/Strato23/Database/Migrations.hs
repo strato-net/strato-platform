@@ -37,6 +37,7 @@ migrations = [ (Throw, createTables)
              , (Throw, insertPublicKey)
              , (Throw, removePublicKey)
              , (Throw, insertOauthProvider)
+             , (Throw, modifytOauthProvider)
              ]
 
 getSchemaVersion :: Query
@@ -63,6 +64,6 @@ removePublicKey = [sql| ALTER TABLE users DROP COLUMN IF EXISTS pub_key; |]
 insertOauthProvider :: Query
 insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
 
--- modifytOauthProvider :: Query
--- modyOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
+modifytOauthProvider :: Query
+modifytOauthProvider = [sql| ALTER TABLE users ALTER COLUMN auth_provider_id DROP DEFAULT; |]
 

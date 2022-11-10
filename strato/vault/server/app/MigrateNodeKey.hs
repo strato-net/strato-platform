@@ -66,6 +66,6 @@ main = do
           if success then
             putStrLn "success"
           else
-            putStrLn "failure Garrett"
+            putStrLn "failure"
         _ -> error "couldn't decrypt the secret message, probably you entered the wrong vault password"
     _ -> error "multiple rows in message table, something is not right"
