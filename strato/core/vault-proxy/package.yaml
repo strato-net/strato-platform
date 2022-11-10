@@ -24,6 +24,7 @@ dependencies:
 - aeson
 - aeson-casing
 - blockapps-init
+- blockapps-vault-wrapper-api
 - bytestring
 - cache
 - clock
@@ -37,6 +38,7 @@ dependencies:
 - json
 - lens
 - modern-uri
+- monad-alter
 - network-uri
 - old-time
 - req
@@ -46,6 +48,7 @@ dependencies:
 - servant-client-core
 - servant-server
 - stm
+- strato-model
 - text
 - time
 - uri-bytestring

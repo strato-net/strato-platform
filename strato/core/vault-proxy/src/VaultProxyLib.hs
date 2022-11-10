@@ -28,8 +28,8 @@ module VaultProxyLib
       VaultToken(..),
       getVirginToken,
       getAwesomeToken,
-      connectRawOauth
-      checkIfAlive,
+      connectRawOauth,
+    --   checkIfAlive,
       VaultConnection(..),
       vaultUrl,
       vaultPassword,
@@ -40,6 +40,8 @@ import           Control.Concurrent.STM
 import           Control.Lens
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Control.Monad.Change.Modify
 import           Data.Aeson  
 import           Data.Aeson.Types
 import           Data.ByteString.Base64
@@ -59,6 +61,15 @@ import           System.Clock
 import           Text.URI                as URI
 import           Yesod.Core.Types        as YC
 
+--matching types import (reduce redundant changes)
+import           Blockchain.Strato.Model.Address
+import           Strato.Strato23.API.Types --Likely will make a circular dependency
+import           Blockchain.Strato.Model.Secp256k1
+import           Strato.Strato23.API.Users
+import           Strato.Strato23.API.Key
+import           Strato.Strato23.API.Signature
+import           Strato.Strato23.API.Password
+import           Strato.Strato23.API.Ping
 
 --------------------------------------------------------------------------------
 --Datas
@@ -85,6 +96,13 @@ instance FromJSON RawOauth where
         _          -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
     return $ RawOauth authend tokend 
   parseJSON wat = typeMismatch "Spec" wat
+
+-- instance FromJSON AddressAndKey where
+--   parseJSON (Object o) = do 
+--     a <- o .: "address"
+--     k <- o .: "pubkey"
+--     return $ AddressAndKey a k 
+--   parseJSON o = error $ "parseJSON AddressAndKey: expected object, but got " ++ show o
 
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
@@ -154,8 +172,9 @@ instance FromJSON VaultToken where
 data VaultConnection = VaultConnection {
     _vaultUrl :: T.Text,
     _vaultPassword :: T.Text,
-    _vaultPort :: Int
-} deriving (Eq, Show, Generic)
+    _vaultPort :: Int,
+    _httpManager :: Manager --Please don't export this, not useful to the user (unless we put this not in its own executable)
+}
 makeLenses ''VaultConnection
 
 --------------------------------------------------------------------------------
@@ -178,8 +197,26 @@ type BlockAppsTokenAPI =
 type VaultCache = Cache T.Text VaultToken
 
 --Need to talk to the vault now
+-- TODO: Make this work, and get rid of the multiple "vault-proxy" instances
+type VaultAPI = GetPing
+           :<|> GetKey
+           :<|> PostKey
+           :<|> GetSharedKey
+           :<|> GetUsers
+           :<|> PostSignature
+           :<|> PostPassword
+           :<|> VerifyPassword
 
+type VaultProxyM = ReaderT VaultConnection
+type HasVaultProxy m = Accessible VaultConnection m
 
+--------------------------------------------------------------------------------
+--API Endpoints (these are used to connect TO the Vault-Proxy)
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--API "proxypoints" (these are used to make the proxy calls to the shared vault)
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 --Functions
@@ -241,12 +278,53 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
+getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+postKey :: Text -> VaultProxyM AddressAndKey
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+postPassword :: Text -> VaultProxyM ()
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+verifyPassword :: VaultProxyM Bool
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+getPing :: VaultProxyM String
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+postSignature :: Text -> MsgHash -> VaultProxyM Signature
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
+--Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
+--This is the actualy function that the services will connect to the vaultProxy with
+vaultProxyServer :: Server VaultAPI
+vaultProxyServer = getKey
+    :<|> getPing
+    :<|> postKey
+    :<|> getSharedKey
+    :<|> getUsers
+    :<|> postSignature
+    :<|> postPassword
+    :<|> verifyPassword
+
+runVaultM :: MonadIO m => String -> VaultM m a -> m a --Might want to add this to the central monad directory strato/libs/composable-monads/vault-monad (this will need to be a new executable though 🤦)
+runVaultM url = do
+    manager <- liftIO $ newManager defaultManagerSettings
+    vaultProxyUrl <- liftIO $ parseBaseUrl url
+    runReaderT f $ VaultConnection vaultProxyUrl flags_VAULT_PASSWORD flags_VAULT_PORT manager
+
 -- makeJWTPayload :: VaultToken -> T.Text -> T.Text
 -- makeJWTPayload token payload = "Hello World" ++ show token ++ show payload
-checkIfAlive :: VaultToken -> Bool
-checkIfAlive token = do
-    let expry = token ^. expiresIn
-    if expry > 0 then True else False
+-- checkIfAlive :: VaultToken -> Bool
+-- checkIfAlive token = do
+--     let expry = token ^. expiresIn
+--     if expry > 0 then True else False
 
 --------------------------------------------------------------------------------
 --API functions
@@ -262,4 +340,3 @@ getRawOauth = client rawOAuthAPI
 
 connectRawOauth :: ClientM RawOauth
 connectRawOauth = getRawOauth
-
