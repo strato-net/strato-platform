@@ -17,7 +17,7 @@ module Blockchain.Event (
   handleGetChainDetails,
   checkPeerIsMember,
   checkPeerIsMember', -- For testing
-  checkPeerIsMember'' -- For testing
+  certOrgTuple,
   ) where
 
 import           Control.Arrow                         ((&&&), second)

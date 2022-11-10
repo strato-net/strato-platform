@@ -62,7 +62,7 @@ module Blockchain.Context
     , shouldSendToPeer
     , withActivePeer
     , getPeerX509
-  
+    , getPeerByParsedSet
     ) where
 
 
@@ -439,6 +439,19 @@ instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. ip ] []
 
+instance Ord Point where
+  (Point it it') `compare` (Point it2 it2') = case (it `compare` it2) of
+    EQ -> (it' `compare` it2')
+    x -> x
+  _ `compare` _ = GT
+ 
+instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
+  select _ pk = sqlQuery actions >>= \case
+        [] -> return Nothing
+        lst -> return . Just . SQL.entityVal $ head lst
+
+    where actions = SQL.selectList [ PPeerPubkey SQL.==. (Just pk) ] []
+
 instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
 
@@ -511,6 +524,7 @@ type MonadP2P m = ( MonadIO m
                   , All '[Mod.Accessible]
                       '[ MaxReturnedHeaders
                        , ConnectionTimeout
+                       , RBDB.RedisConnection
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
@@ -532,6 +546,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Address, X509CertInfoState)
                        , '((IPAsText, UDPPort, B.ByteString), Point)
                        , '(IPAsText, PPeer)
+                       , '(Point, PPeer)
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)
@@ -620,6 +635,22 @@ getPeerX509 :: A.Selectable Address X509CertInfoState m
 getPeerX509 peer = case pPeerPubkey peer of
   Nothing -> pure Nothing
   Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
+
+getPeerByParsedSet :: (MonadP2P m) => ChainMemberParsedSet -> m (Maybe PPeer)
+getPeerByParsedSet member = do
+  cert <- RBDB.withRedisBlockDB (RBDB.getCertFromParsedSet member) 
+  case cert of
+      Nothing -> pure $ Nothing
+      Just c -> do
+          let sub = getCertSubject $ certificate c
+          case sub of
+            Just s -> (getPeerByPubKey . secPubKeyToPoint . subPub) s
+            Nothing -> pure $ Nothing
+
+getPeerByPubKey :: A.Selectable Point PPeer m
+                => Point
+                -> m (Maybe PPeer)
+getPeerByPubKey = A.select (Proxy @PPeer)
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
