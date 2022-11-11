@@ -1,7 +1,7 @@
 BlockData
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Address
+    coinbase ChainMemberParsedSet
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -19,7 +19,7 @@ BlockData
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Address
+    coinbase ChainMemberParsedSet
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot

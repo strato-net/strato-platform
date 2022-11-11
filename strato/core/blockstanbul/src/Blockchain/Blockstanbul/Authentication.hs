@@ -10,16 +10,16 @@ module Blockchain.Blockstanbul.Authentication
   ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (liftM2, liftM3, unless)
+-- import Control.Monad (liftM2, liftM3, unless)
 --import Control.Monad.Trans.Except
-import Control.Monad.Except
+import Control.Monad.Except    hiding (sequence)
 import qualified Control.Monad.Change.Alter        as A
 import Control.Lens as L
 import Data.Binary
-import Data.List (intercalate)
+-- import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Maybe (mapMaybe,fromMaybe, fromJust, isJust)
+import Data.Maybe (mapMaybe, catMaybes)
 import Data.Either.Extra
 import qualified Data.Set as S
 import Test.QuickCheck
@@ -137,7 +137,7 @@ signBenfInfo bnf =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
   in sign mesg
 
-verifyBenfInfo :: (Address, Bool, Int) -> Signature -> Maybe Address
+verifyBenfInfo :: (ChainMemberParsedSet, Bool, Int) -> Signature -> Maybe Address
 verifyBenfInfo bnf sig =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
   in fromPublicKey <$> recoverPub sig mesg
@@ -162,35 +162,46 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
 authenticate _ = return True 
 
 
-replayHistoricBlock ::(A.Selectable Address X509CertInfoState m) => ChainMembers  -> Word256 -> Block -> m (Either String (Word256, Address))
+replayHistoricBlock ::(A.Selectable Address X509CertInfoState m) => ChainMembers  -> Word256 -> Block -> m (Either String (Word256, ChainMemberParsedSet))
 replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = runExceptT $ do
   let ExtraData{..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra{..} <- liftEither $ maybeToEither  "no istanbul metadata"   _istanbul
-    -- Just ist -> Right ist
   let mProp = verifyProposerSeal blk =<< _proposedSig
-      signers = S.fromList
+      signers = S.fromList 
               . mapMaybe (verifyCommitmentSeal (blockHash blk))
               $ _commitment
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
-      noAddress = S.toList $ S.map getX509FromAddress signers
+      -- signersX509 = 
+  -- signersX509 <- liftEither $ maybeToEither "no istanbul metadata" mapMaybe =<<(getX509FromAddress (S.toList signers))
+  -- signersz <-  S.fromList $ (map getChainMemberFromX509 signersX509)
+  noAddress <- lift $ traverse getX509FromAddress (S.toList signers)
+      
 
-  unless (all  (== True) (map isJust noAddress ))  $ liftEither $ Left $ printf "No address realated to singers"
+  -- unless (all  (== True) (map isJust noAddress ))  $ liftEither $ Left $ printf "No address realated to singers"
   
-  signerRes <- getChainMemberFromX509 <$>  noAddress
+  let signerRes =  S.fromList $ ((getChainMemberFromX509 ) <$> (catMaybes noAddress))
   unless (seqNo + 1 == blockNo) $
     liftEither $ Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == _validatorList) $
     liftEither $ Left "mismatched validators"
-  prop <- maybe (Left "invalid proposer seal") Right mProp
-  propRes <- getChainMemberFromX509 <$> (getX509FromAddress prop)
-  unless (propRes `S.member` chainWorkAround) $
-    liftEither $ Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
-  unless (signerRes `S.isSubsetOf` chainWorkAround) $ do
-    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signerRes S.\\ chainWorkAround
-    liftEither $ Left $ "unknown signers: " ++ unexplained
-  unless (3 * S.size signerRes > 2 * S.size chainWorkAround) $
-    liftEither $ Left $ printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size chainWorkAround)
-  liftEither $ Right (fromIntegral $ seqNo + 1, prop)
+  prop <- liftEither $ maybeToEither  "invalid proposer seal" mProp
+  --  maybe (Left "invalid proposer seal") Right mProp
+
+  mPropCert <- lift $  (getX509FromAddress prop)
+  case mPropCert of
+    Nothing -> liftEither . Left $ "Proposer does not have an X509 certificate: " ++ formatAddressWithoutColor prop
+    Just propCert -> do
+      let propChainMember = getChainMemberFromX509 propCert
+      -- unless ( propT == Nothing) $ liftEither $ Left $ printf "No x509 "
+      -- propRes <-  getChainMemberFromX509  (getX509FromAddress prop)
+      unless ( propChainMember `S.member` chainWorkAround) $
+        liftEither $ Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+      unless (signerRes `S.isSubsetOf` chainWorkAround) $ do
+        --let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signerRes S.\\ chainWorkAround
+        liftEither $ Left $ "unknown signers: " -- ++ unexplained
+      unless (3 * S.size signerRes > 2 * S.size chainWorkAround) $
+        liftEither $ Left $ printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size chainWorkAround)
+      liftEither $ Right (fromIntegral $ seqNo + 1, propChainMember)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = (> 32) . B.length . L.view extraLens

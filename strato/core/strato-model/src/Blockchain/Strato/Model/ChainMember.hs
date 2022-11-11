@@ -90,6 +90,13 @@ instance ToJSONKey ChainMembers
 
 instance FromJSONKey ChainMembers
 
+instance Semigroup ChainMembers where
+  (ChainMembers cm) <> _ = ChainMembers cm
+
+instance Monoid ChainMembers where
+  mempty = ChainMembers (S.empty)
+  mappend = (<>)
+
 instance Format ChainMembers where
   format = show
 

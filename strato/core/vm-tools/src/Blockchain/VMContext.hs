@@ -126,6 +126,7 @@ import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
@@ -195,7 +196,7 @@ data ContextState = ContextState
   , _bestBlockInfo     :: ContextBestBlockInfo
   , _hasBlockstanbul   :: Bool
   , _blockRequested    :: Bool
-  , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
+  , _coinbaseQueue     :: Q.Seq ((ChainMemberParsedSet,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
   } deriving (Generic, NFData)
@@ -682,7 +683,7 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 queuePendingVote :: ( MonadLogger m
                     , Mod.Modifiable ContextState m
                     )
-                 => Address -> Bool -> Address -> m ()
+                 => ChainMemberParsedSet -> Bool -> Address -> m ()
 queuePendingVote a r s = do
   let voteDir = case r of
         True -> maxBound
@@ -696,11 +697,11 @@ queuePendingVote a r s = do
 peekPendingVote :: ( MonadLogger m
                    , Mod.Accessible ContextState m
                    )
-                => m (Address, Word64)
+                => m (ChainMemberParsedSet, Word64)
 peekPendingVote = do
   ctx <- Mod.access (Mod.Proxy @ContextState)
   case Q.viewl $ _coinbaseQueue ctx of
-    Q.EmptyL -> return (0,0)
+    Q.EmptyL -> return (Everyone False,0)
     ( v Q.:< _) -> do
       $logInfoLS "peekPendingVote" v
       return $ fst v

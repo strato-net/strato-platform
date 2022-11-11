@@ -187,7 +187,7 @@ instance Format BlockData where
     "parentHash: " ++ format (blockDataParentHash b) ++ "\n" ++
     "unclesHash: " ++ format (blockDataUnclesHash b) ++
     (if blockDataUnclesHash b == hash (BS.pack [0xc0]) then " (the empty array)\n" else "\n") ++
-    "coinbase: " ++ show (pretty $ blockDataCoinbase b) ++ "\n" ++
+    "coinbase: " ++ (format $ blockDataCoinbase b) ++ "\n" ++
     "stateRoot: " ++ format (blockDataStateRoot b) ++ "\n" ++
     "transactionsRoot: " ++ format (blockDataTransactionsRoot b) ++ "\n" ++
     "receiptsRoot: " ++ format (blockDataReceiptsRoot b) ++ "\n" ++

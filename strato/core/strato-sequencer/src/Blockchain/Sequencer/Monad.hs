@@ -359,15 +359,15 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
-instance (Word256 `A.Alters` X509CertInfoState) SequencerM where 
-  lookup = genericLookupSequencer x509CertInfoState
+instance (Address `A.Alters` X509CertInfoState) SequencerM where 
+  lookup = genericLookupSequencer x509certInfoState
   insert p k v = do
-    genericInsertSequencer x509CertInfoState p k v
-    sz <- M.size <$> use x509CertInfoState
+    genericInsertSequencer x509certInfoState p k v
+    sz <- M.size <$> use x509certInfoState
     liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
   delete p k = do
-    genericDeleteSequencer x509CertInfoState p k
-    sz <- M.size <$> use x509CertInfoState
+    genericDeleteSequencer x509certInfoState p k
+    sz <- M.size <$> use x509certInfoState
     liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where

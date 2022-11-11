@@ -7,6 +7,7 @@
 
 module Main where
 
+import qualified Data.Aeson                 as Ae
 import           Control.Exception
 import           Control.Monad
 import qualified Data.ByteString.Char8      as C8
@@ -25,6 +26,7 @@ import           Text.Printf
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 
@@ -48,7 +50,7 @@ instance HasVault IO where
 data Options = Options
   { optRemove    :: Bool
   , optHTTPS     :: Bool
-  , optRecipient :: Address
+  , optRecipient :: ChainMemberParsedSet
   , optNodes     :: [String]
   , optNonce     :: Int
   } deriving Show
@@ -76,10 +78,10 @@ options =
   , Option ['r'] ["recipient"]
       (ReqArg
        (\ rp opts -> do
-           let strAddr = stringAddress rp
-           case strAddr of
-             Just eRecipient -> return opts { optRecipient = eRecipient }
-             Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
+           let strAddr = rp Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]--stringAddress rp
+          --  case strAddr of
+          --    Just eRecipient -> return opts { optRecipient = eRecipient }
+          --    Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
        ) "Address")
     "REQUIRED; The beneficiary address."
   , Option ['d'] ["nodes"]

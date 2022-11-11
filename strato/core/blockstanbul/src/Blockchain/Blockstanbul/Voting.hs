@@ -3,11 +3,11 @@ module Blockchain.Blockstanbul.Voting where
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader as BH
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
 import Data.Map as M
 import Data.List as L
 
-editBeneficiary :: Block -> Address -> Bool ->  Block
+editBeneficiary :: Block -> ChainMemberParsedSet -> Bool ->  Block
 editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
                    where noncw = case nonc of
                                            True -> maxBound
@@ -16,14 +16,14 @@ editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
                                                        blockDataNonce = noncw
                                                      }
 
-extractBeneficiary :: Block -> Maybe(Address,Bool)
-extractBeneficiary ppl = case (((BH.beneficiary $ BH.blockToBlockHeader ppl )> 0),(BH.nonce $ BH.blockToBlockHeader ppl)) of
+extractBeneficiary :: Block -> Maybe (ChainMemberParsedSet,Bool)
+extractBeneficiary ppl = case (((BH.beneficiary $ BH.blockToBlockHeader ppl ) /= Everyone False),(BH.nonce $ BH.blockToBlockHeader ppl)) of
   (True, x) | x == maxBound -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl), True)
             | x == 0 -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl),False)
   (_, _) -> Nothing
 
 --output a new list of validater and beneficiary
-updateValidator :: [Address] -> Map Address (Map Address Bool) -> [Address]
+updateValidator :: [ChainMemberParsedSet] -> Map ChainMemberParsedSet (Map ChainMemberParsedSet Bool) -> [ChainMemberParsedSet]
 updateValidator val voted = sort newVals
                      where (toDrop,toAdd) = partitionWithKey (\ k _ -> k `elem` val) voted
                            addSuccess = M.filter helperAs toAdd
@@ -35,5 +35,5 @@ updateValidator val voted = sort newVals
                            helperDs valu = (length (L.filter (==False) (elems valu)) > threshold)
 
 
-combined :: [Address] -> Map Address (Map Address Bool) -> Map Address (Map Address Bool) -> [Address]
+combined :: [ChainMemberParsedSet] -> Map ChainMemberParsedSet (Map ChainMemberParsedSet Bool) -> Map ChainMemberParsedSet (Map ChainMemberParsedSet Bool) -> [ChainMemberParsedSet]
 combined val adds drops = (val ++  (keys adds)) L.\\ (keys drops)

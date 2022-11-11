@@ -32,7 +32,6 @@ import Blockchain.Data.RLP
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
@@ -143,7 +142,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
-             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
+             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMemberParsedSet, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
              deriving (Eq, Show)
@@ -166,12 +165,15 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
-              | GapFound {have :: Integer, require :: Integer, peer :: ChainMembers}
-              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMembers}
+              | GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
+              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
               -- A PendingVote should be authenticated by blockstanbul, but applied
               -- by a Bagger monad. This is so that the stateroot is computed after
               -- the coinbase is modified to hold the vote.
-              | PendingVote { pendingRecipient :: ChainMembers, pendingVotingDir :: Bool, pendingVoteSender :: ChainMembers}
+              | PendingVote { pendingRecipient :: ChainMemberParsedSet
+                            , pendingVotingDir :: Bool
+                            , pendingVoteSender :: ChainMemberParsedSet 
+                            }
               | VoteResponse HA.VoteResult
               | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)

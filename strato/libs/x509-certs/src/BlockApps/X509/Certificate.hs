@@ -172,7 +172,6 @@ getX509FromAddress :: A.Selectable Address X509CertInfoState m
 getX509FromAddress addr = (A.select (A.Proxy @X509CertInfoState)addr)
 
 
-
 data Issuer = Issuer
   {
     issCommonName :: String

@@ -1,15 +1,18 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Blockstanbul.StateMachine where 
 
 
 import           Conduit
 import           Control.Lens                     hiding (view)
-import           Control.Monad     
+import           Control.Monad
 import           Control.Monad.State.Class
 
 import qualified Data.Map.Strict                  as M
@@ -25,7 +28,6 @@ import           BlockApps.Logging
 import           Blockchain.Blockstanbul.Messages
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
--- import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -41,7 +43,6 @@ type StateMachineM m = ( MonadState BlockstanbulContext m
                        , MonadLogger m
                        , HasVault m
                        )
-
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 

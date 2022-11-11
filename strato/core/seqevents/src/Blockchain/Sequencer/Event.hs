@@ -111,7 +111,7 @@ instance Format SeqLoopEvent where
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
-                 | IENewCertRegistered  Account A.Address X509CertInfoState
+                 | IENewCertRegistered  A.Address X509CertInfoState
                 --  | IENewChainMember Word256 A.Address Enode
                  | IENewChainOrgName Word256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
@@ -147,7 +147,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  format (IENewCertRegistered c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
+  format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
   -- format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
@@ -195,8 +195,8 @@ data P2pEvent =
   | P2pNewOrgName Word256 ChainMemberParsedSet
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
-  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
-  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
+  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
+  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: ChainMemberParsedSet}
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format P2pEvent where
@@ -216,7 +216,7 @@ data VmEvent =
   | VmGenesis OutputGenesis
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
-  | VmVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+  | VmVoteToMake { voteRecipient :: ChainMemberParsedSet, voteVotingDir :: Bool, voteSender :: ChainMemberParsedSet }
   | VmPrivateTx OutputTx
   deriving (Eq, Show, GHCG.Generic, Data)
 

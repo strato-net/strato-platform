@@ -36,6 +36,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import           Control.Monad.Composable.SQL
@@ -47,7 +48,7 @@ import           UnliftIO
 
 type API = 
   "block" :> QueryParam "txaddress" Address
-          :> QueryParam "coinbase" Address
+          -- :> QueryParam "coinbase" ChainMemberParsedSet
           :> QueryParam "address" Address
           :> QueryParam "blockid" Text
           :> QueryParam "hash" Keccak256
@@ -69,7 +70,7 @@ type API =
 
 data BlocksFilterParams = BlocksFilterParams
   { qbTxAddress  :: Maybe Address
-  , qbCoinbase   :: Maybe Address
+  , qbCoinbase   :: Maybe ChainMemberParsedSet
   , qbAddress    :: Maybe Address
   , qbBlockId    :: Maybe Text
   , qbHash       :: Maybe Keccak256
@@ -173,21 +174,20 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
     return . Just $ map (uncurry blockDataRefToBlock) modBlocks
 
 getBlockInfo :: Selectable BlocksFilterParams [Block] m =>
-  Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
+  Maybe Address -> Maybe Address -> Maybe Text ->
   Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
   m [Block']
-getBlockInfo a b c d e f g h i j k l m n o p q r s t =
-  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
+getBlockInfo a c d e f g h i j k l m n o p q r s t =
+  getBlockInfo' (BlocksFilterParams a Nothing c d e f g h i j k l m n o p q r s t)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
 
 blockQueryParams:: [Text]
 blockQueryParams = [ "txaddress",
-                     "coinbase",
                      "address",
                      "blockid",
                      "hash",

@@ -82,23 +82,18 @@ main = do
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
-  
-  selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
-    return $ VC.unAddress addrAndKey
-  
-  putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
-  addSelfAsMetric selfAddress
 
   maybeNetworkParams <- Net.getParams flags_network
-  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
       !validators' =
         case (maybeNetworkParams, eValidators) of
           (Just networkParams, Right []) -> map Net.ethAddress networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid validators: " ++ e
-      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
+      eSelf = Ae.eitherDecodeStrict (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
+      !self = fromRight (error "invalid self cert info") eSelf
  
 
   mCtx <- if not flags_blockstanbul
@@ -106,11 +101,11 @@ main = do
              else do
                validators <- 
                  if flags_isRootNode then do
-                   unless (length validators' == 0) . putStrLn
-                      $ "WARNING: You have given me a validators list and you are telling me that this node \
-                        \ is the root node. I'll ignore the validator list \
-                        \ you gave me, but this is likely a configuration error on your part."
-                   return [selfAddress]
+                   when (length validators' == 0) . putStrLn
+                      $ "WARNING: You have given me an empty validators list. \
+                        \ This is a configuration error on your part. \
+                        \ PBFT will almost certainly not function properly."
+                   return validators'
                  else do
                    when (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me an empty validators list, but this node is not the root \
@@ -120,7 +115,7 @@ main = do
                 
                authSenders <-
                  if flags_isAdmin || flags_isRootNode then 
-                   return $ selfAddress : authSenders'
+                   return $ self : authSenders'
                  else do 
                    when (length authSenders' == 0) . putStrLn
                        $ "WARNING: You haven't given me any blockstanbulAdmins. If you are starting \
@@ -129,7 +124,7 @@ main = do
                        \ to add or remove validators, as it has no authorized senders."
                    return authSenders'
 
-               unless (selfAddress `elem` validators) . putStrLn
+               unless (self `elem` validators) . putStrLn
                     $ "WARNING: NODEKEY does not correspond to an address within the validators.\
                       \ This probably means that you are connecting to an existing network,\
                       \ and you are not one of the original validators of that network.\
@@ -146,7 +141,7 @@ main = do
                ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
                putStrLn $ "Checkpoint: " ++ show ckpt
  
-               return $ Just $ newContext ckpt selfAddress
+               return $ Just $ newContext ckpt self
   
  
   chr <- atomically newTQueue

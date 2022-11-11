@@ -46,6 +46,7 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
+      - aeson
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
       - blockstanbul
@@ -67,6 +68,7 @@ tests:
     source-dirs: test/
     dependencies:
       - QuickCheck
+      - aeson
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
@@ -81,6 +83,8 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - lens
+      - monad-alter
+      - mtl
       - strato-model
       - time
       - transformers
