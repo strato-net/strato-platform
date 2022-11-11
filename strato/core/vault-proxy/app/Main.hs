@@ -20,7 +20,9 @@ defineFlag "OAUTH_JWT_USERNAME_PROPERTY" ("" :: T.Text) "OAuth2 JWT Username Pro
 defineFlag "OAUTH_CLIENT_ID" ("" :: T.Text) "OAuth2 Client ID"
 defineFlag "OAUTH_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Client Secret"
 defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
-defineFlag "VAULT_URL" ("" :: T.Text) "The place where I go to visit THE VAULT 🔒."
+defineFlag "OAUTH_SERVICE_USER_CLIENT_ID" ("" :: T.Text) "OAuth2 Service User Client ID"
+defineFlag "OAUTH_SERVICE_USER_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Service User Client Secret"
+defineFlag "VAULT_URL" ("http:://vault-proxy" :: T.Text) "The place where I go to visit THE VAULT 🔒."
 defineFlag "VAULT_PORT" (8013 :: Int) "This is the place that the vault proxy will attempt to connect and will also communicate with. Same port is used for post and gets, just to let you know."
 defineFlag "VAULT_PASSWORD" ("" :: T.Text) "This is the password that is used to log into the shared vault."
 
@@ -34,10 +36,23 @@ main = do
 
     forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering 
     putStrLn vaultProxyLogo
+
+    --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
+    mgr <- newManager tlsManagerSettings
     let vaultConnection = VaultConnection {
         vaultUrl = flags_VAULT_URL,
         vaultPassword = flags_VAULT_PASSWORD,
-        vaultPort = flags_VAULT_PORT
+        vaultPort = flags_VAULT_PORT,
+        httpManager = mgr,
+        oauthEnabled = flags_OAUTH_ENABLED,
+        oauthUrl = flags_OAUTH_DISCOVERY_URL,
+        oauthClientId = flags_OAUTH_CLIENT_ID
+        oauthClientSecret = flags_OAUTH_CLIENT_SECRET,
+        oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
+        oauthServiceClientId = flags_OAUTH_SERVICE_USER_CLIENT_ID,
+        oauthServiceClientSecret = flags_OAUTH_SERVICE_USER_CLIENT_SECRET,
+        vaultProxyUrl = flags_VAULT_PROXY_URL,
+        vaultProxyPort = flags_VAULT_PROXY_PORT
     }
     _ <- $initHFlags "Vault Proxy"
     --check if the shared vault is alive
@@ -45,8 +60,7 @@ main = do
     
     --Initialize the cache, make it able to use STM
     tokenCache <- atomically $ newCacheSTM Nothing
-    --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
-    mgr <- newManager tlsManagerSettings
+
 
     --TODO: Check if the NGINX information is current and usable, use this info if avail, fall back to discovery URL from getting started script
     startUpScriptOauth <- case flags_OAUTH_DISCOVERY_URL of

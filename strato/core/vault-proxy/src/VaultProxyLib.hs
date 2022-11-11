@@ -56,6 +56,8 @@ import           GHC.Generics
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
 import           Servant.API             as SA
+import           Servant.Auth            as SA
+import           Servant.Auth.Server     as SAS
 import           Servant.Client
 import           System.Clock
 import           Text.URI                as URI
@@ -173,7 +175,19 @@ data VaultConnection = VaultConnection {
     _vaultUrl :: T.Text,
     _vaultPassword :: T.Text,
     _vaultPort :: Int,
-    _httpManager :: Manager --Please don't export this, not useful to the user (unless we put this not in its own executable)
+    _httpManager :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
+    _oauthEnabled :: Bool,
+    _oauthUrl :: T.Text,
+    _oauthClientId :: T.Text,
+    _oauthClientSecret :: T.Text,
+    _oauthReserveSeconds :: Int,
+    _oauthServiceClientId :: T.Text,
+    _oauthServiceClientSecret :: T.Text,
+    _vaultUrl :: T.Text,
+    _vaultPort :: Int,
+    _vaultPassword :: T.Text,
+    _vaultProxyUrl :: T.Text,
+    _vaultProxyPort :: Int
 }
 makeLenses ''VaultConnection
 
@@ -195,6 +209,8 @@ type BlockAppsTokenAPI =
   :> Get '[SA.JSON] VaultToken
 
 type VaultCache = Cache T.Text VaultToken
+
+type VaultProxyAPI = Auth '[SA.JWT, SA.BasicAuth] AuthenticatedUser :> "vault-proxy" :> VaultProxyAPI
 
 --Need to talk to the vault now
 -- TODO: Make this work, and get rid of the multiple "vault-proxy" instances
@@ -278,29 +294,39 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
-getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
+getKey :: Manager -> ForeignVaultConnection -> VaultCache -> Text -> Maybe Text -> VaultProxyM AddressAndKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+getKey boss foreign squirrel userName otherPub = do 
+    -- jwtToken <- (liftIO $ getAwesomeToken squirrel (foreign ^. clientId) (foreign ^. clientSecret) (foreign ^. reserveTime) (foreign ^. additionalOauth)) ^. accessToken
+    pure undefined
 
 postKey :: Text -> VaultProxyM AddressAndKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
 getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
 postPassword :: Text -> VaultProxyM ()
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
 verifyPassword :: VaultProxyM Bool
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
-getPing :: VaultProxyM String
+-- getPing :: VaultProxyM String --Only used in the vault, but could be useful in doing an initial health check
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+
 
 postSignature :: Text -> MsgHash -> VaultProxyM Signature
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
+    pure undefined
 
 --This is the actualy function that the services will connect to the vaultProxy with
 vaultProxyServer :: Server VaultAPI
