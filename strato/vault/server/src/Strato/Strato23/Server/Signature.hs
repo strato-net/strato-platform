@@ -42,7 +42,7 @@ postSignature userName (MsgHash msgBS) = do
 postSignature' :: Text -> Text -> MsgHash -> VaultM Signature
 postSignature' userName oauthProvider (MsgHash msgBS) = do
   cache <- asks keyStoreCache
-  cachedPk <- liftIO $ Cache.lookup cache (append userName oauthProvider)--Not sure how this would be used in this case
+  cachedPk <- liftIO $ Cache.lookup cache (append userName oauthProvider)
   (_,nonce,pKey,_) <- case cachedPk of
     Just (KeyStore a b c d) -> pure (a,b,c,d)
     Nothing -> do
