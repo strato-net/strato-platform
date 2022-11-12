@@ -241,6 +241,12 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           return $ length infos == length chainIds
 
 
+getSingleChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
+                ChainId -> Maybe Integer -> Maybe Integer -> m ChainIdChainOutput
+getSingleChainInfo chainId lim off = do
+   chainoutput <- getChainInfo [chainId] lim off
+   return $ head chainoutput
+
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
                 [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
 getChainInfo chainIds lim off = do
