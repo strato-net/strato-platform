@@ -70,7 +70,6 @@ bloc = return gitInfo
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
   :<|> postChainInfo
-  :<|> getSingleChainInfo
   :<|> postChainInfos
   :<|> getChainInfo
   :<|> postBlocTransactionParallel
@@ -90,5 +89,10 @@ blocSwagger = toSwagger (Proxy @BlocAPI)
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 makeLenses ''Swagger
+type GetSingleChainInfo = "chain"
+  :> QueryParams "chainid" ChainId
+  :> QueryParam "limit" Integer
+  :> QueryParam "offset" Integer
+  :> Get '[JSON] ChainIdChainOutput
 filterEnterprisePaths :: Swagger -> Swagger
 filterEnterprisePaths = over swaggerPaths $ filterWithKey (\k _ -> k /= "/users")
