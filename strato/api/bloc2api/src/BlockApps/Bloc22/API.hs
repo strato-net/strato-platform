@@ -53,9 +53,11 @@ type BlocAPI =
   :<|> PostBlocTransactionResults
   -- /chain endpoints
   :<|> PostChainInfo
-  :<|> GetChainInfo
+  :<|> GetSingleChainInfo
   -- /chains endpoints
   :<|> PostChainInfos
+  :<|> GetChainInfo
+
   -- /transaction endpoints
   :<|> PostBlocTransactionParallel
   :<|> PostBlocTransactionRaw

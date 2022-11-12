@@ -228,11 +228,11 @@ type PostChainInfo = "chain"
 
 -- GET /chain
 
-type GetChainInfo = "chain"
+type GetSingleChainInfo = "chain"
   :> QueryParams "chainid" ChainId
   :> QueryParam "limit" Integer
   :> QueryParam "offset" Integer
-  :> Get '[JSON] [ChainIdChainOutput]
+  :> Get '[JSON] ChainIdChainOutput
 
 -- POST /chains
 
@@ -240,3 +240,11 @@ type PostChainInfos = "chains"
   :> Servant.API.Header "X-USER-UNIQUE-NAME" Text
   :> ReqBody '[JSON] [ChainInput]
   :> Post '[JSON] [ChainId]
+
+-- GET /chains
+
+type GetChainInfo = "chains"
+  :> QueryParams "chainids" [ChainId]
+  :> QueryParam "limit" Integer
+  :> QueryParam "offset" Integer
+  :> Get '[JSON] [ChainIdChainOutput]
