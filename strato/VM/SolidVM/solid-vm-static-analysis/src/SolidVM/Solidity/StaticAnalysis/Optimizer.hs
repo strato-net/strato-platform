@@ -29,8 +29,20 @@ data R = R
 -- Also add state variables.
 -- 
 
-type SSS = StateT [String] (Reader R)
+type SSS = StateT (M.Map SolidString (Expression))   (Reader R) --- hmm SO change this to?
 --type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
+
+--we want a map var name var expression
+--Love it I think that works.
+--This may get tricky, but I am ready for this
+--
+
+-- SO first get this compiling by replacing what you have
+-- Then get it functionally working
+-- I can replace map in 30min or less my goal is before 1:30
+-- Then get work till 3
+-- Then maybe take break to workout
+-- x`
 
 detector ::  CodeCollection -> CodeCollection
 detector cc = (over (contracts . mapped) (contractHelper cc)
@@ -54,7 +66,7 @@ varDeclHelper cc c v = case _varType v of
   (SVMType.UserDefined  _ actua )-> v{_varType = actua  , _varInitialVal = run <$> _varInitialVal v }
   _ -> v{ _varInitialVal = run <$> _varInitialVal v }
   where run e = let r = R cc c
-          in runReader (evalStateT (optimizeExpression e) ["Useless string for State manipulation pattern"]) r
+          in runReader (evalStateT (optimizeExpression e) M.empty) r
 
 
 constDeclHelper :: CodeCollection
@@ -66,7 +78,7 @@ constDeclHelper cc c v =
         (SVMType.UserDefined  _ actua )-> v{ _constType = actua  , _constInitialVal = run  (_constInitialVal v) }
         _ ->  v{ _constInitialVal = run $ _constInitialVal v }
         where run e = let r = R cc c
-                in runReader (evalStateT (optimizeExpression e) ["Useless string for State manipulation pattern"])r
+                in runReader (evalStateT (optimizeExpression e) M.empty)r
 
 
 -- TODO clean this code up
@@ -99,7 +111,7 @@ optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $  []
 optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
   let 
-  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
+  cond' <- (evalStateT (optimizeExpression cond) M.empty) 
   case cond' of
     BoolLiteral _ True -> do
       thens' <- optimizeStatements thens
@@ -116,19 +128,19 @@ optimizeStatements ((TryCatchStatement tryStatements catchMap x) : ss) = do
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (TryCatchStatement tryStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((SolidityTryCatchStatement expr mtpl successStatements catchMap x) : ss) = do
-  expr' <- (evalStateT  (optimizeExpression expr) ["xBS examplex"]) 
+  expr' <- (evalStateT  (optimizeExpression expr) M.empty) 
   successStatements' <- optimizeStatements successStatements
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (SolidityTryCatchStatement expr' mtpl successStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((WhileStatement cond body x) : ss) = do
-  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
+  cond' <- (evalStateT (optimizeExpression cond) M.empty) 
   case cond' of
     BoolLiteral _ False -> optimizeStatements ss
     _ -> do
       body' <- optimizeStatements body
       (WhileStatement cond' body' x:) <$> optimizeStatements ss
 optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
-  let getExpression = (\xxx -> (evalStateT (optimizeExpression xxx) ["xBS examplex"]))
+  let getExpression = (\xxx -> (evalStateT (optimizeExpression xxx) M.empty))
   mCond' <- traverse getExpression  mCond
   mPost' <- traverse getExpression mPost  
   body' <- optimizeStatements body
@@ -136,7 +148,7 @@ optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
 optimizeStatements ((Block _) : ss) = optimizeStatements ss
 optimizeStatements ((DoWhileStatement body cond x) : ss) = do
   body' <- optimizeStatements body
-  cond' <- (evalStateT (optimizeExpression cond) ["xBS examplex"]) 
+  cond' <- (evalStateT (optimizeExpression cond) M.empty) 
   case cond' of
     BoolLiteral _ False -> (body' ++) <$> optimizeStatements ss
     _ -> (DoWhileStatement body' cond' x:) <$> optimizeStatements ss
@@ -151,16 +163,53 @@ optimizeStatements (s@(UncheckedStatement _ _) : ss) = (s:) <$> optimizeStatemen
 optimizeStatements (s@(AssemblyStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 --optimizeStatements (s@(SimpleStatement a _) : ss) = ( ( (optimizeExpression a)) :) <$> optimizeStatements ss
 --optimizeStatements (s@(SimpleStatement a (ExpressionStatement expr)) : ss) = (SimpleStatement a (ExpressionStatement (optimizeExpression expr)) :) <$> optimizeStatements ss
-optimizeStatements (s@(SimpleStatement a b ) : ss) = do 
-  ssss <- (evalStateT (simpleStatementHelper (SimpleStatement a b )) ["xBS examplex"])  
-  pure $ (ssss :) <$> optimizeStatements ss
+optimizeStatements (s@(SimpleStatement _  _) : ss) = do   
+  ssss <- evalStateT (simpleStatementFHelper'  s) M.empty
+  (ssss :) <$> optimizeStatements ss
+
+-- optimizeStatements (s@(SimpleStatement _  _) : ss) = ((evalStateT (simpleStatementFHelper'  s) ["xBS examplex"] ) :) <$> optimizeStatements ss
+
+
+-- Need to handle other case of simple statementF -> VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
+simpleStatementFHelper' ::  Statement -> SSS (Statement)
+simpleStatementFHelper' (SimpleStatement (ExpressionStatement xpr) b ) = do 
+  x <- optimizeExpression xpr
+  _ <- case x of
+    (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
+  pure $   (SimpleStatement (ExpressionStatement x) b )
+simpleStatementFHelper' a = pure $ a
+
+
+--Okay so we need to put vars in the stack
+--Then we need to check if they are being called
+-- Typechecker needs to be doing this
+-- So I should double check what that is doing
+--- I want to hear the feedback from functional programming group
+
+
+-------
+-- simpleStatementFHelper ::  (SimpleStatementF a) -> SSS (SimpleStatement)
+-- --simpleStatementFHelper (SimpleStatement a b ) = pure $ (SimpleStatement a b ) 
+-- simpleStatementFHelper ExpressionStatement b =  pure $ (ExpressionStatement b) b
+-- --simpleStatementFHelper (VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) =  pure $ (SimpleStatement a b ) 
+-- simpleStatementFHelper a = pure $ a 
+-------
+
+-- --   x <- optimizeExpression xpr
+-- --   pure $   ExpressionStatement x
+-- -- simpleStatementHelper a = pure $ a
+-- --   --pushLocalVariables vdefs
+-- --   let ts' = foldr varDefsToType' (topType' x) vdefs
+-- --   ts' ~> maybe (pure $ topType' x) tcExpr mExpr
+-- -- simpleStatementHelper _ (ExpressionStatement expr) =
+-- --   tcExpr expr
 
  
-simpleStatementHelper :: SimpleStatement -> SSS SimpleStatement
-simpleStatementHelper (ExpressionStatement xpr) = do 
-  x <- optimizeExpression xpr
-  pure $   ExpressionStatement x
-simpleStatementHelper a = pure $ a
+-- simpleStatementHelper :: SimpleStatement -> SSS SimpleStatement
+-- simpleStatementHelper (ExpressionStatement xpr) = do 
+--   x <- optimizeExpression xpr
+--   pure $   ExpressionStatement x
+-- simpleStatementHelper a = pure $ a
 -- As of right now this is just a helper for UserDefined types.
 -- TODO alter fore all Types
 -- Also maybe a specialized UserDefined version of this
@@ -180,9 +229,13 @@ getVariableByName name = do
                     -- <|> () <$> M.lookup name (_structs c))
                     -- <|> () <$> M.lookup name (_errors c))
                     -- <|> () <$> M.lookup name (_flErrors cc))
-    Nothing ->  pure $  Nothing
+    Nothing -> do 
+      mVar <- M.lookup name <$> get
+      case mVar of 
+        Nothing -> pure $  Nothing
+        _ -> pure $ mVar
 
-
+--Offf I just realized we don't have an equal
 optimizeExpression :: Expression -> SSS Expression
 optimizeExpression (Binary x "+" a b) = do
   a' <- optimizeExpression a
