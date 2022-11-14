@@ -105,15 +105,6 @@ getChain :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo
          -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain cIds mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLim mOff
 
-{-
---get a single chain
-getChain' :: Selectable ChainFilterParams (NamedTuple "id" "info" ChainId ChainInfo) m
-         => ChainId
-         -> Maybe Integer
-         -> Maybe Integer
-         -> m (NamedTuple "id" "info" ChainId ChainInfo)
-getChain' cId mLim mOff = (NamedTuple "id" "info" ChainId ChainInfo) $ ChainFilterParams cId mLim mOff
--} 
 
 postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChainConduit ci = do

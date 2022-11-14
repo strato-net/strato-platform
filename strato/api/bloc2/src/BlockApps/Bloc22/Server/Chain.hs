@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
+
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Lens                      ((?~), at)
@@ -242,10 +243,9 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
 
 getSingleChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
                 ChainId -> Maybe Integer -> Maybe Integer -> m ChainIdChainOutput
-{- getSingleChainInfo chainId lim off = do
-   chainoutput <- getChainInfo [chainId] lim off
-   return $ head chainoutput -}
-getSingleChainInfo chainId lim off =  head <$> getChainInfo [chainId] lim off 
+
+getSingleChainInfo chainId lim off =  fromMaybe (throwIO $ CouldNotFind "chain not found") . listToMaybe <$> getChainInfo [chainId] lim off 
+
 
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
                 [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
