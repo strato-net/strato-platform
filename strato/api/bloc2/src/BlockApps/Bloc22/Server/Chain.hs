@@ -15,7 +15,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Lens                      ((?~), at)
-import           Control.Monad                     (when, unless)
+import           Control.Monad                     (join, when, unless)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Composable.Vault
 import           Crypto.Random.Entropy
@@ -241,11 +241,11 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           $logDebugLS "waitForChainInfo/resp" infos
           return $ length infos == length chainIds
 
-getSingleChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
-                ChainId -> Maybe Integer -> Maybe Integer -> m ChainIdChainOutput
+getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) => 
+                ChainId -> m ChainIdChainOutput
 
-getSingleChainInfo chainId lim off =  fromMaybe (throwIO $ CouldNotFind "chain not found") . listToMaybe <$> getChainInfo [chainId] lim off 
-
+getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing
+  
 
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
                 [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
