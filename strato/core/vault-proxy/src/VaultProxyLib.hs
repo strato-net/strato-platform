@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,16 +58,17 @@ import           GHC.Generics
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
 import           Servant.API             as SA
-import           Servant.Auth            as SA
+import           Servant.Auth            as SAA
 import           Servant.Auth.Server     as SAS
 import           Servant.Client
+import           Servant.Server          as SS
 import           System.Clock
 import           Text.URI                as URI
 import           Yesod.Core.Types        as YC
 
 --matching types import (reduce redundant changes)
 import           Blockchain.Strato.Model.Address
-import           Strato.Strato23.API.Types --Likely will make a circular dependency
+import           Strato.Strato23.API.Types as Types--Likely will make a circular dependency
 import           Blockchain.Strato.Model.Secp256k1
 import           Strato.Strato23.API.Users
 import           Strato.Strato23.API.Key
@@ -183,9 +186,6 @@ data VaultConnection = VaultConnection {
     _oauthReserveSeconds :: Int,
     _oauthServiceClientId :: T.Text,
     _oauthServiceClientSecret :: T.Text,
-    _vaultUrl :: T.Text,
-    _vaultPort :: Int,
-    _vaultPassword :: T.Text,
     _vaultProxyUrl :: T.Text,
     _vaultProxyPort :: Int
 }
@@ -210,7 +210,7 @@ type BlockAppsTokenAPI =
 
 type VaultCache = Cache T.Text VaultToken
 
-type VaultProxyAPI = Auth '[SA.JWT, SA.BasicAuth] AuthenticatedUser :> "vault-proxy" :> VaultProxyAPI
+type VaultProxyAPI = Auth '[SAA.JWT, SAA.BasicAuth] Types.User :> "vault-proxy" :> VaultAPI
 
 --Need to talk to the vault now
 -- TODO: Make this work, and get rid of the multiple "vault-proxy" instances
@@ -224,6 +224,7 @@ type VaultAPI = GetPing
            :<|> VerifyPassword
 
 type VaultProxyM = ReaderT VaultConnection
+
 type HasVaultProxy m = Accessible VaultConnection m
 
 --------------------------------------------------------------------------------
@@ -294,42 +295,43 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
-getKey :: Manager -> ForeignVaultConnection -> VaultCache -> Text -> Maybe Text -> VaultProxyM AddressAndKey
+getKey :: Manager -> VaultConnection -> VaultCache -> T.Text -> Maybe T.Text -> VaultProxyM AddressAndKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-getKey boss foreign squirrel userName otherPub = do 
+getKey boss env squirrel userName otherPub = do 
     -- jwtToken <- (liftIO $ getAwesomeToken squirrel (foreign ^. clientId) (foreign ^. clientSecret) (foreign ^. reserveTime) (foreign ^. additionalOauth)) ^. accessToken
+    --use res to send the data to vault, adding token to the front header
     pure undefined
 
-postKey :: Text -> VaultProxyM AddressAndKey
+postKey :: T.Text -> VaultProxyM AddressAndKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+postKey kii = pure undefined
 
-getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
+getSharedKey :: T.Text -> PublicKey -> VaultProxyM SharedKey
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+getSharedKey kii pubKii = pure undefined
 
-postPassword :: Text -> VaultProxyM ()
+postPassword :: T.Text -> VaultProxyM ()
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+postPassword pass = pure undefined
 
 verifyPassword :: VaultProxyM Bool
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+verifyPassword = pure undefined
 
 -- getPing :: VaultProxyM String --Only used in the vault, but could be useful in doing an initial health check
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
 
 
-postSignature :: Text -> MsgHash -> VaultProxyM Signature
+postSignature :: T.Text -> MsgHash -> VaultProxyM Signature
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+postSignature sig hash = pure undefined
 
-getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
+getUsers :: T.Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
-    pure undefined
+getUsers temp temp1 temp2 temp3 = pure undefined
 
 --This is the actualy function that the services will connect to the vaultProxy with
-vaultProxyServer :: Server VaultAPI
+vaultProxyServer :: SS.Server VaultAPI
 vaultProxyServer = getKey
     :<|> getPing
     :<|> postKey
@@ -339,7 +341,7 @@ vaultProxyServer = getKey
     :<|> postPassword
     :<|> verifyPassword
 
-runVaultM :: MonadIO m => String -> VaultM m a -> m a --Might want to add this to the central monad directory strato/libs/composable-monads/vault-monad (this will need to be a new executable though 🤦)
+runVaultM :: MonadIO m => String -> VaultProxyM m a -> m a --Might want to add this to the central monad directory strato/libs/composable-monads/vault-monad (this will need to be a new executable though 🤦)
 runVaultM url = do
     manager <- liftIO $ newManager defaultManagerSettings
     vaultProxyUrl <- liftIO $ parseBaseUrl url

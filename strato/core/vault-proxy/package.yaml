@@ -44,6 +44,8 @@ dependencies:
 - req
 - scientific
 - servant
+- servant-auth
+- servant-auth-server
 - servant-client
 - servant-client-core
 - servant-server
