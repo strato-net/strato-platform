@@ -19,7 +19,7 @@ import           Test.Hspec
 
 type TestCertM = ReaderT PrivateKey IO
 
-instance HasVault TestCertM where
+instance HasVaultProxy TestCertM where
   getPub = error "we never call getPub with this tool"
   getShared _ = error "we never call getShared with this tool"
   sign bs = ask >>= return . flip signMsg bs

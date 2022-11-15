@@ -78,7 +78,7 @@ connectMe _ = do
 
   return sock
 
-addPeersIfNeeded :: (HasVault m, MonadIO m, MonadFail m, MonadLogger m)
+addPeersIfNeeded :: (HasVaultProxy m, MonadIO m, MonadFail m, MonadLogger m)
                  => Socket
                  -> m ()
 addPeersIfNeeded sock= do
@@ -100,7 +100,7 @@ addPeersIfNeeded sock= do
         eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
         whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
-attemptBond :: (HasVault m, MonadIO m, MonadFail m, MonadLogger m)
+attemptBond :: (HasVaultProxy m, MonadIO m, MonadFail m, MonadLogger m)
             => Socket
             -> Int
             -> m ()
@@ -132,7 +132,7 @@ attemptBond sock _ = do
                    (time+50)
 
 udpHandshakeServer :: ( HasSQLDB m
-                      , HasVault m
+                      , HasVaultProxy m
                       , MonadFail m
                       , MonadCatch m
                       , MonadThrow m
@@ -169,7 +169,7 @@ udpHandshakeServer sock _ = do
       return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: ( HasSQLDB m
-                     , HasVault m
+                     , HasVaultProxy m
                      , MonadCatch m
                      , MonadThrow m
                      , MonadLogger m

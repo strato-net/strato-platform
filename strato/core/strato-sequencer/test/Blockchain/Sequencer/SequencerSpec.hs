@@ -93,7 +93,7 @@ dedupWindow :: Int
 dedupWindow = 100
 
 -- NOTE: this is (and must be) the same as "testPriv" from Monad.hs....used by the 
--- HasVault instance so we can make Blockstanbul message signatures without a vault client
+-- HasVaultProxy instance so we can make Blockstanbul message signatures without a vault client
 myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 

@@ -38,7 +38,7 @@ class Monad m => HasBlockstanbulContext m where
 type StateMachineM m = ( MonadState BlockstanbulContext m
                        , MonadIO m
                        , MonadLogger m
-                       , HasVault m
+                       , HasVaultProxy m
                        )
 
 

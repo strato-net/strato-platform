@@ -446,7 +446,7 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => HasVault (MonadTest m) where
+instance MonadIO m => HasVaultProxy (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
@@ -459,7 +459,7 @@ instance MonadIO m => HasVault (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
-instance HasVault m => HasVault (MonadP2PTest m) where
+instance HasVaultProxy m => HasVaultProxy (MonadP2PTest m) where
   sign bs = lift $ sign bs
   getPub = lift getPub
   getShared pub = lift $ getShared pub

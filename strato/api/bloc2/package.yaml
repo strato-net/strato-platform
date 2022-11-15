@@ -27,8 +27,8 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
+    - blockapps-vault-proxy-api
+    - blockapps-vault-proxy-client
     - bytestring
     - cache
     - clock
@@ -75,6 +75,7 @@ library:
     - type-lits
     - unliftio
     - vault-monad
+    - vault-proxy-monad
     - vector
     - x509-certs
 

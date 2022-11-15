@@ -294,11 +294,11 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert :: (MonadIO m, HasVaultProxy m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
 makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
 
 
-signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
+signCert :: (MonadIO m, HasVaultProxy m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
 
 makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
@@ -335,7 +335,7 @@ makeCert mDateTime iss sub = do
 --
 -- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
 -- make a PR for it
-ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
+ecdsaWithSHA256 :: (MonadIO m, HasVaultProxy m) => B.ByteString -> m (B.ByteString, SignatureALG)
 ecdsaWithSHA256 = ecdsaWithSHA256F sign
 
 makeSignedCertSigF 

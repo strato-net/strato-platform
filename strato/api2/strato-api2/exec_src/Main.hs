@@ -27,7 +27,7 @@ import           API
 import           BlockApps.Logging
 import           BlockApps.Init
 import           Control.Monad.Composable.SQL    hiding (SQLM)
-import           Control.Monad.Composable.Vault  hiding (httpManager)
+import           Control.Monad.Composable.VaultProxy  hiding (httpManager)
 import           Error404Paths
 import           Options                         ()
 import           SelectAccessible                ()
@@ -44,7 +44,7 @@ hoistCoreServer sqlEnv = hoistServer (Proxy :: Proxy API) (convertErrors runM) s
     runM f =
       runLoggingT .
         runSQLMUsingEnv sqlEnv .
-        runVaultM "http://vault-proxy:8000/strato/v2.3" $ f
+        runVaultProxyM "http://vault-proxy:8000/strato/v2.3" $ f
 
 api :: Proxy API
 api = Proxy

@@ -37,13 +37,13 @@ import Blockchain.Data.AddressStateDB
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
+import Control.Monad.Composable.VaultProxy
 
 bloc :: ( MonadIO m
         , MonadLogger m
         , HasBlocSQL m
         , HasBlocEnv m
-        , HasVault m
+        , HasVaultProxy m
         , HasCoreAPI m
         , HasSQL m
         , Selectable Account ContractDetails m

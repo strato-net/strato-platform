@@ -58,6 +58,7 @@ executables:
     - strato-api2
     - transformers
     - vault-monad
+    - vault-proxy-monad
     - wai-cors
     - wai-extra
     - wai-middleware-prometheus

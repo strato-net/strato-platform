@@ -55,7 +55,7 @@ private = fromMaybe (error "could not import private key") (importPrivateKey (La
 
 
 
-instance HasVault IO where
+instance HasVaultProxy IO where
   sign bs = return $ signMsg private bs 
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"

@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE ConstraintKinds   #-}
+-- {-# LANGUAGE FlexibleContexts  #-}
+-- {-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -41,6 +41,7 @@ module VaultProxyLib
 import           Control.Concurrent.STM
 import           Control.Lens
 import           Control.Monad.Catch
+-- import           Control.Monad.Composable.VaultProxy
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.Change.Modify
@@ -223,9 +224,14 @@ type VaultAPI = GetPing
            :<|> PostPassword
            :<|> VerifyPassword
 
-type VaultProxyM = ReaderT VaultConnection
+type VaultM = ReaderT VaultProxyEnv (LoggingT IO)
 
-type HasVaultProxy m = Accessible VaultConnection m
+data VaultWrapperEnv = VaultWrapperEnv
+  { httpManager         :: Manager
+  , dbPool              :: Pool Connection
+  , superSecretKey      :: IORef (Maybe SecretBox.Key)
+  , keyStoreCache       :: Cache Text KeyStore
+  }
 
 --------------------------------------------------------------------------------
 --API Endpoints (these are used to connect TO the Vault-Proxy)
@@ -322,11 +328,11 @@ verifyPassword = pure undefined
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
 
 
-postSignature :: T.Text -> MsgHash -> VaultProxyM Signature
+postSignature :: T.Text -> MsgHash -> VaultProxyM Types.Signature
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
 postSignature sig hash = pure undefined
 
-getUsers :: T.Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
+getUsers :: T.Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [Types.User]
 --Bounce the information from the vaultproxy to the shared vault, allow for the use of the caching service implmented earlier in the vaultProxy
 getUsers temp temp1 temp2 temp3 = pure undefined
 
@@ -341,8 +347,8 @@ vaultProxyServer = getKey
     :<|> postPassword
     :<|> verifyPassword
 
-runVaultM :: MonadIO m => String -> VaultProxyM m a -> m a --Might want to add this to the central monad directory strato/libs/composable-monads/vault-monad (this will need to be a new executable though 🤦)
-runVaultM url = do
+runVaultProxyM :: MonadIO m => String -> VaultProxyM m a -> m a --Might want to add this to the central monad directory strato/libs/composable-monads/vault-monad (this will need to be a new executable though 🤦)
+runVaultProxyM url = do
     manager <- liftIO $ newManager defaultManagerSettings
     vaultProxyUrl <- liftIO $ parseBaseUrl url
     runReaderT f $ VaultConnection vaultProxyUrl flags_VAULT_PASSWORD flags_VAULT_PORT manager

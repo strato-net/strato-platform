@@ -194,7 +194,7 @@ nextRound nt = do
                                               (uses validators S.toList)
                                               (uses authSenders M.keys)
 
-eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
+eventLoop :: (MonadIO m, MonadLogger m, HasVaultProxy m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   debugShowCtx
   authz <- lift $ isAuthorized ev
@@ -396,7 +396,7 @@ loopback :: EOutEvent -> Maybe InEvent
 loopback (Right (OMsg a m)) = Just $ IMsg a m
 loopback _ = Nothing
 
-sendMessages' :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [EOutEvent]
+sendMessages' :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVaultProxy m) => [InEvent] -> m [EOutEvent]
 sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
@@ -418,10 +418,10 @@ sendMessages' wms = do
       putBlockstanbulContext ctx'
       return evs
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVaultProxy m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVaultProxy m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout 

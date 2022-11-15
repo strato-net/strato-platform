@@ -16,7 +16,7 @@ module BlockApps.Bloc22.Server.Chain where
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import qualified Control.Monad.Change.Alter        as A
-import           Control.Monad.Composable.Vault
+import           Control.Monad.Composable.VaultProxy
 import           Crypto.Random.Entropy
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
@@ -88,7 +88,7 @@ createChainInfo :: ( MonadIO m
                    , MonadLogger m
                    , HasBlocSQL m
                    , HasBlocEnv m
-                   , HasVault m
+                   , HasVaultProxy m
                    )
                 => Text -> Keccak256 -> ChainInput -> m ChainInfo
 createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
@@ -186,7 +186,7 @@ postChainInfo :: ( MonadIO m
                  , HasBlocSQL m
                  , HasBlocEnv m
                  , HasSQL m
-                 , HasVault m
+                 , HasVaultProxy m
                  )
               => Maybe Text -> ChainInput -> m ChainId
 postChainInfo mJwtToken chainInput = case mJwtToken of
@@ -209,7 +209,7 @@ postChainInfos :: ( MonadIO m
                   , HasBlocSQL m
                   , HasSQL m
                   , HasBlocEnv m
-                  , HasVault m
+                  , HasVaultProxy m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]
 postChainInfos mJwtToken chainInputs = case mJwtToken of

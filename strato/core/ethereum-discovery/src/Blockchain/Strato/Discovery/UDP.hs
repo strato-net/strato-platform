@@ -193,7 +193,7 @@ dataToPacket msg = do
         typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
         typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
 
-sendPacket :: (HasVault m, MonadIO m, MonadLogger m)
+sendPacket :: (HasVaultProxy m, MonadIO m, MonadLogger m)
            => Socket
            -> SockAddr
            -> NodeDiscoveryPacket
@@ -268,7 +268,7 @@ getSocket domain _ = do
   _ <- connect s (addrAddress serveraddr)
   return s
 
-getServerPubKey :: (HasVault m, MonadIO m) => String -> PortNumber -> m (Either SomeException Point)
+getServerPubKey :: (HasVaultProxy m, MonadIO m) => String -> PortNumber -> m (Either SomeException Point)
 getServerPubKey domain _ = do
     -- TODO(tim): Reenable port selection
     timestamp <- liftIO $ fmap round getPOSIXTime

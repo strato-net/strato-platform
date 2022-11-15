@@ -68,8 +68,8 @@
         "metric": {
           "__name__": "health_check",
           "instance": "localhost",
-          "job": "vault-wrapper",
-          "location": "blockapps-vault-wrapper-server"
+          "job": "vault-proxy",
+          "location": "blockapps-vault-proxy-server"
         },
         "value": [
           1553824884.792,

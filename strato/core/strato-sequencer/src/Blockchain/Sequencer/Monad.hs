@@ -153,7 +153,7 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
-                           , HasVault m
+                           , HasVaultProxy m
                            )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
@@ -411,13 +411,13 @@ instance HasBlockstanbulContext SequencerM where
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
 
--- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
+-- If there is no vault client (i.e. in hspec tests), the HasVaultProxy instance will use this key, 
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
--- easier than making a whole new SequencerM definition just to get a different HasVault instance
+-- easier than making a whole new SequencerM definition just to get a different HasVaultProxy instance
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance HasVault SequencerM where
+instance HasVaultProxy SequencerM where
   sign mesg = do
     mVc <- asks vaultClient
     case mVc of
@@ -429,15 +429,15 @@ instance HasVault SequencerM where
 
 waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
 waitOnVault action = do
-  $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
+  $logInfoS "HasVaultProxy" "Asking the vault-proxy to sign a Blockstanbul message"
   res <- action
   case res of
     Left err -> do
-      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      $logErrorS "HasVaultProxy" . T.pack $ "failed to get signature from vault-proxy...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> do
-      $logInfoS "HasVault" "Got a signature from vault"
+      $logInfoS "HasVaultProxy" "Got a signature from vault-proxy"
       return val
 
 initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)

@@ -20,8 +20,8 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
-  - blockapps-vault-wrapper-api
-  - blockapps-vault-wrapper-client
+  - blockapps-vault-proxy-api
+  - blockapps-vault-proxy-client
   - bytestring
   - common-log
   - conduit

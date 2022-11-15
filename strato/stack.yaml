@@ -43,6 +43,7 @@ packages:
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/sql-monad
 - libs/composable-monads/vault-monad
+- libs/composable-monads/vault-proxy-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/labeled-error

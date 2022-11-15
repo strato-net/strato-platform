@@ -132,7 +132,7 @@ type MonadSequencer m =
   , HasFullPrivacy m
   , (Keccak256 `A.Alters` DependentBlockEntry) m
   , (Keccak256 `A.Alters` ()) m
-  , HasVault m
+  , HasVaultProxy m
   )
 
 sequencer :: SequencerM ()

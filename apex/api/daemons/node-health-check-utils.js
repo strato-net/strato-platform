@@ -14,7 +14,7 @@ const neededJobs = {
   "strato_p2p": "strato-p2p",
   "vm_main": "vm-runner",
   "seq_main": "strato-sequencer",
-  "blockapps-vault-wrapper-server": "vault-wrapper",
+  "blockapps-vault-proxy-server": "vault-proxy",
   "core-api": "core-api"
 }
 

@@ -32,7 +32,7 @@ import           BlockApps.X509
 -- a simple ReaderT to keep the private key
 type CertGenM = ReaderT PrivateKey IO
 
-instance HasVault CertGenM where
+instance HasVaultProxy CertGenM where
   getPub = error "we never call getPub with this tool"
   getShared _ = error "we never call getShared with this tool"
   sign bs = ask >>= return . flip signMsg bs 

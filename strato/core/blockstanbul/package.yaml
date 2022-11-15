@@ -44,8 +44,8 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
-      - blockapps-vault-wrapper-api   #This will need to be changed
-      - blockapps-vault-wrapper-client
+      - blockapps-vault-proxy-api   #This will need to be changed
+      - blockapps-vault-proxy-client
       - blockstanbul
       - base16-bytestring
       - bytestring

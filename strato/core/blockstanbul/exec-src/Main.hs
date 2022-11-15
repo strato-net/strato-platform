@@ -33,10 +33,11 @@ import qualified Strato.Strato23.API        as VC
 import qualified Strato.Strato23.Client     as VC
 
 
-instance HasVault IO where
+instance HasVaultProxy IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
+    url <- parseBaseUrl "http://vault-proxy:8000/"
+    --Need to change this to get not search the hardcoded "nodekey"
     eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err

@@ -63,7 +63,7 @@ import           Blockchain.Data.Json
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI hiding (httpManager)
 import           Control.Monad.Composable.SQL    hiding (SQLM)
-import           Control.Monad.Composable.Vault  hiding (httpManager)
+import           Control.Monad.Composable.VaultProxy  hiding (httpManager)
 
 import           Text.Tools
 
@@ -110,7 +110,7 @@ instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (Cor
   insert p k = lift . insert p k
   delete p   = lift . delete p
 
-instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (VaultM m) where
+instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (VaultProxyM m) where
   lookup p   = lift . lookup p
   insert p k = lift . insert p k
   delete p   = lift . delete p
@@ -185,6 +185,7 @@ fullServer :: ( MonadLogger m
               , HasBlocSQL m
               , HasBlocEnv m
               , HasVault m
+              , HasVaultProxy m
               , HasCoreAPI m
               , Selectable Account ContractDetails m
               , Selectable Account AddressState m
@@ -209,7 +210,7 @@ hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI)
         runSQLMUsingEnv sqlEnv .
         flip runReaderT blocEnv .
         runBlocSQLMUsingEnv blocSQLEnv .
-        runVaultM "http://vault-wrapper:8000/strato/v2.3" .
+        runVaultProxyM "http://vault-wrapper:8000/strato/v2.3" .
         runCoreAPIM "http://strato:3000/eth/v1.2" $ f
 
 fullAPI :: Proxy FullAPI

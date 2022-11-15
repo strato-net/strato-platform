@@ -388,20 +388,23 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
 
-instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
+instance (MonadIO m, Monad m, MonadLogger m) => HasVaultProxy (ReaderT Config m) where
   sign bs = do
     vc <- asks configVaultClient 
-    $logInfoS "HasVault" "Calling vault-wrapper for a signature"
+    $logInfoS "HasVaultProxy" "Calling vault-proxy for a signature"
+    -- Need to change "nodeKey" to be generic, without changes it will destroy the network
     waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
   
   getPub = do
     vc <- asks configVaultClient 
-    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
+    $logInfoS "HasVaultProxy" "Calling vault-proxy to get the node's public key"
+    -- Need to change "nodeKey" to be generic, without changes it will destroy the network
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
   
   getShared pub = do
     vc <- asks configVaultClient 
-    $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
+    $logInfoS "HasVaultProxy" "Calling vault-proxy to get a shared key"
+    -- Need to change "nodeKey" to be generic, without changes it will destroy the network
     waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
 
 
@@ -410,7 +413,7 @@ waitOnVault action = do
   res <- action
   case res of
     Left err -> do
-      $logErrorS "HasVault" . T.pack $ "Got an error from vault-wrapper: " ++ show err
+      $logErrorS "HasVaultProxy" . T.pack $ "Got an error from vault-proxy: " ++ show err
       liftIO $ threadDelay 2000000
       waitOnVault action
     Right val -> return val
@@ -420,7 +423,7 @@ type MonadP2P m = ( MonadIO m
                   , MonadResource m
                   , MonadUnliftIO m
                   , Stacks Block m
-                  , HasVault m
+                  , HasVaultProxy m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]

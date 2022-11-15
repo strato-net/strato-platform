@@ -24,7 +24,7 @@ dependencies:
 - aeson
 - aeson-casing
 - blockapps-init
-- blockapps-vault-wrapper-api
+- blockapps-vault-proxy-api
 - bytestring
 - cache
 - clock
@@ -55,6 +55,7 @@ dependencies:
 - time
 - uri-bytestring
 - utf8-string
+- vault-proxy-monad
 - yesod-core
 
 ghc-options:

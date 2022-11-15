@@ -103,7 +103,7 @@ import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getWo
 import           Control.Monad.Composable.BlocSQL
 
 import           Control.Monad.Composable.SQL
-import           Control.Monad.Composable.Vault
+import           Control.Monad.Composable.VaultProxy
 
 import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
@@ -127,7 +127,7 @@ txWorker :: ( MonadLogger m
             , (Keccak256 `A.Alters` SourceMap) m
             , HasBlocEnv m
             , HasBlocSQL m
-            , HasVault m
+            , HasVaultProxy m
             , HasSQL m
             )
          => m ()
@@ -230,7 +230,7 @@ postBlocTransactionParallel :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               , HasVault m
+                               , HasVaultProxy m
                                , HasSQL m
                                )
                             => Maybe Text
@@ -255,7 +255,7 @@ postBlocTransaction :: ( MonadLogger m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , HasBlocEnv m
                        , HasBlocSQL m
-                       , HasVault m
+                       , HasVaultProxy m
                        , HasSQL m
                        )
                     => Maybe Text
@@ -272,7 +272,7 @@ postBlocTransaction' :: ( MonadLogger m
                         , (Keccak256 `A.Alters` SourceMap) m
                         , HasBlocEnv m
                         , HasBlocSQL m
-                        , HasVault m
+                        , HasVaultProxy m
                         , HasSQL m
                         )
                      => Should CacheNonce
@@ -416,7 +416,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
-callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
+callSignature :: (MonadIO m, MonadLogger m, HasVaultProxy m) =>
                  Text -> UnsignedTransaction -> m Transaction
 callSignature jwtToken unsigned@UnsignedTransaction{..} = do
   let msgHash = rlpHash unsigned
@@ -453,7 +453,7 @@ postUsersSend' :: ( A.Selectable Account AddressState m
                   , MonadLogger m
                   , HasBlocEnv m
                   , HasBlocSQL m
-                  , HasVault m
+                  , HasVaultProxy m
                   , HasSQL m
                   )
                => Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
@@ -475,7 +475,7 @@ postUsersContractEVM' :: ( MonadLogger m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , HasBlocEnv m
                          , HasBlocSQL m
-                         , HasVault m
+                         , HasVaultProxy m
                          , HasSQL m
                          )
                       => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
@@ -514,7 +514,7 @@ postUsersContractSolidVM' :: ( MonadLogger m
                              , (Keccak256 `A.Alters` SourceMap) m
                              , HasBlocEnv m
                              , HasBlocSQL m
-                             , HasVault m
+                             , HasVaultProxy m
                              , HasSQL m
                              )
                           => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
@@ -550,7 +550,7 @@ postUsersUploadListSolidVM' :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               , HasVault m
+                               , HasVaultProxy m
                                , HasSQL m
                                )
                             => Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
@@ -597,7 +597,7 @@ postUsersUploadListEVM' :: ( MonadLogger m
                            , (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocEnv m
                            , HasBlocSQL m
-                           , HasVault m
+                           , HasVaultProxy m
                            , HasSQL m
                            )
                         => Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
@@ -640,7 +640,7 @@ postUsersSendList' :: ( MonadLogger m
                       , (Keccak256 `A.Alters` SourceMap) m
                       , HasBlocEnv m
                       , HasBlocSQL m
-                      , HasVault m
+                      , HasVaultProxy m
                       , HasSQL m
                       )
                    => Should CacheNonce -> TransferListParameters -> Text -> m [BlocTransactionResult]
@@ -667,7 +667,7 @@ postUsersContractMethodList' :: ( MonadLogger m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , HasBlocEnv m
                                 , HasBlocSQL m
-                                , HasVault m
+                                , HasVaultProxy m
                                 , HasSQL m
                                 )
                              => Should CacheNonce -> FunctionListParameters -> Text -> m [BlocTransactionResult]
@@ -727,7 +727,7 @@ postUsersContractMethod' :: ( MonadLogger m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , HasBlocEnv m
                             , HasBlocSQL m
-                            , HasVault m
+                            , HasVaultProxy m
                             , HasSQL m
                             )
                          => Should CacheNonce -> FunctionParameters -> Text -> m BlocTransactionResult
@@ -826,7 +826,7 @@ preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t{transactionMetadata = m}
 
-signAndPrepare :: (MonadIO m, MonadLogger m, HasVault m) =>
+signAndPrepare :: (MonadIO m, MonadLogger m, HasVaultProxy m) =>
                   Text -> Address -> Maybe (Map Text Text) -> TransactionHeader -> m RawTransaction'
 signAndPrepare jwtToken from md th = do
   let sign' = callSignature jwtToken

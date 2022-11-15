@@ -22,8 +22,8 @@ library:
     - blockapps-datadefs
     - blockapps-init
     - blockapps-privacy
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
+    - blockapps-vault-proxy-api
+    - blockapps-vault-proxy-client
     - blockstanbul
     - bytestring
     - clock
@@ -68,8 +68,8 @@ executables:
       - async
       - blockapps-data
       - blockapps-init
-      - blockapps-vault-wrapper-api
-      - blockapps-vault-wrapper-client
+      - blockapps-vault-proxy-api
+      - blockapps-vault-proxy-client
       - blockstanbul
       - bytestring
       - common-log

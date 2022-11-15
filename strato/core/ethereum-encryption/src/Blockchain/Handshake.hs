@@ -72,7 +72,7 @@ bytesToAckMsg bytes | B.length bytes == 97 =
 bytesToAckMsg _ = error "wrong number of bytes in call to bytesToECIESMsg"
 
 
-getHandshakeBytes :: (MonadIO m, HasVault m) => PublicPoint -> B.ByteString -> m B.ByteString
+getHandshakeBytes :: (MonadIO m, HasVaultProxy m) => PublicPoint -> B.ByteString -> m B.ByteString
 getHandshakeBytes otherPubKey myNonce = do
   myPublic' <- getPub
   SharedKey sharedKey <- getShared $ pointToSecPubKey otherPubKey

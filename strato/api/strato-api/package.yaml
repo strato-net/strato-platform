@@ -46,6 +46,7 @@ executables:
     - text
     - unliftio
     - vault-monad
+    - vault-proxy-monad
     - wai
     - wai-cors
     - wai-extra

@@ -39,6 +39,7 @@ stack test -j1 \
       evm-solidity \
       bloc2api \
       blockapps-vault-wrapper-server \
+      blockapps-vault-proxy-server \
       slipstream \
       blockapps-privacy \
       seqevents \

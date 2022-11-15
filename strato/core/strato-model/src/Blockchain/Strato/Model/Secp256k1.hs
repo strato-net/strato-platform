@@ -11,7 +11,7 @@ module Blockchain.Strato.Model.Secp256k1
   , PublicKey(..)
   , Signature(..) 
   , SharedKey(..)
-  , HasVault(..)
+  , HasVaultProxy(..)
   , newPrivateKey
   , exportPrivateKey
   , importPrivateKey
@@ -87,19 +87,19 @@ newtype Signature = Signature S.CompactRecSig
 --  in some monad that "has a vault" which stores the private key
 --  In prod, this is the vault-wrapper, and we use its servant client
 --  In tests, the private key is either in the monad, or a global key
-class Monad m => HasVault m where
+class Monad m => HasVaultProxy m where
   sign :: B.ByteString -> m Signature
   getPub :: m PublicKey
   getShared :: PublicKey -> m SharedKey
   
 
 -- some instances we use elsewhere
-instance HasVault m => HasVault (ConduitT i o m) where
+instance HasVaultProxy m => HasVaultProxy (ConduitT i o m) where
   sign = lift . sign
   getPub = lift getPub
   getShared = lift . getShared
 
-instance HasVault m => HasVault (StateT s m) where
+instance HasVaultProxy m => HasVaultProxy (StateT s m) where
   sign = lift . sign
   getPub = lift getPub
   getShared = lift . getShared

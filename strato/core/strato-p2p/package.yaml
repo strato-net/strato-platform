@@ -35,8 +35,8 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - blockapps-datadefs
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
+    - blockapps-vault-proxy-api
+    - blockapps-vault-proxy-client
     - blockstanbul
     - bytestring
     - conduit

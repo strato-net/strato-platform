@@ -40,7 +40,7 @@ bXor :: B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
 bXor _ _ = error' "bXor called with two ByteStrings of different length"
 
-ethCryptConnect :: (MonadIO m, HasVault m)
+ethCryptConnect :: (MonadIO m, HasVaultProxy m)
                 => PublicPoint
                 -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptConnect otherPubKey = do
@@ -88,7 +88,7 @@ add acc val | B.length acc ==32 && B.length val == 32 = keccak256ToByteString $ 
 add _ _     = error "add called with ByteString of length not 32"
 
 
-ethCryptAccept :: (MonadIO m, HasVault m)
+ethCryptAccept :: (MonadIO m, HasVaultProxy m)
                => Point
                -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAccept otherPoint = do
@@ -114,7 +114,7 @@ ethCryptAccept otherPoint = do
      ethCryptAcceptEIP8 otherPoint (hsBytes `BL.append` remainingBytes) eciesMsgIBytes
 
 
-ethCryptAcceptEIP8 :: (MonadIO m, HasVault m)
+ethCryptAcceptEIP8 :: (MonadIO m, HasVaultProxy m)
                    => Point
                    -> BL.ByteString
                    -> B.ByteString
@@ -168,7 +168,7 @@ ethCryptAcceptEIP8 _ hsBytes eciesMsgIBytes = do
         }
       )
 
-ethCryptAcceptOld :: (MonadIO m, HasVault m)
+ethCryptAcceptOld :: (MonadIO m, HasVaultProxy m)
                   => Point
                   -> BL.ByteString
                   -> B.ByteString

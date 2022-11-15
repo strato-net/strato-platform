@@ -33,7 +33,7 @@ encrypt sharedKey myPubKey bytes prefix = do
   cipherIV <- liftIO $ getEntropy 16
   return $ encode $ encryptECIES sharedKey myPubKey cipherIV bytes prefix
 
-decrypt :: HasVault m => BL.ByteString -> B.ByteString -> m (Either String B.ByteString)
+decrypt :: HasVaultProxy m => BL.ByteString -> B.ByteString -> m (Either String B.ByteString)
 decrypt bytes prefix = do
   let eciesMsg = decode bytes
 

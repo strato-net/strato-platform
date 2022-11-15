@@ -93,7 +93,7 @@ proposalMessage = keccak256ToByteString
 
 
 
-proposerSeal :: (HasVault m) => Block -> m (Signature)
+proposerSeal :: (HasVaultProxy m) => Block -> m (Signature)
 proposerSeal blk =
   let mesg = proposalMessage blk
   in sign mesg
@@ -107,7 +107,7 @@ verifyProposerSeal blk sig =
 commitmentMessage :: Keccak256 -> B.ByteString
 commitmentMessage dig = keccak256ToByteString . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
 
-commitmentSeal :: (HasVault m) => Keccak256 -> m (Signature)
+commitmentSeal :: (HasVaultProxy m) => Keccak256 -> m (Signature)
 commitmentSeal sha =
   let mesg = commitmentMessage sha
   in sign mesg
@@ -124,7 +124,7 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signBenfInfo  :: (HasVault m) => (Address, Bool, Int) -> m (Signature)
+signBenfInfo  :: (HasVaultProxy m) => (Address, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
   in sign mesg

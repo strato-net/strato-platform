@@ -63,7 +63,7 @@ import           Data.Source.Map
 import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI   hiding (httpManager)
-import           Control.Monad.Composable.Vault     hiding (httpManager)
+import           Control.Monad.Composable.VaultProxy     hiding (httpManager)
 
 import           SQLM
 
@@ -146,11 +146,11 @@ blocStrato client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . StratoError) return resultEither
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVaultProxy m, HasCallStack) =>
                     ClientM x -> m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
+  VaultProxyData url mgr <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
