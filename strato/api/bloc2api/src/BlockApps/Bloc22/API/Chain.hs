@@ -240,7 +240,7 @@ type PostChainInfos = "chains"
 
 -- GET /chains
 
-type GetChainInfo = "chains"
+type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId
   :> QueryParam "limit" Integer
   :> QueryParam "offset" Integer
