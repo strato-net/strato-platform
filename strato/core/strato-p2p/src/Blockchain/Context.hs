@@ -251,9 +251,16 @@ instance MonadIO m => A.Selectable Word256 ChainMemberRSet (ReaderT Config m) wh
   selectWithDefault _ cid = do
     ancestors <- catMaybes <$> getAncestorChains (Just cid)
     allRSets <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
-    pure $ case allRSets of
-      [] -> ChainMemberRSet rSetEmpty
-      rsets -> foldr1 (\(ChainMemberRSet a) (ChainMemberRSet b) -> ChainMemberRSet $ rSetIntersection a b) rsets
+    case allRSets of
+      Left [] -> pure $ ChainMemberRSet rSetEmpty
+      Right rsets -> do
+        let ancestorChains = foldr1 (\(ChainMemberRSet a) (ChainMemberRSet b) -> ChainMemberRSet $ rSetIntersection a b) rsets
+        when (null ancestorChains) $
+          $logWarnS "a member is added, and it is NOT a member of any ancestor chains" 
+        pure ancestorChains
+
+     
+
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
