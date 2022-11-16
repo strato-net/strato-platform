@@ -32,8 +32,8 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Servant.Client
-import qualified Strato.Strato23.API.Types  as VC
-import qualified Strato.Strato23.Client     as VC
+import qualified Strato.VaultProxy.API.Types  as VP
+import qualified Strato.VaultProxy.Client     as VP
 
 import           Flags
 
@@ -84,8 +84,8 @@ main = do
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
-    return $ VC.unAddress addrAndKey
+    addrAndKey <- waitOnVault $ runClientM (VP.getKey (T.pack "nodekey") Nothing) clientEnv
+    return $ VP.unAddress addrAndKey
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress

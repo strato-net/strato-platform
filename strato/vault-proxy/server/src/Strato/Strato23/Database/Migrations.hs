@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Strato.Strato23.Database.Migrations where
+module Strato.VaultProxy.Database.Migrations where
 
 import           Control.Exception                 (catch)
 import           Control.Monad                     (forM_)
@@ -11,7 +11,7 @@ import           Data.Maybe                        (listToMaybe)
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           Strato.Strato23.Database.Create  (createTables, messageTable)
+import           Strato.VaultProxy.Database.Create  (createTables, messageTable)
 
 data MigrationErrorBehavior = Throw | Catch
 

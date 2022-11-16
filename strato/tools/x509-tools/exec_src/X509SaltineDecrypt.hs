@@ -8,8 +8,8 @@ import qualified Data.ByteString.Char8              as C8
 import qualified Crypto.Saltine.Class               as CS             
 import qualified Crypto.Saltine.Core.SecretBox      as CS
 
-import           Strato.Strato23.Server.Password
-import           Strato.Strato23.Crypto
+import           Strato.VaultProxy.Server.Password
+import           Strato.VaultProxy.Crypto
 import           BlockApps.X509.Keys 
 
 

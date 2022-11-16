@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes       #-}
 
-module Strato.Strato23.Database.Create where
+module Strato.VaultProxy.Database.Create where
 
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ

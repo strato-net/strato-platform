@@ -24,8 +24,8 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-proxy-wrapper-api #Will need to be changed
-    - blockapps-proxy-wrapper-client
+    - blockapps-vault-proxy-api 
+    - blockapps-vault-proxy-client
     - bytestring
     - common-log
     - cpu

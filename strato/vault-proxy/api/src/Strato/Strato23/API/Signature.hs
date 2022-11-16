@@ -7,7 +7,7 @@ module Strato.VaultProxy.API.Signature where
 
 import           Data.Text
 import           Servant.API
-import           Strato.Strato23.API.Types
+import           Strato.VaultProxy.API.Types
 
 --------------------------------------------------------------------------------
 -- Routes and Types

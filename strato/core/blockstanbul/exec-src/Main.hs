@@ -29,8 +29,8 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 
 import           Servant.Client
-import qualified Strato.Strato23.API        as VC
-import qualified Strato.Strato23.Client     as VC
+import qualified Strato.VaultProxy.API        as VP
+import qualified Strato.VaultProxy.Client     as VP
 
 
 instance HasVaultProxy IO where
@@ -38,7 +38,7 @@ instance HasVaultProxy IO where
     mgr <- newManager defaultManagerSettings
     url <- parseBaseUrl "http://vault-proxy:8000/"
     --Need to change this to get not search the hardcoded "nodekey"
-    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
+    eSig <- runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
@@ -116,10 +116,10 @@ main = do
   mgr <- newManager defaultManagerSettings
   vaultUrl <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
   optSender <- do 
-    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
+    eAdAndKey <- runClientM (VP.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
-      Right adAndKey -> return $ VC.unAddress adAndKey
+      Right adAndKey -> return $ VP.unAddress adAndKey
   
   putStrLn $ "Sender (admin node) address: " ++ show optSender
   putStrLn $ "Starting nonce: " ++ show optNonce

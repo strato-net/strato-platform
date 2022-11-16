@@ -1,6 +1,6 @@
-module Strato.Strato23.Server.Ping where
+module Strato.VaultProxy.Server.Ping where
 
-  import           Strato.Strato23.Monad
+  import           Strato.VaultProxy.Monad
 
   getPing :: VaultM String
   getPing = return "pingDetail"

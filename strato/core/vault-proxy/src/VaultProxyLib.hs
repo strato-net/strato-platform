@@ -69,13 +69,13 @@ import           Yesod.Core.Types        as YC
 
 --matching types import (reduce redundant changes)
 import           Blockchain.Strato.Model.Address
-import           Strato.Strato23.API.Types as Types--Likely will make a circular dependency
+import           Strato.VaultProxy.API.Types as Types--Likely will make a circular dependency
 import           Blockchain.Strato.Model.Secp256k1
-import           Strato.Strato23.API.Users
-import           Strato.Strato23.API.Key
-import           Strato.Strato23.API.Signature
-import           Strato.Strato23.API.Password
-import           Strato.Strato23.API.Ping
+import           Strato.VaultProxy.API.Users
+import           Strato.VaultProxy.API.Key
+import           Strato.VaultProxy.API.Signature
+import           Strato.VaultProxy.API.Password
+import           Strato.VaultProxy.API.Ping
 
 --------------------------------------------------------------------------------
 --Datas

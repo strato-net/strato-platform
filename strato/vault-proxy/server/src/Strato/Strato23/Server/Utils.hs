@@ -1,4 +1,4 @@
-module Strato.Strato23.Server.Utils where
+module Strato.VaultProxy.Server.Utils where
 
 import           Data.ByteString                       (ByteString)
 import           Blockchain.Strato.Model.ExtendedWord

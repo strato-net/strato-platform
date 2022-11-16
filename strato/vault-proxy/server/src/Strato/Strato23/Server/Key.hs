@@ -2,16 +2,16 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Strato.Strato23.Server.Key where
+module Strato.VaultProxy.Server.Key where
 
 import           Data.ByteString (ByteString)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
 
-import           Strato.Strato23.API
-import           Strato.Strato23.Crypto
-import           Strato.Strato23.Monad
-import           Strato.Strato23.Database.Queries
+import           Strato.VaultProxy.API
+import           Strato.VaultProxy.Crypto
+import           Strato.VaultProxy.Monad
+import           Strato.VaultProxy.Database.Queries
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
 

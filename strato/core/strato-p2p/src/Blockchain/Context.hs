@@ -113,8 +113,8 @@ import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Servant.Client
-import qualified Strato.Strato23.API                   as VC
-import qualified Strato.Strato23.Client                as VC
+import qualified Strato.VaultProxy.API                   as VP
+import qualified Strato.VaultProxy.Client                as VP
 
 import           UnliftIO
 
@@ -390,22 +390,22 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
 instance (MonadIO m, Monad m, MonadLogger m) => HasVaultProxy (ReaderT Config m) where
   sign bs = do
-    vc <- asks configVaultClient 
+    vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy for a signature"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+    waitOnVault $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash bs)) vp
   
   getPub = do
-    vc <- asks configVaultClient 
+    vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy to get the node's public key"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VP.unPubKey $ waitOnVault $ liftIO $ runClientM (VP.getKey (T.pack "nodekey") Nothing) vp
   
   getShared pub = do
-    vc <- asks configVaultClient 
+    vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy to get a shared key"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
+    waitOnVault $ liftIO $ runClientM (VP.getSharedKey "nodekey" pub) vp
 
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b

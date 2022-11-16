@@ -56,8 +56,8 @@ import           Control.Monad.Composable.SQL
 import           Handlers.Chain
 import qualified LabeledError
 import           SQLM
-import           Strato.Strato23.Client
-import           Strato.Strato23.API.Types
+import           Strato.VaultProxy.Client
+import           Strato.VaultProxy.API.Types
 
 import           UnliftIO
 

@@ -117,8 +117,8 @@ import           System.Directory                          (createDirectoryIfMis
 import           Text.Format
 
 import           Servant.Client
-import qualified Strato.Strato23.API.Types                 as VC hiding (Address(..))
-import qualified Strato.Strato23.Client                    as VC
+import qualified Strato.VaultProxy.API.Types                 as VP hiding (Address(..))
+import qualified Strato.VaultProxy.Client                    as VP
 
 
 
@@ -419,10 +419,10 @@ testPriv = fromMaybe (error "could not import private key") (importPrivateKey (L
 
 instance HasVaultProxy SequencerM where
   sign mesg = do
-    mVc <- asks vaultClient
-    case mVc of
+    mVp <- asks vaultClient
+    case mVp of
       Nothing -> return $ signMsg testPriv mesg
-      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+      Just vp -> waitOnVault $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash mesg)) vp
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"

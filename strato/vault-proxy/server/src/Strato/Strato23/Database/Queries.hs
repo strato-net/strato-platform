@@ -8,7 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
-module Strato.Strato23.Database.Queries where
+module Strato.VaultProxy.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad                   (void)
@@ -27,8 +27,8 @@ import           Opaleye                         hiding (not, null, index, FromF
 
 import           Blockchain.Strato.Model.Address
 
-import           Strato.Strato23.Crypto
-import           Strato.Strato23.Database.Tables
+import           Strato.VaultProxy.Crypto
+import           Strato.VaultProxy.Database.Tables
 
 
 

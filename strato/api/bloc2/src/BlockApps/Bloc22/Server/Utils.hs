@@ -46,7 +46,7 @@ import           Handlers.Transaction
 import qualified LabeledError
 import qualified MaybeNamed
 import           SQLM
-import           Strato.Strato23.API.Types
+import           Strato.VaultProxy.API.Types
 
 
 toMaybe :: Eq a => a -> a -> Maybe a

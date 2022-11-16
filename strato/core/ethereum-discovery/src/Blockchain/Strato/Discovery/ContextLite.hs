@@ -32,8 +32,8 @@ import qualified Database.Persist.Postgresql           as SQL
 
 import           Network.HTTP.Client                   (newManager, defaultManagerSettings)
 import           Servant.Client
-import qualified Strato.Strato23.API                   as VC
-import qualified Strato.Strato23.Client                as VC
+import qualified Strato.VaultProxy.API                   as VP
+import qualified Strato.VaultProxy.Client                as VP
 
 data ContextLite =
   ContextLite { liteSQLDB :: SQLDB
@@ -45,15 +45,15 @@ instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
 
 instance (Monad m, MonadIO m, MonadLogger m) => HasVaultProxy (ReaderT ContextLite m) where
   sign msg = do
-    vc <- asks vaultProxyClient
+    vp <- asks vaultProxyClient
     $logInfoS "HasVaultProxy" "asking vault-proxy for a message signature"
     --Need to change this to not use the hardcoded "nodekey"
-    waitOnVaultProxy $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash msg)) vc
+    waitOnVaultProxy $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash msg)) vp
 
   getPub = do
-    vc <- asks vaultProxyClient
+    vp <- asks vaultProxyClient
     $logInfoS "HasVaultProxy" "asking vault-proxy for the node's public key"
-    fmap VC.unPubKey $ waitOnVaultProxy $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VP.unPubKey $ waitOnVaultProxy $ liftIO $ runClientM (VP.getKey (T.pack "nodekey") Nothing) vp
 
   getShared _ = error "called HasVaultProxy's getShared in ethereum-discovery, but this should never happen"
 

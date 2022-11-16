@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Strato.Strato23.Server where
+module Strato.VaultProxy.Server where
 
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
@@ -13,13 +13,13 @@ import           Data.Swagger
 import           Servant
 import           Servant.Swagger
 
-import           Strato.Strato23.API
-import           Strato.Strato23.Monad
-import           Strato.Strato23.Server.Key
-import           Strato.Strato23.Server.Password
-import           Strato.Strato23.Server.Ping
-import           Strato.Strato23.Server.Signature
-import           Strato.Strato23.Server.User
+import           Strato.VaultProxy.API
+import           Strato.VaultProxy.Monad
+import           Strato.VaultProxy.Server.Key
+import           Strato.VaultProxy.Server.Password
+import           Strato.VaultProxy.Server.Ping
+import           Strato.VaultProxy.Server.Signature
+import           Strato.VaultProxy.Server.User
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing

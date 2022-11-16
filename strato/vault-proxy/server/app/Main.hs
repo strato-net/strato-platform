@@ -27,10 +27,10 @@ import           System.IO                              (BufferMode (..),
 
 import           BlockApps.Init
 import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
-import qualified Strato.Strato23.API                    as Strato23
-import qualified Strato.Strato23.Database.Migrations    as Strato23
-import qualified Strato.Strato23.Monad                  as Strato23
-import qualified Strato.Strato23.Server                 as Strato23
+import qualified Strato.VaultProxy.API                    as VaultProxy
+import qualified Strato.VaultProxy.Database.Migrations    as VaultProxy
+import qualified Strato.VaultProxy.Monad                  as VaultProxy
+import qualified Strato.VaultProxy.Server                 as VaultProxy
 
 import           Options
 
@@ -59,29 +59,29 @@ main = do
                                   }
 
   conn <- connect dbConnectInfo
-  void $ Strato23.runMigrations conn
+  void $ VaultProxy.runMigrations conn
   close conn
 
   pool <- createPool (connect dbConnectInfo) close 20 3 20
   mgr <- newManager defaultManagerSettings
   password <- newIORef Nothing
   cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
-  let env = Strato23.VaultWrapperEnv mgr pool password cache
+  let env = VaultProxy.VaultWrapperEnv mgr pool password cache
   run flags_port (appVaultWrapper env)
 
-appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
+appVaultWrapper :: VaultProxy.VaultWrapperEnv -> Application
 appVaultWrapper env =
     prometheus def{ prometheusEndPoint = ["strato", "v2.3", "metrics"]
                   , prometheusInstrumentApp = False}
   . instrumentApp "vault-wrapper"
   . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . cors (const $ Just policy)
-  . provideOptions (Proxy @ Strato23.VaultWrapperAPI)
+  . provideOptions (Proxy @ VaultProxy.VaultWrapperAPI)
   . serve (Proxy @ (
-              "strato" :> "v2.3" :> Strato23.VaultWrapperAPI
-         :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
+              "strato" :> "v2.3" :> VaultProxy.VaultWrapperAPI
+         :<|> "strato" :> "v2.3" :> VaultProxy.VaultWrapperDocsAPI
               ))
-  $ Strato23.serveVaultWrapper env
-     :<|> return Strato23.vaultWrapperSwagger
+  $ VaultProxy.serveVaultWrapper env
+     :<|> return VaultProxy.vaultWrapperSwagger
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}

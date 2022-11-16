@@ -16,8 +16,8 @@ import           Text.Format
 import           Blockchain.EthConf
 import           Blockchain.Init.Options
 import           Blockchain.Strato.Model.Address
-import           Strato.Strato23.Client
-import qualified Strato.Strato23.API                as VC
+import           Strato.VaultProxy.Client
+import qualified Strato.VaultProxy.API                as VP
 
 
 
@@ -99,16 +99,16 @@ defaultConfig =
     }
 
 
-getNodeKey :: IO (VC.PublicKey, Address)
+getNodeKey :: IO (VP.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
   ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
-  return (VC.unPubKey ak, VC.unAddress ak)
+  return (VP.unPubKey ak, VP.unAddress ak)
 
-waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
+waitOnVault :: ClientEnv -> IO (Either ClientError VP.AddressAndKey) -> IO VP.AddressAndKey
 waitOnVault clientEnv request = do
   res <- request
   case res of

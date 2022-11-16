@@ -1,4 +1,4 @@
-module Strato.Strato23.Database.Tables where
+module Strato.VaultProxy.Database.Tables where
 
 import           Data.Profunctor.Product
 import           Opaleye

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Strato.Strato23.Server.User
+module Strato.VaultProxy.Server.User
   ( getUsers
   ) where
 
@@ -8,9 +8,9 @@ import Data.Int
 import Data.Text hiding (map)
 
 import BlockApps.Logging
-import Strato.Strato23.API
-import Strato.Strato23.Monad
-import Strato.Strato23.Database.Queries
+import Strato.VaultProxy.API
+import Strato.VaultProxy.Monad
+import Strato.VaultProxy.Database.Queries
 
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultM [User]
 getUsers headerUsername mAddr mLimit mOffset = do

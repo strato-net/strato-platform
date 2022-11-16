@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Strato.Strato23.Server.Password where
+module Strato.VaultProxy.Server.Password where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
@@ -17,9 +17,9 @@ import           Data.Text                        (Text)
 import           Data.Text.Encoding               (encodeUtf8)
 import           Database.PostgreSQL.Simple       (Connection)
 
-import           Strato.Strato23.Crypto
-import           Strato.Strato23.Database.Queries
-import           Strato.Strato23.Monad
+import           Strato.VaultProxy.Crypto
+import           Strato.VaultProxy.Database.Queries
+import           Strato.VaultProxy.Monad
 
 superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =

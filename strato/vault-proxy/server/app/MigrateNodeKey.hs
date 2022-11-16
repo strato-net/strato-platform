@@ -61,7 +61,8 @@ main = do
                                      , VC.keystoreAcctEncSecKey = encAcctSk
                                      , VC.keystoreAcctAddress = acctAddr
                                      }
-  
+VP.getAwesomeToken a a a a a a  --> JWT ^. accessToken ^. <serverUser>
+
           success <- VQ.postUserKeyQuery (T.pack "nodekey") keystore conn
           if success then
             putStrLn "success"

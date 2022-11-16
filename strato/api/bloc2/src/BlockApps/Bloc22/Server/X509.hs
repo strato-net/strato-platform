@@ -13,8 +13,8 @@ import           Data.ByteString
 import           Data.Maybe
 import           Data.Text                              (Text)
 import           SQLM                                   -- For the error handling
-import           Strato.Strato23.API.Types
-import           Strato.Strato23.Client
+import           Strato.VaultProxy.API.Types
+import           Strato.VaultProxy.Client
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.X509

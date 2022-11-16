@@ -10,7 +10,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-module Strato.Strato23.Monad where
+module Strato.VaultProxy.Monad where
 
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
@@ -30,7 +30,7 @@ import           GHC.Stack
 import           Network.HTTP.Client
 import           Opaleye
 import           Servant
-import           Strato.Strato23.Crypto
+import           Strato.VaultProxy.Crypto
 
 import           UnliftIO                        hiding (Handler(..))
 
