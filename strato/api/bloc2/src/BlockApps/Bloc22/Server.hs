@@ -70,8 +70,9 @@ bloc = return gitInfo
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
   :<|> postChainInfo
-  :<|> getChainInfo
+  :<|> getSingleChainInfo
   :<|> postChainInfos
+  :<|> getChainInfo
   :<|> postBlocTransactionParallel
   :<|> postBlocTransactionRaw
   :<|> postBlocTransaction
