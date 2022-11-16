@@ -63,7 +63,7 @@ class ContractMethodCall extends Component {
           password: isOauthEnabled() ? '' : values.modalPassword,
           value: values.modalValue,
           args: parsedArgs,
-          chainId: values.chainId
+          chainId: this.props.chainId
         }
         mixpanelWrapper.track("method_call_submit");
         this.props.methodCall(this.props.lookup, payload);

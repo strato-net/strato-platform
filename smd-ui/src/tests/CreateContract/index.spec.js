@@ -81,7 +81,8 @@ describe('CreateContract: index', () => {
         initialValues: {
           username: '',
           address: ''
-        }
+        },
+        toastsError: ''
       }
       const wrapper = shallow(
         <Provider store={store}>
@@ -128,7 +129,8 @@ describe('CreateContract: index', () => {
         initialValues: {
           username: 'Admin_1177_49507',
           address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-        }
+        },
+        toastsError: 'unable to call the function'
       }
       const wrapper = shallow(
         <Provider store={store}>
@@ -533,6 +535,7 @@ describe('CreateContract: index', () => {
         username: '',
         isToasts: false,
         toastsMessage: 'message',
+        toastsError: ''
       },
       accounts: {
         accounts: indexAccountsMock
