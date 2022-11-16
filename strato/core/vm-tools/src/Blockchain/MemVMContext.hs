@@ -44,12 +44,16 @@ import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
 import           Data.Default
 import qualified Data.Map                           as M
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text            
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import           Data.Traversable                   (for)
+import           Data.Either.Extra
 import           Debugger
 import           GHC.Generics
 import           Prometheus
+import           Text.Read                          (readMaybe)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
@@ -82,6 +86,7 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , storageBlockMap
                                                     , certTxMap
                                                     , certBlockMap
+                                                    , lookupX509AddrFromCBHash
                                                     )
 
 import           UnliftIO
@@ -313,6 +318,20 @@ instance (Address `A.Alters` X509Certificate) MemContextM where
     fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
   insert _ = putCert
   delete _ = deleteCert
+
+instance (Address `A.Selectable` X509Certificate) MemContextM where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+instance ((Address,T.Text) `A.Selectable` X509CertificateField) MemContextM where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
   lookup _ n1    = dbsGets $ view (hashDB . at n1)

@@ -10,6 +10,7 @@
 
 module BlockApps.X509.Certificate (
   X509Certificate(..),
+  X509CertificateField(..),
   X509CertInfoState(..),
   CertificateChain(..),
   SignedCertificate,
@@ -74,6 +75,7 @@ import           Data.Swagger                       hiding (Format, get, put, fo
 import           Data.Swagger.Internal.Schema
 
 import qualified Data.Set                           as S
+import           Data.String
 import           Data.Functor
 import           Data.Either
 import           Data.Maybe
@@ -98,6 +100,12 @@ import           Servant.Docs
 
 
 newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
+
+newtype X509CertificateField = X509CertificateField String deriving (Show, Eq, Binary, Generic, Read, NFData)
+
+instance IsString X509CertificateField where
+  fromString "" = X509CertificateField ""
+  fromString s  = X509CertificateField s
 
 instance Ord X509Certificate where
     compare a b = compare (certToBytes a) (certToBytes b)

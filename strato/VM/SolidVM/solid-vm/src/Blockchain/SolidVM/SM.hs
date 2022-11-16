@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
@@ -44,6 +45,7 @@ module Blockchain.SolidVM.SM (
   getValueType,
   pushSender,
   initializeAction,
+  -- lookupX509AddrFromCBHash,
   markDiffForAction,
   getBlockHashWithNumber,
   getBSum,
@@ -77,6 +79,7 @@ import qualified Data.Sequence as Q
 import           Data.Source
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Data.Either.Extra
 import           Debugger
 
 import           BlockApps.Logging
@@ -107,6 +110,7 @@ import           Blockchain.SolidVM.GasInfo
 import qualified SolidVM.Model.CodeCollection as CC
 import           Blockchain.Data.BlockSummary 
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -165,6 +169,8 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
                  , HasX509CertDB m
+                 , HasSelectX509CertDB m
+                 , HasSelectX509FieldDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -272,6 +278,33 @@ instance ( (Address `A.Alters` X509Certificate) m
     fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
   insert _ = putCert
   delete _ = deleteCert
+
+instance ( (Address `A.Selectable` X509Certificate) m
+         , Mod.Modifiable CertRoot m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (MonadLogger m)
+         ,(A.Alters (Maybe Word256) MP.StateRoot m)
+         ,(A.Alters N.NibbleString N.NibbleString m)
+         ) => (Address `A.Selectable` X509Certificate) (SM m) where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+instance ( ((Address,T.Text) `A.Selectable` X509CertificateField) m
+         , Mod.Modifiable CertRoot m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (MonadLogger m)
+         ,(A.Alters (Maybe Word256) MP.StateRoot m)
+         ,(A.Alters N.NibbleString N.NibbleString m)
+         ) => ((Address,T.Text) `A.Selectable` X509CertificateField) (SM m) where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
+
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
