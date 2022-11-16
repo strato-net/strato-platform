@@ -1516,7 +1516,6 @@ decrementGas gas = do
       liftIO $ putStrLn $ C.red $ msg
       tooMuchGas (show (_gasInitalAllotment gasInfo')) gasInfo'
     else do
-      onTraced $ liftIO $ putStrLn $ C.green $ "with gasInfo: " ++ show gasInfo'
       return ()
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
