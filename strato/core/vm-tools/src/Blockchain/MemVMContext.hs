@@ -31,8 +31,6 @@ module Blockchain.MemVMContext
   , stateBlockMap
   , storageTxMap
   , storageBlockMap
-  , certTxMap
-  , certBlockMap
   ) where
 
 import           Control.DeepSeq
@@ -62,9 +60,7 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.TxRunResultCache        as TRC
@@ -80,8 +76,6 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
-                                                    , certTxMap
-                                                    , certBlockMap
                                                     )
 
 import           UnliftIO
@@ -90,12 +84,10 @@ data MemContextDBs = MemContextDBs
   { _stateDB        :: M.Map MP.StateRoot MP.NodeData
   , _hashDB         :: M.Map N.NibbleString N.NibbleString
   , _codeDB         :: M.Map Keccak256 DBCode
-  , _x509CertDB     :: M.Map Address X509Certificate
   , _blockSummaryDB :: M.Map Keccak256 BlockSummary
   , _blockHashRoot  :: BlockHashRoot
   , _genesisRoot    :: GenesisRoot
   , _bestBlockRoot  :: BestBlockRoot
-  , _certRoot       :: CertRoot
   , _worldBestBlock :: Maybe WorldBestBlock
   } deriving (Generic)
 makeLenses ''MemContextDBs
@@ -105,12 +97,10 @@ instance Default MemContextDBs where
           { _stateDB        = M.empty
           , _hashDB         = M.empty
           , _codeDB         = M.empty
-          , _x509CertDB     = M.empty
           , _blockSummaryDB = M.empty
           , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
           , _genesisRoot    = GenesisRoot MP.emptyTriePtr
           , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
-          , _certRoot       = CertRoot MP.emptyTriePtr
           , _worldBestBlock = Nothing
           }
 
@@ -119,7 +109,6 @@ instance NFData MemContextDBs where
     _stateDB `seq`
     _hashDB `seq`
     rnf _codeDB `seq`
-    rnf _x509CertDB `seq`
     _blockSummaryDB `seq`
     rnf _blockHashRoot `seq`
     rnf _genesisRoot `seq`
@@ -246,10 +235,6 @@ instance Mod.Modifiable BestBlockRoot MemContextM where
   get _     = dbsGets $ view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
-instance Mod.Modifiable CertRoot MemContextM where
-  get _     = dbsGets $ view certRoot
-  put _ bbr = dbsModify' $ certRoot .~ bbr
-
 instance Mod.Modifiable CurrentBlockHash MemContextM where
   get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -260,11 +245,6 @@ instance HasMemAddressStateDB MemContextM where
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance HasMemCertDB MemContextM where
-  getCertTxDBMap = gets $ view $ memDBs . certTxMap
-  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
-  getCertBlockDBMap = gets $ view $ memDBs . certBlockMap
-  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) MemContextM where
   lookup _ sr    = dbsGets $ view (stateDB . at sr)
@@ -307,12 +287,6 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
-instance (Address `A.Alters` X509Certificate) MemContextM where
-  lookup _ k = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
-  insert _ = putCert
-  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
   lookup _ n1    = dbsGets $ view (hashDB . at n1)

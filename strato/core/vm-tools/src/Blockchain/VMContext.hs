@@ -37,8 +37,6 @@ module Blockchain.VMContext
     , stateBlockMap
     , storageTxMap
     , storageBlockMap
-    , certTxMap
-    , certBlockMap
     , stateRoots
     , currentBlock
     , memDBs
@@ -120,7 +118,6 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
@@ -168,8 +165,6 @@ data MemDBs = MemDBs
   , _stateBlockMap   :: M.Map Account AddressStateModification
   , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
-  , _certTxMap       :: M.Map Address CertModification
-  , _certBlockMap    :: M.Map Address CertModification
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
   } deriving (Generic, NFData, Show)
@@ -181,8 +176,6 @@ instance Default MemDBs where
     , _stateBlockMap   = M.empty
     , _storageTxMap    = M.empty
     , _storageBlockMap = M.empty
-    , _certTxMap       = M.empty
-    , _certBlockMap    = M.empty
     , _stateRoots      = M.empty
     , _currentBlock    = Nothing
     }
@@ -231,16 +224,13 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable BlockHashRoot m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
-                , Mod.Modifiable CertRoot m
                 , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
-                , HasMemCertDB m
                 , A.Selectable (Maybe Word256) ParentChainId m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
-                , HasX509CertDB m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -251,7 +241,6 @@ type VMBase m = ( MonadIO m
 withCurrentBlockHash :: ( MonadLogger m
                         , Mod.Modifiable MemDBs m
                         , Mod.Modifiable CurrentBlockHash m
-                        , Mod.Modifiable CertRoot m
                         , HasMemAddressStateDB m
                         , (Maybe Word256 `A.Alters` MP.StateRoot) m
                         , (MP.StateRoot `A.Alters` MP.NodeData) m
@@ -259,7 +248,6 @@ withCurrentBlockHash :: ( MonadLogger m
                         , (N.NibbleString `A.Alters` N.NibbleString) m
                         , HasMemRawStorageDB m
                         , (RawStorageKey `A.Alters` RawStorageValue) m
-                        , HasMemCertDB m
                         )
                      => Keccak256 -> m a -> m a
 withCurrentBlockHash bh f = do
@@ -268,7 +256,6 @@ withCurrentBlockHash bh f = do
   a <- f
   flushMemStorageDB
   flushMemAddressStateDB
-  flushMemCertDB bh
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
@@ -371,8 +358,6 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
-vmCertRootKey :: B.ByteString
-vmCertRootKey = "cert_root"
 
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _ = do
@@ -398,13 +383,6 @@ instance Mod.Modifiable BestBlockRoot ContextM where
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
 
-instance Mod.Modifiable CertRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    CertRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmCertRootKey
-  put _ (CertRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmCertRootKey sr
 
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = readIORef =<< view (dbs . kafkaState)
@@ -419,12 +397,6 @@ instance HasMemAddressStateDB ContextM where
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
-
-instance HasMemCertDB ContextM where
-  getCertTxDBMap = gets $ view $ memDBs . certTxMap
-  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
-  getCertBlockDBMap = gets $ view $ memDBs . certBlockMap
-  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   lookup _ = MP.genericLookupDB $ getStateDB
@@ -467,14 +439,6 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (Address `A.Alters` X509Certificate) ContextM where
-  lookup _ k = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
-  insert _ k v = do
-    liftIO . appendFile "registrations.txt" $ formatAddressWithoutColor k ++ ": " ++ show v ++ "\n"
-    putCert k v
-  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
@@ -555,8 +519,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
-            , _certTxMap       = M.empty
-            , _certBlockMap    = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
             }

@@ -62,7 +62,6 @@ import Executable.EVMFlags() -- for HFlags
 import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Blockchain.DB.X509CertDB as X509
 import Data.ByteString (putStr)
 import GHC.TypeLits (ErrorMessage(Text))
 import qualified Control.Exception as Blockchain.SolidVM

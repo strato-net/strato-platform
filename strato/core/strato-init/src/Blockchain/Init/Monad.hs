@@ -23,7 +23,6 @@ import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
@@ -33,7 +32,6 @@ import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 
@@ -110,11 +108,6 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB
-
-instance (Address `A.Alters` X509Certificate) SetupDBM where
-  lookup _ = error "SetupDBM lookup @X509Certificate"
-  insert _ = error "SetupDBM insert @X509Certificate"
-  delete _ = error "SetupDBM delete @X509Certificate"
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB

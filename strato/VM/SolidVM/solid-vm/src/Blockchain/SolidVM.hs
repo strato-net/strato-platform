@@ -73,7 +73,6 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
-import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -93,7 +92,8 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
-         
+import           BlockApps.X509.Certificate
+import           BlockApps.X509.Keys
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -345,7 +345,6 @@ create' creator newAccount ch cc contractName' argExps = do
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
-  x509s' <- getCertTxMap
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -359,7 +358,6 @@ create' creator newAccount ch cc contractName' argExps = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erNewX509Certs = x509s',
     erPragmas = CC._pragmas cc
     }
 
@@ -433,7 +431,6 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-    x509s <- getCertTxMap
 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -447,7 +444,6 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
       erAction = Just $ finalAct,
       erException = Nothing,
       erKind = SolidVM,
-      erNewX509Certs = x509s,
       erPragmas=[]
       }
 
@@ -457,7 +453,7 @@ setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
 setCreator creator contract cntrct blockNumber = do
 
   let creatorAddress = _accountAddress creator
-  maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
+  maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
   let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
   case maybeCert of
@@ -509,7 +505,7 @@ getOrg caller vers = do
       EVMCode _ -> do
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
-        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ caller ^. accountAddress
+        maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
         let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
         liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
         return org'
@@ -1676,28 +1672,28 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do
         env' <- getEnv
-        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
         return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do
         env' <- getEnv
-        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
         return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do
         env' <- getEnv
-        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
         return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       m@(SBuiltinVariable "tx", "organizationalUnit") ->
         if (CC._vmVersion contract'' == "svm3.3" || CC._vmVersion contract'' == "svm3.4") 
           then do 
             env' <- getEnv
-            maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+            maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
       m@(SBuiltinVariable "tx", "certificate") ->
         if (CC._vmVersion contract'' == "svm3.3" || CC._vmVersion contract'' == "svm3.4")
           then do 
             env' <- getEnv
-            maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+            maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
             return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
@@ -2788,7 +2784,6 @@ callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
               Right x509Cert -> do
                 onTraced $ liftIO $ putStrLn $ C.red "WARNING we are unsafely registering a certificate to an arbitrary address"
                 let theAddress = _accountAddress $ namedAccountToAccount Nothing a
-                A.insert (A.Proxy @X509Certificate) theAddress x509Cert
                 onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
                 return SNULL
 
@@ -2826,7 +2821,6 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                             let subjectAddress = fromPublicKey $ subPub subject
                             onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
                               format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
-                            A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
                             return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
             typ -> internalError "creatorAddress field has not been set or is not an account type" typ
 
@@ -2868,7 +2862,6 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
                             SolidVMCode name _ | name /= (labelToString $ CC._contractName curContract) -> pure name
                             _                                                    -> pure "")
                 
-                A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
                 
                 addEvent $ Event org parentName (labelToString $ CC._contractName curContract) curAccount "CertificateRegistered" [
                       ("userAddress", show subjectAddress)
@@ -2892,7 +2885,7 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
 
 callBuiltin "getUserCert" [SAccount a _] _ = do
   curContract <- getCurrentContract
-  maybeCert <- A.lookup (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
+  maybeCert <- A.select (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
 
 -- SolidVM built in function that verifies that the root cert is signed by the key

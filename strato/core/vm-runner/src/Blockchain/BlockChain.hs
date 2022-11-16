@@ -70,7 +70,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Event
