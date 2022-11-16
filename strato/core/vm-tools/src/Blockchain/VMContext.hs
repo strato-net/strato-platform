@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE TupleSections         #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS -fno-warn-deprecations #-}
@@ -68,6 +69,7 @@ module Blockchain.VMContext
     , peekPendingVote
     , clearPendingVote
     , compactContextM
+    , lookupX509AddrFromCBHash
     ) where
 
 import           Control.DeepSeq
@@ -86,7 +88,9 @@ import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
+import           Data.Either.Extra
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
@@ -96,7 +100,9 @@ import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
+import           Text.Read                         (readMaybe)
 
+import           BlockApps.X509.Certificate
 import           BlockApps.Init()
 import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
@@ -236,6 +242,8 @@ type VMBase m = ( MonadIO m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
                 , (Keccak256 `A.Alters` BlockSummary) m
                 , Mod.Accessible (Maybe WorldBestBlock) m
+                , (A.Selectable (Address, T.Text) X509CertificateField) m
+                , (A.Selectable Address X509Certificate) m
                 )
 
 withCurrentBlockHash :: ( MonadLogger m
@@ -465,7 +473,7 @@ lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
     maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
-    
+
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB

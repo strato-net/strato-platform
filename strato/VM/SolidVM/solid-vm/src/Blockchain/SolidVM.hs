@@ -199,6 +199,13 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
 
+-- instance (MonadIO m, MonadLogger m) => ((Address,T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
+--   select _ (k,t) = do
+--     let certKey addr = ((Account addr Nothing),) . TE.encodeUtf8 
+--     mCertAddress <- lookupX509AddrFromCBHash k
+--     fmap join . for mCertAddress $ \certAddress ->
+--       maybe Nothing (readMaybe . T.unpack . TE.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
+
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
   let eExpr = runParser expression (ParserState "" "" M.empty) "" (T.unpack exprText)
@@ -226,10 +233,10 @@ solidVMBreakpoint ann = do
 
 requireOriginCert :: MonadSM m => Account -> m ()
 requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
-  originHasCert <- A.exists (A.Proxy @X509Certificate) $ acct ^. accountAddress
+  originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress)
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
-create :: SolidVMBase m
+create :: (SolidVMBase m)
        => Bool
        -> Bool
        -> S.Set Account
@@ -377,7 +384,7 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-call :: SolidVMBase m
+call :: (SolidVMBase m )
      => Bool
      -> Bool
      -> Bool
@@ -2888,7 +2895,7 @@ callBuiltin "getUserCert" [SAccount a _] _ = do --Add others
   maybeCert <- A.select (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
 
-callBuiltin "getCertField" [(SAccount a _), certField] _ = do --Add others
+callBuiltin "getCertField" [(SAccount a _), (SString certField)] _ = do --Add others
   maybeField <- A.select (A.Proxy @X509CertificateField) $ ( (a ^. namedAccountAddress), ((T.pack $ show certField) ))
   case maybeField of
     Nothing -> return $ (SString $ fromString "")

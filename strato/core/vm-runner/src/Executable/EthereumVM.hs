@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DerivingStrategies  #-}
 
 module Executable.EthereumVM (
   ethereumVM,
@@ -94,18 +95,20 @@ import           Blockchain.Timing
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
+-- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
+--   deriving (Eq, Ord, Show)
+
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR cpCR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR, cpCR)
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
-    Mod.put Proxy $ CertRoot cpCR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -130,8 +133,8 @@ ethereumVM d = void . execContextM d $ do
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
-        setCheckpoint newOffset withCertroot
+        -- withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
+        setCheckpoint newOffset withChainroot
 
 microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -389,7 +392,6 @@ runChainConstructors cId cInfo = do
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
-  flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr,actions) 
@@ -397,18 +399,15 @@ runChainConstructors cId cInfo = do
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
                                        , Mod.Modifiable GenesisRoot m
-                                       , Mod.Modifiable CertRoot m
                                        , (MP.StateRoot `A.Alters` MP.NodeData) m
                                        )
                                     => OutputBlock
                                     -> m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint sha _ _ sr _) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint sha _ _ sr ) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
   (BlockHashRoot bhr) <- bootstrapChainDB sha [(Nothing, sr)]
-  (CertRoot cr) <- bootstrapCertDB sha
   return evmc{ ctxChainDBStateRoot = bhr
-             , ctxCertDBStateRoot = cr
              }
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
@@ -421,7 +420,7 @@ outputBlockToEvmCheckpoint block =
       uncL   = length (obBlockUncles block)
       cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
       sr     = blockDataStateRoot header
-   in EVMCheckpoint sha header cbbi sr MP.emptyTriePtr
+   in EVMCheckpoint sha header cbbi sr 
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =

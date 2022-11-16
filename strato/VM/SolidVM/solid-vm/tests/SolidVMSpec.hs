@@ -67,6 +67,7 @@ import GHC.TypeLits (ErrorMessage(Text))
 import qualified Control.Exception as Blockchain.SolidVM
 import qualified LabeledError
 import Blockchain.Strato.Model.Gas
+import BlockApps.X509.Keys as X509
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults

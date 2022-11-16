@@ -94,7 +94,6 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.StateDiff             as SD
-
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
 
@@ -133,11 +132,6 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
 
-instance (Monad m, HasMemCertDB m) => HasMemCertDB (ConduitT i o m) where
-  getCertTxDBMap    = lift getCertTxDBMap
-  putCertTxDBMap    = lift . putCertTxDBMap
-  getCertBlockDBMap = lift getCertBlockDBMap
-  putCertBlockDBMap = lift . putCertBlockDBMap 
 
 -- todo: lovely!
 
@@ -211,7 +205,6 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
-    putBlockHeaderInCertDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
@@ -260,7 +253,6 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-  lift $ timeit "flushMemCertDB" (Just vmBlockInsertionMined) $ flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 => BlockData
@@ -278,7 +270,6 @@ addTransactions blockData txs =
       let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
-      flushMemCertTxToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
@@ -319,14 +310,12 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
                  then do
                   putAddressStateTxDBMap M.empty
                   putMemRawStorageTxMap M.empty
-                  putCertTxDBMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
                  else do
                    let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
                    flushMemAddressStateTxToBlockDB
                    flushMemStorageTxDBToBlockDB
-                   flushMemCertTxToBlockDB
                    mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
 
         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
@@ -414,7 +403,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
-runCodeForTransaction :: VMBase m
+runCodeForTransaction ::(VMBase m)
                       => Bool
                       -> Bool
                       -> BlockData
@@ -741,14 +730,12 @@ completeDiff :: ( MonadLogger m
                 , Mod.Modifiable MemDBs m
                 , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
-                , Mod.Modifiable CertRoot m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
-                , HasMemCertDB m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do

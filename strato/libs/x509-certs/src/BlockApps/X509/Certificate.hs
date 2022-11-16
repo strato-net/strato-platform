@@ -3,7 +3,9 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric      #-}
--- {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -54,6 +56,7 @@ import qualified Control.Lens                       as Lens
 import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
+import qualified Control.Monad.Change.Alter         as A        
 import           Crypto.Random.Entropy
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms             as CH
@@ -105,9 +108,9 @@ newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
 
 newtype X509CertificateField = X509CertificateField String deriving (Show, Eq, Binary, Generic, Read, NFData)
 
-type HasSelectX509CertDB m = (Address `Selectable` X509Certificate) m
+type HasSelectX509CertDB m = (Address `A.Selectable` X509Certificate) m
 
-type HasSelectX509FieldDB m = ((Address, T.Text) `Selectable` X509CertificateField) m
+type HasSelectX509FieldDB m = ((Address, T.Text) `A.Selectable` X509CertificateField) m
 
 instance IsString X509CertificateField where
   fromString "" = X509CertificateField ""

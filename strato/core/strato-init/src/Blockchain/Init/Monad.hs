@@ -34,6 +34,8 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Address
+import           BlockApps.X509.Certificate
 
 
 data SetupDBs =
