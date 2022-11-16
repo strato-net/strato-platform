@@ -25,6 +25,7 @@ vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing
           :<|> getKey
           :<|> getKey'
+          :<|> getKeys'
           :<|> postKey
           :<|> postKey'
           :<|> getSharedKey

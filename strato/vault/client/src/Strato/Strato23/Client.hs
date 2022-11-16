@@ -6,6 +6,7 @@ module Strato.Strato23.Client
   , getKey'
   , postKey
   , postKey'
+  , getKeys'
   , getSharedKey
   , getSharedKey'
   , getUsers
@@ -29,6 +30,9 @@ getKey = client (Proxy @ GetKey)
 
 getKey' :: Text -> Text -> Maybe Text -> ClientM AddressAndKey
 getKey' = client (Proxy @ GetKey')
+
+getKeys' :: Text -> Text -> Maybe Text -> ClientM [AddressAndKey]
+getKeys' = client (Proxy @ GetKeys')
 
 postKey :: Text -> ClientM AddressAndKey
 postKey = client (Proxy @ PostKey)

@@ -34,36 +34,36 @@ import           Strato.Strato23.Database.Tables
 
 countUsers :: T.Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
-  (_, name, _, _, _, _, _, _) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, _) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
 
 countUsers' :: T.Text -> T.Text -> Query (Column PGInt8)
 countUsers' username oauthRealm  = aggregate countStar $ proc () -> do
-  (_, name, _, _, _, _, _, oauth) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, oauth) <- selectTable usersTable -< ()
   restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
 
 
 getUserKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
-  (_, name, salt, nonce, _, encSecPrvKey, address, _) <- selectTable usersTable -< ()
+  (_, name, salt, nonce, encSecPrvKey, address, _) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecPrvKey, address)
 
 getUserKeyQuery' :: T.Text -> T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery' username oauthRealm = proc () -> do
-  (_, name, salt, nonce, _, encSecPrvKey, address, oauth) <- selectTable usersTable -< ()
+  (_, name, salt, nonce, encSecPrvKey, address, oauth) <- selectTable usersTable -< ()
   restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
   returnA -< (salt, nonce, encSecPrvKey, address)
 
 getUserByAddress :: Address -> Query (Column PGText)
 getUserByAddress qaddr = proc () -> do
-  (_, name, _, _, _, _, taddr, _) <- selectTable usersTable -< ()
+  (_, name, _, _, _, taddr, _) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< name
 
 getUserByAddress' :: Address -> Query (Column PGText, Column PGText)
 getUserByAddress' qaddr = proc () -> do
-  (_, name, _, _, _, _, taddr, oauth) <- selectTable usersTable -< ()
+  (_, name, _, _,  _, taddr, oauth) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< (name, oauth)
 
@@ -71,13 +71,13 @@ getUserAddresses :: Maybe Int -> Maybe Int -> Query (Column PGText, Column PGByt
 getUserAddresses mOffset mLimit = maybe id limit mLimit
                                 . maybe id offset mOffset
                                 $ proc () -> do
-  (_, name, _, _, _, _, addr, _) <- selectTable usersTable -< ()
+  (_, name, _, _,  _, addr, _) <- selectTable usersTable -< ()
   returnA -< (name, addr)
 
 postUserKeyQuery :: T.Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do
   (userIds :: [Int32]) <- runSelect conn $ proc () -> do
-    (userId, name, _, _,_,_,_,_) <- selectTable usersTable -< ()
+    (userId, name, _, _,_,_,_) <- selectTable usersTable -< ()
     restrict -< name .== toFields userName
     returnA -< userId
   case listToMaybe userIds of
@@ -91,7 +91,6 @@ postUserKeyQuery userName KeyStore{..} conn = do
             , toFields keystoreSalt
             , toFields keystoreAcctNonce
             , toFields keystoreAcctEncSecKey
-            , toFields keystoreAcctEncSecKey
             , toFields keystoreAcctAddress
             , toFields userName
             )],
@@ -103,7 +102,7 @@ postUserKeyQuery userName KeyStore{..} conn = do
 postUserKeyQuery' :: T.Text -> T.Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery' userName oauthProvider KeyStore{..} conn = do
   (userIds :: [Int32]) <- runSelect conn $ proc () -> do
-    (userId, name, _, _,_,_,_, oauth) <- selectTable usersTable -< ()
+    (userId, name, _, _,_,_, oauth) <- selectTable usersTable -< ()
     restrict -< (name .== toFields userName .&& oauth .== toFields oauthProvider ) 
     returnA -< userId
   case listToMaybe userIds of
@@ -116,7 +115,6 @@ postUserKeyQuery' userName oauthProvider KeyStore{..} conn = do
             , toFields userName
             , toFields keystoreSalt
             , toFields keystoreAcctNonce
-            , toFields keystoreAcctEncSecKey
             , toFields keystoreAcctEncSecKey
             , toFields keystoreAcctAddress
             , toFields oauthProvider

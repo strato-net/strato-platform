@@ -22,7 +22,6 @@ usersTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   , Column PGText
   )
   ( Column PGInt4
@@ -31,18 +30,16 @@ usersTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   , Column PGText
   )
-usersTable = Table "users" $ p8
+usersTable = Table "users" $ p7
   ( optionalTableField "id"
   , requiredTableField "x_user_unique_name"
   , requiredTableField "salt"
   , requiredTableField "nonce"
-  , requiredTableField "enc_sec_key"
   , requiredTableField "enc_sec_prv_key"
   , requiredTableField "address"
-  , requiredTableField "auth_provider_id"
+  , requiredTableField "oauth_provider_id"
   )
 
 messageTable :: Table

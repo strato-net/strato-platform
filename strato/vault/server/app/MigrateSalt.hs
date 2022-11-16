@@ -37,7 +37,7 @@ import Control.Monad
 
 getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
 getUsersQuery conn = runSelect conn $ proc () -> do
-  (userId, _,  salt, nonce, _, encKey, _, _) <- selectTable usersTable -< ()
+  (userId, _,  salt, nonce, encKey, _, _) <- selectTable usersTable -< ()
   returnA -< (userId, salt, nonce, encKey)
 
 
@@ -76,8 +76,8 @@ main = do
   -- then, reencrypt with the global password Secretbox.key and the original user nonce
   let reencrypt :: Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, Int32)
       reencrypt i salt nonce encKey = do
-          let sbKey = VP.getKeyFromPasswordAndSalt pw salt
-          decKey <- VC.decryptSecKey sbKey nonce encKey
+          let sbKey    =  VP.getKeyFromPasswordAndSalt pw salt
+          decKey       <- VC.decryptSecKey sbKey nonce encKey
           let newEncKey = VC.encrypt pwKey nonce (exportPrivateKey decKey)
           pure (newEncKey, i)
  

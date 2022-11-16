@@ -5,12 +5,12 @@
 module Strato.Strato23.Server.Key where
 
 import           Data.ByteString (ByteString)
-import           Data.Maybe                       (fromMaybe)
+import           Data.Maybe                       (fromMaybe, fromJust)
 import           Data.Text                        (Text)
-
 import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
+import qualified Crypto.Saltine.Core.SecretBox  as SecretBox
 import           Strato.Strato23.Database.Queries
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
@@ -33,6 +33,17 @@ getKey' headerUserName headerOauthProvider queryParamUserName = withSecretKey $ 
   case decryptSecKey key nonce encKey of
     Nothing   -> vaultWrapperError IncorrectPasswordError
     Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
+
+getKeys' :: Text -> Text -> Maybe Text -> VaultM [AddressAndKey]
+getKeys' _ _ queryParamUserName = withSecretKey $ \key -> do
+  let userName = fromJust queryParamUserName
+  ls :: [( ByteString, SecretBox.Nonce, ByteString,  Address)]    <-  toUserError ("User " <> userName <> " doesn't exist") . vaultQueryMany $ getUserKeyQuery userName               
+  let decryptHelper nonce encKey = 
+        case decryptSecKey key nonce encKey of
+            Nothing   -> vaultWrapperError IncorrectPasswordError
+            Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey) 
+  sequence $ map (\(_, noncee, encKeyy, _ ) ->  decryptHelper noncee encKeyy) ls
+  
 
 postKey :: Text -> VaultM AddressAndKey
 postKey userName = withSecretKey $ \key -> do
