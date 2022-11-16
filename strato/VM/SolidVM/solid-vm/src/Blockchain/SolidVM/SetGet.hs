@@ -170,9 +170,9 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                                 _             -> toBasic src
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
-  contract <- getCurrentContract
-  let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3" || CC._vmVersion contract == "svm3.4"
-  putSolidStorageKeyVal' svm3_0 addr path basicSrc
+  -- contract <- getCurrentContract
+  -- let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3" || CC._vmVersion contract == "svm3.4"
+  putSolidStorageKeyVal' addr path basicSrc -- svm3_0
 
 
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -318,9 +318,9 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       ro <- readOnly <$> getCurrentCallInfo
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
-      contract <- getCurrentContract
-      let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3" || CC._vmVersion contract == "svm3.4"
-      putSolidStorageKeyVal' svm3_0 addr path $ MS.BDefault
+      -- contract <- getCurrentContract
+      -- let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3" || CC._vmVersion contract == "svm3.4"
+      putSolidStorageKeyVal' addr path $ MS.BDefault
 
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 

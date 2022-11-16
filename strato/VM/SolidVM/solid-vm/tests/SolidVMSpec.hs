@@ -4506,7 +4506,7 @@ contract qq {
 
   it "only a contract posted by the root user can call registerCert" $ (runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
     constructor() {
@@ -4516,7 +4516,7 @@ contract qq {
 
   it "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
     account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0, "main");
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
@@ -4535,7 +4535,7 @@ contract qq {
 
   it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
     account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
@@ -4607,7 +4607,7 @@ contract qq {
   
   it "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+
 contract Certificate {
     string name;
     constructor(string _name) {
@@ -4633,7 +4633,7 @@ contract qq {
       ]
   it "can get a users cert" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.3;
+
 contract qq {
     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
     
@@ -5685,7 +5685,6 @@ contract qq{
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5725,7 +5724,7 @@ contract qq is Validator {
   }
 }
 |]
-    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True,BDefault]
 
 
   it "can run this for loop and increment the counter" . runTest $ do
@@ -5853,7 +5852,7 @@ contract qq{
 
   it "free functions cannot access internal functions of contracts" $ runTest ( do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function callInternal() {
   setNum(4);

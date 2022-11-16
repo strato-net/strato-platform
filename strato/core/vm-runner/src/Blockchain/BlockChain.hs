@@ -313,7 +313,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult ->
-          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3"),("solidvm","3.4")]
+          let supportedPragmas = []
               findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
