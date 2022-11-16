@@ -29,7 +29,6 @@ module Blockchain.VMContext
     , stateDB
     , hashDB
     , codeDB
-    , x509CertDB
     , blockSummaryDB
     , kafkaState
     , redisPool
@@ -157,7 +156,6 @@ data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
   , _codeDB         :: CodeDB
-  , _x509CertDB     :: X509CertDB
   , _blockSummaryDB :: BlockSummaryDB
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
@@ -531,7 +529,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       sdb <- openDB stateDBPath
       hdb <- openDB hashDBPath
       cdb <- openDB codeDBPath
-      x509db <- openDB x509CertDBPath
       blksumdb <- openDB blockSummaryCacheDBPath
       rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
         Redis.connectHost = "localhost",
@@ -547,7 +544,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
-            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
@@ -603,7 +599,6 @@ runContextM dSettings f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-      x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
@@ -613,7 +608,6 @@ runContextM dSettings f = do
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
-            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool

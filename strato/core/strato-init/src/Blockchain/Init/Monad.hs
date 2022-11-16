@@ -43,7 +43,6 @@ data SetupDBs =
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
-    x509DB  :: X509CertDB,
     sqlDB   :: SQLDB,
     redisDB :: RBDB.RedisConnection,
     localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
@@ -61,12 +60,11 @@ runSetupDBM mv = do
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
-  xdb <- X509CertDB <$> open x509CertDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
   pool <- createPostgresqlPool connStr 20
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb xdb pool redisConn m1 m2 m3 m4
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn m1 m2 m3 m4
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots

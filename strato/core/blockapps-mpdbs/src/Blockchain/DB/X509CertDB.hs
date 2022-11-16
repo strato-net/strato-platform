@@ -9,8 +9,8 @@
 {-# LANGUAGE TypeOperators              #-}
 
 module Blockchain.DB.X509CertDB
-  ( X509CertDB(..)
-  , HasX509CertDB
+  ( 
+    HasX509CertDB
   , HasMemCertDB(..)
   , CertModification(..)
   , getCertTxMap
@@ -58,7 +58,6 @@ import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromMaybe, isJust)
 import qualified Data.NibbleString                    as N
 import           Data.Traversable                     (for)
-import qualified Database.LevelDB                     as DB
 
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.Data.RLP
@@ -72,10 +71,7 @@ import           BlockApps.X509
 import           GHC.Generics
 import           Text.Format
 
-newtype X509CertDB = X509CertDB { unX509CertDB :: DB.DB }
 
-instance NFData X509CertDB where
-  rnf (X509CertDB a) = a `seq` ()
 
 type HasX509CertDB m = (Address `Alters` X509Certificate) m
 
