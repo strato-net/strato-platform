@@ -4,17 +4,18 @@ const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const { getOrCreateKey } = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
 async function createUserKey(req, res, next) {
-  const username = req.headers['x-user-unique-name'];
+  const accessToken = req.headers['x-user-access-token'];
 
-  if (!username) {
+  if (!accessToken) {
     let err = new Error("invalid param, expected username to be a non-empty string");
     err.status = RestStatus.BAD_REQUEST;
     return next(err);
   }
 
   try {
-    const response = await getOrCreateKey(username);
-    const userKeyData = Object.assign({}, response.user, { username });
+    const response = await getOrCreateKey(accessToken);
+    // TODO: Critical: return the actual username coming from VaultProxy instead #fix-before-shared-vault-done
+    const userKeyData = Object.assign({}, response.user, { username: '#todo-in-apex-#fix-before-shared-vault-done' });
 
     res.status(200).json(userKeyData);
   } catch (error) {

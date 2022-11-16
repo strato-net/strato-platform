@@ -218,6 +218,8 @@ contract Certificate {
     }
     
     function addChild(address _child) public {
+        require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
+
         children.push(_child);
     }
     

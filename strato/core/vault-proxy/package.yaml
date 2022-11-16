@@ -1,0 +1,85 @@
+name:                vault-proxy
+version:             0.1.0.0
+github:              "blockapps/strato-platform"
+license:             Propietary
+author:              "Steven Glasford"
+maintainer:          "steven_glasford@blockapps.net"
+copyright:           "2022 Blockapps, Inc"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         This is where strato nodes communicate to the foreign shared vault
+
+dependencies:
+- base
+- aeson
+- aeson-casing
+- blockapps-init
+- bytestring
+- clock
+- hflags
+- hoauth2
+- http-client
+- http-client-tls
+- http-conduit
+- lens
+- network-uri
+- scientific
+- servant
+- servant-client
+- servant-client-core
+- servant-server
+- stm
+- text
+- time
+- uri-bytestring
+- utf8-string
+
+ghc-options:
+- -Wall
+- -O2
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  dependencies: 
+  - time
+  - bytestring
+
+executables:
+  vault-proxy-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - vault-proxy
+
+tests:
+  vault-proxy-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - vault-proxy

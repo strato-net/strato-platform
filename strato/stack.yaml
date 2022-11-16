@@ -5,6 +5,7 @@ packages:
 - api/ethereum-jsonrpc
 - api/strato-api
 - api2/strato-api2
+# - api/vaultProxy
 
 - core/blockapps-data
 - core/blockapps-datadefs
@@ -30,6 +31,7 @@ packages:
 - core/strato-statediff
 - core/vm-runner/
 - core/vm-tools/
+- core/vault-proxy/
 
 - indexer/slipstream
 - indexer/strato-index

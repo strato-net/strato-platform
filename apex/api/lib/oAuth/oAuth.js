@@ -5,9 +5,9 @@ const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 
-async function createKey(username, userParams = null) {
+async function createKey(accessToken, userParams = null) {
 
-    if (!username) {
+    if (!accessToken) {
       let err = new Error("invalid param, expected username to be a non-empty string");
       err.status = RestStatus.BAD_REQUEST;
       throw err;
@@ -17,12 +17,14 @@ async function createKey(username, userParams = null) {
     try {
 
       userParams = userParams == null ? {} : userParams;
-      const userAccount = await ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', {
-        "x-user-unique-name": username,
+      const userAccount = await ax.post(process.env.vaultProxyUrl, userParams, '/strato/v2.3/key', {
+        "x-user-access-token": accessToken,
       });
       //faucet user so they can do stuff
       await waitFaucet(userAccount.address);
-
+      
+      // TODO: add the username to userAccount object here if not present #fix-before-shared-vault-done
+      
       return {
         status: RestStatus.OK,
         user: userAccount
@@ -34,9 +36,9 @@ async function createKey(username, userParams = null) {
     }
 }
 
-async function getKey(username, userQuery = null) {
+async function getKey(accessToken, userQuery = null) {
 
-  if (!username) {
+  if (!accessToken) {
     let err = new Error("invalid param, expected username to be a non-empty string");
     err.status = RestStatus.BAD_REQUEST;
     throw err;
@@ -44,9 +46,8 @@ async function getKey(username, userQuery = null) {
 
   try {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
-
-    const userAccount = await ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key${query}`, {
-      "x-user-unique-name": username,
+    const userAccount = await ax.get(process.env.vaultProxyUrl, `/strato/v2.3/key${query}`, {
+      "x-user-access-token": accessToken,
     });
 
     return {
@@ -81,7 +82,7 @@ async function waitFaucet(address) {
 
   //faucet
   await ax.postue(process.env.stratoRoot, params, '/faucet')
-  
+
   //wait for update
   const sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
