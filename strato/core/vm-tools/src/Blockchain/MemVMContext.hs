@@ -42,12 +42,16 @@ import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
 import           Data.Default
 import qualified Data.Map                           as M
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text            
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import           Data.Traversable                   (for)
+import           Data.Either.Extra
 import           Debugger
 import           GHC.Generics
 import           Prometheus
+import           Text.Read                          (readMaybe)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
@@ -76,6 +80,7 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
+                                                    ,lookupX509AddrFromCBHash
                                                     )
 
 import           UnliftIO
@@ -287,6 +292,12 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
+instance (Address `A.Alters` X509Certificate) MemContextM where
+  lookup _ k = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
   lookup _ n1    = dbsGets $ view (hashDB . at n1)

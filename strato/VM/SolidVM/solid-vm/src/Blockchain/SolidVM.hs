@@ -2883,10 +2883,16 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
         ]))) vmVersion
 
 
-callBuiltin "getUserCert" [SAccount a _] _ = do
+callBuiltin "getUserCert" [SAccount a _] _ = do --Add others
   curContract <- getCurrentContract
   maybeCert <- A.select (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
+
+callBuiltin "getCertField" [(SAccount a _), certField] _ = do --Add others
+  maybeField <- A.select (A.Proxy @X509CertificateField) $ ( (a ^. namedAccountAddress), ((T.pack $ show certField) ))
+  case maybeField of
+    Nothing -> return $ (SString $ fromString "")
+    Just f -> return $ SString ((\(X509CertificateField xf)-> xf)f)
 
 -- SolidVM built in function that verifies that the root cert is signed by the key
 -- verifyCert checks that the root of a chained cert is signed by the public key.

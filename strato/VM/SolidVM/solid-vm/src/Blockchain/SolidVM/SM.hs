@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
@@ -44,6 +45,7 @@ module Blockchain.SolidVM.SM (
   getValueType,
   pushSender,
   initializeAction,
+  -- lookupX509AddrFromCBHash,
   markDiffForAction,
   getBlockHashWithNumber,
   getBSum,
@@ -76,6 +78,7 @@ import qualified Data.Sequence as Q
 import           Data.Source
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Data.Either.Extra
 import           Debugger
 
 import           BlockApps.Logging
@@ -104,6 +107,7 @@ import           Blockchain.SolidVM.GasInfo
 import qualified SolidVM.Model.CodeCollection as CC
 import           Blockchain.Data.BlockSummary 
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -161,6 +165,8 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
+                 , HasSelectX509CertDB m
+                 , HasSelectX509FieldDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -248,6 +254,20 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
+
+instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
+  get = lift . Mod.get
+  put p = lift . Mod.put p
+
+instance ( (Address `A.Alters` X509Certificate) m
+         , Mod.Modifiable CertRoot m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         ) => (Address `A.Alters` X509Certificate) (SM m) where
+  lookup _ k = do
+    mBH <- gets $ view $ ssMemDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p

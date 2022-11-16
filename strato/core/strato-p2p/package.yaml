@@ -8,6 +8,8 @@ dependencies:
   - base
   - blockapps-data
   - common-log
+  - extra
+  - vm-tools
 
 ghc-options: -Wall -threaded
 

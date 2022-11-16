@@ -15,6 +15,7 @@ import qualified Data.ByteString                    as B
 import           Data.IORef
 import qualified Data.Map                           as M
 import qualified Data.NibbleString                  as N
+import qualified Data.Text                          as T
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
 
@@ -108,6 +109,12 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB
+
+instance (Address `A.Selectable` X509Certificate) SetupDBM where
+  select _ = error "SetupDBM select @X509Certificate"
+
+instance ((Address, T.Text) `A.Selectable` X509CertificateField) SetupDBM where
+  select _ = error "SetupDBM select @X509CertificateField"
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB

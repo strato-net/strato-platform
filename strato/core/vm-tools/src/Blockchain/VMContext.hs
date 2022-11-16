@@ -439,7 +439,33 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
+instance (Address `A.Selectable` X509Certificate) ContextM where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+lookupX509AddrFromCBHash ::(
+                     (A.Alters (Account, B.ByteString) B.ByteString) m
+                      )
+      => Address -> m (Maybe Address)
+lookupX509AddrFromCBHash k = do
+  -- do
+  --   mBH <- Mod.get (Mod.Proxy @CurrentBlockHash)
+  --   mbh= 0
+    -- fmap join . for mBH $ \(CurrentBlockHash _) -> do 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+        certRegistryKey = certKey (Address 0x509)
+    maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+    
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB

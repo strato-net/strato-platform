@@ -30,6 +30,7 @@ import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue                   hiding (newTQueueIO)
 import           Data.Default
+import           Data.Either.Extra
 import           Data.Foldable                         (for_, toList, traverse_)
 import           Data.List                             (intercalate)
 import           Data.Map.Strict                       (Map)
@@ -41,9 +42,10 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
 import qualified Data.Text                             as T
-import           Data.Text.Encoding                    (decodeUtf8)
+import           Data.Text.Encoding                    (encodeUtf8, decodeUtf8)
 import           Data.Traversable                      (for)
 import           Data.Maybe
+import           Text.Read                          (readMaybe)
 -- import           Text.Printf
 
 import           BlockApps.Logging
@@ -111,6 +113,7 @@ import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
 import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.VMContext                  (lookupX509AddrFromCBHash)
 import qualified Blockchain.TxRunResultCache           as TRC
 
 import           Debugger                              (DebugSettings)
@@ -673,6 +676,20 @@ instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) wh
     fmap join . for mBH $ \(CurrentBlockHash bh) -> X509.getCertMaybe k bh
   insert _ = X509.putCert
   delete _ = X509.deleteCert
+
+instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m)  where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+instance (MonadIO m, MonadLogger m) => ((Address,T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MonadTest m) where
   lookup _ n1    = dbsGets $ Lens.view (hashDB . at n1)
