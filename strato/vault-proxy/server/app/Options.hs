@@ -5,15 +5,14 @@ module Options where
 
 import           HFlags
 
-defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
-defineFlag "P:pghost" ("postgres" :: String) "Postgres hostname"
-defineFlag "pgport" ("5432" :: String) "Postgres port"
-defineFlag "p:password" ("api" :: String) "Postgres password"
-defineFlag "d:database" ("oauth" :: String) "Postgres database name"
-defineFlag "port" (8000::Int) "The port which the server runs on"
-defineFlag "loglevel" (4::Int) "The log level for output messages"
-defineFlag "keyStoreCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
-
-defineFlag "pw" ("" :: String) "Password for vault-proxy"
-defineFlag "key" ("" :: String) "the old blockstanbulPrivateKey to migrate"
-
+defineFlag "OAUTH_ENABLED" (True :: Bool) "Enable OAuth2"
+defineFlag "OAUTH_DISCOVERY_URL" ("" :: T.Text) "OAuth2 Discovery URL"
+defineFlag "OAUTH_JWT_USERNAME_PROPERTY" ("" :: T.Text) "OAuth2 JWT Username Property"
+defineFlag "OAUTH_CLIENT_ID" ("" :: T.Text) "OAuth2 Client ID"
+defineFlag "OAUTH_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Client Secret"
+defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
+defineFlag "OAUTH_SERVICE_USER_CLIENT_ID" ("" :: T.Text) "OAuth2 Service User Client ID"
+defineFlag "OAUTH_SERVICE_USER_CLIENT_SECRET" ("" :: T.Text) "OAuth2 Service User Client Secret"
+defineFlag "VAULT_URL" ("http:://vault-proxy" :: T.Text) "The place where I go to visit THE VAULT 🔒."
+defineFlag "VAULT_PORT" (8013 :: Int) "This is the place that the vault proxy will attempt to connect and will also communicate with. Same port is used for post and gets, just to let you know."
+defineFlag "VAULT_PASSWORD" ("" :: T.Text) "This is the password that is used to log into the shared vault."

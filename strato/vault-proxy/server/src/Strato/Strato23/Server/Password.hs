@@ -21,8 +21,8 @@ import           Strato.VaultProxy.Crypto
 import           Strato.VaultProxy.Database.Queries
 import           Strato.VaultProxy.Monad
 
-superSecretVaultWrapperMessage :: ByteString
-superSecretVaultWrapperMessage =
+superSecretVaultProxyMessage :: ByteString
+superSecretVaultProxyMessage =
   "A monad is just a monoid in the category of endofunctors, what's the problem?"
 
 getKeyFromPasswordAndSalt :: Password -> ByteString -> SecretBox.Key
@@ -43,37 +43,40 @@ setPassword pw conn = do
   let key = getKeyFromPasswordAndSalt pw salt
   let ciphertext = encrypt key
                            nonce
-                           superSecretVaultWrapperMessage
+                           superSecretVaultProxyMessage
   success <- postMessageQuery salt nonce ciphertext conn
   if success
     then return $ Just key
     else return Nothing
 
-postPassword :: Text -> VaultM ()
-postPassword password = do
-  existingKey <- asks superSecretKey
-  doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
 
-  case doIAlreadyHaveAKey of
-    Just _ -> vaultWrapperError $ UserError "Password is already set"
-    Nothing -> do
-      mMsg <- listToMaybe <$> vaultQuery getMessageQuery
-      case mMsg of
-        Nothing -> do
-          maybeKey <- vaultModify . setPassword $ Password $ encodeUtf8 password
-          case maybeKey of
-            Just key -> liftIO . atomicWriteIORef existingKey $ Just key
-            Nothing -> vaultWrapperError $ AnError "Failed to insert encrypted message into database"
-        Just (salt :: ByteString, nonce, ciphertext) -> do
-          let key = getKeyFromPasswordAndSalt (Password $ encodeUtf8 password) salt
-          case decrypt key nonce ciphertext of
-            Just msg | msg == superSecretVaultWrapperMessage ->
-              liftIO . atomicWriteIORef existingKey $ Just key
-            _ -> vaultWrapperError $ UserError "Could not validate password"
+postPassword :: Text -> VaultProxyM ()
+postPassword password = pure undefined
+--   do
+--   existingKey <- asks superSecretKey
+--   doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
 
-verifyPassword :: VaultM Bool
-verifyPassword = do 
-  existingKey <- asks superSecretKey
-  doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
-  return $ isJust doIAlreadyHaveAKey
+--   case doIAlreadyHaveAKey of
+--     Just _ -> vaultProxyError $ UserError "Password is already set"
+--     Nothing -> do
+--       mMsg <- listToMaybe <$> vaultQuery getMessageQuery
+--       case mMsg of
+--         Nothing -> do
+--           maybeKey <- vaultModify . setPassword $ Password $ encodeUtf8 password
+--           case maybeKey of
+--             Just key -> liftIO . atomicWriteIORef existingKey $ Just key
+--             Nothing -> vaultWrapperError $ AnError "Failed to insert encrypted message into database"
+--         Just (salt :: ByteString, nonce, ciphertext) -> do
+--           let key = getKeyFromPasswordAndSalt (Password $ encodeUtf8 password) salt
+--           case decrypt key nonce ciphertext of
+--             Just msg | msg == superSecretVaultWrapperMessage ->
+--               liftIO . atomicWriteIORef existingKey $ Just key
+--             _ -> vaultWrapperError $ UserError "Could not validate password"
+
+verifyPassword :: VaultProxyM Bool
+verifyPassword = pure undefined
+  -- do 
+  -- existingKey <- asks superSecretKey
+  -- doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
+  -- return $ isJust doIAlreadyHaveAKey
   

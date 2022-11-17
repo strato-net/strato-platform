@@ -21,8 +21,8 @@ import           Strato.VaultProxy.Server.Ping
 import           Strato.VaultProxy.Server.Signature
 import           Strato.VaultProxy.Server.User
 
-vaultWrapper :: ServerT VaultWrapperAPI VaultM
-vaultWrapper = getPing
+vaultProxy :: ServerT VaultProxyAPI VaultProxyM
+vaultProxy = getPing
           :<|> getKey
           :<|> postKey
           :<|> getSharedKey
@@ -30,18 +30,20 @@ vaultWrapper = getPing
           :<|> postSignature
           :<|> postPassword
           :<|> verifyPassword
+          :<|> getRawToken
+          :<|> getCurrentUser
 
-serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
-serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper
+serveVaultProxy :: VaultProxyEnv -> Server VaultProxyAPI
+serveVaultProxy env = hoistServer serverProxy (enterVaultProxy env) vaultProxy
 
-serverProxy :: Proxy VaultWrapperAPI
+serverProxy :: Proxy VaultProxyAPI
 serverProxy = Proxy
 
-vaultWrapperSwagger :: Swagger
-vaultWrapperSwagger = toSwagger (Proxy @ VaultWrapperAPI)
-    & info.title   .~ "Vault Wrapper API"
+vaultProxySwagger :: Swagger
+vaultProxySwagger = toSwagger (Proxy @ VaultProxyAPI)
+    & info.title   .~ "Vault Proxy API"
     & info.version .~ "2.3"
-    & info.description ?~ "This is the V2.3 API for Vault Wrapper"
-    & basePath ?~ "/strato/v2.3"
+    & info.description ?~ "This is the V2.3 API for Vault Proxy"
+    & basePath ?~ "/vaultProxy"
 
-type VaultWrapperDocsAPI = "swagger.json" :> Get '[JSON] Swagger
+type VaultProxyDocsAPI = "swagger.json" :> Get '[JSON] Swagger

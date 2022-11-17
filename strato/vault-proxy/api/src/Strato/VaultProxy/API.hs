@@ -9,6 +9,7 @@ module Strato.VaultProxy.API
   , module Strato.VaultProxy.API.Signature
   , module Strato.VaultProxy.API.Types
   , module Strato.VaultProxy.API.Users
+  , module Strato.VaultProxy.API.Token
   ) where
 
 import           Servant
@@ -18,6 +19,7 @@ import           Strato.VaultProxy.API.Ping
 import           Strato.VaultProxy.API.Signature
 import           Strato.VaultProxy.API.Types
 import           Strato.VaultProxy.API.Users
+import           Strato.VaultProxy.API.Token
 
 
 type VaultProxyAPI = GetPing
@@ -28,3 +30,5 @@ type VaultProxyAPI = GetPing
                   :<|> PostSignature
                   :<|> PostPassword
                   :<|> VerifyPassword
+                  :<|> GetRawToken
+                  :<|> GetCurrentUser

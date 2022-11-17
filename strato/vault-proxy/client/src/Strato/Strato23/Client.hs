@@ -9,6 +9,8 @@ module Strato.VaultProxy.Client
   , postSignature
   , postPassword
   , verifyPassword
+  , getCurrentUser
+  , getRawToken
   ) where
 
 import           Servant.Client
@@ -39,3 +41,9 @@ postPassword = client (Proxy @ PostPassword)
 
 verifyPassword :: ClientM Bool
 verifyPassword = client (Proxy @ VerifyPassword)
+
+getCurrentUser :: ClientM Text
+getCurrentUser = client (Proxy @ GetCurrentUser)
+
+getRawToken :: ClientM Text
+getRawToken = client (Proxy @ GetRawToken)

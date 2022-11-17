@@ -26,6 +26,16 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Strato.VaultProxy.Monad
+  - Strato.VaultProxy.Server
+  - Strato.VaultProxy.Server.Key
+  - Strato.VaultProxy.Server.Password
+  - Strato.VaultProxy.Server.Ping
+  - Strato.VaultProxy.Server.Signature
+  - Strato.VaultProxy.Server.Token
+  - Strato.VaultProxy.Server.User
+  - Strato.VaultProxy.Server.Utils
   dependencies:
     - bytestring
     - cache
@@ -71,48 +81,6 @@ executables:
       - warp
     ghc-options: -threaded
       
-  migrate-keys:
-    source-dirs: app
-    main: MigrateKeys.hs
-    other-modules: [Options]
-    dependencies:
-      - blockapps-vault-proxy-server
-      - bytestring
-      - csv
-      - hflags
-      - lens
-      - opaleye
-      - text
-
-  migrate-nodekey:
-    source-dirs: app
-    main: MigrateNodeKey.hs
-    other-modules: [Options]
-    dependencies:
-      - blockapps-vault-proxy-server
-      - base64-bytestring
-      - bytestring
-      - cryptonite
-      - hflags
-      - opaleye
-      - saltine
-      - strato-model
-      - text
-
-  migrate-salt:
-    source-dirs: app
-    main: MigrateSalt.hs
-    other-modules: [Options]
-    dependencies:
-      - blockapps-vault-proxy-server
-      - bytestring
-      - hflags
-      - lens
-      - opaleye
-      - saltine
-      - strato-model
-      - text
-
 tests:
   vault-proxy-spec:
     source-dirs: test/

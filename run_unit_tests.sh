@@ -38,7 +38,7 @@ stack test -j1 \
       x509-certs \
       evm-solidity \
       bloc2api \
-      blockapps-vault-wrapper-server \
+      # blockapps-vault-wrapper-server \
       blockapps-vault-proxy-server \
       slipstream \
       blockapps-privacy \

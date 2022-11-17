@@ -36,12 +36,7 @@ import           UnliftIO                        hiding (Handler(..))
 
 import           BlockApps.Logging
 
-type VaultM = ReaderT VaultWrapperEnv (LoggingT IO)
-
-dbErrorToUserError :: MonadUnliftIO m => m a -> m a
-dbErrorToUserError = flip catch $ \case
-                       DBError msg -> throwIO (UserError msg)
-                       err         -> throwIO err
+type VaultProxyM = ReaderT VaultProxyEnv (LoggingT IO)
 
 toUserError :: (MonadUnliftIO m, MonadLogger m) => Text -> m a -> m a
 toUserError msg = flip catch $ reportAndConvertError msg
@@ -60,19 +55,18 @@ prettyCallStack' cs =
     formatCSLine (funcName, SrcLoc{..}) =
       "  " ++ funcName ++ ", called at " ++ srcLocModule ++ ":" ++ show srcLocStartLine ++ ":" ++ show srcLocStartCol
 
-vaultWrapperError :: HasCallStack => VaultWrapperError -> VaultM y
-vaultWrapperError err = do
+vaultProxyError :: HasCallStack => VaultProxyError -> VaultProxyM y
+vaultProxyError err = do
     logErrorCS callStack . Text.pack $ show err ++ "\n" ++ prettyCallStack' ?callStack
     throwIO err
 
-data VaultWrapperEnv = VaultWrapperEnv
+data VaultProxyEnv = VaultProxyEnv
   { httpManager         :: Manager
-  , dbPool              :: Pool Connection
   , superSecretKey      :: IORef (Maybe SecretBox.Key)
   , keyStoreCache       :: Cache Text KeyStore
   }
 
-data VaultWrapperError
+data VaultProxyError
   = DBError Text
   | UserError Text
   | NoPasswordError
@@ -87,44 +81,44 @@ data VaultWrapperError
 
 --------------------------------------------------------------------------------
 
-runVaultWithEnv :: VaultWrapperEnv -> VaultM a -> IO a
-runVaultWithEnv env = runLoggingT
-                    . flip runReaderT env
+runVaultProxyWithEnv :: VaultProxyEnv -> VaultProxyM a -> IO a
+runVaultProxyWithEnv env = runLoggingT
+                         . flip runReaderT env
 
-runVaultToIO :: VaultWrapperEnv -> VaultM a -> IO (Either VaultWrapperError a)
-runVaultToIO env = try . runVaultWithEnv env
+runVaultProxyToIO :: VaultProxyEnv -> VaultProxyM a -> IO (Either VaultProxyError a)
+runVaultProxyToIO env = try . runVaultProxyWithEnv env
 
-handleRuntimeError :: SomeException -> VaultM a
+handleRuntimeError :: SomeException -> VaultProxyM a
 handleRuntimeError (e :: SomeException) = case fromException e of
-  Just (_ :: VaultWrapperError) -> throwIO e
+  Just (_ :: VaultProxyError) -> throwIO e
   Nothing -> throwIO $ RuntimeError e
 
-handleVaultError :: VaultWrapperError -> VaultM a
-handleVaultError = \case
+handleVaultProxyError :: VaultProxyError -> VaultProxyM a
+handleVaultProxyError = \case
   NoPasswordError -> do
-    $logErrorS "handleVaultError/NoPasswordError"
-               "Password has not been set. Please set password by calling POST /strato/v2.3/password for node to function properly"
+    $logErrorS "handleVaultProxyError/NoPasswordError"
+               "Password has not been set. Please set password by calling POST /vault-proxy/password for node to function properly"
     throwIO NoPasswordError
   IncorrectPasswordError -> do
-    $logErrorS "handleVaultError/IncorrectPasswordError"
+    $logErrorS "handleVaultProxyError/IncorrectPasswordError"
       "The password has been set incorrectly. Please restart the node and supply the correct password."
     throwIO IncorrectPasswordError
   e@(RuntimeError _) -> do
-    $logErrorS "handleVaultError/RuntimeError" . Text.pack
+    $logErrorS "handleVaultProxyError/RuntimeError" . Text.pack
         $ show e ++ "\n  callstack missing for runtime errors"
     throwIO e
   e -> do
-    $logErrorLS "handleVaultError" e
+    $logErrorLS "handleVaultProxyError" e
     throwIO e
 
-enterVaultWrapper :: VaultWrapperEnv -> VaultM x -> Handler x
-enterVaultWrapper env x = Handler $ do
-  eRes <- liftIO . runVaultToIO env $ x `catch` handleRuntimeError `catch` handleVaultError
+enterVaultProxy :: VaultProxyEnv -> VaultProxyM x -> Handler x
+enterVaultProxy env x = Handler $ do
+  eRes <- liftIO . runVaultProxyToIO env $ x `catch` handleRuntimeError `catch` handleVaultProxyError
   case eRes of
     Right a -> return a
     Left e -> throwE $ reThrowError e
   where
-    reThrowError :: VaultWrapperError -> ServerError
+    reThrowError :: VaultProxyError -> ServerError
     reThrowError
       = \case
           DBError err ->
@@ -141,14 +135,14 @@ enterVaultWrapper env x = Handler $ do
           NoPasswordError ->
             err503{errBody = fromString $ unlines
                    [
-                     "No Password for Vault-Wrapper!",
+                     "No Password for Vault-Proxy!",
                      "STRATO has not been initialized properly.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
           IncorrectPasswordError ->
             err503{errBody = fromString $ unlines
                    [
-                     "Incorrect Password for Vault-Wrapper!",
+                     "Incorrect Password for Vault-Proxy!",
                      "STRATO has not been initialized properly.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
@@ -177,64 +171,18 @@ enterVaultWrapper env x = Handler $ do
                      "Please contact your network administrator to have this problem fixed."
                    ]}
 
-withSecretKey :: (SecretBox.Key -> VaultM a) -> VaultM a
+withSecretKey :: (SecretBox.Key -> VaultProxyM a) -> VaultProxyM a
 withSecretKey f = do
   pwioref <- asks superSecretKey
   key <- readIORef pwioref
   case key of
-    Nothing -> vaultWrapperError NoPasswordError
+    Nothing -> vaultProxyError NoPasswordError
     Just k -> f k
 
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
-vaultQuery
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Query x
-  -> VaultM [y]
-vaultQuery q = do
-  traverse_ (logDebugCS callStack . Text.pack) (showSql q)
-  pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ runSelect conn q)
-
-vaultQueryMaybe
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Query x
-  -> VaultM (Maybe y)
-vaultQueryMaybe q = vaultQuery q >>= \case
-    [] -> return Nothing
-    [y] -> return (Just y)
-    _:_:_ -> throwIO $ DBError "vaultQueryMaybe: Multiple results, expected one row"
-
-vaultQuery1
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Query x
-  -> VaultM y
-vaultQuery1 q = vaultQuery q >>= \case
-    [] -> vaultWrapperError $ DBError "No result, expected one row"
-    [y] -> return y
-    _:_:_ -> throwIO $ DBError "vaultQuery1: Multiple results, expected one row"
-
-vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
-vaultModify modify = do
-  logInfoCS callStack "Updating the database"
-  pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ modify conn)
-
-vaultModify1 :: HasCallStack => (Connection -> IO [x]) -> VaultM x
-vaultModify1 modify = do
-  logInfoCS callStack "Updating the database"
-  results <- vaultModify modify
-  case results of
-    []    -> throwIO $ DBError "No result, expected one row"
-    [y]   -> return y
-    _:_:_ -> throwIO $ DBError "Multiple results, expected one row"
-
-vaultTransaction :: VaultM x -> VaultM x
-vaultTransaction vault = do
-  pool <- asks dbPool
-  withResource pool $ (\conn -> liftBaseOp_ (withTransaction conn) vault)
 
 vaultMaybe :: Text -> Maybe x -> VaultM x
 vaultMaybe msg = maybe (throwIO (CouldNotFind msg)) return
