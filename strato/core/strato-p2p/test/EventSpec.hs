@@ -78,8 +78,8 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
---import  BlockApps.X509.Certificate           
-import  BlockApps.X509.Keys
+import           BlockApps.X509.Certificate            as X509
+import           BlockApps.X509.Keys
 
 import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
@@ -612,10 +612,6 @@ instance MonadIO m => Mod.Modifiable BestBlockRoot (MonadTest m) where
   get _     = dbsGets $ Lens.view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
-instance MonadIO m => Mod.Modifiable X509.CertRoot (MonadTest m) where
-  get _     = dbsGets $ Lens.view certRoot
-  put _ bbr = dbsModify' $ certRoot .~ bbr
-
 instance MonadIO m => Mod.Modifiable CurrentBlockHash (MonadTest m) where
   get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ Lens.view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -664,13 +660,6 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
   lookup _ k   = dbsGets $ Lens.view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
-
-instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) where
-  lookup _ k = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> X509.getCertMaybe k bh
-  insert _ = X509.putCert
-  delete _ = X509.deleteCert
 
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m)  where
   select _ k = do
@@ -1008,10 +997,8 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
         writeBlockSummary genesisOutputBlock
         for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
-        (X509.CertRoot cr) <- X509.bootstrapCertDB genHash
         putContextBestBlockInfo $ ContextBestBlockInfo (genHash, genesisBlock, 0, 0, 0)
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
-        Mod.put (Mod.Proxy @X509.CertRoot) $ X509.CertRoot cr
         processNewBestBlock genHash genesisBlock [] -- bootstrap Bagger with genesis block
         runConduit $ sourceTQueue seqVmSource
                   .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
