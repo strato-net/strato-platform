@@ -104,6 +104,7 @@ import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Wei
 import           Blockchain.VMContext                 (lookupX509AddrFromCBHash)
 import qualified Blockchain.TxRunResultCache           as TRC
+import qualified BlockApps.X509.Certificate            as X509
 import           Text.Read                            (readMaybe)
 
 import           Debugger                              (DebugSettings)
@@ -646,12 +647,6 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
-instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) where
-  lookup _ k = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> X509.getCertMaybe k bh
-  insert _ = X509.putCert
-  delete _ = X509.deleteCert
 
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
