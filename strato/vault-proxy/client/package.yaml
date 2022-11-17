@@ -26,6 +26,3 @@ dependencies:
 
 library:
   source-dirs: src
-  exposed-modules:
-  - Strato.VaultProxy.Client
-

@@ -23,16 +23,6 @@ dependencies:
 
 library:
   source-dirs: src
-  exposed-modules:
-  - Strato.VaultProxy.API
-  - Strato.VaultProxy.API.Key
-  - Strato.VaultProxy.API.Password
-  - Strato.VaultProxy.API.Ping
-  - Strato.VaultProxy.API.Signature
-  - Strato.VaultProxy.API.Token
-  - Strato.VaultProxy.API.Types
-  - Strato.VaultProxy.API.Users
-  - Strato.VaultProxy.Crypto
   dependencies:
   - aeson
   - aeson-casing

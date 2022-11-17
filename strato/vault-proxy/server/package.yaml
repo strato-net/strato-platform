@@ -26,16 +26,6 @@ dependencies:
 
 library:
   source-dirs: src
-  exposed-modules:
-  - Strato.VaultProxy.Monad
-  - Strato.VaultProxy.Server
-  - Strato.VaultProxy.Server.Key
-  - Strato.VaultProxy.Server.Password
-  - Strato.VaultProxy.Server.Ping
-  - Strato.VaultProxy.Server.Signature
-  - Strato.VaultProxy.Server.Token
-  - Strato.VaultProxy.Server.User
-  - Strato.VaultProxy.Server.Utils
   dependencies:
     - bytestring
     - cache
