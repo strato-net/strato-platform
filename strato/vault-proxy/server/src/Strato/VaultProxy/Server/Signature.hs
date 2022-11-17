@@ -4,22 +4,21 @@
 
 module Strato.VaultProxy.Server.Signature where
 
-import           Control.Monad.Reader                  (asks)
-import qualified Data.ByteString                       as B
-import qualified Data.Cache                            as Cache
+-- import           Control.Monad.Reader                  (asks)
+-- import qualified Data.ByteString                       as B
+-- import qualified Data.Cache                            as Cache
 import           Data.Text                             (Text)
 import           Blockchain.Strato.Model.Secp256k1
 import           Strato.VaultProxy.Monad
 import           Strato.VaultProxy.API.Types
-import           Strato.VaultProxy.Crypto
-import           Strato.VaultProxy.Database.Queries      (getUserKeyQuery)
-import           UnliftIO
+-- import           Strato.VaultProxy.Crypto
+-- import           UnliftIO
 
 
 --bounce the request to the vault
-postSignature :: Text -> MsgHash -> VaultM Signature
-postSignature userName (MsgHash msgBS) = 
-  pure undefined
+postSignature :: Text -> MsgHash -> VaultProxyM Signature
+-- postSignature userName (MsgHash msgBS) = pure undefined
+postSignature = pure undefined
   -- do
   -- cache <- asks keyStoreCache
   -- cachedPk <- liftIO $ Cache.lookup cache userName

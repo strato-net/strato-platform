@@ -27,20 +27,32 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+    - aeson
+    - base64-bytestring
     - bytestring
     - cache
     - clock
     - cryptonite
+    - exceptions
     - http-client
     - lens
+    - modern-uri
+    - monad-alter
     - monad-control
     - mtl
     - opaleye
     - product-profunctors
     - profunctors
+    - req
     - saltine
+    - servant
+    - servant-auth
+    - servant-auth-server
+    - servant-client
+    - scientific
     - servant-swagger
     - strato-model
+    - stm
     - swagger2
     - transformers
     - unliftio
@@ -48,6 +60,7 @@ library:
     - secp256k1-haskell == 0.2.0
     - servant-server
     - text
+    - yesod-core
 
 
 executables:

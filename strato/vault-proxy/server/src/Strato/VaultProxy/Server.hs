@@ -19,6 +19,7 @@ import           Strato.VaultProxy.Server.Key
 import           Strato.VaultProxy.Server.Password
 import           Strato.VaultProxy.Server.Ping
 import           Strato.VaultProxy.Server.Signature
+import           Strato.VaultProxy.Server.Token
 import           Strato.VaultProxy.Server.User
 
 vaultProxy :: ServerT VaultProxyAPI VaultProxyM

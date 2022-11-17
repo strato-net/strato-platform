@@ -28,10 +28,12 @@ library:
   - aeson-casing
   - base16-bytestring
   - bytestring
+  - cache
   - cryptonite
   - labeled-error
   - lens
   - saltine
+  - scientific
   - servant
   - servant-server
   - strato-model

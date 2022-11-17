@@ -184,7 +184,6 @@ fullServer :: ( MonadLogger m
               , HasSQL m
               , HasBlocSQL m
               , HasBlocEnv m
-              , HasVault m
               , HasVaultProxy m
               , HasCoreAPI m
               , Selectable Account ContractDetails m

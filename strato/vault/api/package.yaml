@@ -32,6 +32,7 @@ library:
   - labeled-error
   - lens
   - saltine
+  - scientific
   - servant
   - servant-server
   - strato-model

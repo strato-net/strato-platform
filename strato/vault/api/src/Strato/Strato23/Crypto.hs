@@ -11,7 +11,10 @@ import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
+-- import           Data.Aeson
 import           Data.ByteString                   (ByteString)
+-- import           Data.Scientific
+-- import           Data.String
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf

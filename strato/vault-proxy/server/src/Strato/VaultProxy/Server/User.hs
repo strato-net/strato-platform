@@ -10,11 +10,12 @@ import Data.Text hiding (map)
 import BlockApps.Logging
 import Strato.VaultProxy.API
 import Strato.VaultProxy.Monad
-import Strato.VaultProxy.Database.Queries
 
 --Replace with the bouncer
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
-getUsers headerUsername mAddr mLimit mOffset = pure undefined
+-- getUsers headerUsername mAddr mLimit mOffset = pure undefined
+getUsers = pure undefined
+
   -- do
   --  $logDebugLS "getUsers" (headerUsername, mAddr, mOffset, mLimit)
   --  exists <- (>0) <$> (vaultQuery1 (countUsers headerUsername) :: VaultProxyM Int64)

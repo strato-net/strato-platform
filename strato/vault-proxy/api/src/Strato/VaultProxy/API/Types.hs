@@ -12,16 +12,18 @@ module Strato.VaultProxy.API.Types
   , Signature(..) -- TODO: remove, ideally
   , PublicKey(..) --       same
   , SharedKey(..) --       same
+  , RawOauth(..)
   ) where
 
-
-import           Control.Lens                 ((&), (?~))
+import           Control.Lens                 hiding ((.=))
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Char8        as C8
+import           Data.Cache
+import           Data.Scientific              as Scientific
 import qualified Data.Text                    as T
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
@@ -30,6 +32,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
+import           Strato.VaultProxy.DataTypes
 import qualified LabeledError
 
 
@@ -78,8 +81,30 @@ instance FromJSON MsgHash where
 instance ToSchema MsgHash where
   declareNamedSchema = const . pure $ named "MsgHash bytestring" binarySchema
 
-
 data User = User
   { username :: T.Text
   , address :: Address
   } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
+
+data RawOauth = RawOauth {
+    authorization_endpoint :: T.Text,
+    token_endpoint :: T.Text --,
+} deriving (Show, Generic, Eq)
+
+instance FromJSON RawOauth where
+  parseJSON (Object o) = do
+    aue  <- o .: "authorization_endpoint"
+    ton  <- o .: "token_endpoint"
+
+    authend <- case aue of
+        (String s) -> pure s
+        (Object _) -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
+        _          -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
+    tokend <- case ton of
+        (String s) -> pure s
+        (Object _) -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
+        _          -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
+    return $ RawOauth authend tokend 
+  parseJSON wat = typeMismatch "Spec" wat
+
+type VaultCache = Cache T.Text VaultToken

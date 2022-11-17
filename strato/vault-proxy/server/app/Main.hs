@@ -28,7 +28,6 @@ import           System.IO                              (BufferMode (..),
 import           BlockApps.Init
 import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
 import qualified Strato.VaultProxy.API                    as VaultProxy
-import qualified Strato.VaultProxy.Database.Migrations    as VaultProxy
 import qualified Strato.VaultProxy.Monad                  as VaultProxy
 import qualified Strato.VaultProxy.Server                 as VaultProxy
 
@@ -37,10 +36,8 @@ import           Options
 main :: IO ()
 main = do
   blockappsInit "blockapps-vault-proxy-server"
+  --Print the startup logo
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
-
-
-
   putStrLn . unlines $
     [ "                                      mm                                                                     "
     , "*@@@@*   *@@@*                      *@@@    @@           *@@@***@@m                                          "
@@ -56,23 +53,28 @@ main = do
     , "                                                                                                  :::        "
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
-  let dbConnectInfo = ConnectInfo { connectHost = flags_pghost
-                                  , connectPort = read flags_pgport
-                                  , connectUser = flags_pguser
-                                  , connectPassword = flags_password
-                                  , connectDatabase = flags_database
-                                  }
-
-  conn <- connect dbConnectInfo
-  void $ VaultProxy.runMigrations conn
-  close conn
-
-  pool <- createPool (connect dbConnectInfo) close 20 3 20
-  mgr <- newManager defaultManagerSettings
+  --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
+  mgr <- newManager tlsManagerSettings
+  let vaultConnection = VaultConnection {
+      vaultUrl = flags_VAULT_URL,
+      vaultPassword = flags_VAULT_PASSWORD,
+      vaultPort = flags_VAULT_PORT,
+      httpManager = mgr,
+      oauthEnabled = flags_OAUTH_ENABLED,
+      oauthUrl = flags_OAUTH_DISCOVERY_URL,
+      oauthClientId = flags_OAUTH_CLIENT_ID
+      oauthClientSecret = flags_OAUTH_CLIENT_SECRET,
+      oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
+      oauthServiceClientId = flags_OAUTH_SERVICE_USER_CLIENT_ID,
+      oauthServiceClientSecret = flags_OAUTH_SERVICE_USER_CLIENT_SECRET,
+      vaultProxyUrl = flags_VAULT_PROXY_URL,
+      vaultProxyPort = flags_VAULT_PROXY_PORT
+  }
   password <- newIORef Nothing
-  cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
-  let env = VaultProxy.VaultWrapperEnv mgr pool password cache
-  run flags_port (appVaultWrapper env)
+  tokenCache <- atomically $ newCacheSTM Nothing
+  -- cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
+  -- let env = VaultProxy.VaultWrapperEnv mgr pool password cache
+  run (vaultConnection ^. vaultPort) (appVaultProxy vaultConnection)
 
 appVaultWrapper :: VaultProxy.VaultWrapperEnv -> Application
 appVaultWrapper env =

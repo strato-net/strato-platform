@@ -1,77 +1,45 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Strato.VaultProxy.Server.Token where
 
+import           Control.Concurrent.STM
+import           Control.Lens
+import           Control.Monad.Catch
+-- import           Control.Monad.Composable.VaultProxy
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Control.Monad.Change.Modify
+import           Data.Aeson  
+import           Data.Aeson.Types
+import           Data.ByteString.Base64
+import           Data.Cache               as C
+import           Data.Cache.Internal      as C
+import           Data.Maybe
+import           Data.Proxy
+import qualified Data.Scientific         as Scientific
+import qualified Data.Text               as T
+import           Data.Text.Encoding      as TE
+import           GHC.Generics
+import           Network.HTTP.Client     as HTC hiding (Proxy)
+import           Network.HTTP.Req        as R
+import           Servant.API             as SA
+import           Servant.Auth            as SAA
+import           Servant.Auth.Server     as SAS
+import           Servant.Client
+import           Servant.Server          as SS
+import           Strato.VaultProxy.API
+import           Strato.VaultProxy.Monad
+import           System.Clock
+import           Text.URI                as URI
+import           Yesod.Core.Types        as YC
 
-data VaultToken = VaultToken {
-    _accessToken :: T.Text,
-    _expiresIn :: Integer,
-    _refreshExpiresIn :: Integer,
-    _refreshToken :: T.Text,
-    _tokenType :: T.Text,
-    _notBeforePolicy :: Integer,
-    _sessionState :: T.Text,
-    _scone :: T.Text
-} deriving (Eq, Show, Generic)
-makeLenses ''VaultToken
-
-instance FromJSON VaultToken where
-  parseJSON (Object o) = do
-    ao  <- o .: "access_token"
-    ei  <- o .: "expires_in"
-    rei <- o .: "refresh_expires_in"
-    rt  <- o .: "refresh_token"
-    tt  <- o .: "token_type"
-    nbp <- o .: "not-before-policy"
-    ss  <- o .: "session_state"
-    sc  <- o .: "scope"
-    --Ensure the correct data types are coming into the system
-    access_token <- case ao of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-    exprin <- case ei of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"expires_in\", but got something different."
-    refreshexin <- case rei of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"refresh_expires_in\", but got something different."
-    refresh_token <- case rt of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"refresh_token\", but got something different."
-    token_type <- case tt of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"token_type\", but got something different."
-    notb4pol <- case nbp of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"not-before-policy\", but got something different."
-    session_state <- case ss of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"session_state\", but got something different."
-    --can't call it scope, so I called it scone, bon appetit
-    sconce <- case sc of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-    --Put the scientific numbers into regular ints
-    let not_before_policy   = Scientific.coefficient notb4pol
-        refresh_expires_in  = Scientific.coefficient refreshexin
-        expires_in          = Scientific.coefficient exprin
---   parseJSON wat = typeMismatch "Spec" wat
-    return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
-  parseJSON wat = typeMismatch "Spec" wat
-
---This will get the currently logged in user, this is a way to fix the hardcoded "nodekey"
-getCurrentUser :: VaultToken ->  T.Text
-getCurrentUser = pure undefined 
 
 --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
 --User never really needs to use this function, it is mostly called by getAwesomeToken 
@@ -129,8 +97,8 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
-getRawToken :: Text
+getRawToken :: VaultProxyM T.Text
 getRawToken = pure undefined
 
-getCurrentUser :: Text
+getCurrentUser :: VaultProxyM T.Text
 getCurrentUser = pure undefined

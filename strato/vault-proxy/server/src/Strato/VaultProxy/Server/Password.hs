@@ -4,21 +4,20 @@
 
 module Strato.VaultProxy.Server.Password where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader
+-- import           Control.Monad.IO.Class
+-- import           Control.Monad.Reader
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                  (ByteString)
-import           Data.Maybe                       (fromMaybe, listToMaybe, isJust)
-import           Data.IORef
+import           Data.Maybe                       (fromMaybe)
+-- import           Data.IORef
 import           Data.Text                        (Text)
-import           Data.Text.Encoding               (encodeUtf8)
-import           Database.PostgreSQL.Simple       (Connection)
+-- import           Data.Text.Encoding               (encodeUtf8)
+-- import           Database.PostgreSQL.Simple       (Connection)
 
 import           Strato.VaultProxy.Crypto
-import           Strato.VaultProxy.Database.Queries
 import           Strato.VaultProxy.Monad
 
 superSecretVaultProxyMessage :: ByteString
@@ -37,21 +36,22 @@ getKeyFromPasswordAndSalt (Password pw) salt =
      Scrypt.generate scryptParams pw salt
 
 
-setPassword :: Password -> Connection -> IO (Maybe SecretBox.Key)
-setPassword pw conn = do
-  (salt, nonce) <- newSaltAndNonce
-  let key = getKeyFromPasswordAndSalt pw salt
-  let ciphertext = encrypt key
-                           nonce
-                           superSecretVaultProxyMessage
-  success <- postMessageQuery salt nonce ciphertext conn
-  if success
-    then return $ Just key
-    else return Nothing
+-- setPassword :: Password -> Connection -> IO (Maybe SecretBox.Key)
+-- setPassword pw conn = do
+--   (salt, nonce) <- newSaltAndNonce
+--   let key = getKeyFromPasswordAndSalt pw salt
+--   let ciphertext = encrypt key
+--                            nonce
+--                            superSecretVaultProxyMessage
+--   success <- postMessageQuery salt nonce ciphertext conn
+--   if success
+--     then return $ Just key
+--     else return Nothing
 
 
 postPassword :: Text -> VaultProxyM ()
-postPassword password = pure undefined
+-- postPassword password = pure undefined
+postPassword = pure undefined
 --   do
 --   existingKey <- asks superSecretKey
 --   doIAlreadyHaveAKey <- liftIO $ readIORef existingKey

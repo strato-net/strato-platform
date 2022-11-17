@@ -4,21 +4,16 @@
 
 module Strato.VaultProxy.Server.Key where
 
-import           Data.ByteString (ByteString)
-import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
 
 import           Strato.VaultProxy.API
-import           Strato.VaultProxy.Crypto
 import           Strato.VaultProxy.Monad
-import           Strato.VaultProxy.Database.Queries
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Secp256k1
 
 --Bounce that request
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
-getKey headerUserName queryParamUserName = --withSecretKey $ \key -> do
-  pure undefined
+-- getKey headerUserName queryParamUserName =   pure undefined
+getKey = pure undefined
+  --withSecretKey $ \key -> do
   -- let userName = fromMaybe headerUserName queryParamUserName
   -- (_ :: ByteString, nonce, encKey, _ :: Address) <- toUserError ("User " <> userName <> " doesn't exist")
   --                              . vaultQuery1 $ getUserKeyQuery userName
@@ -27,7 +22,8 @@ getKey headerUserName queryParamUserName = --withSecretKey $ \key -> do
   --   Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
 
 postKey :: Text -> VaultProxyM AddressAndKey
-postKey userName = pure undefined
+-- postKey userName = pure undefined
+postKey = pure undefined
   -- withSecretKey $ \key -> do
   -- keyStore@KeyStore{..} <- newKeyStore key
   -- created <- vaultModify $ postUserKeyQuery userName keyStore
@@ -40,7 +36,8 @@ postKey userName = pure undefined
 
 -- Get an ECDH shared secret from the user's private key and a supplied public key
 getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
-getSharedKey userName otherPub = pure undefined
+-- getSharedKey userName otherPub = pure undefined
+getSharedKey = pure undefined
 -- withSecretKey $ \key -> do
   -- (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
   --                         toUserError ("User " <> userName <> " doesn't exist")
