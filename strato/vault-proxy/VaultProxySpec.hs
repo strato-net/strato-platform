@@ -1,3 +1,5 @@
+--This file isn't particularly used but might be useful soon.
+
 module VaultProxySpec (
   spec) where
 
