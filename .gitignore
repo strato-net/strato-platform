@@ -5,11 +5,11 @@
 .stack-work-profile
 docker-compose.push.yml
 docker-compose.yml
+docker-compose.vault.push.yml
+docker-compose.vault.yml
 stack.yaml.lock
 configurationCache.log
 dryrun.log
 targets.log
 *.cabal
 *~
-docker-compose.vault.push.yml
-docker-compose.vault.yml
