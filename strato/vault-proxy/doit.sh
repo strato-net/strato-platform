@@ -44,7 +44,9 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 blockapps-vault-proxy-server \
-  --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" \
-  --password="$postgres_password" --database="$postgres_vault_proxy_db" --minLogLevel="${minLogLevel}" --keyStoreCacheTimeout="$keyStoreCacheTimeout" \
+  --OAUTH_ENABLED="$OAUTH_ENABLED" --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+  --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS"  --OAUTH_SERVICE_USER_CLIENT_ID="${OAUTH_SERVICE_USER_CLIENT_ID}"
+  --OAUTH_SERVICE_USER_CLIENT_SECRET="${OAUTH_SERVICE_USER_CLIENT_SECRET}" --VAULT_URL="${VAULT_URL}" --VAULT_PORT="${VAULT_PORT}" \
+  --VAULT_PASSWORD="${VAULT_PASSWORD}" --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}" --VAULT_PROXY_URL="${VAULT_PROXY_URL}" \
+  --minLogLevel="${minLogLevel}" \
   || set +x && echo -e "\n${RED}blockapps-vault-proxy-server has terminated!!!${NC}" && tail -f /dev/null
-
