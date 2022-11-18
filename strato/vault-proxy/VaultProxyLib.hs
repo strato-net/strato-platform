@@ -162,7 +162,8 @@ type VaultAPI = GetPing
 
 type VaultM = ReaderT VaultProxyEnv (LoggingT IO)
 
-data VaultWrapperEnv = VaultWrapperEnv
+--TODO: remove this if it is not needed (likely removable and replaced with VaultConnection)
+data VaultProxyEnv = VaultProxyEnv
   { httpManager         :: Manager
   , dbPool              :: Pool Connection
   , superSecretKey      :: IORef (Maybe SecretBox.Key)

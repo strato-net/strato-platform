@@ -80,8 +80,8 @@ main = do
   
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultProxyUrl
-  let clientEnv = mkClientEnv mgr vaultWrapperUrl
+  vaultProxyUrl <- parseBaseUrl flags_vaultProxyUrl
+  let clientEnv = mkClientEnv mgr vaultProxyUrl
   
   selfAddress <- do
     addrAndKey <- waitOnVault $ runClientM (VP.getKey (T.pack "nodekey") Nothing) clientEnv

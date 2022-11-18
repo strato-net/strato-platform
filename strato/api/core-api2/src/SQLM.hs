@@ -109,8 +109,8 @@ apiErrorToServantErr = \case
   VaultProxyError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Vault-Wrapper Error!",
-                     "Bloc recieved a malformed response from Vault-Wrapper.",
+                     "Vault-Proxy Error!",
+                     "Bloc recieved a malformed response from Vault-Proxy.",
                      "This is probably a backend configuration problem.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the strato-api logs.)"

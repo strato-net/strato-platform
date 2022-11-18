@@ -35,8 +35,8 @@ import           Strato.VaultProxy.DataTypes
 import qualified LabeledError
 
 
-vaultWrapperSchemaOptions :: SchemaOptions
-vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
+vaultProxySchemaOptions :: SchemaOptions
+vaultProxySchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
 
 data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PublicKey } deriving (Show, Generic)

@@ -102,9 +102,10 @@ defaultConfig =
 getNodeKey :: IO (VP.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
-  let clientEnv = mkClientEnv mgr vaultWrapperUrl
-  putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
+  vaultProxyUrl <- parseBaseUrl flags_vaultProxyUrl 
+  let clientEnv = mkClientEnv mgr vaultProxyUrl
+  putStrLn "asking vault-proxy for the node's key, or to create one, if it does not exist"
+    --TODO: need to remove hardcoded "nodekey"
   ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
   return (VP.unPubKey ak, VP.unAddress ak)
 
