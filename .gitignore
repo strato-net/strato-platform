@@ -11,3 +11,5 @@ dryrun.log
 targets.log
 *.cabal
 *~
+docker-compose.vault.push.yml
+docker-compose.vault.yml
