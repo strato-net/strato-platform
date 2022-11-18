@@ -21,6 +21,7 @@ import           Strato.VaultProxy.Server.Ping
 import           Strato.VaultProxy.Server.Signature
 import           Strato.VaultProxy.Server.Token
 import           Strato.VaultProxy.Server.User
+import           Strato.VaultProxy.DataTypes
 
 vaultProxy :: ServerT VaultProxyAPI VaultProxyM
 vaultProxy = getPing
@@ -34,7 +35,7 @@ vaultProxy = getPing
           :<|> getRawToken
           :<|> getCurrentUser
 
-serveVaultProxy :: VaultProxyEnv -> Server VaultProxyAPI
+serveVaultProxy :: VaultConnection -> Server VaultProxyAPI
 serveVaultProxy env = hoistServer serverProxy (enterVaultProxy env) vaultProxy
 
 serverProxy :: Proxy VaultProxyAPI

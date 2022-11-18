@@ -10,7 +10,6 @@ module Strato.VaultProxy.API
   , module Strato.VaultProxy.API.Types
   , module Strato.VaultProxy.API.Users
   , module Strato.VaultProxy.API.Token
-  , RawOauth(..)
   ) where
 
 import           Servant

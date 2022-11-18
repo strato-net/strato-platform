@@ -15,25 +15,27 @@ module Strato.VaultProxy.Monad where
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 -- import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
-import           Data.Aeson
-import           Data.Aeson.Types
+-- import           Data.Aeson
+-- import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy            as LB
-import           Data.Cache
-import           Data.Scientific                 as Scientific
+-- import           Data.Cache
+-- import           Data.Scientific                 as Scientific
 import           Data.String
 import           Data.Text                       as T hiding (map, unlines)
 import qualified Data.Text                       as Text
 import           Data.Text.Encoding
 import           GHC.Stack
-import           Network.HTTP.Client
+-- import           Network.HTTP.Client
 import           Servant
 -- import           Strato.VaultProxy.Crypto
 
 import           UnliftIO                        hiding (Handler(..))
 
-import           BlockApps.Logging
+import           BlockApps.Logging  
 
-type VaultProxyM = ReaderT VaultConnection (LoggingT IO)
+import           Strato.VaultProxy.DataTypes        as DT
+
+type VaultProxyM = ReaderT DT.VaultConnection (LoggingT IO)
 
 toUserError :: (MonadUnliftIO m, MonadLogger m) => Text -> m a -> m a
 toUserError msg = flip catch $ reportAndConvertError msg
@@ -56,86 +58,6 @@ vaultProxyError :: HasCallStack => VaultProxyError -> VaultProxyM y
 vaultProxyError err = do
     logErrorCS callStack . Text.pack $ show err ++ "\n" ++ prettyCallStack' ?callStack
     throwIO err
-
-data VaultConnection = VaultConnection {
-    vaultUrl :: Text,
-    vaultPassword :: Text,
-    vaultPort :: Int,
-    httpManager :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
-    oauthEnabled :: Bool,
-    oauthUrl :: Text,
-    oauthClientId :: Text,
-    oauthClientSecret :: Text,
-    oauthReserveSeconds :: Int,
-    oauthServiceClientId :: Text,
-    oauthServiceClientSecret :: Text,
-    vaultProxyUrl :: Text,
-    vaultProxyPort :: Int,
-    vaultCache :: Cache Text VaultToken
-}
-
-data VaultToken = VaultToken {
-    accessToken :: T.Text,
-    expiresIn :: Integer,
-    refreshExpiresIn :: Integer,
-    refreshToken :: T.Text,
-    tokenType :: T.Text,
-    notBeforePolicy :: Integer,
-    sessionState :: T.Text,
-    scone :: T.Text
-} deriving (Eq, Show)
-
-instance FromJSON VaultToken where
-  parseJSON (Object o) = do
-    ao  <- o .: "access_token"
-    ei  <- o .: "expires_in"
-    rei <- o .: "refresh_expires_in"
-    rt  <- o .: "refresh_token"
-    tt  <- o .: "token_type"
-    nbp <- o .: "not-before-policy"
-    ss  <- o .: "session_state"
-    sc  <- o .: "scope"
-    --Ensure the correct data types are coming into the system
-    access_token <- case ao of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-    exprin <- case ei of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"expires_in\", but got something different."
-    refreshexin <- case rei of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"refresh_expires_in\", but got something different."
-    refresh_token <- case rt of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"refresh_token\", but got something different."
-    token_type <- case tt of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"token_type\", but got something different."
-    notb4pol <- case nbp of
-        (Number n) -> pure n
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"not-before-policy\", but got something different."
-    session_state <- case ss of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"session_state\", but got something different."
-    --can't call it scope, so I called it scone, bon appetit
-    sconce <- case sc of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-    --Put the scientific numbers into regular ints
-    let not_before_policy   = Scientific.coefficient notb4pol
-        refresh_expires_in  = Scientific.coefficient refreshexin
-        expires_in          = Scientific.coefficient exprin
---   parseJSON wat = typeMismatch "Spec" wat
-    return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
-  parseJSON wat = typeMismatch "Spec" wat
 
 -- data VaultProxyEnv = VaultProxyEnv
 --   { httpManager         :: Manager

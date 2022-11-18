@@ -10,35 +10,37 @@
 module Strato.VaultProxy.Server.Token where
 
 import           Control.Concurrent.STM
-import           Control.Lens
+-- import           Control.Lens
 import           Control.Monad.Catch
 -- import           Control.Monad.Composable.VaultProxy
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader
-import           Control.Monad.Change.Modify
-import           Data.Aeson  
-import           Data.Aeson.Types
-import           Data.ByteString.Base64
+-- import           Control.Monad.Reader
+-- import           Control.Monad.Change.Modify
+-- import           Data.Aeson  
+-- import           Data.Aeson.Types
+import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
 import           Data.Cache.Internal      as C
 import           Data.Maybe
-import           Data.Proxy
-import qualified Data.Scientific         as Scientific
+-- import           Data.Proxy
+-- import qualified Data.Scientific         as Scientific
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
-import           GHC.Generics
+-- import           GHC.Generics
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
-import           Servant.API             as SA
-import           Servant.Auth            as SAA
-import           Servant.Auth.Server     as SAS
-import           Servant.Client
-import           Servant.Server          as SS
+-- import           Servant.API             as SA
+-- import           Servant.Auth            as SAA
+-- import           Servant.Auth.Server     as SAS
+-- import           Servant.Client
+-- import           Servant.Server          as SS
 import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
 import           System.Clock
 import           Text.URI                as URI
-import           Yesod.Core.Types        as YC
+-- import           Yesod.Core.Types        as YC
+
+import           Strato.VaultProxy.DataTypes
 
 
 --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
@@ -46,10 +48,10 @@ import           Yesod.Core.Types        as YC
 getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> m VaultToken --OAuth2Token ---Might need to include the discovery URL later
 getVirginToken clientId clientSecret additionalOauth = do --virginToken
     --Conver the token endpoint to a URI
-    uri <- URI.mkURI $ additionalOauth ^. token_endpoint
+    uri <- URI.mkURI $ token_endpoint additionalOauth
     --Encode all of the parameters, get ready to send to server
     let (url, _) = fromJust (useHttpsURI $ uri)
-        authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
         contType = header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server
@@ -92,7 +94,7 @@ makeExpry token reserveTime = do
     let nanoTime :: Integer
         nanoTime = toNanoSecs (whatTimeIsIt)
         tokenExpry :: Integer
-        tokenExpry =  token ^. expiresIn
+        tokenExpry =  expiresIn token
         expry :: TimeSpec
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry

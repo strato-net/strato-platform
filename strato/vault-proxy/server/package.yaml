@@ -23,12 +23,14 @@ dependencies:
 - blockapps-vault-proxy-api
 - common-log
 - postgresql-simple
+- text
+- http-conduit
 
 library:
   source-dirs: src
   dependencies:
     - aeson
-    - base64-bytestring
+    - base64
     - bytestring
     - cache
     - clock

@@ -4,10 +4,10 @@ module Strato.VaultProxy.Server.User
   ( getUsers
   ) where
 
-import Data.Int
+-- import Data.Int
 import Data.Text hiding (map)
 
-import BlockApps.Logging
+-- import BlockApps.Logging
 import Strato.VaultProxy.API
 import Strato.VaultProxy.Monad
 

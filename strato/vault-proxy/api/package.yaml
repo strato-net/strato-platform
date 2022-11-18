@@ -30,6 +30,7 @@ library:
   - bytestring
   - cache
   - cryptonite
+  - http-client
   - labeled-error
   - lens
   - saltine
