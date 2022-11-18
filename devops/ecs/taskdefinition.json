@@ -87,10 +87,12 @@
                     "name": "stratoHost",
                     "value": "strato:3000"
                 },
+                // I have no idea if this is correct, not enough time to review
                 {
-                    "name": "vaultWrapperHost",
-                    "value": "vault-wrapper:8000"
+                    "name": "vaultProxyHost",
+                    "value": "strato:8013"
                 }
+
             ],
             "mountPoints": [],
             "memoryReservation": 512,
@@ -243,8 +245,8 @@
                     "value": "strato:3000"
                 },
                 {
-                    "name": "vaultWrapperHost",
-                    "value": "vault-wrapper:8000"
+                    "name": "vaultProxyHost",
+                    "value": "strato:8013"
                 },
                 {
                     "name": "zkHost",

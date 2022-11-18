@@ -40,7 +40,7 @@ createCertificate userName CreateCertEndpoint{..} = do
     Nothing -> throwIO $ UserError "Certificate could not be signed!"
 
 signViaVault :: (MonadIO m, MonadLogger m, HasVaultProxy m) => Text -> ByteString -> m Signature 
-signViaVault userName bs = blocVaultWrapper $ postSignature userName (MsgHash bs)
+signViaVault userName bs = blocVaultProxy $ postSignature userName (MsgHash bs)
 
 subjectToIssuer :: Subject -> Issuer
 subjectToIssuer Subject{..} = Issuer 

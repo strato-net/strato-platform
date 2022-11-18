@@ -25,7 +25,7 @@ module BlockApps.Bloc22.Monad (
   blocMaybe,
   getBlocEnv,
   blocTransaction,
-  blocVaultWrapper,
+  blocVaultProxy,
   blocStrato,
   blocModify,
   blocModify1,
@@ -146,14 +146,14 @@ blocStrato client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . StratoError) return resultEither
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVaultProxy m, HasCallStack) =>
+blocVaultProxy :: (MonadIO m, MonadLogger m, HasVaultProxy m, HasCallStack) =>
                     ClientM x -> m x
-blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
+blocVaultProxy client' = do
+  logInfoCS callStack "Querying Vault Proxy"
   VaultProxyData url mgr <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (mkClientEnv mgr url)
-  either (blocError . VaultWrapperError) return resultEither
+  either (blocError . VaultProxyError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
 blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return

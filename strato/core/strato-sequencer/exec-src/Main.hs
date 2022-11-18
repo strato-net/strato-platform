@@ -62,7 +62,7 @@ main = do
   putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
-  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
+  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultProxyUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   
   pkg <- atomically newCablePackage
@@ -80,7 +80,7 @@ main = do
   
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
+  vaultWrapperUrl <- parseBaseUrl flags_vaultProxyUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do

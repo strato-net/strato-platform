@@ -35,7 +35,9 @@ transaction.  Transactions are typically initiated from the smd container (the
 built-in UI), the swagger container (a documentation platform that allows
 testing out requests), or from the clientside javascript library,
 blockapps-rest. Transactions are then sent to Bloc. In the legacy user mode,
-Bloc will sign transactions itself. When running with Oauth, the vault-wrapper
+Bloc will sign transactions itself. When running with Oauth, the vault-wrapper,
+messages are not called to the vault-wrapper anymore, instead they are sent to
+vault-proxy, which then are bounced to the actual foreign vault-wrapper
 container is responsible for managing keys. For now, these both store keys in
 postgres. Keys in bloc are encrypted with the users password, and keys in
 vault-wrapper are encrypted by a global password for the node. Vault-wrapper

@@ -38,7 +38,7 @@ data ApiError
   | DeprecatedError String
   | StratoError ClientError
   | CirrusError SERVANT.ServerError
-  | VaultWrapperError ClientError
+  | VaultProxyError ClientError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -93,20 +93,20 @@ apiErrorToServantErr = \case
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the strato-api logs.)"
                    ]}
-  VaultWrapperError (FailureResponse _ Response{..}) | responseStatusCode == status503 ->
+  VaultProxyError (FailureResponse _ Response{..}) | responseStatusCode == status503 ->
             err503{errBody = responseBody}
                                                            | statusIsClientError responseStatusCode ->
             err400{errBody = responseBody } 
-  VaultWrapperError (ConnectionError _) ->
+  VaultProxyError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines
                    [
                      "Connection Error!",
-                     "Bloc can not connect to the Vault Wrapper.",
+                     "Bloc can not connect to the Vault Proxy.",
                      "This probably is a configuration error, but can also mean the Strato peer is down.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the strato-api logs.)"
                    ]}
-  VaultWrapperError _ ->
+  VaultProxyError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
                      "Vault-Wrapper Error!",

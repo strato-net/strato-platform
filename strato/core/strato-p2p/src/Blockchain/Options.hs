@@ -25,7 +25,7 @@ defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from 
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
-defineFlag "vaultWrapperUrl" ("http://vault-proxy:8000/strato/v2.3" :: String) "The Vault-WraProxy URL"
+defineFlag "vaultProxyUrl" ("http://vault-proxy:8013/vault-proxy" :: String) "The Vault-Proxy URL"
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."

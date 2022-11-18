@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# Not sure what this file is supposed to do, but it will become unsupported with creation of vault-proxy, it will be updated if needed
 set -x
 set -e
 

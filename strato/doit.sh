@@ -67,7 +67,12 @@ function newnode {
 
   echo "Starting vault-proxy"
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
-  runBackgroundProcess vault-proxy  --oidcUrl=$oidcUrl --oidcContentType=$oidcContentType --oidcAuthorization=$oidcAuthorization --oidcGrantType=$oidcGrantType &>> logs/vault-proxy
+  runBackgroundProcess blockapps-vault-proxy-server \
+      --OAUTH_ENABLED="$OAUTH_ENABLED" --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS"  --OAUTH_SERVICE_USER_CLIENT_ID="${OAUTH_SERVICE_USER_CLIENT_ID}"
+      --OAUTH_SERVICE_USER_CLIENT_SECRET="${OAUTH_SERVICE_USER_CLIENT_SECRET}" --VAULT_URL="${VAULT_URL}" --VAULT_PORT="${VAULT_PORT}" \
+      --VAULT_PASSWORD="${VAULT_PASSWORD}" --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}" --VAULT_PROXY_URL="${VAULT_PROXY_URL}" \
+      --minLogLevel="${minLogLevel}"
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -80,7 +85,7 @@ function newnode {
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$VAULT_PROXY_ROOT_PATH &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover --vaultProxyUrl=$VAULT_PROXY_ROOT_PATH &>> logs/ethereum-discover
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
@@ -115,7 +120,7 @@ function newnode {
      --maxConn=$maxConn \
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
-     --vaultWrapperUrl=$VAULT_PROXY_ROOT_PATH \
+     --vaultProxyUrl=$VAULT_PROXY_ROOT_PATH \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -159,7 +164,7 @@ function newnode {
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
-  vwFlag="--vaultWrapperUrl=${VAULT_URL_ROOT_PATH}"
+  vwFlag="--vaultProxyUrl=${VAULT_URL_ROOT_PATH}"
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
@@ -219,7 +224,7 @@ function newnode {
 
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-    --stratourl=${STRATO_API_LOCAL_ROOT_PATH} --vaultwrapperurl=${VAULT_URL_ROOT_PATH}  \
+    --stratourl=${STRATO_API_LOCAL_ROOT_PATH} --vaultProxyurl=${VAULT_URL_ROOT_PATH}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -299,7 +304,7 @@ function doInit {
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-        --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$VAULT_PROXY_ROOT_PATH \
+        --addBootnodes=$addBootnodes $stratoBootnode --vaultProxyUrl=$VAULT_PROXY_ROOT_PATH \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
         --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag}"
 
@@ -422,7 +427,7 @@ setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
-setEnv VAULT_PROXY_ROOT_PATH http://localhost:8000/strato/v2.3 # TODO: change-vault-proxy-port-when-known
+setEnv VAULT_PROXY_ROOT_PATH http://localhost:8013/vault-proxy # TODO: change-vault-proxy-port-when-known
 
 if [[ -z ${VAULT_URL} ]] ; then
   echo -e "Error: VAULT_URL is required"

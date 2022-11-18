@@ -99,6 +99,11 @@ vault-wrapper: build_common
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
+# vault-proxy: build_common
+# 	@echo Now building vault-proxy...
+# 	cp strato/vault-proxy/doit.sh ${VAULTDIR}
+# 	docker build --target vault-proxy --tag ${REPO_URL}vault-proxy:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+
 docker-compose:
 	@echo Now generating docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml...
