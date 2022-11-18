@@ -26,6 +26,8 @@ dependencies:
 - text
 - http-conduit
 
+ghc-options: -Wall -Werror -threaded
+
 library:
   source-dirs: src
   dependencies:

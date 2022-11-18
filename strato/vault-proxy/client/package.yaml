@@ -24,5 +24,7 @@ dependencies:
 - text
 - blockapps-vault-proxy-api
 
+ghc-options: -Wall -Werror -threaded
+
 library:
   source-dirs: src
