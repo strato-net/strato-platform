@@ -20,7 +20,7 @@ if ngx.req.get_headers()["Authorization"] then
   -- TODO: MOVE TO CONFIG (if config empty - validate INITIAL_ vars and create config)
   local identity_providers = {
     ["<INITIAL_OAUTH_ISSUER_PLACEHOLDER>"] = {DISCOVERY_URL = "<INITIAL_OAUTH_DISCOVERY_URL_PLACEHOLDER>", USER_ID_CLAIM = "<INITIAL_OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>"},
-    ["https://keycloak.blockapps.net/auth/realms/genesis-for-beef"] = {DISCOVERY_URL = "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration", USER_ID_CLAIM = "sub"},
+    ["https://keycloak.blockapps.net/auth/realms/public"] = {DISCOVERY_URL = "https://keycloak.blockapps.net/auth/realms/public/.well-known/openid-configuration", USER_ID_CLAIM = "sub"},
   }
   
 --   -- TODO: get ISSUER from Bearer
@@ -39,7 +39,7 @@ if ngx.req.get_headers()["Authorization"] then
 --     return nil, err
 --   end
 -- 
---   local enc_hdr, enc_payload, enc_sign = string.match(ngx.req.get_headers()["Authorization"], '^(.+)%.(.+)%.(.*)$')
+--   local enc_hdr, enc_payload, enc_sign = string.match(auth_header, '^(.+)%.(.+)%.(.*)$')
 --   local payload = cjson_s.decode(openidc.openidc_base64_url_decode(enc_payload))
 --   local ISSUER = payload['iss']
   

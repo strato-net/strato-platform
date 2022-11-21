@@ -1,5 +1,8 @@
 -- for openid reference see https://github.com/zmartzone/lua-resty-openidc
 
+
+--TODO: update steps:
+
 -- This Lua script supports two request types:
 -- 1. access_token provided directly in Authorization header (OAuth2 authorization flow happens on the third-party application side) -
 --    the token is being verified and either authorizes the request or exits with 403
@@ -11,6 +14,8 @@
 -- Flow (1) is used when Authorization header is provided in the request.
 -- Access token has a slack time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
 
+
+--TODO: clean up user_access_token code
 
 local openidc = require("resty.openidc")
 
@@ -130,7 +135,6 @@ else
 end
 
 -- set request headers to forward to APIs
-ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name) -- TODO: legacy support, remove before release #fix-before-shared-vault-done
-ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token) -- TODO: pass the token instead https://blockapps.atlassian.net/browse/STRATO-2843
+ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")
