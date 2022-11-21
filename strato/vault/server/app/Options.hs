@@ -16,4 +16,5 @@ defineFlag "keyStoreCacheTimeout" (60::Integer) "The number of seconds nonces ar
 
 defineFlag "pw" ("" :: String) "Password for vault-wrapper"
 defineFlag "key" ("" :: String) "the old blockstanbulPrivateKey to migrate"
+defineFlag "pwOld" ("" :: String) "Password for old vault-wrapper" -- Used for mercata migration
 

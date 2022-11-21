@@ -99,6 +99,60 @@ executables:
       - strato-model
       - text
 
+  migrate-mercata:
+    source-dirs: app
+    main: MigrateMercata.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - lens
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+      - resource-pool
+      - http-client
+
+
+  migrate-import-to-mercata:
+    source-dirs: app
+    main: MigrateImportToMercata.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - lens
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+      - cache
+      - resource-pool
+      - http-client
+      - clock
+
+  migrate-export-to-mercata:
+    source-dirs: app
+    main: MigrateExportToMercata.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - lens
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+      - cache
+      - resource-pool
+      - http-client
+      - clock
+
+
   migrate-salt:
     source-dirs: app
     main: MigrateSalt.hs
@@ -112,6 +166,11 @@ executables:
       - saltine
       - strato-model
       - text
+      - cache
+      - resource-pool
+      - http-client
+      - clock
+      
 
 tests:
   vault-wrapper-spec:
