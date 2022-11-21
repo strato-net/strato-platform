@@ -62,7 +62,7 @@ main = do
                                      , VC.keystoreAcctAddress = acctAddr
                                      }
   
-          success <- VQ.postUserKeyQuery (T.pack "nodekey") keystore conn
+          success <- VQ.postUserKeyQuery (T.pack "nodekey") keystore conn --This will become a problem as "nodeKey" is being removed
           if success then
             putStrLn "success"
           else

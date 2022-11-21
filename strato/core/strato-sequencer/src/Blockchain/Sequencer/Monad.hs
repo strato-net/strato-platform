@@ -422,7 +422,14 @@ instance HasVaultProxy SequencerM where
     mVp <- asks vaultClient
     case mVp of
       Nothing -> return $ signMsg testPriv mesg
-      Just vp -> waitOnVault $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash mesg)) vp
+      Just vp -> do 
+        nk <- liftIO $ runClientM (VP.getCurrentUser) vp ---Might need to actually be mVp instead 
+        nodeKii <- case nk of
+          Left err -> error $ "There was an error getting the current user's name from the vault proxy." <> show err
+          Right k -> pure k
+        let nodeKey :: T.Text
+            nodeKey = nodeKii
+        waitOnVault $ liftIO $ runClientM (VP.postSignature nodeKey (VP.MsgHash mesg)) vp
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"

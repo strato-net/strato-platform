@@ -6,7 +6,7 @@ import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
-import qualified Data.Text                          as T
+-- import qualified Data.Text                          as T
 import           Network.HTTP.Client                (newManager, defaultManagerSettings)
 import           Network.HTTP.Types.Status
 import           Servant.Client
@@ -106,7 +106,11 @@ getNodeKey = do
   let clientEnv = mkClientEnv mgr vaultProxyUrl
   putStrLn "asking vault-proxy for the node's key, or to create one, if it does not exist"
     --TODO: need to remove hardcoded "nodekey"
-  ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
+  nk <- runClientM getCurrentUser clientEnv
+  nodeKey <- case nk of 
+    Left err -> error $ "Failed to get the current node information from the vault-proxy: " <> show err
+    Right k -> pure k
+  ak <- waitOnVault clientEnv $ runClientM (getKey nodeKey Nothing) clientEnv
   return (VP.unPubKey ak, VP.unAddress ak)
 
 waitOnVault :: ClientEnv -> IO (Either ClientError VP.AddressAndKey) -> IO VP.AddressAndKey
@@ -121,7 +125,11 @@ waitOnVault clientEnv request = do
       400 -> -- 400 is thrown when the key does not exist
         if flags_generateKey then do 
           putStrLn "nodekey does not exist -  I'm going to create one"
-          waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+          nk <- runClientM getCurrentUser clientEnv
+          nodeKey <- case nk of 
+            Left err -> error $ "Failed to get the current node information from the vault-proxy: " <> show err
+            Right k -> pure k
+          waitOnVault clientEnv $ runClientM (postKey nodeKey) clientEnv
         else do
           putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
           threadDelay 5000000 -- 5 seconds

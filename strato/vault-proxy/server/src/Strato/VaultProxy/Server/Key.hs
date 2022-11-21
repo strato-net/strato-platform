@@ -6,8 +6,10 @@ module Strato.VaultProxy.Server.Key where
 
 import           Data.Text                        (Text)
 
+-- import           Servant.Client --needed for the bouncing service and runClientM
 import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
+-- import           Hflags
 
 --Bounce that request
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey

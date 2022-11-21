@@ -393,19 +393,31 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVaultProxy (ReaderT Config m)
     vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy for a signature"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    waitOnVault $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash bs)) vp
+    nk <- liftIO $ runClientM (VP.getCurrentUser) vp
+    nodeKey <- case nk of
+      Left err -> error $ "Error getting node key from vault-proxy: " <> show err
+      Right nk' -> return nk'
+    waitOnVault $ liftIO $ runClientM (VP.postSignature nodeKey (VP.MsgHash bs)) vp
   
   getPub = do
     vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy to get the node's public key"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    fmap VP.unPubKey $ waitOnVault $ liftIO $ runClientM (VP.getKey (T.pack "nodekey") Nothing) vp
+    nk <- liftIO $ runClientM (VP.getCurrentUser) vp
+    nodeKey <- case nk of
+      Left err -> error $ "Error getting node key from vault-proxy: " <> show err
+      Right nk' -> return nk'
+    fmap VP.unPubKey $ waitOnVault $ liftIO $ runClientM (VP.getKey nodeKey Nothing) vp
   
   getShared pub = do
     vp <- asks configVaultClient 
     $logInfoS "HasVaultProxy" "Calling vault-proxy to get a shared key"
     -- Need to change "nodeKey" to be generic, without changes it will destroy the network
-    waitOnVault $ liftIO $ runClientM (VP.getSharedKey "nodekey" pub) vp
+    nk <- liftIO $ runClientM (VP.getCurrentUser) vp
+    nodeKey <- case nk of
+      Left err -> error $ "Error getting current user from vault proxy: " <> show err
+      Right k -> return k
+    waitOnVault $ liftIO $ runClientM (VP.getSharedKey nodeKey pub) vp
 
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b

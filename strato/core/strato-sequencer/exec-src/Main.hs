@@ -11,7 +11,7 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.Text                  as T
+-- import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -84,7 +84,11 @@ main = do
   let clientEnv = mkClientEnv mgr vaultProxyUrl
   
   selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VP.getKey (T.pack "nodekey") Nothing) clientEnv
+    nk <- runClientM (VP.getCurrentUser) clientEnv
+    nodeKey <- case nk of
+      Left err -> error $ "Failed to get the curren't node's name from the vault-proxy: " <> show err
+      Right nk' -> return nk'
+    addrAndKey <- waitOnVault $ runClientM (VP.getKey nodeKey Nothing) clientEnv
     return $ VP.unAddress addrAndKey
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress

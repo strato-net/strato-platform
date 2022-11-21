@@ -13,7 +13,7 @@ import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
-import qualified Data.Text                  as T
+-- import qualified Data.Text                  as T
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Network.HTTP.Simple
 import           Network.HTTP.Types.Status
@@ -38,7 +38,11 @@ instance HasVaultProxy IO where
     mgr <- newManager defaultManagerSettings
     url <- parseBaseUrl "http://strato:8013/vault-proxy"
     --Need to change this to get not search the hardcoded "nodekey"
-    eSig <- runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash bs)) (mkClientEnv mgr url)
+    nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr url)
+    nodeKey <- case (nk) of
+      Left err -> die $ "Failed to connect to the vault proxy to get the node's name " ++ show err
+      Right key -> return key
+    eSig <- runClientM (VP.postSignature (nodeKey) (VP.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
@@ -115,8 +119,13 @@ main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
   vaultUrl <- parseBaseUrl "http://strato:8013/vault-proxy"
+  nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr vaultUrl)
+  nodeKey <- case nk of
+    Left err -> die $ "failed to get the node's name from vault proxy: " ++ show err
+    Right key -> return key
+
   optSender <- do 
-    eAdAndKey <- runClientM (VP.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
+    eAdAndKey <- runClientM (VP.getKey nodeKey Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
       Right adAndKey -> return $ VP.unAddress adAndKey

@@ -48,12 +48,20 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVaultProxy (ReaderT ContextLi
     vp <- asks vaultProxyClient
     $logInfoS "HasVaultProxy" "asking vault-proxy for a message signature"
     --Need to change this to not use the hardcoded "nodekey"
-    waitOnVaultProxy $ liftIO $ runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash msg)) vp
+    nk <- liftIO $ runClientM (VP.getCurrentUser) vp
+    nodeKey <- case (nk) of
+      Left err -> error $ "Failed to connect to the vault proxy to get the node's name " ++ show err
+      Right key -> return key
+    waitOnVaultProxy $ liftIO $ runClientM (VP.postSignature nodeKey (VP.MsgHash msg)) vp
 
   getPub = do
     vp <- asks vaultProxyClient
+    nk <- liftIO $ runClientM (VP.getCurrentUser) vp
+    nodeKey <- case nk of 
+      Left err -> error $ "Failed to connect to the vault proxy to get the node's name " ++ show err
+      Right key -> return key
     $logInfoS "HasVaultProxy" "asking vault-proxy for the node's public key"
-    fmap VP.unPubKey $ waitOnVaultProxy $ liftIO $ runClientM (VP.getKey (T.pack "nodekey") Nothing) vp
+    fmap VP.unPubKey $ waitOnVaultProxy $ liftIO $ runClientM (VP.getKey nodeKey Nothing) vp
 
   getShared _ = error "called HasVaultProxy's getShared in ethereum-discovery, but this should never happen"
 
