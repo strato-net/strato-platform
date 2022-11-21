@@ -427,7 +427,8 @@ setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
-setEnv VAULT_PROXY_ROOT_PATH http://localhost:8013/vault-proxy # TODO: change-vault-proxy-port-when-known
+setEnv VAULT_PROXY_ROOT_PATH http://strato:8013/vault-proxy 
+setEnv VAULT_URL http://vault-wrapper:8000/strato/v2.3
 
 if [[ -z ${VAULT_URL} ]] ; then
   echo -e "Error: VAULT_URL is required"

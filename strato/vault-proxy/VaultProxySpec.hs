@@ -31,7 +31,7 @@ spec :: Spec
 spec = do
   describe "Vault proxy library" $ do
     it "can get the initial connection information." $ do
-      mngr <- liftIO $ newManager tlsManagerSettings
+      mngr <- liftIO $ newManager defaultManagerSettings
       ourl <- parseBaseUrl discoveryUrl
       rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
       noErrorOauth <- case rawOauthInfo of
@@ -41,7 +41,7 @@ spec = do
     
     --The following test will always fail as the token is generated elsewhere, but the test is useful to see if the token is being generated correctly
     xit "can use the virgin token function." $ do
-      mngr <- liftIO $ newManager tlsManagerSettings
+      mngr <- liftIO $ newManager defaultManagerSettings
       ourl <- parseBaseUrl discoveryUrl
       rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
       noErrorOauth <- case rawOauthInfo of
@@ -61,7 +61,7 @@ spec = do
 
     --The following test will always fail as the token is generated elsewhere, but the test is useful to see if the token is being generated correctly
     xit "can properly use the getAwesomeToken function to get the token." $ do 
-      mngr <- liftIO $ newManager tlsManagerSettings
+      mngr <- liftIO $ newManager defaultManagerSettings
       ourl <- parseBaseUrl discoveryUrl
       rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
       noErrorOauth <- case rawOauthInfo of
@@ -76,7 +76,7 @@ spec = do
       madison `shouldBe` clinton
     
     it "can properly store a token in the cache, without trying to request a new one.s" $ do 
-      mngr <- liftIO $ newManager tlsManagerSettings
+      mngr <- liftIO $ newManager defaultManagerSettings
       ourl <- parseBaseUrl discoveryUrl
       rawOauthInfo <- runClientM connectRawOauth (mkClientEnv mngr ourl)
       noErrorOauth <- case rawOauthInfo of

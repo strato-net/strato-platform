@@ -36,7 +36,7 @@ import qualified Strato.VaultProxy.Client     as VP
 instance HasVaultProxy IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://vault-proxy:8000/"
+    url <- parseBaseUrl "http://strato:8013/vault-proxy"
     --Need to change this to get not search the hardcoded "nodekey"
     eSig <- runClientM (VP.postSignature (T.pack "nodekey") (VP.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
@@ -114,7 +114,7 @@ main :: IO ()
 main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
+  vaultUrl <- parseBaseUrl "http://strato:8013/vault-proxy"
   optSender <- do 
     eAdAndKey <- runClientM (VP.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of

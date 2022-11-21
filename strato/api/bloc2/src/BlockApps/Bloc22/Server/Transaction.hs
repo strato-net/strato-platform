@@ -421,7 +421,7 @@ callSignature :: (MonadIO m, MonadLogger m, HasVaultProxy m) =>
                  Text -> UnsignedTransaction -> m Transaction
 callSignature jwtToken unsigned@UnsignedTransaction{..} = do
   let msgHash = rlpHash unsigned
-  sig <- blocVaultWrapper $ postSignature jwtToken (MsgHash msgHash)
+  sig <- blocVaultProxy $ postSignature jwtToken (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
   return $ Transaction
     unsignedTransactionNonce

@@ -15,7 +15,7 @@ import           Data.Cache
 import           HFlags
 import           GHC.Conc
 import           Network.HTTP.Client                    hiding (Proxy)
-import           Network.HTTP.Conduit                   hiding (Proxy)
+-- import           Network.HTTP.Conduit                   hiding (Proxy)
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
@@ -58,7 +58,7 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
-  mgr <- newManager tlsManagerSettings
+  mgr <- newManager defaultManagerSettings
   tokenCash <- atomically $ newCacheSTM Nothing
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,

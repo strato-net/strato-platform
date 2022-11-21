@@ -15,12 +15,14 @@ import           Executable.StratoP2PLoopback
 import           BlockApps.Init
 import           Data.IORef
 import           Data.Set.Ordered (empty)
+import Debug.Trace
 
 main :: IO ()
 main = do
   blockappsInit "strato_p2p"
   resetPeers
   _ <- $initHFlags "Strato P2P"
+  traceM "hflags initialized correctly"
   setParticipationMode flags_participationMode
   wireMessagesRef <- newIORef empty
   race_

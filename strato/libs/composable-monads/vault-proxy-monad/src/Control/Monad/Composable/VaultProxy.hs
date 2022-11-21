@@ -10,7 +10,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Change.Modify
 
 import           Network.HTTP.Client
-import           Network.HTTP.Conduit
+-- import           Network.HTTP.Conduit
 
 import           Servant.Client
 
@@ -26,7 +26,7 @@ type HasVaultProxy m = Accessible VaultProxyData m
 
 runVaultProxyM :: MonadIO m => String -> VaultProxyM m a -> m a
 runVaultProxyM url f = do
-  mgr <- liftIO $ newManager tlsManagerSettings
+  mgr <- liftIO $ newManager defaultManagerSettings
   vaultProxyUrl <- liftIO $ parseBaseUrl url
 
   runReaderT f $ VaultProxyData vaultProxyUrl mgr
