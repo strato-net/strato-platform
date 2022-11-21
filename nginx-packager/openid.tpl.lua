@@ -24,6 +24,7 @@ local username_property = "<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>"
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
 local unique_name = ''
+local user_access_token = ''
 
 local verify_opts = {
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
@@ -60,6 +61,11 @@ if ngx.req.get_headers()["Authorization"] then
     ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
+
+  -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
+  local header = ngx.req.get_headers()["Authorization"]
+  local divider = header:find(' ')
+ user_access_token = header:sub(divider + 1)
 
   if not isEmpty(verify_res[username_property]) then
     unique_name = verify_res[username_property]
@@ -101,8 +107,10 @@ else
   -- Request is authorized at this point - prepare data
   if not isEmpty(authenticate_res.id_token[username_property]) then
     unique_name = authenticate_res.id_token[username_property]
+    user_access_token = authenticate_res.access_token
   else
     if not isEmpty(authenticate_res.id_token.appid) then
+      -- todo:
       unique_name = authenticate_res.id_token.appid
     else
       -- None of the two expected properties found in id_token
@@ -123,6 +131,6 @@ end
 
 -- set request headers to forward to APIs
 ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name) -- TODO: legacy support, remove before release #fix-before-shared-vault-done
-ngx.req.set_header("X-USER-ACCESS-TOKEN", unique_name) -- TODO: pass the token instead https://blockapps.atlassian.net/browse/STRATO-2843
+ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token) -- TODO: pass the token instead https://blockapps.atlassian.net/browse/STRATO-2843
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")
