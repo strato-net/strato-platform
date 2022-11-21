@@ -17,10 +17,12 @@ module Blockchain.Data.GenesisBlock (
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Arrow                        ((***))
 import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
+import           Data.ByteString                      as BS hiding (zip, map)
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
@@ -48,6 +50,7 @@ import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action             as A
 import           Blockchain.Stream.VMEvent
@@ -72,13 +75,13 @@ putStorageTrie :: ( MonadLogger m
                   , HasHashDB m
                   , Mem.HasMemAddressStateDB m
                   , HasStateDB m
-                  , HasStorageDB m
-                  , HasMemStorageDB m
+                  , HasRawStorageDB m
+                  , HasMemRawStorageDB m
                   , (Account `A.Alters` AddressState) m
                   ) =>
-                  Account -> [(Word256, Word256)] -> m ()
+                  Account -> [(BS.ByteString, BS.ByteString)] -> m ()
 putStorageTrie account slots = do
-    mapM_ (uncurry $ putStorageKeyVal' account) slots
+    mapM_  (\slot -> putRawStorageKeyVal' (account, fst slot) (snd slot)) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
@@ -101,6 +104,12 @@ putAccount chainId acc = case acc of
                                               , addressStateCodeHash=codeHash'
                                               }
   ContractWithStorage address balance' codeHash' slots -> do
+    let acct = Account address chainId
+    A.insert A.Proxy acct blankAddressState{ addressStateBalance=balance'
+                                           , addressStateCodeHash=codeHash'
+                                           }
+    putStorageTrie acct $ map (word256ToBytes *** word256ToBytes) slots
+  SolidVMContractWithStorage address balance' codeHash' slots -> do
     let acct = Account address chainId
     A.insert A.Proxy acct blankAddressState{ addressStateBalance=balance'
                                            , addressStateCodeHash=codeHash'
@@ -220,6 +229,10 @@ zipSourceInfo accounts codes =
       findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor (ContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
+      findCodeFor acc@(SolidVMContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor (SolidVMContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
+
   in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock :: ( MonadLogger m

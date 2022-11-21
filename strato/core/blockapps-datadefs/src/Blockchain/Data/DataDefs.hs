@@ -112,7 +112,7 @@ indexAll = do
 -- todo newtype me
 type Difficulty = Integer
 
-type MapPair = (Word256, Word256)
+type MapPair = (BS.ByteString, BS.ByteString)
 type TextPair = (Text, Text)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData

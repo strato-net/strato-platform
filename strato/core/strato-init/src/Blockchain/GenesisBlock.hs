@@ -15,6 +15,7 @@ import           Control.Monad
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
+import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
@@ -48,6 +49,7 @@ import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.Generation                       (insertCertRegistryContract)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
 import qualified Blockchain.Stream.Action                     as A
@@ -119,8 +121,9 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
                       _ -> error $ "invalid genesis: " ++ show genesis
         faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
         faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-        theJSON' = theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+        theJSON' = insertCertRegistryContract $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+    
     genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
 initializeGenesisBlock :: ( HasCodeDB m
@@ -214,13 +217,14 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  (EVMCode ch)
+                                  (SolidVMCode "CertificateRegistry" ch)
                                   ""
                                   ""
-                                  EVM
+                                  SolidVM
+                                  -- AccountDiff -> storage d -> StorageDiff -> EVMDiff | SolidVMDiff
                                   (case storage d of
-                                    EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
-                                    SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
+                                    SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
+                                    EVMDiff _ -> error "EVMDiff not supported")
                                   [A.Create]
             , A._metadata = getMetadata ch
             , A._events = S.empty
@@ -230,12 +234,15 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                       EVMCode ch' -> ch'
                       SolidVMCode _ ch' -> ch'
                       CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
-          fromDiff :: Diff Word256 'Eventual -> Word256
+          fromDiff :: Diff B.ByteString 'Eventual -> B.ByteString
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
-
+      $logInfoS "initgen" $ T.pack $ "##################### fullAddrStates" ++ show fullAddrStates
+      $logInfoS "initgen" $ T.pack $ "##################### filteredAddrStates" ++ show filteredAddrStates
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
+
+      -- $logInfoS "initgen" $ T.pack $ unlines $ (show . (storage . snd) <$>  (Map.toList fullAccountDiffs))
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
 
       let statediff ad = StateDiff {

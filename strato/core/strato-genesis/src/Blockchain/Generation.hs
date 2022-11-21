@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE QuasiQuotes #-}
+
 
 module Blockchain.Generation (
   encodeAllRecords,
@@ -10,6 +12,7 @@ module Blockchain.Generation (
   insertContractsJSON,
   insertContractsJSONHashMaps,
   insertContracts,
+  insertCertRegistryContract,
   Records(..),
   RecordsHashMap(..),
   Type(..),
@@ -30,6 +33,7 @@ import           Data.Text (Text)
 import qualified Data.Vector as V
 import Data.Text.Encoding
 import GHC.Generics
+import Text.RawString.QQ
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
@@ -175,3 +179,182 @@ insertContracts slotss name src code start gi =
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]}
+
+insertCertRegistryContract :: GenesisInfo -> GenesisInfo
+insertCertRegistryContract gi =
+  let initialAccounts = genesisInfoAccountInfo gi
+      initialCode     = genesisInfoCodeInfo gi
+      encoded         = encodeUtf8 certificateRegistryContract
+      certAccount     = SolidVMContractWithStorage 0x509 509 
+        (SolidVMCode "CertificateRegistry" (KECCAK256.hash encoded)) 
+        []
+        --[("owner", "3282791d6fd713f1e94f4bfd565eaa78b3a0599d")]
+  in gi {genesisInfoAccountInfo = initialAccounts ++ [certAccount],
+         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encoded certificateRegistryContract (Just "CertificateRegistry")]}
+
+certificateRegistryContract :: Text
+certificateRegistryContract = [r|
+pragma solidvm 3.4;
+contract Certificate {
+    address owner;  // The CertificateRegistry Contract
+
+    address public userAddress;
+    address public parent;
+    address[] public children;
+
+    
+    // Store all the fields of a certificate in a Cirrus record
+    string commonName;
+    string country;
+    string organization;
+    string group;
+    string organizationalUnit;
+    string public publicKey;
+    string public certificateString;
+    bool public isValid;
+    uint expirationDate;
+
+    constructor(string _certificateString) {
+        owner = msg.sender;
+
+        mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        userAddress = address(parsedCert["userAddress"]);
+        commonName = parsedCert["commonName"];
+        organization = parsedCert["organization"];
+        group = parsedCert["group"];
+        organizationalUnit = parsedCert["organizationalUnit"];
+        country = parsedCert["country"];
+        publicKey = parsedCert["publicKey"];
+        certificateString = parsedCert["certString"];
+        isValid = true;
+        expirationDate = uint(parsedCert["expirationDate"],10);
+        parent = address(parsedCert["parent"]);
+        children = [];
+    }
+    
+    function addChild(address _child) public {
+        require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
+
+        children.push(_child);
+    }
+    
+    function revoke() public returns (int){
+        require(msg.sender == owner,"You don't have permission to CALL revoke!");
+
+        isValid = false;
+        return children.length;
+    }
+    
+    function getChild(int index) public returns (address){
+        require(msg.sender == owner,"You don't have permission to get children!");
+        
+        return children[index];
+    }
+}
+
+pragma solidvm 3.4;
+contract CertificateRegistry {
+    // The registry maintains a list and mapping of all the certificates
+    // We need the extra array in order for us to iterate through our certificates.
+    // Solidity mappings are non-iterable.
+    Certificate[] certificates;
+    mapping(address => uint) certificatesMap;
+    address public owner;
+
+    bool initialized;
+
+    event CertificateRegistered(string certificate);
+    event CertificateRevoked(address userAddress);
+    event CertificateRegistryInitialized();
+
+    constructor() {
+        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+        owner = msg.sender;
+
+        initialized = false;
+    }
+
+    function initializeCertificateRegistry(string[] _rootCerts) returns (int) {
+        require(!initialized, "The CertificateRegistry has already been initialized!");        
+        
+        for (uint i=0; i < _rootCerts.length; i += 1) {
+            // Create the Certificate record
+            Certificate c = new Certificate(_rootCerts[i]);
+            // Register the root certificates and emit event
+            certificates.push(c);
+            certificatesMap[c.userAddress()] = certificates.length;
+            registerCert(_rootCerts[i]);
+            emit CertificateRegistered(_rootCerts[i]);
+        }
+        
+        initialized = true;
+        emit CertificateRegistryInitialized();
+        
+        return 200;
+    }
+    
+    function registerCertificate(string newCertificateString) returns (int) {
+        require(initialized, "You must first initialize with initializeCertificateRegistry!");
+        
+        mapping(string => string) parsedCert = parseCert(newCertificateString);
+        address parentUserAddress = address(parsedCert["parent"]);
+        Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
+        
+        if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
+            // Create the new Certificate record
+            Certificate c = new Certificate(newCertificateString);
+
+            if (parentUserAddress != address(0x0)){
+                parentContract.addChild(c.userAddress());    
+            }
+
+            certificates.push(c);
+            certificatesMap[c.userAddress()] = certificates.length;
+            
+            registerCert(newCertificateString);
+            emit CertificateRegistered(newCertificateString);
+    
+            return 200; // 200 = HTTP Status OK
+        }
+        return 400;
+    }
+
+    function getUserCert(address _address) returns (address) {
+        return certificates[certificatesMap[account(_address)]];
+    }
+    
+    function getCertByAddress(address _address) returns (Certificate) {
+        return getCertByAccount(account(_address));
+    }
+    
+    function getCertByAccount(address _account) returns (Certificate) {
+        return certificates[certificatesMap[_account]-1];
+    }
+    
+    function revokeCert(address userAddress){
+        Certificate myCert = certificates[certificatesMap[userAddress]-1];
+        require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
+
+        int childrenLength = myCert.revoke();
+        for (int i = 0; i < childrenLength; i += 1) {
+            revokeCert(myCert.getChild(i));
+        }
+        
+        emit CertificateRevoked(userAddress);
+    }
+    
+    function isChild(string pCert, address certUserAddress) returns (bool) {
+        Certificate myCert = certificates[certificatesMap[certUserAddress]-1];
+        address parentUserAddress = myCert.parent();
+        if(myCert.parent() != address(0x0) && pCert == certificates[certificatesMap[parentUserAddress]-1].certificateString()){
+            return true;
+        }
+        
+        if(myCert.parent() != address(0x0)){
+            return isChild(pCert, parentUserAddress);
+        }
+        
+        return false;
+    }
+}|]

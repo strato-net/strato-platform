@@ -529,7 +529,8 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
-  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource), ("history", cName)]
+  $logInfoLS "postUsersContractSolidVM'/metadata" metadata
 
   tx <- signAndPrepare userName fromAddr metadata' $
     TransactionHeader
@@ -539,7 +540,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
       chainId
-  $logDebugLS "postUsersContractSolidVM'/tx" tx
+  $logInfoLS "postUsersContractSolidVM'/tx" tx
 
   txHash <- postTransaction tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
