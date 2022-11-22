@@ -38,6 +38,7 @@ import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
 import           System.Clock
 import           Text.URI                as URI
+import           Web.JWT                 as JWT
 -- import           Yesod.Core.Types        as YC
 
 import           Strato.VaultProxy.DataTypes
@@ -108,8 +109,26 @@ getRawToken = do
     rt <- ask oauthReserveSeconds
     ao <- ask additionalOauth 
     tok <- getAwesomeToken cash cid cs rt ao
-    pure $ show tok
+    pure $ T.pack $ show tok
 
 getCurrentUser :: VaultProxyM T.Text
 getCurrentUser = do
     cash <- ask tokenCache
+    cid <- ask oauthClientId
+    cs <- ask oauthClientSecret
+    rt <- ask oauthReserveSeconds
+    ao <- ask additionalOauth 
+    tok <- getAwesomeToken cash cid cs rt ao
+    let jwt = JWT.decode $ TE.encodeUtf8 $ access_token tok
+        claims = JWT.claims $ fromJust jwt
+        unreg = JWT.unregisteredClaims claims
+    --The word "prefered_username" might not be universal, but that is what we provide as of 11-22-2022
+    user <- lookupKey "preferred_username" unreg
+    pure $ T.pack user
+
+lookupKey :: Eq v => v -> Map.Map k v -> [k]
+lookupKey val = Map.foldrWithKey go [] where
+  go key value found =
+    if value == val
+    then key:found
+    else found
