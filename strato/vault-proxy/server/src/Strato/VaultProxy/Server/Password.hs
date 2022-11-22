@@ -51,7 +51,13 @@ getKeyFromPasswordAndSalt (Password pw) salt =
 
 postPassword :: Text -> VaultProxyM ()
 -- postPassword password = pure undefined
-postPassword = pure undefined
+postPassword password = do
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (postPassword password) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
 --   do
 --   existingKey <- asks superSecretKey
 --   doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
@@ -73,8 +79,15 @@ postPassword = pure undefined
 --               liftIO . atomicWriteIORef existingKey $ Just key
 --             _ -> vaultWrapperError $ UserError "Could not validate password"
 
+---TODO: This will not work once the migration for the vault proxy is complete
 verifyPassword :: VaultProxyM Bool
-verifyPassword = pure undefined
+verifyPassword = do
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (verifyPassword) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
   -- do 
   -- existingKey <- asks superSecretKey
   -- doIAlreadyHaveAKey <- liftIO $ readIORef existingKey

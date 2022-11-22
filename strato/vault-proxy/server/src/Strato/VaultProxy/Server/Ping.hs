@@ -3,4 +3,10 @@ module Strato.VaultProxy.Server.Ping where
 import           Strato.VaultProxy.Monad
 
 getPing :: VaultProxyM String
-getPing = return "pingDetail"
+getPing = do
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (getPing) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key

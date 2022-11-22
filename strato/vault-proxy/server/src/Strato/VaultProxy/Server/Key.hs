@@ -6,7 +6,7 @@ module Strato.VaultProxy.Server.Key where
 
 import           Data.Text                        (Text)
 
--- import           Servant.Client --needed for the bouncing service and runClientM
+import           Servant.Client --needed for the bouncing service and runClientM
 import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
 -- import           Hflags
@@ -14,7 +14,13 @@ import           Strato.VaultProxy.Monad
 --Bounce that request
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
 -- getKey headerUserName queryParamUserName =   pure undefined
-getKey = pure undefined
+getKey headerUsername queryParamUserName = do
+  vp  <- undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- liftIO $ runClientM (getKey nodeKey Nothing) vp
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
   --withSecretKey $ \key -> do
   -- let userName = fromMaybe headerUserName queryParamUserName
   -- (_ :: ByteString, nonce, encKey, _ :: Address) <- toUserError ("User " <> userName <> " doesn't exist")
@@ -25,7 +31,13 @@ getKey = pure undefined
 
 postKey :: Text -> VaultProxyM AddressAndKey
 -- postKey userName = pure undefined
-postKey = pure undefined
+postKey userName = do 
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (postKey nodeKey) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
   -- withSecretKey $ \key -> do
   -- keyStore@KeyStore{..} <- newKeyStore key
   -- created <- vaultModify $ postUserKeyQuery userName keyStore
@@ -39,7 +51,13 @@ postKey = pure undefined
 -- Get an ECDH shared secret from the user's private key and a supplied public key
 getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
 -- getSharedKey userName otherPub = pure undefined
-getSharedKey = pure undefined
+getSharedKey userName otherPub = do
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (getSharedKey userName otherPub) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
 -- withSecretKey $ \key -> do
   -- (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
   --                         toUserError ("User " <> userName <> " doesn't exist")

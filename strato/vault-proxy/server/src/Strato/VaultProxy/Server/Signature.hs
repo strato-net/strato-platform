@@ -18,7 +18,13 @@ import           Strato.VaultProxy.API.Types
 --bounce the request to the vault
 postSignature :: Text -> MsgHash -> VaultProxyM Signature
 -- postSignature userName (MsgHash msgBS) = pure undefined
-postSignature = pure undefined
+postSignature username (MsgHash msgBS) = do
+  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  kii <- runClientM (postSignature username msgBS) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  key <- case kii of
+    Left err -> error $ "Error connecting to the shared vault: " ++ show err
+    Right k -> return k
+  pure key
   -- do
   -- cache <- asks keyStoreCache
   -- cachedPk <- liftIO $ Cache.lookup cache userName
