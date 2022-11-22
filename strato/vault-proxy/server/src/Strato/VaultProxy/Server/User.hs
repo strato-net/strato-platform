@@ -5,6 +5,7 @@ module Strato.VaultProxy.Server.User
   ) where
 
 -- import Data.Int
+import Control.Monad.Trans.Reader
 import Data.Text hiding (map)
 
 -- import BlockApps.Logging

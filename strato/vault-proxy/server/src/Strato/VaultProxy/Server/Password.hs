@@ -6,6 +6,7 @@ module Strato.VaultProxy.Server.Password where
 
 -- import           Control.Monad.IO.Class
 -- import           Control.Monad.Reader
+import           Control.Monad.Trans.Reader
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Class              as Saltine

@@ -1,5 +1,6 @@
 module Strato.VaultProxy.Server.Ping where
 
+import           Control.Monad.Trans.Reader
 import           Strato.VaultProxy.Monad
 
 getPing :: VaultProxyM String

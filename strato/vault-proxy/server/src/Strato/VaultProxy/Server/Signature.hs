@@ -7,6 +7,7 @@ module Strato.VaultProxy.Server.Signature where
 -- import           Control.Monad.Reader                  (asks)
 -- import qualified Data.ByteString                       as B
 -- import qualified Data.Cache                            as Cache
+import           Control.Monad.Trans.Reader
 import           Data.Text                             (Text)
 import           Blockchain.Strato.Model.Secp256k1
 import           Strato.VaultProxy.Monad

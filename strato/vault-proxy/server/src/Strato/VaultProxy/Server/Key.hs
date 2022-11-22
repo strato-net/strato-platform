@@ -4,6 +4,8 @@
 
 module Strato.VaultProxy.Server.Key where
 
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
 import           Data.Text                        (Text)
 
 import           Servant.Client --needed for the bouncing service and runClientM
@@ -17,6 +19,7 @@ getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
 getKey headerUsername queryParamUserName = do
   mgr <- ask httpManager
   url <- ask vaultUrl
+
   kii <- liftIO $ runClientM (getKey nodeKey Nothing) (mkClientEnv mgr url)
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
@@ -35,6 +38,10 @@ postKey :: Text -> VaultProxyM AddressAndKey
 postKey userName = do 
   mgr <- ask httpManager
   url <- ask vaultUrl
+  nk <- runClientM (getCurrentUser) (mkClientEnv mgr url)
+  nodeKey <- case (nk) of
+    Left err -> error $ "Failed to connect to the vault proxy to get the node's name " <> show err
+    Right key -> return key
   kii <- runClientM (postKey nodeKey) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
