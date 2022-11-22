@@ -25,7 +25,7 @@ module Blockchain.SolidVM
 
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
-import           Control.Lens hiding (assign, to, Context)
+import           Control.Lens                  hiding (assign, to, Context)
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Extra                  (fromMaybeM, findM)
