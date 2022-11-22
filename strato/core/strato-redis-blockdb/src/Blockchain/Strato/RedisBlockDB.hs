@@ -961,10 +961,11 @@ getSyncStatusNow = do
             worldBestBlock <- getWorldBestBlockInfo
             let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
                 worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
-            pure $ Just $  case (nodeTotalDiff, worldTotalDiff) of
-                (Just ntd, Just wtd) -> ntd >= wtd
-                (Nothing,  Just _  ) ->  False
-                _ ->  False
+            pure $ Just $  case (status, nodeTotalDiff, worldTotalDiff) of
+                (Just False, Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Nothing,  Just _  ) -> False
+                _ ->  True
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"
