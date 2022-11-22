@@ -433,8 +433,8 @@ getPrivateTransactions :: Keccak256
 getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
     Left _            -> return Nothing
     Right Nothing     -> return Nothing
-    Right (Just rtx) -> let (anchor, RedisTx tx) = fromValue rtx in
-        return . Just $ (anchor, morphTx tx)
+    Right (Just rtx) -> let (itx, RedisTx tx) = fromValue rtx in
+        return . Just $ (itx, morphTx tx)
 
 addPrivateTransactions :: [(Keccak256, (Word256, OutputTx))]
                        -> Redis (Either Reply Status)

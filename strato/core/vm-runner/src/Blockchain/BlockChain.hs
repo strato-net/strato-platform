@@ -253,7 +253,6 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
-  -- $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
   let txs = filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t))
           $  transactions
   -- TODO: Run the checks Bagger does reject invalid transactions for private chains

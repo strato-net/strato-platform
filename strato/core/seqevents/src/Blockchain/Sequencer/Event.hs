@@ -266,12 +266,10 @@ wrapTransaction  tx@IngestTx{} = do
   case TX.whoSignedThisTransaction baseTx of
     Nothing -> return Nothing
     Just signer -> do
-     -- anchor <- getAnchorChain f baseTx
       return $ Just OutputTx
         { otOrigin = itOrigin tx
         , otHash   = TX.transactionHash baseTx
         , otSigner = signer
-      --  , otAnchorChain = anchor
         , otBaseTx = baseTx
         , otPrivatePayload = Nothing
         }
