@@ -1,25 +1,37 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Strato.VaultProxy.Server.Key where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.RWS.CPS
 import           Data.Text                        (Text)
 
 import           Servant.Client --needed for the bouncing service and runClientM
 import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
+import           Strato.VaultProxy.API.Token       as Tok
+import           Strato.VaultProxy.DataTypes       as DT
+
 -- import           Hflags
 
 --Bounce that request
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
 -- getKey headerUserName queryParamUserName =   pure undefined
 getKey headerUsername queryParamUserName = do
-  mgr <- ask httpManager
-  url <- ask vaultUrl
-
+  vaultConn <- ask
+  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
+  nk <- runClientM (Tok.getCurrentUser) (mkClientEnv mgr url)
+  nodeKey <- case (nk) of
+    Left err -> error $ "Failed to connect to the vault proxy to get the node's name " <> show err
+    Right key -> return key
   kii <- liftIO $ runClientM (getKey nodeKey Nothing) (mkClientEnv mgr url)
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
@@ -36,9 +48,9 @@ getKey headerUsername queryParamUserName = do
 postKey :: Text -> VaultProxyM AddressAndKey
 -- postKey userName = pure undefined
 postKey userName = do 
-  mgr <- ask httpManager
-  url <- ask vaultUrl
-  nk <- runClientM (getCurrentUser) (mkClientEnv mgr url)
+  vaultConn <- ask
+  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
+  nk <- runClientM (Tok.getCurrentUser) (mkClientEnv mgr url)
   nodeKey <- case (nk) of
     Left err -> error $ "Failed to connect to the vault proxy to get the node's name " <> show err
     Right key -> return key
@@ -61,8 +73,8 @@ postKey userName = do
 getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
 -- getSharedKey userName otherPub = pure undefined
 getSharedKey userName otherPub = do
-  mgr <- ask httpManager
-  url <- ask vaultUrl
+  vaultConn <- ask
+  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
   kii <- runClientM (getSharedKey userName otherPub) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
