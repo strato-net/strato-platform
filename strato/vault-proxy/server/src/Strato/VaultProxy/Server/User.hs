@@ -15,7 +15,9 @@ import Strato.VaultProxy.Monad
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
 -- getUsers headerUsername mAddr mLimit mOffset = pure undefined
 getUsers headerUsername mAddr mLimit mOffset = do
-  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  clientEnv <- mkClientEnv mgr url
   kii <- runClientM (getUsers headerUsername mAddr mLimit mOffset) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err

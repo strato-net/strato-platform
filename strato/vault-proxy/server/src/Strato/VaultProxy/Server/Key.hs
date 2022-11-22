@@ -15,8 +15,9 @@ import           Strato.VaultProxy.Monad
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
 -- getKey headerUserName queryParamUserName =   pure undefined
 getKey headerUsername queryParamUserName = do
-  vp  <- undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
-  kii <- liftIO $ runClientM (getKey nodeKey Nothing) vp
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  kii <- liftIO $ runClientM (getKey nodeKey Nothing) (mkClientEnv mgr url)
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
     Right k -> return k
@@ -32,8 +33,9 @@ getKey headerUsername queryParamUserName = do
 postKey :: Text -> VaultProxyM AddressAndKey
 -- postKey userName = pure undefined
 postKey userName = do 
-  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
-  kii <- runClientM (postKey nodeKey) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  kii <- runClientM (postKey nodeKey) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
     Right k -> return k
@@ -52,8 +54,9 @@ postKey userName = do
 getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
 -- getSharedKey userName otherPub = pure undefined
 getSharedKey userName otherPub = do
-  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
-  kii <- runClientM (getSharedKey userName otherPub) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  kii <- runClientM (getSharedKey userName otherPub) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
     Right k -> return k

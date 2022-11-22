@@ -52,7 +52,9 @@ getKeyFromPasswordAndSalt (Password pw) salt =
 postPassword :: Text -> VaultProxyM ()
 -- postPassword password = pure undefined
 postPassword password = do
-  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  clientEnv <- mkClientEnv mgr url
   kii <- runClientM (postPassword password) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
@@ -82,8 +84,10 @@ postPassword password = do
 ---TODO: This will not work once the migration for the vault proxy is complete
 verifyPassword :: VaultProxyM Bool
 verifyPassword = do
-  clientEnv <- pure undefined --TODO: need to figure out how to pass the vaultproxy config to this function instead of vp
-  kii <- runClientM (verifyPassword) clientEnv --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
+  mgr <- ask httpManager
+  url <- ask vaultUrl
+  clientEnv <- mkClientEnv mgr url
+  kii <- runClientM (verifyPassword) clientEnv
   key <- case kii of
     Left err -> error $ "Error connecting to the shared vault: " ++ show err
     Right k -> return k
