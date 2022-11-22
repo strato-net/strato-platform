@@ -13,7 +13,7 @@ module Blockchain.Privacy.Event
   , lookupSeenChain
   , insertTransaction
   , findChainHashUses
-  , lookupChainIdFromChainHash
+  --, lookupChainIdFromChainHash
   , useChainHash
   , getChainBuffer , lookupChainBuffer
   , insertChainBufferEntry
@@ -149,9 +149,10 @@ insertPrivateHash bInfo tx = case txChainId tx of
     mapM_ (insertChainBufferEntry chainId) cHashes'
     logFF "insertPrivateHash" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHashes': " ++ format cHashes'
     findChainHashUses chainId cHashes'
-
+{-
 lookupChainIdFromChainHash :: (Keccak256 `Alters` ChainHashEntry) m => Keccak256 -> m (Maybe Word256)
 lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
+-}
 
 data InsertChainHashResult = Inserted
                            | AlreadyExistsOnSameChain
@@ -415,16 +416,17 @@ hydratePrivateHashes chainF b = do
                                 , " but still sending transaction to the VM,"
                                 , " where it will fail."
                                 ]
-                          let tx' = tx{ otAnchorChain = AnchoredPrivate cId
-                                      , otSigner = otSigner ptx
+                          let tx' = tx{ --otAnchorChain = AnchoredPrivate cId
+                                        otSigner = otSigner ptx
                                       , otPrivatePayload = Just $ otBaseTx ptx
                                       }
                           return (tx', st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
-  let anchorToChain = fromAnchorChain . otAnchorChain
-  txs'' <- for (zip txs txs') $ \(tx,tx') -> bool tx' tx <$> discluded newDiscludes (anchorToChain tx')
+  -- let anchorToChain = fromAnchorChain . otAnchorChain
+
+  txs'' <- for (zip txs txs') $ \(tx,tx') -> bool tx' tx <$> (return True)
 
   unless (null depTXs) $ do
     logF . concat $
