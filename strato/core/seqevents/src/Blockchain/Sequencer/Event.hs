@@ -46,66 +46,7 @@ import           Blockchain.Sequencer.BinaryInstances      ()
 import qualified Text.Colors                               as CL
 import           Text.Format
 import           Text.Tools
-{-
-data AnchorChain = Public
-                 | UnknownPrivate       -- TODO: It's possible these two aren't needed,
-                 | KnownPrivate Word256 --       but I'm leaving them in for now.
-                 | AnchoredPrivate Word256
-                 deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data, ToJSON, FromJSON)
-                 -}
-{-
-getAnchorChain :: (Monad m, TransactionLike t) => (Keccak256 -> m (Maybe Word256)) -> t -> m AnchorChain
-getAnchorChain f tx =
-  if txType tx == PrivateHash
-    then f (txChainHash tx) >>= \case
-      Just anchor -> return $ AnchoredPrivate anchor
-      Nothing -> return UnknownPrivate
-    else return . maybe Public KnownPrivate $ txChainId tx
-    -}
-{-
-getAnchorChainUnanchored :: TransactionLike t => t -> AnchorChain
-getAnchorChainUnanchored = runIdentity . getAnchorChain (const (Identity Nothing))
--}
-{-
-isAnchored :: AnchorChain -> Bool
-isAnchored Public              = True
-isAnchored (AnchoredPrivate _) = True
-isAnchored _                   = False
--}
 
-{-
-isAnchoredPrivate :: AnchorChain -> Bool
-isAnchoredPrivate (AnchoredPrivate _) = True
-isAnchoredPrivate _                   = False
--}
-
--- Transactions that are anchored (Public or AnchoredPrivate), and the anchors are correct
-{-
-isAnchoredCorrectly :: TransactionLike t =>  t -> Bool
-isAnchoredCorrectly                 tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
-isAnchoredCorrectly cId tx = txChainId tx == Just cId
-isAnchoredCorrectly _                     _  = False
--}
-
-{-
--- Transactions that may or may not be anchored, but that status matches the transaction payload
-hasCorrectAnchor :: TransactionLike t =>  t -> Bool
-hasCorrectAnchor              tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
-hasCorrectAnchor  tx = txChainId tx == Just cId
-hasCorrectAnchor      tx = txType tx == PrivateHash
-hasCorrectAnchor _                     _  = False
--}
-
-{-
-fromAnchorChain :: AnchorChain -> Maybe Word256
-fromAnchorChain (AnchoredPrivate cId) = Just cId
-fromAnchorChain _                     = Nothing
--}
-{-
-filterAnchoredTxs :: OutputBlock -> OutputBlock
-filterAnchoredTxs ob = ob{obReceiptTransactions = filter f (obReceiptTransactions ob)}
- where f otx = hasCorrectAnchor (otAnchorChain otx) otx
--}
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
                   | UnseqEvent IngestEvent
@@ -235,7 +176,6 @@ instance Format VmEvent where
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
                          , otHash        :: Keccak256
                          , otSigner      :: A.Address
-                       --  , otAnchorChain :: AnchorChain
                          , otBaseTx      :: TX.Transaction
                          , otPrivatePayload :: Maybe TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
@@ -243,7 +183,6 @@ data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
 data OutputTx' = OutputTx' { ot'Origin      :: TO.TXOrigin
                            , ot'Hash        :: Keccak256
                            , ot'Signer      :: A.Address
-                         --  , ot'AnchorChain :: AnchorChain
                            , ot'BaseTx      :: Transaction'
                            , ot'PrivatePayload :: Maybe Transaction'
                            } deriving (Eq, Show, GHCG.Generic)
@@ -343,12 +282,10 @@ wrapTransactionUnanchored tx@IngestTx{} =
    in case TX.whoSignedThisTransaction baseTx of
         Nothing -> Nothing
         Just signer ->
-         -- let anchor = getAnchorChainUnanchored baseTx
             Just OutputTx
                 { otOrigin = itOrigin tx
                 , otHash   = TX.transactionHash baseTx
                 , otSigner = signer
-               -- , otAnchorChain = anchor
                 , otBaseTx = baseTx
                 , otPrivatePayload = Nothing
                 }
@@ -358,12 +295,10 @@ wrapIngestBlockTransaction hash tx =
   case TX.whoSignedThisTransaction tx of
     Nothing -> Nothing
     Just signer -> 
-    --  anchor <- getAnchorChain f tx
       Just OutputTx
         { otOrigin = TO.BlockHash hash
         , otSigner = signer
         , otBaseTx = tx
-       -- , otAnchorChain = anchor
         , otHash   = TX.transactionHash tx
         , otPrivatePayload = Nothing
         }
@@ -373,12 +308,10 @@ wrapIngestBlockTransactionUnanchored hash tx =
   case TX.whoSignedThisTransaction tx of
     Nothing -> Nothing
     Just signer ->
-     -- let anchor = getAnchorChainUnanchored tx
         Just OutputTx
             { otOrigin = TO.BlockHash hash
             , otSigner = signer
             , otBaseTx = tx
-           -- , otAnchorChain = anchor
             , otHash   = TX.transactionHash tx
             , otPrivatePayload = Nothing
             }
@@ -424,12 +357,10 @@ quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransac
     }
 
     where wrapQuarryReceipt t = do
-          --  anchor <- getAnchorChain f t
             return OutputTx
               { otOrigin = TO.Quarry
               , otBaseTx = t
               , otSigner = fromJust . TX.whoSignedThisTransaction $ t
-             -- , otAnchorChain = anchor
               , otHash   = TX.transactionHash t
               , otPrivatePayload = Nothing
               }
@@ -449,7 +380,6 @@ instance Eq SequencedBlock where
 instance Ord OutputTx where
     compare OutputTx{otHash = hA} OutputTx{otHash = hB} = compare hA hB
 
---instance Binary AnchorChain where
 instance Binary IngestTx where
 instance Binary IngestBlock where
 instance Binary IngestGenesis where
@@ -498,7 +428,6 @@ instance Format OutputBlock where
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin
                    , otSigner = signer
-                 --  , otAnchorChain = anchor
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer )
@@ -532,12 +461,10 @@ instance TransactionLike OutputTx where
     txData        = txData . otBaseTx
     txChainId     = txChainId . otBaseTx
     txMetadata    = txMetadata . otBaseTx
-    --txAnchorChain = fromAnchorChain . otAnchorChain
 
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t
                          , otSigner = fromJust (txSigner t) -- todo: D A N G E R
-                        -- , otAnchorChain = runIdentity $ getAnchorChain (const (Identity Nothing)) t
                          , otBaseTx = morphTx t
                          , otPrivatePayload = Nothing
                          }
@@ -553,11 +480,6 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
 
     blockOrdering = DD.blockDataNumber . obBlockData
     buildBlock = OutputBlock TO.Morphism 0
-{-
-instance Arbitrary AnchorChain where
-  arbitrary = genericArbitrary
--}
-
 instance Arbitrary IngestEvent where
   arbitrary = genericArbitrary
 
