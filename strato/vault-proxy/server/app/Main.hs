@@ -33,6 +33,7 @@ import qualified Strato.VaultProxy.API                    as VaultProxy
 -- import qualified Strato.VaultProxy.Monad                  as VaultProxy
 import qualified Strato.VaultProxy.Server                 as VaultProxy
 import           Strato.VaultProxy.DataTypes              as VaultProxy
+import           Strato.VaultProxy.RawOauth               as RO
 
 import           Options
 
@@ -60,6 +61,15 @@ main = do
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- newManager defaultManagerSettings
   tokenCash <- atomically $ newCacheSTM Nothing
+  --make the connection to the OAUTH provider to get the information we need to connect to the shared vault
+  rawoauth <- case flags_OAUTH_DISCOVERY_URL of
+    "" -> error "No OAuth2 Discovery URL was provided"
+    url -> do
+        ourl <- parseBaseUrl url
+        rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
+        case rawOAuthInfo of
+            Left err -> error $ "Error connecting to the OAUTH server: " <> show err
+            Right val -> return val
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       vaultPassword = flags_VAULT_PASSWORD,
@@ -74,12 +84,11 @@ main = do
       oauthServiceClientSecret = flags_OAUTH_SERVICE_USER_CLIENT_SECRET,
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
-      tokenCache = tokenCash
+      tokenCache = tokenCash,
+      additionalOauth = rawoauth
   }
-  -- password <- newIORef Nothing
 
-  -- cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
-  -- let env = VaultProxy.VaultWrapperEnv mgr pool password cache
+  --Actually run the app and keep it alive
   run (vaultPort vaultConnection) (appVaultProxy vaultConnection)
 
 appVaultProxy :: VaultProxy.VaultConnection -> Application

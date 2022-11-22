@@ -100,7 +100,8 @@ data VaultConnection = VaultConnection {
     oauthServiceClientSecret :: T.Text,
     vaultProxyUrl :: T.Text,
     vaultProxyPort :: Int,
-    tokenCache :: Cache T.Text VaultToken
+    tokenCache :: Cache T.Text VaultToken,
+    additionalOauth :: RawOauth
 }
 
 data RawOauth = RawOauth {

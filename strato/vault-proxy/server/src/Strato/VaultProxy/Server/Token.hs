@@ -99,8 +99,17 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
+--ask function will get the information from the ReaderT monad VaultProxyM
 getRawToken :: VaultProxyM T.Text
-getRawToken = pure undefined
+getRawToken = do
+    cash <- ask tokenCache
+    cid <- ask oauthClientId
+    cs <- ask oauthClientSecret
+    rt <- ask oauthReserveSeconds
+    ao <- ask additionalOauth 
+    tok <- getAwesomeToken cash cid cs rt ao
+    pure $ show tok
 
 getCurrentUser :: VaultProxyM T.Text
-getCurrentUser = pure undefined
+getCurrentUser = do
+    cash <- ask tokenCache
