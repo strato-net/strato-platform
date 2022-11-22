@@ -22,6 +22,7 @@ import           Strato.VaultProxy.Server.Signature
 import           Strato.VaultProxy.Server.Token
 import           Strato.VaultProxy.Server.User
 import           Strato.VaultProxy.DataTypes
+import           Strato.VaultProxy.RawOauth
 
 vaultProxy :: ServerT VaultProxyAPI VaultProxyM
 vaultProxy = getPing

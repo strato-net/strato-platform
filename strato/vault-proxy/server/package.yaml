@@ -36,6 +36,7 @@ library:
     - bytestring
     - cache
     - clock
+    - containers
     - cryptonite
     - exceptions
     - http-client
