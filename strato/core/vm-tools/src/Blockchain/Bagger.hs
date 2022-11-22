@@ -7,7 +7,6 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
-{-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
