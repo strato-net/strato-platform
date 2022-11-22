@@ -16,7 +16,6 @@
 
 module Handlers.Metadata
   (  API
-    --,MetadataResponse
     , getMetaDataClient
     , MetadataResponse
     , server
@@ -39,7 +38,7 @@ import           GHC.Stack
 import           BlockApps.Logging
 
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatus)
+import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatusNow)
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Strato.Strato23.Client   hiding (verifyPassword)
@@ -90,10 +89,15 @@ getMetaData token =
   do
   validators <- access (Proxy @[Address])
   isSynced <- checkIsSynced
-  pubK <- getPubKey token
-  case pubK of
+  mAddressAndKey <- getPubKeyAndAddress token
+  case mAddressAndKey of
     Left  _      -> pure $ (MetadataResponse " "  "Error" validators False False) 
-    Right pubKey -> pure $ (MetadataResponse " "  (show pubKey) validators  isSynced True)
+    Right addressAndKey -> pure $ (MetadataResponse 
+          ((\l -> drop 1 $ take ((length l) -1 )  l )  $ ((\(PublicKey pubkey) ->   show  pubkey ) $ fst addressAndKey )) --probably a better way to pretty print pubkey
+          (show $ snd  addressAndKey) 
+          validators  
+          isSynced 
+          True)
 
 
 
@@ -107,11 +111,14 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError Address)
-getPubKey mAccessToken =
+getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError (PublicKey, Address))
+getPubKeyAndAddress mAccessToken =
   case mAccessToken of
-    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" -- This may not be needed
-    Just _  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  "nodekey" Nothing
+    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" 
+    Just _  -> try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  "nodekey" Nothing
+
+unaddressAndUnkey :: AddressAndKey -> (PublicKey, Address)
+unaddressAndUnkey addressAndKey = (Strato.Strato23.API.Types.unPubKey addressAndKey ,Strato.Strato23.API.Types.unAddress addressAndKey) 
 
 checkIsSynced :: (HasSQL m) => m Bool
-checkIsSynced = (runStratoRedisIO getSyncStatus) >>= \case Nothing -> pure False; Just c ->pure  c; 
+checkIsSynced = (runStratoRedisIO getSyncStatusNow) >>= \case Nothing -> pure False; Just c ->pure  c; 
