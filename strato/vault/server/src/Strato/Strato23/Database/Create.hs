@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS users(
   nonce bytea            NOT NULL,
   enc_sec_prv_key bytea  NOT NULL,
   address bytea          NOT NULL,
-  oauth_provider_id      varchar(512) NOT NULL,
-  UNIQUE (x_user_unique_name, oauth_provider_id)
+  x_identity_provider_id      varchar(512) NOT NULL,
+  UNIQUE (x_user_unique_name, x_identity_provider_id)
 );
 CREATE INDEX IF NOT EXISTS indexed_address ON users (address);
 |]

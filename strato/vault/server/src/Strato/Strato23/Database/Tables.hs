@@ -39,7 +39,7 @@ usersTable = Table "users" $ p7
   , requiredTableField "nonce"
   , requiredTableField "enc_sec_prv_key"
   , requiredTableField "address"
-  , requiredTableField "oauth_provider_id"
+  , requiredTableField "x_identity_provider_id"--
   )
 
 messageTable :: Table

@@ -23,7 +23,7 @@ type GetUsers = "users"
 
 type GetUsers' = "users"
               :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-              :> Header' '[Required, Strict] "X-OAUTH-PROVIDER"    Text
+              :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
               :> QueryParam "address" Address
               :> QueryParam "limit" Int
               :> QueryParam "offset" Int
