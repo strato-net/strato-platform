@@ -299,7 +299,7 @@ class CreateContract extends Component {
             <div className="col-sm-3 text-right">
               <label className="pt-label smd-pad-4">
                 Chain IDs
-          </label>
+              </label>
             </div>
             <div className="col-sm-9 smd-pad-4">
               <div className="pt-select smd-max-width">
@@ -326,7 +326,7 @@ class CreateContract extends Component {
   }
 
   render() {
-    const { handleSubmit, pristine, submitting, valid } = this.props;
+    const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const isModeOauth = isOauthEnabled();
 
@@ -499,6 +499,15 @@ class CreateContract extends Component {
                   </table>
                 </div>
               </div>
+              {toastsError && <div className="row">
+                <div className="col-sm-12">
+                  <hr />
+                  <h5>Error:</h5>
+                  <pre className="smd-scrollable">
+                    {toastsError}
+                  </pre>
+                </div>
+              </div>}
             </div>
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
@@ -558,7 +567,8 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    codeType : state.codeEditor.codeType,
+    toastsError: state.createContract.error,
+    codeType: state.codeEditor.codeType,
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
       address: state.user.oauthUser ? state.user.oauthUser.address : ''

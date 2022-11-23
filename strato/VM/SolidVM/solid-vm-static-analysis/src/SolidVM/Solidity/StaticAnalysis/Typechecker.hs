@@ -960,7 +960,7 @@ blockhashArgs :: SourceAnnotation Text -> Type'
 blockhashArgs x = intType' x
 
 ecrecoverArgs :: SourceAnnotation Text -> Type'
-ecrecoverArgs x = Product [stringType' x, intType' x, intType' x, intType' x] x
+ecrecoverArgs x = Product [stringType' x, intType' x, stringType' x, stringType' x] x
 
 addmodArgs  :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x

@@ -33,7 +33,8 @@ describe('CreateContract: reducer', () => {
       createDisabled: true,
       filename: undefined,
       toster: false,
-      tosterMessage: ''
+      toastsMessage: '',
+      error: "",
     };
   })
 

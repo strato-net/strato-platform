@@ -12,6 +12,20 @@ export const payload = {
   chainId: "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86"
 }
 
+export const contractErrPayload = {
+  address: "ff1046b63167dbf7fcf2f0deccd2ea6c2972c78e",
+  arguments: {
+    _greeting: "abrrr"
+  },
+  contract: "GreeterCC",
+  fileText: "contract GreeterCC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+  password: "123456",
+  searchable: undefined,
+  username: "abc",
+  greet:'',
+  chainId: "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86"
+}
+
 export const createContractResponse = [{
   data: {
     tag: "Upload", contents: {

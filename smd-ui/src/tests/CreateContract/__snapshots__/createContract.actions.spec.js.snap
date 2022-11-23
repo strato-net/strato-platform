@@ -106,7 +106,7 @@ Object {
   "isOpen": false,
   "spinning": false,
   "toasts": true,
-  "toastsMessage": "Contract creation failed",
+  "toastsMessage": "Contract creation failed: error",
   "type": "CREATE_CONTRACT_FAILURE",
 }
 `;
