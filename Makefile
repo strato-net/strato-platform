@@ -35,9 +35,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: strato apex nginx postgrest prometheus smd vault-wrapper
+build_all: strato apex nginx postgrest prometheus smd vault-wrapper vault-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
+.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper vault-nginx get_solcs build_buildbase build_common build_common_profiled
 
 apex:
 	@echo Now building apex...
@@ -102,6 +102,10 @@ vault-wrapper: build_common
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}vault-wrapper:${VERSION} ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION}
+
+vault-nginx:
+	@echo Now building vault-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
