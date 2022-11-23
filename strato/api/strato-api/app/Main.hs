@@ -15,6 +15,7 @@ module Main where
 
 import           Prelude hiding (lookup)
 import           Control.Lens.Operators
+import           Control.Monad.Change.Modify  (Accessible)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
@@ -75,6 +76,7 @@ import qualified Handlers.Chain                  as Chain
 import qualified Handlers.Coinbase               as Coinbase
 import qualified Handlers.Faucet                 as Faucet
 import qualified Handlers.Log                    as Log
+import qualified Handlers.Metadata               as Metadata
 import qualified Handlers.Peers                  as Peers
 import qualified Handlers.QueuedTransactions     as QueuedTransactions
 import qualified Handlers.Stats                  as Stats
@@ -148,6 +150,7 @@ type CoreAPI =
     :<|> Coinbase.API
     :<|> Faucet.API
     :<|> Log.API
+    :<|> Metadata.API
     :<|> Peers.API
     :<|> QueuedTransactions.API
     :<|> Stats.API
@@ -161,7 +164,7 @@ type CoreAPI =
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-coreServer :: (MonadLogger m, HasSQL m) => ServerT CoreAPI m
+coreServer :: (MonadLogger m, HasSQL m, Accessible VaultData m ) => ServerT CoreAPI m
 coreServer = Account.server
   :<|> BatchTransactionResult.server
   :<|> BlkLast.server
@@ -170,6 +173,7 @@ coreServer = Account.server
   :<|> Coinbase.server
   :<|> Faucet.server
   :<|> Log.server
+  :<|> Metadata.server
   :<|> Peers.server
   :<|> QueuedTransactions.server
   :<|> Stats.server

@@ -5,10 +5,8 @@ import { Button, Dialog, Intent } from '@blueprintjs/core';
 
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm } from 'redux-form';
-import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
 import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
 import { validate } from './validate';
-import { isOauthEnabled } from '../../../../lib/checkMode';
 
 class AddMember extends Component {
 
@@ -16,12 +14,11 @@ class AddMember extends Component {
     super(props)
     this.state = {
       form: {
-        userSelected: true
       },
-      username: null,
-      address: null,
-      enode: `enode://${this.props.publicKey}@1.2.3.4:30303`,
-      balance: 0,
+      orgName: ``,
+      orgUnit: ``,
+      commonName: ``,
+      access: true,
       errors: null
     }
   }
@@ -32,89 +29,30 @@ class AddMember extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("add_member_loaded");
-    this.props.fetchAccounts(true, true);
   }
-  
-  handleUsernameChange(event) {
+
+  handleOrgNameChange(event) {
     this.setState({
-      username: event.target.value
+      orgName: event.target.value
     });
   }
 
-  handleAddressChange(event) {
+  handleOrgUnitChange(event) {
     this.setState({
-      address: event.target.value
+      orgUnit: event.target.value
     });
   }
 
-  handleEnodeChange(event) {
+  handleCommonNameChange(event) {
     this.setState({
-      enode: event.target.value
+      commonName: event.target.value
     });
   }
 
-  handleBalanceChange(event) {
+  handleAccessChange(event) {
     this.setState({
-      balance: event.target.value
+      access: event.target.value
     });
-  }
-
-  userNameField = (users, isModeOauth) => {
-    return (
-      <Field
-        className="pt-input"
-        component="select"
-        name="from"
-        value={this.state.username}
-        onChange={
-          (e) => {
-            this.props.fetchUserAddresses(e.target.value, false);
-            this.handleUsernameChange(e);
-          }
-        }
-        required
-        disabled={isModeOauth}
-      >
-        {isModeOauth && <option value={isModeOauth ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
-        {!isModeOauth && <option />}
-        {
-          !isModeOauth && users.map((user, i) => {
-            return (
-              <option key={'user' + i} value={user}>{user}</option>
-            )
-          })
-        }
-      </Field>
-    )
-  }
-
-  addressField = (isModeOauth) => {
-    const fromUserAddresses = Object.keys(this.props.accounts).length && this.state.username ?
-      Object.getOwnPropertyNames(this.props.accounts[this.state.username])
-      : [];
-
-    return (
-      <Field
-        className="pt-input"
-        component="select"
-        name="fromAddress"
-        value={this.state.address}
-        onChange={(e) => this.handleAddressChange(e)}
-        required
-        disabled={isModeOauth}
-      >
-        <option value={isModeOauth ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
-        {
-          (!isModeOauth && fromUserAddresses.length) ?
-            fromUserAddresses.map((address, i) => {
-              return (
-                <option key={address} value={address}>{address}</option>
-              )
-            })
-            : ''
-        }
-      </Field>
-    )
   }
 
   errorMessageFor(fieldName) {
@@ -126,13 +64,13 @@ class AddMember extends Component {
 
   submit = () => {
     let data = {
-      username: isOauthEnabled() ? this.props.initialValues.from : this.state.username,
-      address: isOauthEnabled() ? this.props.initialValues.fromAddress : this.state.address,
-      enode: this.state.enode,
-      balance: this.state.balance
+      orgName: this.state.orgName,
+      orgUnit: this.state.orgUnit,
+      commonName: this.state.commonName,
+      access: this.state.access
     }
     
-    let errors = validate(data, this.state.form.userSelected);
+    let errors = validate(data);
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
@@ -144,9 +82,6 @@ class AddMember extends Component {
   }
 
   render() {
-    const users = Object.getOwnPropertyNames(this.props.accounts);
-    const isModeOauth = isOauthEnabled();
-
     return (
       <div >
         <Button onClick={() => {
@@ -167,162 +102,115 @@ class AddMember extends Component {
             <div className="pt-dialog-body">
 
               {
-                !isModeOauth &&
+                // !this.state.form.userSelected &&
                 <div className="row">
-                  <div className="col-sm-3 text-right" />
+                  <div className="col-sm-3 text-right">
+                    <label className="pt-label smd-pad-4">
+                      Org Name:
+                  </label>
+                  </div>
                   <div className="col-sm-9 smd-pad-4">
                     <Field
-                      name="radio"
+                      id="orgName"
+                      className="form-width pt-input"
+                      placeholder="Org Name"
+                      name="orgName"
                       component="input"
-                      type="radio"
-                      value={0}
-                      label='User'
-                      checked={this.state.form.userSelected}
-                      onClick={
-                        () => {
-                          this.setState((prevState) => {
-                            return {
-                              form: { userSelected: !prevState.form.userSelected },
-                              username: null,
-                              address: null,
-                              balance: 0,
-                              enode: `enode://${this.props.publicKey}@1.2.3.4:3030`,
-                              errors: null
-                            };
-                          });
-                        }
-                      }
-                    /> User
+                      dir="auto"
+                      title="orgName"
+                      onChange={(e) => this.handleOrgNameChange(e)}
+                      required
+                    />
+                    <br /><span className="error-text">{this.errorMessageFor('orgName')}</span>
+                  </div>
+                </div>
+              }
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Org Unit:
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="form-width">
                     <Field
+                      name="orgUnit"
+                      component="input"
+                      type="text"
+                      placeholder="Org Unit"
+                      value={this.state.orgUnit}
+                      className="pt-input form-width"
+                      onChange={(e) => this.handleOrgUnitChange(e)}
+                      required
+                    />
+                    <br /><span className="error-text">{this.errorMessageFor('orgUnit')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Common Name:
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="form-width">
+                    <Field
+                      name="commonName"
+                      component="input"
+                      type="text"
+                      placeholder="Common Name"
+                      value={this.state.commonName}
+                      className="pt-input form-width"
+                      onChange={(e) => this.handleCommonNameChange(e)}
+                      required
+                    />
+                    <br /><span className="error-text">{this.errorMessageFor('commonName')}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Access
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="form-width">
+                  <Field
                       style={{ marginLeft: 25 }}
                       name="radio"
                       component="input"
                       type="radio"
-                      value={1}
-                      label='Address'
-                      checked={!this.state.form.userSelected}
-                      onClick={
-                        () => {
-                          this.setState((prevState) => {
-                            return {
-                              form: { userSelected: !prevState.form.userSelected },
-                              username: null,
-                              address: null,
-                              balance: 0,
-                              enode: `enode://${this.props.publicKey}@1.2.3.4:3030`,
-                              errors: null
-                            };
-                          });
-                        }
-                      }
-                    /> Address
-                  </div>
-                </div>
-              }
-
-              {
-                this.state.form.userSelected &&
-                <div>
-                  <div className="row">
-                    <div className="col-sm-3 text-right">
-                      <label className="pt-label smd-pad-4">
-                        Username
-                  </label>
-                    </div>
-                    <div className="col-sm-9 smd-pad-4">
-                      <div className="pt-select">
-                        {this.userNameField(users, isModeOauth)}
-                        <br /><span className="error-text">{this.errorMessageFor('username')}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-sm-3 text-right">
-                      <label className="pt-label smd-pad-4">
-                        Address
-                  </label>
-                    </div>
-                    <div className="col-sm-9 smd-pad-4">
-                      <div className="pt-select">
-                        {this.addressField(isModeOauth)}
-                        <br /><span className="error-text">{this.errorMessageFor('address')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              {
-                !this.state.form.userSelected &&
-                <div className="row">
-                  <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4">
-                      Address
-                  </label>
-                  </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <Field
-                      id="address"
-                      className="form-width pt-input"
-                      placeholder="address"
-                      name="address"
+                      value={true}
+                      label='Add'
+                      checked={this.state.access === true}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:true };
+                        });
+                      }}
+                    /> Add
+                  <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
                       component="input"
-                      dir="auto"
-                      title="address"
-                      onChange={(e) => this.handleAddressChange(e)}
-                      required
-                    />
-                    <br /><span className="error-text">{this.errorMessageFor('address')}</span>
-                  </div>
-                </div>
-              }
-
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Enode
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="form-width">
-                    <Field
-                      name="enode"
-                      component="input"
-                      type="text"
-                      placeholder="Enode"
-                      value={this.state.enode}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleEnodeChange(e)}
-                      required
-                    />
-                    <br /><span className="error-text">{this.errorMessageFor('enode')}</span>
+                      type="radio"
+                      value={false}
+                      label='Remove'
+                      checked={this.state.access === false}
+                      onClick={() => {
+                        this.setState((prevState) => {
+                          return {access:false };
+                        });
+                      }}
+                    /> Remove
+                    <br /><span className="error-text">{this.errorMessageFor('access')}</span>
                   </div>
                 </div>
               </div>
-
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Balance
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="form-width">
-                    <Field
-                      name="value"
-                      component="input"
-                      type="number"
-                      placeholder="Balance"
-                      value={this.state.balance}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleBalanceChange(e)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
             </div>
 
             <div className="pt-dialog-footer">
@@ -349,19 +237,17 @@ class AddMember extends Component {
 export function mapStateToProps(state) {
   return {
     isOpen: state.createChain.isAddMemberModalOpen,
-    accounts: state.accounts.accounts,
     initialValues: {
-      from: state.user.oauthUser ? state.user.oauthUser.username : '',
-      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : '',
-      enode : `enode://${state.user.publicKey}@1.2.3.4:30303`
+      orgName: "",
+      orgUnit: "",
+      commonName: "",
+      access: true
     }
   };
 }
 
 const formed = reduxForm({ form: 'add-member' })(AddMember);
 const connected = connect(mapStateToProps, {
-  fetchAccounts,
-  fetchUserAddresses,
   openAddMemberModal,
   closeAddMemberModal
 })(formed);

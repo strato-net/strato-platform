@@ -7,18 +7,19 @@
 module Blockchain.Strato.Indexer.TxrIndexer where
 
 import           Conduit
-import           Control.DeepSeq
-import           Control.Exception
+-- import           Control.DeepSeq
+-- import           Control.Exception
 import           Control.Monad
-import           Data.Binary
-import qualified Data.ByteString                    as BS
+-- import           Data.Binary
+-- import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
-import qualified Data.ByteString.Lazy               as BL
+-- import qualified Data.ByteString.Lazy               as BL
 import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
 import           Data.Maybe                         (maybeToList, fromMaybe)
 import qualified Data.Text                          as T
-import           Data.Text.Encoding                 (decodeUtf8)
+import qualified Data.Set                           as S
+-- import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
@@ -27,7 +28,7 @@ import           BlockApps.X509.Certificate
 import           BlockApps.Logging
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
 import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
-import           Blockchain.Data.Enode
+-- import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
 -- import qualified Blockchain.Data.EventDB            as EventDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
@@ -42,11 +43,12 @@ import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util       (byteString2Integer)
+-- import           Blockchain.Strato.Model.Util       (byteString2Integer)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainMember
 
-import           System.IO.Unsafe                   (unsafePerformIO)
+-- import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format
 
 addTopic :: Keccak256
@@ -61,47 +63,46 @@ terminateTopic = hash $ C8.pack "ChainTerminated()"
 logF :: MonadLogger m => [String] -> m ()
 logF = $logInfoS "txrIndexer" . T.pack . concat
 
-doAddMember :: Word256 -> Address -> Enode -> IContextM ()
-doAddMember chainId address enode = do
-  logF [ "Adding member "
-       , format address
-       , " on chain "
-       , formatChainId $ Just chainId
-       ]
-  lift $ addMember chainId address (showEnode enode) -- We only need the Text version for Postgres
-  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
-  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+-- doAddMember :: Word256 -> Address -> Enode -> IContextM ()
+-- doAddMember chainId address enode = do
+--   logF [ "Adding member "
+--        , format address
+--        , " on chain "
+--        , formatChainId $ Just chainId
+--        ]
+--    -- We only need the Text version for Postgres
+--   void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+--   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
 
-doRemoveMember :: Word256 -> Address -> IContextM ()
-doRemoveMember chainId address = do
-  logF [ "Removing member "
-       , format address
-       , " on chain "
-       , formatChainId $ Just chainId
-       ]
-  lift $ removeMember chainId address
-  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+-- doRemoveMember :: Word256 -> Address -> IContextM ()
+-- doRemoveMember chainId address = do
+--   logF [ "Removing member "
+--        , format address
+--        , " on chain "
+--        , formatChainId $ Just chainId
+--        ]
+--   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
-doAddOrgName :: Word256 -> (String, Maybe String) -> IContextM ()
-doAddOrgName chainId org = do
+doAddOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
+doAddOrgName chainId cm = do
   logF [ "Adding chain "
        , formatChainId $ Just chainId
-       , " to org "
-       , fst org
-       , maybe "" ("/" ++) (snd org)
+       , " to cm "
+       , format cm
        ]
-  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain org chainId
-  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId org]
+  lift $ addMember chainId cm
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId (ChainMembers $ S.singleton cm)
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
-doRemoveOrgName :: Word256 -> (String, Maybe String) -> IContextM ()
-doRemoveOrgName chainId org = do
+doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
+doRemoveOrgName chainId cm = do
   logF [ "Removing chain "
        , formatChainId $ Just chainId
        , " from org "
-       , fst org
-       , maybe "" ("/" ++) (snd org)
+       , format cm
        ]
-  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain org chainId
+  lift $ removeMember chainId cm
+  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain (ChainMembers $ S.singleton cm) chainId
 
 doRegisterCertificate :: Account -> Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate contractAddress userAddress x509CertInfoState = do
@@ -135,10 +136,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
   where process = awaitForever $ yieldMany . indexEventToTxrResults
         output = awaitForever $ lift . txrResultHandler
 
-data TxrResult = AddMember (Either String (Word256, Address, Enode))
-               | RemoveMember (Either String (Word256, Address))
-               | AddOrgName (Either String (Word256, (String, Maybe String)))
-               | RemoveOrgName (Either String (Word256, (String, Maybe String)))
+
+data TxrResult = 
+  -- AddMember (Either String (Word256, Address, Enode))
+              --  | RemoveMember (Either String (Word256, Address))
+                AddOrgName (Either String (Word256, ChainMemberParsedSet))
+               | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
                | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
                | CertificateRevoked (Either String (Account, Address))
                | CertificateRegistryInitialized (Either String Account)
@@ -150,53 +153,53 @@ data TxrResult = AddMember (Either String (Word256, Address, Enode))
 
 indexEventToTxrResults :: IndexEvent -> [TxrResult] -- emit MemberAdded(address,enode);
 indexEventToTxrResults = \case
-  LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
-    case logDBTopic1 l of
-      Just x | x == keccak256ToWord256 addTopic ->
-        let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
-            enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
-            enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
-            --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
-            eEnode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enode'
-         in case eEnode of
-          Left err -> Just . AddMember . Left $ "failed to parse enode: " ++ show err
-          Right enode -> Just . AddMember $ Right (chainId, address, enode)
-      Just x | x == keccak256ToWord256 removeTopic ->
-        let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
-         in Just . RemoveMember $ Right (chainId, address)
-      Just x | x == keccak256ToWord256 terminateTopic -> Just . TerminateChain $ Right chainId
-      _ -> Nothing
+  -- LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
+  --   case logDBTopic1 l of
+  --     Just x | x == keccak256ToWord256 addTopic ->
+  --       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
+  --           enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
+  --           enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
+  --           --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
+  --           eEnode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enode'
+  --        in case eEnode of
+  --         Left err -> Just . AddMember . Left $ "failed to parse enode: " ++ show err
+  --         Right enode -> Just . AddMember $ Right (chainId, address, enode)
+  --     Just x | x == keccak256ToWord256 removeTopic ->
+  --       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
+  --        in Just . RemoveMember $ Right (chainId, address)
+  --     Just x | x == keccak256ToWord256 terminateTopic -> Just . TerminateChain $ Right chainId
+  --     _ -> Nothing
   EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $
      case (eventDBChainId ev, eventDBName ev, eventDBArgs ev) of
-      (Just chainId, "MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
-        Nothing -> Just . AddMember . Left $ "failed to parse address for MemberAdded event: " ++ addressStr
-        Just address ->
+      -- (Just chainId, "MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
+      --   Nothing -> Just . AddMember . Left $ "failed to parse address for MemberAdded event: " ++ addressStr
+      --   Just address ->
           --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
-          let eNode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enodeStr
-           in case eNode of
-            Left err -> Just . AddMember . Left $ "failed to parse enode" ++ show err
-            Right enode -> Just . AddMember $ Right (chainId, address, enode)
-      (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
-        Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
-        Just address -> Just . RemoveMember $ Right (chainId, address)
-      (Just chainId, "OrganizationAdded", _) -> case eventDBArgs ev of
-        (n:u:_) -> Just . AddOrgName $ Right (chainId, (n, Just u))
-        (n:_)   -> Just . AddOrgName $ Right (chainId, (n, Nothing))
-        []      -> Just . AddOrgName . Left $ "failed to provide any arguments for OrganizationAdded event"
-      (Just chainId, "OrganizationRemoved", _) -> case eventDBArgs ev of
-        (n:u:_) -> Just . RemoveOrgName $ Right (chainId, (n, Just u))
-        (n:_)   -> Just . RemoveOrgName $ Right (chainId, (n, Nothing))
-        []      -> Just . RemoveOrgName . Left $ "failed to provide any arguments for OrganizationRemoved event"
+          -- let eNode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enodeStr
+          --  in case eNode of
+          --   Left err -> Just . AddMember . Left $ "failed to parse enode" ++ show err
+          --   Right enode -> Just . AddMember $ Right (chainId, address, enode)
+      -- (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
+      --   Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
+      --   Just address -> Just . RemoveMember $ Right (chainId, address)
+      (Just chainId, "OrgAdded", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) True))
+      (Just chainId, "OrgUnitAdded", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) True))
+      (Just chainId, "CommonNameAdded", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) True))
+      (Just chainId, "OrgRemoved", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) False))
+      (Just chainId, "OrgUnitRemoved", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
+      (Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
             org = maybe "" subOrg $ getCertSubject =<< eitherToMaybe cert
             orgUnit = fromMaybe Nothing $ Just . subUnit =<< getCertSubject =<< eitherToMaybe cert
+            commonName = maybe "" subCommonName $ getCertSubject =<< eitherToMaybe cert
+            -- commonName = fromMaybe Nothing $ Just . subCommonName =<< getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit})
+            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit, commonName=commonName})
       (Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of
@@ -209,17 +212,17 @@ indexEventToTxrResults = \case
 
 txrResultHandler :: TxrResult -> IContextM ()
 txrResultHandler = \case
-  AddMember e -> case e of
-    Right (chainId, address, enode) -> doAddMember chainId address enode
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  RemoveMember e -> case e of
-    Right (chainId, address) -> doRemoveMember chainId address
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  -- AddMember e -> case e of
+  --   Right (chainId, address, enode) -> doAddMember chainId address enode
+  --   Left err -> $logErrorS "txrIndexer" $ T.pack err
+  -- RemoveMember e -> case e of
+  --   Right (chainId, address) -> doRemoveMember chainId address
+  --   Left err -> $logErrorS "txrIndexer" $ T.pack err
   AddOrgName e -> case e of
-    Right (chainId, (orgName, orgUnit)) -> doAddOrgName chainId (orgName, orgUnit)
+    Right (chainId, chainMember) -> doAddOrgName chainId chainMember
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RemoveOrgName e -> case e of
-    Right (chainId, (orgName, orgUnit)) -> doRemoveOrgName chainId (orgName, orgUnit)
+    Right (chainId, chainMember) -> doRemoveOrgName chainId chainMember
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RegisterCertificate e -> case e of
     Right (contractAddress, ua, certInfoState) -> doRegisterCertificate contractAddress ua certInfoState

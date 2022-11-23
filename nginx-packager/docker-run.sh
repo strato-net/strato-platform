@@ -18,7 +18,7 @@ debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
-APEX_HOST=${APEX_HOST:-apex:3001}
+APEX_HOST=${APEX_HOST:-apex:3009}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
@@ -28,7 +28,7 @@ STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
-VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8000} # TODO: change-vault-proxy-port-when-known
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -109,7 +109,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_BLOCKSTANBUL_VOTE__/$STRATO_PORT_BLOCKSTANBUL_VOTE/g" /tmp/nginx.conf
-  sed -i "s/__VAULT_WRAPPER_HOST__/$VAULT_WRAPPER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_VAULT_PROXY__/$STRATO_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
@@ -148,12 +148,12 @@ do
 done
 echo 'apex is available'
 
-echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://${VAULT_WRAPPER_HOST}/strato/v2.3/_ping
+echo 'Waiting for VaultProxy to be available...'
+until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/_ping
 do
   sleep 0.5
 done
-echo 'vault-wrapper is available'
+echo 'VaultProxy is available'
 
 echo  'nginx is now running. See the logs below...'
 openresty -g "daemon off;"

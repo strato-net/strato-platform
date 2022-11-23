@@ -61,9 +61,11 @@ runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
         -> PPeer
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
+        -> Config
         -> m ()
-runPeer wireMessagesRef peer _ _ = do
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+runPeer _ peer _ _ cfg = do -- runs a single connection
+  --move cfg to StratoP2PClient
+  --cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runContextM cfg $ do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
@@ -103,7 +105,7 @@ runPeer wireMessagesRef peer _ _ = do
           runEthClientConduit peer{pPeerPubkey=Just otherPubKey} pSource pSink sSource uSink pStr
       case attempt of
         Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
-        Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+        Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully" ++ show err
 
 runEthClientConduit :: MonadP2P m
                     => PPeer
@@ -127,25 +129,24 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
                   .| eventSink
                   .| peerSink
 
-
 runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
               => IORef (S.OSet Keccak256)
               -> PPeer
               -> BC.ByteString
               -> CommPort
+              -> Config
               -> m ()
-runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
+runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort cfg = do
   eErr <- liftIO $ nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
-  runPeer wireMessagesRef thePeer otherServiceHost otherServicePort
+  runPeer wireMessagesRef thePeer otherServiceHost otherServicePort cfg
 
-stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO () -- outer function to manage connections
 stratoP2PClient wireMessagesRef = do
-  $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
@@ -155,21 +156,21 @@ stratoP2PClient wireMessagesRef = do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        multiThreadedClient peers activePeersSem
+        multiThreadedClient peers activePeersSem cfg
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
     where
-      multiThreadedClient :: [PPeer] -> SSem -> LoggingT IO ()
-      multiThreadedClient [] _ = do
+      multiThreadedClient :: [PPeer] -> SSem -> Config -> LoggingT IO ()
+      multiThreadedClient [] _ _ = do
         $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
         liftIO $ threadDelay 10000000
-      multiThreadedClient peers sem = liftIO . void . for peers $ \p -> do
+      multiThreadedClient peers sem cfg = liftIO . void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
             Just _  -> void . forkIO . runLoggingT $ do
-              result <- try $ runPeerInList wireMessagesRef p osch oscp
+              result <- try $ runPeerInList wireMessagesRef p osch oscp cfg
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 

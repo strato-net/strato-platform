@@ -25,7 +25,7 @@ import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
 
--- import           Control.Monad.State                       (put)
+import           Control.Monad.State
 import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
@@ -39,6 +39,7 @@ import           Text.Printf
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.StateMachine (validators)
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -255,6 +256,7 @@ checkForUnseq inEvents = do
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
+  _ <- get >>= (\sequencerContext -> traverse_  (\x -> writeSeqVmEvents [VmValidatorList [] (S.toList $ x ^. validators) ])  (_blockstanbulContext  sequencerContext) )-- add first validator to validators DB
   createFirstTimer
 
 blockstanbulSend :: ( MonadLogger m
@@ -297,13 +299,11 @@ blockstanbulSend' msg = do
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+  let (vms, p2pevs, ckpts) = vmEvenP2pCheckptFilterHelper resp
+  
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
-           ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
-      p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-            ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
-            ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
-      ckpts = [ck | NewCheckpoint ck <- resp]
+           ++ vms
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -319,6 +319,19 @@ blockstanbulSend' msg = do
   yieldMany $ ToP2p <$> p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldMany $ ToVm <$> vmevs
+  where 
+    vmEvenP2pCheckptFilterHelper :: [OutEvent] ->  ([VmEvent], [P2pEvent], [Checkpoint])
+    vmEvenP2pCheckptFilterHelper (x:xs) = do
+      let (vms, p2ps, ctxs) = vmEvenP2pCheckptFilterHelper xs
+      case x of 
+         ListOfValidators toDrop toAdd -> (VmValidatorList toDrop toAdd : vms, p2ps, ctxs)
+         PendingVote r d s             -> (VmVoteToMake r d s : vms, p2ps, ctxs)
+         OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m) : p2ps, ctxs)
+         GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
+         LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
+         NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
+         _                             -> (vms,  p2ps, ctxs)
+    vmEvenP2pCheckptFilterHelper [] = ([],[], [])
 
 privateWitnessableHash :: Keccak256 -> Keccak256 -> Keccak256
 privateWitnessableHash tHash cHash =
@@ -623,12 +636,12 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       record "inevent_type_genesis" "IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
-    IETNewChainMember -> do
-      record "inevent_type_new_chain_member" "IngestNewChainMembers"
-      yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
+    -- IETNewChainMember -> do
+    --   record "inevent_type_new_chain_member" "IngestNewChainMembers"
+    --   yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
-      yieldMany $ map (\(IENewChainOrgName c (n, u)) -> ToP2p $ P2pNewOrgName c (n, u)) events
+      yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
