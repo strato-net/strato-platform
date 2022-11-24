@@ -6,6 +6,7 @@ import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
+import { Button } from '@blueprintjs/core';
 
 const tourSteps = [
   /*  {
@@ -25,26 +26,47 @@ const tourSteps = [
 ];
 
 class Contracts extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      limit: 10,
+      offset: 0
+    }
+  }
 
   componentWillMount() {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
-    this.props.fetchContracts(this.props.selectedChain);
+    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
   }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain)
-      this.props.fetchContracts(nextProps.selectedChain);
+      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset);
   }
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
   }
 
+  onNextClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = offset + limit;
+    this.setState({offset: newOffset});
+  };
+
+  onPrevClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = Math.max(0, offset - limit);
+    this.setState({offset: newOffset});
+  };
+  
   render() {
+    console.log(this.state)
     const contracts = this.props.contracts;
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
+    
 
     const cards = contractNames.length === 0 ? [] : contractNames
       .filter(function (contract) {
@@ -57,7 +79,7 @@ class Contracts extends Component {
         return (
           <div className="row pt-dark" key={'contract-card-' + i}>
             <div className="col-sm-12">
-              <ContractCard contract={{ name: value, contract: contracts[value] }} />
+              {value && <ContractCard contract={{ name: value, contract: contracts[value] }} />}
               <br />
             </div>
           </div>
@@ -95,6 +117,29 @@ class Contracts extends Component {
               <br />
             </div>
           </div> : cards}
+          <div className="pt-dark">
+            <div className="row">
+              <div className="col-sm-2 smd-pad-16 text-left">
+                <Button
+                  onClick={this.onPrevClick}
+                  className="pt-icon-arrow-left"
+                  text="Previous"
+                  disabled={!(this.state.offset > 0)}
+                />
+              </div>
+              <div className="col-sm-2 text-center" style={{marginTop: '22px'}}>
+                {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)}`}
+              </div>
+              <div className="col-sm-2 smd-pad-16 text-right">
+                <Button
+                  onClick={this.onNextClick}
+                  className="pt-icon-arrow-right"
+                  text="Next"
+                  disabled={cards.length < this.state.limit}
+                />
+              </div>
+            </div>
+        </div>
       </div>
     );
   }

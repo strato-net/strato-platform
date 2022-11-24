@@ -14,8 +14,8 @@ import { createUrl } from '../../lib/url';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts(chainid) {
-  const options = { query: { chainid } };
+export function getContracts(chainid, limit, offset) {
+  const options = { query: { chainid, limit, offset } };
   const url = createUrl(contractsUrl, options);
 
   return fetch(
@@ -38,7 +38,7 @@ export function getContracts(chainid) {
 
 export function* fetchContracts(action) {
   try {
-    let response = yield call(getContracts, action.chainId);
+    let response = yield call(getContracts, action.chainId, action.limit, action.offset);
     yield put(fetchContractsSuccess(response));
   }
   catch (err) {
