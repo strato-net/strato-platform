@@ -90,7 +90,6 @@ class Contracts extends Component {
       });
 
     const isPaginationDisplay = cards.length ? true : Boolean(this.state.offset);
-    console.log(cards)
 
     return (
       <div className="container-fluid">
