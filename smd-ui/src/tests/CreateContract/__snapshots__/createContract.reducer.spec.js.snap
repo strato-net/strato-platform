@@ -15,8 +15,8 @@ expecting \\"pragma\\", \\"import\\", \\"contract\\", \\"library\\" or end of in
   "filename": undefined,
   "isOpen": true,
   "response": "Error Uploading Contract...: [object Object]",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -28,11 +28,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": true,
   "response": "Uploading Contract...",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -86,11 +87,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": "funcs",
   "createDisabled": false,
+  "error": "",
   "filename": undefined,
   "isOpen": true,
   "response": "Status: Upload Contract",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -102,11 +104,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "response": "Status: Upload Contract",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -118,11 +121,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": "GreeterC",
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "response": "Status: Upload Contract",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -147,11 +151,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "response": "Status: Upload Contract",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -168,9 +173,8 @@ Object {
   "isOpen": true,
   "isToasts": true,
   "response": "Error Uploading Contract...: error",
-  "toastsMessage": "Contract creation failed",
+  "toastsMessage": "Contract creation failed: error",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -182,11 +186,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": true,
   "response": "Uploading Contract...",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -198,6 +203,7 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "isToasts": true,
@@ -274,7 +280,6 @@ Object {
     },
   ],
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -286,13 +291,13 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "isToasts": true,
   "response": "Upload Success: [object Object]",
   "toastsMessage": Object {},
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -304,13 +309,13 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "isToasts": null,
   "response": "Status: Upload Contract",
   "toastsMessage": null,
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -322,6 +327,7 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "isToasts": false,
@@ -338,13 +344,13 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "isToasts": false,
   "response": "Status: Upload Contract",
   "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "",
 }
 `;
@@ -356,11 +362,12 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
+  "error": "",
   "filename": undefined,
   "isOpen": false,
   "response": "Status: Upload Contract",
+  "toastsMessage": "",
   "toster": false,
-  "tosterMessage": "",
   "username": "abc",
 }
 `;

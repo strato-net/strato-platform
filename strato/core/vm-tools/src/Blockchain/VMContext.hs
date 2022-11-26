@@ -474,7 +474,9 @@ instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ k = do
     mBH <- gets $ view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
-  insert _ = putCert
+  insert _ k v = do
+    liftIO . appendFile "registrations.txt" $ formatAddressWithoutColor k ++ ": " ++ show v ++ "\n"
+    putCert k v
   delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where

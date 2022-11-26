@@ -29,6 +29,7 @@ module Blockchain.SolidVM.Simple
   , module Blockchain.Data.ExecResults
   , module Blockchain.Strato.Model.ExtendedWord
   , module Blockchain.Strato.Model.Account
+  , module Blockchain.Strato.Model.Gas
   , module Blockchain.Strato.Model.Keccak256
   , module Blockchain.VM.SolidException
   , module Data.Default
@@ -47,6 +48,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM                as SolidVM
 import           Blockchain.VM.SolidException
@@ -144,7 +146,7 @@ create s = SolidVM.create
   (s ^. createArgs . argsOrigin)
   (createErr "value")
   (createErr "gasPrice")
-  (createErr "availableGas")
+  (Gas 100000000)
   (s ^. createNewAddress)
   (s ^. createCode)
   (s ^. createArgs . argsTxHash)
@@ -168,7 +170,7 @@ call s = SolidVM.call
   (callErr "value")
   (callErr "gasPrice")
   (callErr "theData")
-  (callErr "availableGas")
+  (Gas 100000000)
   (s ^. callArgs . argsOrigin)
   (s ^. callArgs . argsTxHash)
   (s ^. callArgs . argsChainId)

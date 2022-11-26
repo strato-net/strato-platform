@@ -169,7 +169,10 @@ nextRound nt = do
   --update validators list
   val <- uses validators S.toList
   vot <- use voted
-  validators .= S.fromList (updateValidator val vot)
+  let (newVals, toDrop, toAdd) = (updateValidator val vot)
+  when (val /= newVals) $ do
+    validators .= S.fromList newVals
+    yieldR $ ListOfValidators toDrop toAdd
   $logInfoS "blockstanbul/voting" . T.pack $
                  "nextRound: voted map" ++ show vot
   valNew <- use validators
@@ -522,3 +525,4 @@ recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCoun
     PendingVote{} -> inc "pending_vote"
     VoteResponse{} -> inc "vote_response"
     NewCheckpoint{} -> inc "new_checkpoint"
+    ListOfValidators{} -> inc "new_validators"

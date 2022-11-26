@@ -67,6 +67,7 @@ import Data.ByteString (putStr)
 import GHC.TypeLits (ErrorMessage(Text))
 import qualified Control.Exception as Blockchain.SolidVM
 import qualified LabeledError
+import Blockchain.Strato.Model.Gas
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -213,8 +214,10 @@ devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
 runTest :: ContextM a -> IO ()
-runTest f = do
-  let timeout = 5000000
+runTest = runTestWithTimeout 5000000
+
+runTestWithTimeout :: Int -> ContextM a -> IO ()
+runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
@@ -267,7 +270,7 @@ runArgsWithSenderBeef acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Just 0xfeedbeef
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -303,7 +306,7 @@ runArgsWithSender acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -338,7 +341,7 @@ runArgsWithOrigin orig acc args bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
@@ -381,7 +384,7 @@ runCall funcName callArgs bs = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
@@ -426,7 +429,7 @@ call2 funcName callArgs contractAddress = do
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
-      availableGas = error "TODO: availableGas"
+      availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
@@ -5274,10 +5277,22 @@ contract qq {
   
   address addr;
   constructor() {
-  addr = ecrecover("3a5d3354533658145308bb0d64dbc1508fc09cdfb776fbd3ef69c5733efff993",62426968875534762403852209127290402186903754337050088741962154937967930754218,50195776013273436178497944053297375925820829706569486652594540226567378884053,27);
+  addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"c99b861c7a2d47bcf5a8423b94cc962b585f340a53e88c91b86a53effd10dc58","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
   }
 }|]
-    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0xe2b74b933b1fbe7f3736ad437b60a7828bcc4b80 UnspecifiedChain)]
+    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0x91bc5385f9cfa1f4c9c9805102d54c7f77bde902 UnspecifiedChain)] -- 666171f931111ae3aed54595fc9776699e5eb03d
+
+--   it "returns 0  for invalid ecrecover call" . runTest $ do
+--     runBS [r|
+-- pragma solidvm 3.4;
+-- contract qq {
+  
+--   address addr;
+--   constructor() {
+--   addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"efd16e46ceb4851861b89aa5fddb18e18a70bdaf029d77482bdd9b2242854b59","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
+--   }
+-- }|]
+--     getFields ["addr"] `shouldReturn` [BDefault]
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
@@ -6768,3 +6783,36 @@ contract A {
   uint x = type(B).name;
 
 }|]) `shouldThrow` anyTypeError
+
+  it "cant infinite loop" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+pragma solidvm 3.4;
+contract qq {
+  uint x = 3;
+  constructor() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
+
+  it "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+pragma solidvm 3.4;
+
+contract A {
+  uint x = 3;
+  function f() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}
+
+contract qq {
+  constructor() public returns () {
+    A a = new A();
+    a.f();
+    return;
+  }
+}   |]) `shouldThrow` anyTooMuchGasError

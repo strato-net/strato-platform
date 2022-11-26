@@ -91,7 +91,7 @@ doAddOrgName chainId cm = do
        , format cm
        ]
   lift $ addMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain (ChainMembers $ S.singleton cm) chainId
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId (ChainMembers $ S.singleton cm)
   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
 doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
@@ -182,18 +182,12 @@ indexEventToTxrResults = \case
       -- (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
       --   Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
       --   Just address -> Just . RemoveMember $ Right (chainId, address)
-      (Just chainId, "OrganizationAdded", _) -> case eventDBArgs ev of
-        (o:u:c:_) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) True))
-        (o:u:_) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) True))
-        (o:_) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) True))
-        -- (_) -> Just . AddOrgName $ Right (chainId, (Everyone True))
-        []       -> Just . AddOrgName . Left $ "failed to provide any arguments for OrganizationAdded event"
-      (Just chainId, "OrganizationRemoved", _) -> case eventDBArgs ev of
-        (o:u:c:_) -> Just . RemoveOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
-        (o:u:_) -> Just . RemoveOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
-        (o:_) -> Just . RemoveOrgName $ Right (chainId, (Org (T.pack o) False))
-        -- (_) -> Just . RemoveOrgName $ Right (chainId, (Everyone True))
-        []       -> Just . RemoveOrgName . Left $ "failed to provide any arguments for OrganizationRemoved event"
+      (Just chainId, "OrgAdded", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) True))
+      (Just chainId, "OrgUnitAdded", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) True))
+      (Just chainId, "CommonNameAdded", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) True))
+      (Just chainId, "OrgRemoved", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) False))
+      (Just chainId, "OrgUnitRemoved", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
+      (Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert

@@ -43,6 +43,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import qualified Numeric                              (readHex)
 import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
@@ -77,6 +78,7 @@ import           Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
+import           Blockchain.SolidVM.GasInfo
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
@@ -91,7 +93,7 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
-
+         
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -222,6 +224,11 @@ solidVMBreakpoint ann = do
 
 -- end debugger-related code
 
+requireOriginCert :: MonadSM m => Account -> m ()
+requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
+  originHasCert <- A.exists (A.Proxy @X509Certificate) $ acct ^. accountAddress
+  unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
+
 create :: SolidVMBase m
        => Bool
        -> Bool
@@ -241,14 +248,19 @@ create :: SolidVMBase m
        -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
-  recordCreate
+create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
+  
   let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
-        Env.txHash=txHash',
-        Env.metadata=metadata
+        Env.txHash= txHash',
+        Env.metadata= metadata
+      }
+  let gasInfo' = GasInfo {
+        _gasLeft = availableGas,
+        _gasInitalAllotment = availableGas, 
+        _gasMetadata = ""
       }
 
   initCode <- case code of
@@ -257,7 +269,8 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
+    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -291,7 +304,10 @@ create' creator newAccount ch cc contractName' argExps = do
                         , addressStateCodeHash = if ((vmVersion' == "svm3.0" || vmVersion' == "svm3.2" || vmVersion' == "svm3.3" || vmVersion' == "svm3.4")  && contractName' /= stringToLabel parentName && not (null parentName)) then CodeAtAccount creator (labelToString contractName') else SolidVMCode (labelToString contractName') ch
                         }
 
-  onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
+  -- get the gasLeft from the environment
+  gasInfo <- getGasInfo
+
+  liftIO $ putStrLn $ C.green $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName' ++ "with gasInfo: " ++ show gasInfo
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
   addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
@@ -386,7 +402,7 @@ call :: SolidVMBase m
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' txHash' chainId' metadata = do
   recordCall
 
   let env' = Env.Environment {
@@ -397,7 +413,15 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         Env.metadata=metadata
         }
 
-  fmap (either solidvmErrorResults id) . runSM Nothing env' chainId' $ do
+  let gasInfo' = GasInfo {
+      _gasLeft = availableGas,
+      _gasInitalAllotment = availableGas, 
+      _gasMetadata = ""
+    }
+
+
+  fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' chainId' $ do
+    requireOriginCert origin'
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
@@ -805,13 +829,22 @@ callWrapper from to mContract functionName isRCC argExps  = do
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
-  -- grab the org for this contract
-  org <- getOrg to (contract ^. CC.vmVersion)
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+-- grab the org for this codeAddress
+  when (not isRCC) $ do
+    org <- getOrg to (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
-  liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-        " in app " ++ (show parentName) ++ " of org " ++ show org
+--  grab the org from the senders account and set it to the codeAddress
+  when (isRCC) $ do
+    org <- getOrg from (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
@@ -889,6 +922,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
+  decrementGas 100
   ret <- runStatement s
 
   case ret of
@@ -1359,6 +1393,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  decrementGas 1000
   cntrct <- getCurrentContract
   if c
     then do
@@ -1378,6 +1413,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
+  decrementGas 1000
   case result of
     Nothing -> do
       c <- condition
@@ -1467,7 +1503,20 @@ expToPath x = todo "expToPath/unhandled" x
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
+  decrementGas 100
   return v
+
+decrementGas :: MonadSM m => Gas -> m ()
+decrementGas gas = do
+  gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
+  let !gasLeft' = gasInfo' ^. gasLeft
+  if (gasLeft') < (Gas 0)
+    then do
+      let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
+      liftIO $ putStrLn $ C.red $ msg
+      tooMuchGas (show (_gasInitalAllotment gasInfo')) gasInfo'
+    else do
+      return ()
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
@@ -2664,13 +2713,19 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin ecrecover@("ecrecover") [SString h, SInteger r, SInteger s, SInteger v] _ = do
+callBuiltin ecrecover@("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
   contract' <- getCurrentContract
   if CC._vmVersion contract' == "svm3.4"
     then do 
       let intHash = intBuiltin [SString h]
       bytestringHash <- encodeForReturn intHash
-      let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) r s v
+      rIntHash <-case Numeric.readHex r of
+        [(x, "")] -> return x
+        _ -> invalidArguments "parseHex: error parsing r: " r
+      sIntHash <- case Numeric.readHex s of
+        [(y, "")] -> return y
+        _ -> invalidArguments "parseHex: error parsing s: " s
+      let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
       let theZero ::  Integer
           theZero = 0
       case theSignerAddress of
@@ -3442,7 +3497,7 @@ encodeVector v = do
 
 
 
-{- BEN WILL REFACTOR THIS -}
+{- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
   let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
@@ -3623,8 +3678,10 @@ solidityExceptionHandler catchBlockMap ex = do
     (GeneralMetaProgrammingError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 28 generalMetaProgrammingError
       return res
+    (MissingCertificate s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 missingCertificate
+      return res
     _ -> error "unhandled solid exception" (show ex)
-
 
 
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)

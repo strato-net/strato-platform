@@ -18,7 +18,6 @@ module Blockchain.Strato.Model.ChainMember (
   cmBoundedToRSet,
   emptyChainMember,
   removeChainMember,
-  addChainMember,
   getRangeFromBounds,
   chainMembersToChainMemberRset,
   chainMemberParsedSetToChainMemberRSet,
@@ -44,11 +43,13 @@ import qualified Database.Persist.Sql                 as DPS
 import           Data.Aeson                           hiding (Array, String)
 import qualified Data.Aeson                           as A (Value(..))
 import           Data.Binary                          
+import           Data.Function                        (on)
 import           Data.Ranged
 import           Data.Swagger                         (ToSchema, NamedSchema(..), declareNamedSchema)
 import qualified Data.ByteString.Lazy.Internal        as BSLI
 import           Data.Data
 import qualified Data.Default                         as D
+import           Data.List                            (foldl')
 import           Data.Maybe                           (fromMaybe)
 import qualified Data.Set                             as S
 import           Data.Text                            (Text)
@@ -108,7 +109,7 @@ data ChainMemberParsedSet =
   Everyone Bool
   | Org Text Bool
   | OrgUnit Text Text Bool
-  | CommonName Text Text Text Bool deriving(Generic, Eq, Data, Show, Ord, Read, ToJSON)
+  | CommonName Text Text Text Bool deriving(Generic, Eq, Data, Show, Ord, Read)
 
 instance ToJSONKey ChainMemberParsedSet
 
@@ -141,20 +142,42 @@ rowToSet ((Just o),(Just u), Nothing,a) = OrgUnit o u a
 rowToSet ((Just o),(Just u),(Just n),a) = CommonName o u n a
 rowToSet ((Just o),Nothing,(Just n),a) = CommonName o "Nothing" n a
 
-chainMemberParsedSetToChainMemberRSet :: ChainMemberParsedSet -> (ChainMemberRSet,Bool)
-chainMemberParsedSetToChainMemberRSet (Everyone a)  = ((ChainMemberRSet $  makeRangedSet [getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound ) (ChainMemberF UpperBound UpperBound UpperBound )]),a)
-chainMemberParsedSetToChainMemberRSet (Org o a) = ((ChainMemberRSet $  makeRangedSet [getRangeFromBounds (ChainMemberF (Middle o) LowerBound LowerBound ) (ChainMemberF (Middle o) UpperBound UpperBound )]),a)
-chainMemberParsedSetToChainMemberRSet (OrgUnit o u a) = ((ChainMemberRSet $  makeRangedSet [getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) LowerBound ) (ChainMemberF (Middle o) (Middle $ Just u) UpperBound ) ]),a)
-chainMemberParsedSetToChainMemberRSet (CommonName o u c a) = ((ChainMemberRSet $  makeRangedSet [getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) ) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) )]),a)
+chainMemberParsedSetToChainMemberRSet :: ChainMemberParsedSet -> (Bool, ChainMemberRSet)
+chainMemberParsedSetToChainMemberRSet (Everyone True)  = (True, ChainMemberRSet $ makeRangedSet
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  ])
+chainMemberParsedSetToChainMemberRSet (Everyone False)  = (False, ChainMemberRSet rSetEmpty)
+chainMemberParsedSetToChainMemberRSet (Org o True) = (True, ChainMemberRSet $  makeRangedSet
+  [ getRangeFromBounds (ChainMemberF (Middle o) LowerBound LowerBound) (ChainMemberF (Middle o) UpperBound UpperBound)
+  ])
+chainMemberParsedSetToChainMemberRSet (Org o False) = (False, ChainMemberRSet $  makeRangedSet
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) LowerBound LowerBound)
+  , getRangeFromBounds (ChainMemberF (Middle o) UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  ])
+chainMemberParsedSetToChainMemberRSet (OrgUnit o u True) = (True, ChainMemberRSet $ makeRangedSet
+  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) UpperBound)
+  ])
+chainMemberParsedSetToChainMemberRSet (OrgUnit o u False) = (False, ChainMemberRSet $ makeRangedSet
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) LowerBound)
+  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) UpperBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  ])
+chainMemberParsedSetToChainMemberRSet (CommonName o u c True) = (True, ChainMemberRSet $ makeRangedSet
+  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c)) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c))
+  ])
+chainMemberParsedSetToChainMemberRSet (CommonName o u c False) = (False, ChainMemberRSet $ makeRangedSet
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c))
+  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c)) (ChainMemberF UpperBound UpperBound UpperBound)
+  ])
 
 
 chainMembersToChainMemberRset :: ChainMembers -> ChainMemberRSet
-chainMembersToChainMemberRset cms = ChainMemberRSet finalRSet where 
-  listOfCMPS  = S.toList $ unChainMembers cms
-  listOfCMRSetWithBool = map chainMemberParsedSetToChainMemberRSet listOfCMPS
-  listOfJustCMRSets = map fst listOfCMRSetWithBool
-  listOfJustRSets = map getChainMemberRSet listOfJustCMRSets
-  finalRSet = foldl1 rSetUnion listOfJustRSets
+chainMembersToChainMemberRset cms =
+  let listOfCMPS  = S.toList $ unChainMembers cms
+      listOfCMRSetWithBool = map chainMemberParsedSetToChainMemberRSet listOfCMPS
+   in foldl' (\(ChainMemberRSet b) (access, ChainMemberRSet a) -> ChainMemberRSet $
+        if access
+          then rSetUnion a b
+          else rSetIntersection a b) D.def listOfCMRSetWithBool
 
 returnBoolOfChainMemberParsedSets :: ChainMemberParsedSet -> Bool
 returnBoolOfChainMemberParsedSets (Everyone a) = a 
@@ -163,10 +186,10 @@ returnBoolOfChainMemberParsedSets (OrgUnit _ _ a) = a
 returnBoolOfChainMemberParsedSets (CommonName _ _ _ a) = a
 
 getTrueChainMemberParsedSets :: ChainMembers -> ChainMembers
-getTrueChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter (\a-> (returnBoolOfChainMemberParsedSets a) == True ) (S.toList $ unChainMembers cms)
+getTrueChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter returnBoolOfChainMemberParsedSets (S.toList $ unChainMembers cms)
 
 getFalseChainMemberParsedSets :: ChainMembers -> ChainMembers
-getFalseChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter (\a-> (returnBoolOfChainMemberParsedSets a) == False ) (S.toList $ unChainMembers cms)
+getFalseChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter (not . returnBoolOfChainMemberParsedSets) (S.toList $ unChainMembers cms)
 
 
 getTextFromIdentity :: IText -> T.Text
@@ -182,7 +205,7 @@ cmBoundedToRSet cm = ChainMemberRSet $ makeRangedSet[(getRangeFromBounds (fst (g
 
 
 isChainMemberInRangeSet :: ChainMemberRSet -> ChainMemberRSet -> Bool
-isChainMemberInRangeSet rangeSet cmr = rSetIsSubset (getChainMemberRSet cmr) (getChainMemberRSet rangeSet)
+isChainMemberInRangeSet = rSetIsSubset `on` getChainMemberRSet
 
 
 getRangeFromBounds :: ChainMemberBounded -> ChainMemberBounded -> Range ChainMemberBounded
@@ -198,10 +221,6 @@ getBoundsFromCMBounded (ChainMemberF (Middle n) _ _ ) =
   ((ChainMemberF (Middle n) LowerBound LowerBound ), (ChainMemberF (Middle n) UpperBound UpperBound ))
 getBoundsFromCMBounded (ChainMemberF _ _ _ ) = 
   ((ChainMemberF LowerBound LowerBound LowerBound ), (ChainMemberF UpperBound UpperBound UpperBound ))
-
-
-addChainMember :: ChainMemberRSet -> ChainMemberBounded -> ChainMemberRSet
-addChainMember rangeSet cm = ChainMemberRSet (rSetUnion (getChainMemberRSet rangeSet) (getChainMemberRSet $ cmBoundedToRSet cm))
 
 
 removeChainMember :: ChainMemberRSet -> ChainMemberBounded -> ChainMemberRSet
@@ -277,7 +296,7 @@ instance Format ChainMemberParsedSet where
 
 
 instance Show (ChainMemberF BoundedData) where
-  show (ChainMemberF on ou cm) = (show on) ++ " " ++ (show ou) ++ " " ++ (show cm) 
+  show (ChainMemberF on' ou cm) = (show on') ++ " " ++ (show ou) ++ " " ++ (show cm) 
 
 
 deriving instance Show (ChainMemberF DFI.Identity)
@@ -336,8 +355,8 @@ instance RLPSerializable (MaybeIITTEXT) where
 
 
 instance RLPSerializable ChainMembers where
-  rlpEncode (ChainMembers cms) = rlpEncode cms
-  rlpDecode x = ChainMembers(rlpDecode x)
+  rlpEncode (ChainMembers cms) = rlpEncode $ S.toList cms
+  rlpDecode x = ChainMembers . S.fromList $ rlpDecode x
 
 instance RLPSerializable (BoundedData Text) where
   rlpEncode (LowerBound)= RLPScalar 0
@@ -362,14 +381,14 @@ instance RLPSerializable (BoundedData (Maybe Text)) where
 
 
 instance RLPSerializable ChainMemberBounded where
-  rlpEncode (ChainMemberF on ou cmn) = RLPArray
-    [ rlpEncode on
+  rlpEncode (ChainMemberF on' ou cmn) = RLPArray
+    [ rlpEncode on'
     , rlpEncode ou
     , rlpEncode cmn
     ]
-  rlpDecode (RLPArray [on, ou, cmn]) =
+  rlpDecode (RLPArray [on', ou, cmn]) =
     ChainMemberF
-      (rlpDecode on)
+      (rlpDecode on')
       (rlpDecode ou)
       (rlpDecode cmn)
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
@@ -461,6 +480,11 @@ instance FromJSON ChainMembers where
   parseJSON (A.Array xs) = ChainMembers . S.fromList <$> traverse parseJSON (V.toList xs)
   parseJSON x = fail $ "couldn't parse JSON for chain members info: " ++ show x  
 
+instance ToJSON ChainMembers where
+  toJSON (ChainMembers xs) = toJSON (S.toList xs)
+    -- traverse A.Array V.fromList 
+    --  V.fromList <$> traverse A.Array toJSON 
+
 
 instance FromJSON ChainMemberParsedSet where
   parseJSON (A.String s) = pure $ Org s True
@@ -480,10 +504,23 @@ instance FromJSON ChainMemberParsedSet where
               Just name -> pure $ CommonName org unit name a
   parseJSON o = fail $ "parseJSON ChainMembersParsedSet failed: expected object, got: " ++ show o
 
-instance ToJSON ChainMembers where
-  toJSON (ChainMembers cm) =
-    object [ "cm" .= cm
-           ]
+
+instance ToJSON ChainMemberParsedSet where
+  toJSON (Everyone a) = object["access" .= a]
+  toJSON (Org o a) = object["orgName".= o, "access" .= a]
+  toJSON (OrgUnit o u a) = object["orgName".= o, "orgUnit".= u,"access" .= a]
+  toJSON (CommonName o u c a) = object["orgName".= o, "orgUnit".= u, "commonName".=c, "access" .= a]
+
+
+
+    
+    -- A.Array (  <$> traverse parseJSON  (S.toList  xs))
+  --   ChainMembers . S.fromList <$> traverse parseJSON (V.toList xs)
+  -- toJSON (ChainMembers cm) =
+  --   object [ "cm" .= cm
+  --          ]
+
+instance D.Default ChainMemberRSet where def = ChainMemberRSet rSetEmpty
 
 instance D.Default ChainMembers  where def = ChainMembers S.empty
 

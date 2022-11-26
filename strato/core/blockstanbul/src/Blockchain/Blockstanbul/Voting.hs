@@ -23,8 +23,8 @@ extractBeneficiary ppl = case (((BH.beneficiary $ BH.blockToBlockHeader ppl ) /=
   (_, _) -> Nothing
 
 --output a new list of validater and beneficiary
-updateValidator :: [ChainMemberParsedSet] -> Map ChainMemberParsedSet (Map ChainMemberParsedSet Bool) -> [ChainMemberParsedSet]
-updateValidator val voted = sort newVals
+updateValidator :: [Address] -> Map Address (Map Address Bool) -> ([Address], [Address], [Address])
+updateValidator val voted = (sort newVals, keys dropSuccess, keys addSuccess)
                      where (toDrop,toAdd) = partitionWithKey (\ k _ -> k `elem` val) voted
                            addSuccess = M.filter helperAs toAdd
                            dropSuccess = M.filter helperDs toDrop

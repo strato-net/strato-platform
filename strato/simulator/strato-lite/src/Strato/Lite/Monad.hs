@@ -140,7 +140,7 @@ data TestContext = TestContext
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
-  , _chainMembersMap       :: Map Word256 ChainMembers
+  , _chainMembersMap       :: Map Word256 ChainMemberRSet
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
   , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
@@ -218,7 +218,7 @@ instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (MonadTest m) where
+instance MonadIO m => A.Selectable Word256 ChainMemberRSet (MonadTest m) where
   select _ cid = M.lookup cid <$> use chainMembersMap
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
@@ -307,7 +307,7 @@ instance A.Selectable OrgId OrgIdChains m => A.Selectable OrgId OrgIdChains (Mon
 instance A.Selectable Keccak256 ChainTxsInBlock m => A.Selectable Keccak256 ChainTxsInBlock (MonadP2PTest m) where
   select p sha = lift $ A.select p sha
 
-instance A.Selectable Word256 ChainMembers m => A.Selectable Word256 ChainMembers (MonadP2PTest m) where
+instance A.Selectable Word256 ChainMemberRSet m => A.Selectable Word256 ChainMemberRSet (MonadP2PTest m) where
   select p cid = lift $ A.select p cid
 
 instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (MonadP2PTest m) where
@@ -712,6 +712,11 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) wher
   delete _ _   = pure ()
   insert _ _ _ = pure ()
 
+instance MonadIO m => (([Address],[Address]) `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
 instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
@@ -734,7 +739,7 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainInfo) (MonadTest m) where
 instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
-  insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
+  insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -852,14 +857,14 @@ createPeer :: PrivateKey
            -> Text
            -> IO P2PPeer
 createPeer privKey initialValidators unseqSink name ipAddr = do
-  unseqSource <- newTQueueIO
-  seqP2pSource <- newBroadcastTMChanIO
-  seqVmSource <- newTQueueIO
+  unseqSource      <- newTQueueIO
+  seqP2pSource     <- newBroadcastTMChanIO
+  seqVmSource      <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   txrIndexerSource <- newTQueueIO
   seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
-  cache <- TRC.new 64
+  cache  <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do

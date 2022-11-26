@@ -168,6 +168,7 @@ generateChainHashes :: OutputTx -> [Keccak256]
 generateChainHashes tx =
   let r = txSigR tx
       s = txSigS tx
-      rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-      sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+      cId = txChainId tx
+      rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s, rlpEncode cId]
+      sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r, rlpEncode cId]
    in [rs,sr]

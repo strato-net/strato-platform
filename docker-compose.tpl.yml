@@ -141,11 +141,11 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
-    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
+    - requireCerts=${requireCerts:-true}
     - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
@@ -230,22 +230,33 @@ services:
     - strato
     - vault-wrapper
     environment:
+    - APEX_HOST=${APEX_HOST}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
+    - DOCS_HOST=${DOCS_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
+    - POSTGREST_HOST=${POSTGREST_HOST}
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
     - SERVE_LOGS=${SERVE_LOGS}
     - SMD_DEV_MODE=${SMD_DEV_MODE}
     - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP}
+    - SMD_HOST=${SMD_HOST}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
+    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+    - STRATO_PORT_API=${STRATO_PORT_API}
+    - STRATO_PORT_API2=${STRATO_PORT_API2}
+    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
+    - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
+    - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}

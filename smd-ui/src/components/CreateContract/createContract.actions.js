@@ -67,7 +67,7 @@ export const createContractSuccess = function(response) {
   }
 }
 
-export const updateToast = function(response) {
+export const updateToast = function() {
   return {
     type: 'UPDATE_TOAST',
     toasts: false,
@@ -78,11 +78,11 @@ export const updateToast = function(response) {
 export const createContractFailure = function(error) {
   return {
     type: CREATE_CONTRACT_FAILURE,
-    error: error,
+    error,
     spinning: false,
     isOpen: false,
     toasts: true,
-    toastsMessage: 'Contract creation failed'
+    toastsMessage: `Contract creation failed: ${error}`
   }
 }
 

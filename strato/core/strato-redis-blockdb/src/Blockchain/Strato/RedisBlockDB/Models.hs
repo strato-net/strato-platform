@@ -41,8 +41,8 @@ data BlockDBNamespace = Headers
                       | PrivateChainMembers
                       | PrivateTransactions
                       | PrivateTxsInBlocks
-                      | PrivateIPChains
-                      | PrivateOrgIdChains
+                      | PrivateOrgNameChains
+                      -- | Validators
                       | PrivateTrueOrgNameChains
                       | PrivateFalseOrgNameChains
                       | X509Certificates
@@ -118,8 +118,8 @@ instance RedisDBValuable RedisChainInfo where
     fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBValuable RedisChainMemberRSet where
-    toValue   = rlpSerialize . rlpEncode
-    fromValue = rlpDecode . rlpDeserialize
+    toValue (RedisChainMemberRSet c) = toStrict $ encode c
+    fromValue = RedisChainMemberRSet . decode . fromStrict
 
 instance RedisDBValuable RedisChainTxsInBlocks where
     toValue   = rlpSerialize . rlpEncode
@@ -127,14 +127,6 @@ instance RedisDBValuable RedisChainTxsInBlocks where
 
 instance RedisDBKeyable IPAddress where
     toKey = S8.pack . showIP
-
-instance RedisDBValuable RedisIPChains where
-    toValue   = rlpSerialize . rlpEncode
-    fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisOrgIdChains where
-    toValue   = rlpSerialize . rlpEncode
-    fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBValuable RedisOrgNameChains where
     toValue   = rlpSerialize . rlpEncode
@@ -169,6 +161,9 @@ newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
+--newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
+
+
 
     -- instance RLPSerializable RedisChainMemberRSet where
     --   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
@@ -211,11 +206,11 @@ displayForNamespace ns input = case ns of
     PrivateChainMembers -> let RedisChainMemberRSet mems = fromValue input in show mems
     PrivateTransactions -> let (anchor, RedisTx tx) = fromValue input in formatChainId (Just anchor) ++ format tx
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
-    PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
-    PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
+    PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     PrivateTrueOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-    X509Certificates -> format (fromValue input :: Address)
-    X509Initialized -> format input
+    --Validators           -> format (fromValue input :: [Address])
+    X509Certificates     -> format (fromValue input :: Address)
+    X509Initialized      -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
