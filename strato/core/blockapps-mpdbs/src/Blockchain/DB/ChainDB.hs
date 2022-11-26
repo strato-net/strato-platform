@@ -216,7 +216,7 @@ getGenesisStateRoot = fmap (fmap (\(_,sr,_) -> sr)) . getChainGenesisInfo
 getChainGenesisInfo :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
                        )
-                    => Maybe Word256 -> m (Maybe (Keccak256, MP.StateRoot, Maybe Word256))
+                    => Maybe Word256 -> m (Maybe (Keccak256, MP.StateRoot, Map Text Word256))
 getChainGenesisInfo cid = do
   gr <- unGenesisRoot <$> get Proxy
   fmap unGenesisData <$> getkv gr (word256ToMPKey cid)
@@ -224,7 +224,7 @@ getChainGenesisInfo cid = do
 putChainGenesisInfo :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
                        )
-                    => Maybe Word256 -> Keccak256 -> MP.StateRoot -> Maybe Word256 -> m ()
+                    => Maybe Word256 -> Keccak256 -> MP.StateRoot -> Map Text Word256 -> m ()
 putChainGenesisInfo chainId creationBlock stateRoot parent = do
   gr <- unGenesisRoot <$> get Proxy
   newGenesisRoot <- putkv gr (word256ToMPKey chainId) $ GenesisData (creationBlock, stateRoot, parent)

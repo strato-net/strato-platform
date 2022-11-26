@@ -59,7 +59,7 @@ type HasPrivacyRegistries m = ( (Keccak256 `Alters` OutputBlock) m
                               , (Keccak256 `Alters` OutputTx) m
                               , (Keccak256 `Alters` ChainHashEntry) m
                               , (Word256 `Alters` ChainIdEntry) m
-                              , Selectable (Maybe Word256) ParentChainId m
+                              , Selectable Word256 ParentChainIds m
                               )
 
 type HasFullPrivacy m = ( HasPrivacyRegistries m
@@ -306,8 +306,22 @@ hasAllAncestorChains = go
   where
     go Nothing = pure True
     go (Just chainId) = do
-      mmParent <- join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      mmParent <- join . fmap (fmap (parentChains . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
       maybe (pure False) go mmParent
+
+hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m => Maybe Word256 -> m Bool
+hasAllAncestorChains Nothing = pure True
+hasAllAncestorChains (Just cid) = go (S.singleton cid) cid
+  where go seen descendent = lookup (Proxy @ChainIdEntry) descendent >>= \case
+          Nothing -> pure False
+          Just cie -> case cie ^. chainIdInfo of
+            Nothing -> pure False
+            Just cInfo ->
+              let parentSet = S.fromList . M.elems . parentChains $ chainInfo cInfo
+                  newSeen = seen <> parentSet
+               in foldrM (maybeDo $ go newSeen) True $ S.toList parentSet
+        maybeDo _ False _ = pure False
+        maybeDo a _     f = f a
 
 traverseAncestorChains :: (Word256 `Alters` ChainIdEntry) m
                        => (Word256 -> m a) -> Word256 -> m [a]
@@ -316,7 +330,7 @@ traverseAncestorChains action cId = go (Just cId)
     go Nothing = pure []
     go (Just chainId) = do
       a <- action chainId
-      mmParent <- join . join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      mmParent <- join . join . fmap (fmap (parentChains . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
       (a:) <$> go mmParent
 
 forAncestorChains :: (Word256 `Alters` ChainIdEntry) m

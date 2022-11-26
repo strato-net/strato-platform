@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeOperators            #-}
 
 module Blockchain.Data.ChainInfo
-  ( ParentChainId(..)
+  ( ParentChainIds(..)
   , ChainInfo (..)
   , UnsignedChainInfo(..)
   , ChainSignature(..)
@@ -22,14 +22,14 @@ module Blockchain.Data.ChainInfo
   , CodeInfo (..)
   , isAncestorChainOf
   , getAncestorChains
-  , getNthAncestorChain
+--  , getNthAncestorChain
   , accountExtractor
   , whoSignedThisChainInfo
   ) where
 
 import           Control.Applicative               (many)
+import           Control.Arrow                     ((&&&))
 import qualified Control.Monad.Change.Alter        as A
-import           Control.Monad                     (join)
 import qualified Crypto.Secp256k1                  as SEC
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances.ByteString  ()
@@ -47,20 +47,23 @@ import qualified Blockchain.Strato.Model.Secp256k1    as EC
 -- import           Blockchain.TypeLits
 
 import           Data.Aeson
+import           Data.Bifunctor                       (first)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Short                as BSS
 import           Data.Data
+import           Data.Foldable
 import qualified Data.JsonStream.Parser               as JS
+import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
-import           Data.Maybe                           (listToMaybe)
+import           Data.Maybe                           (fromMaybe)
+import qualified Data.Set                             as S
 import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
 import           Data.Word
--- import qualified Data.Set                             as S
 
 import qualified GHC.Generics                         as GHCG
 import           LabeledError
@@ -70,7 +73,7 @@ import           Text.Format
 import qualified Text.Colors                          as CL
 import           Text.Tools
 
-newtype ParentChainId = ParentChainId { unParentChainId :: Maybe Word256 }
+newtype ParentChainIds = ParentChainIds { unParentChainIds :: Map T.Text Word256 }
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
@@ -270,7 +273,7 @@ data UnsignedChainInfo = UnsignedChainInfo
   , accountInfo    :: [AccountInfo]
   , codeInfo       :: [CodeInfo]
   , members        :: ChainMembers
-  , parentChain    :: (Maybe Word256)
+  , parentChains   :: Map T.Text Word256
   , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
@@ -289,9 +292,6 @@ instance ToSchema AccountInfo where
 instance ToSchema ChainSignature where
 instance ToSchema UnsignedChainInfo where
 instance ToSchema ChainInfo where
---  declareNamedSchema _ = return $
---    NamedSchema (Just "ChainInfo")
---      ( mempty )
 
 instance Show UnsignedChainInfo where
   show UnsignedChainInfo{..} = unlines
@@ -301,7 +301,7 @@ instance Show UnsignedChainInfo where
     , tab' $ "Account info:   " ++ format accountInfo
     , tab' $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
     , tab' $ "Members:        " ++ show members
-    , tab' $ "Parent chain:   " ++ CL.yellow (format parentChain)
+    , tab' $ "Parent chains:  " ++ (show $ map (first T.unpack) $ M.toList parentChains)
     , tab' $ "Creation block: " ++ format creationBlock
     , tab' $ "Nonce:          " ++ CL.yellow (format chainNonce)
     , tab' $ "Metadata:       " ++ show (M.keys chainMetadata)
@@ -312,7 +312,7 @@ instance Format UnsignedChainInfo where
 
 data ChainInfo = ChainInfo
   { chainInfo      :: UnsignedChainInfo
-  , chainSignature :: (Maybe ChainSignature)
+  , chainSignature :: ChainSignature
   } deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format ChainInfo where
@@ -331,20 +331,22 @@ instance FromJSON ChainInfo where
     cs <- o .: "codeInfo"
     ms <- o .: "members"
     pc <- o .:? "parentChain"
+    mPcs <- o .:? "parentChains"
     cb <- o .: "creationBlock"
     cn <- o .: "nonce"
     md <- o .: "metadata"
-    sig <- o .:? "signature"
-    return $ ChainInfo (UnsignedChainInfo l as cs ms pc cb cn md) sig
+    sig <- o .: "signature"
+    let pcs = fromMaybe M.empty mPcs <> maybe M.empty (M.singleton "parent") pc
+    return $ ChainInfo (UnsignedChainInfo l as cs ms pcs cb cn md) sig
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON (ChainInfo (UnsignedChainInfo cl ai ci ms pc cb cn md) sig) =
+  toJSON (ChainInfo (UnsignedChainInfo cl ai ci ms pcs cb cn md) sig) =
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
            , "members" .= ms
-           , "parentChain" .= pc
+           , "parentChains" .= pcs
            , "creationBlock" .= cb
            , "nonce" .= cn
            , "metadata" .= md
@@ -361,7 +363,7 @@ instance RLPSerializable UnsignedChainInfo where
     , RLPArray $ map rlpEncode accountInfo
     , RLPArray $ map rlpEncode codeInfo
     , rlpEncode members
-    , rlpEncode parentChain
+    , rlpEncode parentChains
     , rlpEncode creationBlock
     , rlpEncode chainNonce
     , rlpEncode . M.mapKeys encodeUtf8 $ M.map encodeUtf8 chainMetadata
@@ -388,22 +390,23 @@ instance RLPSerializable ChainInfo where
       (rlpDecode $ xs !! 8)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 9 element RLPArray, got " ++ show o
 
-isAncestorChainOf :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> Maybe Word256 -> m Bool
+isAncestorChainOf :: A.Selectable Word256 ParentChainIds m => Maybe Word256 -> Maybe Word256 -> m Bool
 isAncestorChainOf Nothing  _       = pure True
 isAncestorChainOf (Just _) Nothing = pure False
 isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = pure True
-isAncestorChainOf ancestor descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
-  Nothing -> pure False
-  Just (ParentChainId parent) -> ancestor `isAncestorChainOf` parent
+isAncestorChainOf (Just ancestor) (Just descendent) = S.member ancestor <$> getAncestorChains descendent -- I don't feel like writing a more efficient function right now
 
-getAncestorChains :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> m [Maybe Word256]
-getAncestorChains Nothing  = pure [] -- needed in case we somehow have an entry for `Nothing` in the db
-getAncestorChains descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
-  Nothing -> pure [descendent]
-  Just (ParentChainId parent) -> (descendent:) <$> getAncestorChains parent
+getAncestorChains :: A.Selectable Word256 ParentChainIds m => Word256 -> m (S.Set Word256)
+getAncestorChains = uncurry go . (id &&& S.singleton)
+  where go descendent seen = A.select (A.Proxy @ParentChainIds) descendent >>= \case
+          Nothing -> pure seen
+          Just (ParentChainIds parents) ->
+            let parentSet = S.fromList $ M.elems parents
+                newSeen = seen <> parentSet
+             in foldrM go newSeen $ S.toList parentSet
 
-getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainId m => Int -> Maybe Word256 -> m (Maybe Word256)
-getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
+-- getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainIds m => Int -> Maybe Word256 -> m (Maybe Word256)
+-- getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
@@ -412,8 +415,7 @@ acctInfo :: JS.Parser AccountInfo
 acctInfo = JS.value
 
 whoSignedThisChainInfo :: ChainInfo -> Maybe Address
-whoSignedThisChainInfo (ChainInfo _ Nothing) = Nothing
-whoSignedThisChainInfo (ChainInfo u (Just (ChainSignature r s v))) =
+whoSignedThisChainInfo (ChainInfo u (ChainSignature r s v)) =
   let intToBSS = BSS.toShort . word256ToBytes
       sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (v - 0x1b))
       mesg = keccak256ToByteString $ rlpHash u

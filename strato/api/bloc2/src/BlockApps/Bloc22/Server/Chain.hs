@@ -161,7 +161,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
       msgHash = keccak256ToByteString $ rlpHash unsigned
   sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
-      chainInfo = ChainInfo unsigned (Just $ ChainSignature r s v)
+      chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
 
 withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>

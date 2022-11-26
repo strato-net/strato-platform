@@ -57,18 +57,18 @@ data CachedStorage = CS
   , _atx :: AMap
   , _abs :: AMap
   , _srm :: M.Map (Maybe Word256) MP.StateRoot
-  , _parentChainMap :: M.Map (Maybe Word256) ParentChainId
+  , _parentChainMap :: M.Map Word256 ParentChainIds
   } deriving (Generic)
 makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
-instance (Maybe Word256 `Alters` ParentChainId) StorM where
+instance (Word256 `Alters` ParentChainIds) StorM where
   lookup _ k    = use $ parentChainMap . at k
   insert _ k v  = parentChainMap . at k ?= v
   delete _ k    = parentChainMap . at k .= Nothing
 
-instance Selectable (Maybe Word256) ParentChainId StorM where
+instance Selectable Word256 ParentChainIds StorM where
   select = lookup
 
 instance HasMemRawStorageDB StorM where
@@ -235,8 +235,8 @@ storageSpec = do
 
   describe "resolveCodePtr" $ do
     it "should resolve direct code pointers" . runStorM $ do
-      let chainRelationships = [(Just (0 :: Word256), ParentChainId $ Nothing)]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let chainRelationships = [((0 :: Word256), ParentChainIds M.empty)]
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [Account 0xabc (Just 0)
                   , Account 0xdef (Just 0)]
       let codePtrs = [SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
@@ -245,10 +245,10 @@ storageSpec = do
       resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
       resolveCodePtr (Just 0) (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
     it "should resolve an ancestor code pointer" . runStorM $ do
-      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
-                                ,(Just (1 :: Word256), ParentChainId $ Just 0)
+      let chainRelationships = [ ((0 :: Word256), ParentChainIds M.empty)
+                                , ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [ Account 0xabc (Just 0)
                   , Account 0xdef (Just 1)
                   ]
@@ -258,10 +258,10 @@ storageSpec = do
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
     it "should resolve child-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
-                                ,(Just (1 :: Word256), ParentChainId $ Just 0)
+      let chainRelationships = [ ((0 :: Word256), ParentChainIds M.empty)
+                               , ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [ Account 0xabc (Just 0)
                   , Account 0xdef (Just 1)
                   ]
@@ -271,11 +271,11 @@ storageSpec = do
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Nothing
     it "should resolve sibling-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
-                                , (Just (1 :: Word256), ParentChainId $ Just 0)
-                                , (Just (2 :: Word256), ParentChainId $ Just 0)
+      let chainRelationships = [ ((0 :: Word256), ParentChainIds M.empty)
+                                , ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
+                                , ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [ Account 0xabc (Just 1)
                   , Account 0xdef (Just 2)
                   ]
@@ -285,11 +285,11 @@ storageSpec = do
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
     it "should resolve two-level (pointer to parent, parent to child) code pointer indirection to Nothing" . runStorM $ do
-      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
-                               , (Just (1 :: Word256), ParentChainId $ Just 0)
-                               , (Just (2 :: Word256), ParentChainId $ Just 0)
+      let chainRelationships = [ ((0 :: Word256), ParentChainIds M.empty)
+                               , ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
+                               , ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
                                ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [ Account 0xabc (Just 1)
                   , Account 0xdef (Just 0)
                   , Account 0xfff (Just 2)
@@ -300,10 +300,10 @@ storageSpec = do
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
     it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
-      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
-                               , (Just (1 :: Word256), ParentChainId $ Just 0)
+      let chainRelationships = [ ((0 :: Word256), ParentChainIds M.empty)
+                               , ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
                                ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts = [ Account 0xabc (Just 0)
                   , Account 0xdef (Just 0)
                   , Account 0xfff (Just 1)
