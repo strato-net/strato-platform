@@ -97,13 +97,15 @@ instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId 
   select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
   selectWithDefault _ (ChainFilterParams cIds lim ofs) = getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
 
+--- get an array of chains
 getChain :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m
          => [ChainId]
          -> Maybe Integer
          -> Maybe Integer
          -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain cIds mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLim mOff
-    
+
+
 postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChainConduit ci = do
     case processChainInfos [ci] of
