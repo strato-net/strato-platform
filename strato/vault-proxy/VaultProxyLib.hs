@@ -35,7 +35,8 @@ module VaultProxyLib
       VaultConnection(..),
       vaultUrl,
       vaultPassword,
-      vaultPort
+      vaultPort,
+      vaulty
     ) where
 
 import           Control.Concurrent.STM

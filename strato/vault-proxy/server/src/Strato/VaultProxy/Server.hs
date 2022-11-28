@@ -25,6 +25,7 @@ import           Strato.VaultProxy.DataTypes
 import           Strato.VaultProxy.RawOauth
 
 vaultProxy :: ServerT VaultProxyAPI VaultProxyM
+-- vaultProxy :: Int
 vaultProxy = getPing
           :<|> getKey
           :<|> postKey

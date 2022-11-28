@@ -22,12 +22,14 @@ import           Control.Monad.Trans.Reader
 import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
 import           Data.Cache.Internal      as C
+-- import           Data.Map                 as Map
 import           Data.Maybe
 -- import           Data.Proxy
 -- import qualified Data.Scientific         as Scientific
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
 -- import           GHC.Generics
+-- import           GHC.Conc
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
 -- import           Servant.API             as SA
@@ -53,8 +55,8 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
     uri <- URI.mkURI $ token_endpoint additionalOauth
     --Encode all of the parameters, get ready to send to server
     let (url, _) = fromJust (useHttpsURI $ uri)
-        authHeadr = header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-        contType = header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
+        authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server
     makeHttpCall <- runReq defaultHttpConfig $ do
@@ -101,35 +103,38 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
+vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
+vaulty vaultConn = getAwesomeToken tc cid csec rs ao
+    where
+        cid = oauthClientId vaultConn
+        csec = oauthClientSecret vaultConn
+        ao = additionalOauth vaultConn
+        rs = oauthReserveSeconds vaultConn
+        tc = tokenCache vaultConn
+
 --ask function will get the information from the ReaderT monad VaultProxyM
 getRawToken :: VaultProxyM T.Text
 getRawToken = do
-    cash <- ask tokenCache
-    cid <- ask oauthClientId
-    cs <- ask oauthClientSecret
-    rt <- ask oauthReserveSeconds
-    ao <- ask additionalOauth 
-    tok <- getAwesomeToken cash cid cs rt ao
+    vaultConn <- ask
+    tok <- vaulty vaultConn
     pure $ T.pack $ show tok
 
 getCurrentUser :: VaultProxyM T.Text
 getCurrentUser = do
-    cash <- ask tokenCache
-    cid <- ask oauthClientId
-    cs <- ask oauthClientSecret
-    rt <- ask oauthReserveSeconds
-    ao <- ask additionalOauth 
-    tok <- getAwesomeToken cash cid cs rt ao
-    let jwt = JWT.decode $ TE.encodeUtf8 $ access_token tok
-        claims = JWT.claims $ fromJust jwt
-        unreg = JWT.unregisteredClaims claims
-    --The word "prefered_username" might not be universal, but that is what we provide as of 11-22-2022
-    user <- lookupKey "preferred_username" unreg
-    pure $ T.pack user
+    vaultConn <- ask
+    tok <- vaulty vaultConn
+    let jwt = JWT.decode $ accessToken tok 
+        cl = JWT.claims $ fromJust jwt
+        user = iss cl
+    result <- case (user) of
+        Nothing -> error "User information from Oauth Provider is not readable."
+        Just u -> pure u
+    pure $ stringOrURIToText result
 
-lookupKey :: Eq v => v -> Map.Map k v -> [k]
-lookupKey val = Map.foldrWithKey go [] where
-  go key value found =
-    if value == val
-    then key:found
-    else found
+--Useful function for looking inside the JWT token
+-- lookupKey :: Eq v => v -> Map.Map k v -> [k]
+-- lookupKey val = Map.foldrWithKey go [] where
+--   go key value found =
+--     if value == val
+--     then key:found
+--     else found

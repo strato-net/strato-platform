@@ -10,80 +10,101 @@
 
 module Strato.VaultProxy.Server.Key where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.RWS.CPS
-import           Data.Text                        (Text)
+-- import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader        as RT
+-- import           Control.Monad.Trans.RWS.CPS
+-- import           Data.Text                         (Text)
+import           Network.HTTP.Req                  as R
 
-import           Servant.Client --needed for the bouncing service and runClientM
+-- import           Servant.Client --needed for the bouncing service and runClientM
 import           Strato.VaultProxy.API
+-- import           Strato.VaultProxy.Server
+-- import           Strato.VaultProxy.Server.Token    (vaulty)
 import           Strato.VaultProxy.Monad
-import           Strato.VaultProxy.API.Token       as Tok
-import           Strato.VaultProxy.DataTypes       as DT
+-- import           Strato.VaultProxy.API.Token       as Tok
+import           Strato.VaultProxy.DataTypes
+-- import           Data.ByteString                   (ByteString)
+-- import           Data.ByteString.Char8             as B
+import           Data.Maybe                        (fromJust)
+-- import           Data.IORef
+import           Data.Text                        as T
+import qualified Data.Text.Encoding               as TE
+-- import           GHC.Conc
+-- import           Network.HTTP.Client              as HTC
+-- import           Database.PostgreSQL.Simple       (Connection)
+-- import           Network.HTTP.Req                 as R
+-- import           Strato.VaultProxy.Crypto
+-- import           Strato.VaultProxy.Monad
+-- import           Strato.VaultProxy.DataTypes
+import           Strato.VaultProxy.Server.Token
+-- import           Servant.Client
+import qualified Text.URI                          as URI
+
 
 -- import           Hflags
 
 --Bounce that request
-getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey
--- getKey headerUserName queryParamUserName =   pure undefined
-getKey headerUsername queryParamUserName = do
+getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey --TODO: Make this able to avoid using providing anything (This should replace getCurrentKey)
+getKey headerUsername = do --not sure if queryParamUserName is needed (haven't seen it used)
+  --Get the VaultConnection information
   vaultConn <- ask
-  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
-  nk <- runClientM (Tok.getCurrentUser) (mkClientEnv mgr url)
-  nodeKey <- case (nk) of
-    Left err -> error $ "Failed to connect to the vault proxy to get the node's name " <> show err
-    Right key -> return key
-  kii <- liftIO $ runClientM (getKey nodeKey Nothing) (mkClientEnv mgr url)
-  key <- case kii of
-    Left err -> error $ "Error connecting to the shared vault: " ++ show err
-    Right k -> return k
-  pure key
-  --withSecretKey $ \key -> do
-  -- let userName = fromMaybe headerUserName queryParamUserName
-  -- (_ :: ByteString, nonce, encKey, _ :: Address) <- toUserError ("User " <> userName <> " doesn't exist")
-  --                              . vaultQuery1 $ getUserKeyQuery userName
-  -- case decryptSecKey key nonce encKey of
-  --   Nothing -> vaultWrapperError IncorrectPasswordError
-  --   Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
+  --Make the url for getting the key
+  let url = (vaultUrl vaultConn) <> "/key" <> "$username=" <> headerUsername
+  uri <- URI.mkURI url
+  --Make the other pieces that are needed to connect to the shared vault
+  let (ur,_) = fromJust (useHttpsURI $ uri)
+  --Get the jwt token from the vaultProxy
+  jwt <- vaulty vaultConn
+  --Make the jwt header to allow for the connecting of the foreign vault
+  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+  --make a req request to the shared vault
+  makeHttpCall <- runReq defaultHttpConfig $ do
+    response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr)
+    pure $ R.responseBody response
+  --Convert the response to the correct type automatically
+  pure makeHttpCall
 
-postKey :: Text -> VaultProxyM AddressAndKey
+postKey :: AddressAndKey -> VaultProxyM AddressAndKey
 -- postKey userName = pure undefined
-postKey userName = do 
+postKey addk = do 
+  --Get the VaultConnection information
   vaultConn <- ask
-  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
-  nk <- runClientM (Tok.getCurrentUser) (mkClientEnv mgr url)
-  nodeKey <- case (nk) of
-    Left err -> error $ "Failed to connect to the vault proxy to get the node's name " <> show err
-    Right key -> return key
-  kii <- runClientM (postKey nodeKey) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
-  key <- case kii of
-    Left err -> error $ "Error connecting to the shared vault: " ++ show err
-    Right k -> return k
-  pure key
-  -- withSecretKey $ \key -> do
-  -- keyStore@KeyStore{..} <- newKeyStore key
-  -- created <- vaultModify $ postUserKeyQuery userName keyStore
-  -- if not created
-  --   then vaultWrapperError $ UserError ("User " <> userName <> " already exists")
-  --   else case decryptSecKey key keystoreAcctNonce keystoreAcctEncSecKey of
-  --     Nothing -> vaultWrapperError IncorrectPasswordError
-  --     Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
-
+  --Make the url for getting the key
+  let url = (vaultUrl vaultConn) <> "/key"
+      urlEncodedPart = ReqBodyBs (TE.encodeUtf8 $ T.pack $ show addk)
+  uri <- URI.mkURI url
+  --Make the other pieces that are needed to connect to the shared vault
+  let (ur,_) = fromJust (useHttpsURI $ uri)
+  --Get the jwt token from the vaultProxy
+  jwt <- vaulty vaultConn
+  --Make the jwt header to allow for the connecting of the foreign vault
+  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+  --make a req request to the shared vault
+  makeHttpCall <- runReq defaultHttpConfig $ do
+    response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr)
+    pure $ R.responseBody response
+  --Convert the response to the correct type automatically
+  pure makeHttpCall
 
 -- Get an ECDH shared secret from the user's private key and a supplied public key
-getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
+getSharedKey :: PublicKey -> VaultProxyM SharedKey
 -- getSharedKey userName otherPub = pure undefined
-getSharedKey userName otherPub = do
+getSharedKey pub = do
+    --Get the VaultConnection information
   vaultConn <- ask
-  let (url,_,_,mgr,_,_,_,_,_,_,_,_,_,_,_) = vaultConn
-  kii <- runClientM (getSharedKey userName otherPub) (mkClientEnv mgr url) --TODO: need to figure out how to pass the vaultproxy config to this function instead of clientEnv
-  key <- case kii of
-    Left err -> error $ "Error connecting to the shared vault: " ++ show err
-    Right k -> return k
-  pure key
--- withSecretKey $ \key -> do
-  -- (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
-  --                         toUserError ("User " <> userName <> " doesn't exist")
-  --                         . vaultQuery1 $ getUserKeyQuery userName
-  -- case decryptSecKey key nonce encKey of
-  --   Nothing -> vaultWrapperError IncorrectPasswordError
-  --   Just pKey -> return $ deriveSharedKey pKey otherPub
+  --Make the url for getting the key
+  let url = (vaultUrl vaultConn) <> "/key"
+      -- urlEncodedPart = ReqBodyJson pub
+  uri <- URI.mkURI url
+  --Make the other pieces that are needed to connect to the shared vault
+  let (ur,_) = fromJust (useHttpsURI $ uri)
+  jwt <- vaulty vaultConn
+  --Make the jwt header to allow for the connecting of the foreign vault
+  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+      pubKeyHeadr = header "publicKey" (TE.encodeUtf8 $ T.pack $ show pub) --TODO: NOT CORRECT BUT WILL FIX LATER
+  --make a req request to the shared vault
+  makeHttpCall <- runReq defaultHttpConfig $ do
+    response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr <> pubKeyHeadr)
+    pure $ R.responseBody response
+  --Convert the response to the correct type automatically
+  pure makeHttpCall

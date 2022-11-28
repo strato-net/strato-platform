@@ -90,7 +90,7 @@ data VaultConnection = VaultConnection {
     vaultUrl :: T.Text,
     vaultPassword :: T.Text,
     vaultPort :: Int,
-    manger :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
+    httpManager :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
     oauthEnabled :: Bool,
     oauthUrl :: T.Text,
     oauthClientId :: T.Text,
