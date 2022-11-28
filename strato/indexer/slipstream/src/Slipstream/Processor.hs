@@ -456,14 +456,13 @@ processTheMessages env sqlEnv conn g messages = do
 
                 let htn = historyTableName o a n
                     historyTableNames = map (historyTableName o a) hl
-                    historyEnabled = htn `elem` historyTableNames
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
                 historyStatus <- historyStatusCreated g htn
                 when (not historyStatus) $ do
-                  -- history status is not defined, so set it to whether or not this is found in the history list
-                  setHistoryTable g htn historyEnabled
+                  -- creates a history table for all contracts in the CodeCollection
+                  setHistoryTable g htn True
 
                 hasHistoryTable <- isHistoric g htn
 
