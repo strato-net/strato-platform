@@ -27,9 +27,9 @@ import           Strato.VaultProxy.DataTypes
 
 
 --bounce the request to the vault
-postSignature :: MsgHash -> VaultProxyM Signature
+postSignature :: Text -> MsgHash -> VaultProxyM Signature
 -- postSignature userName (MsgHash msgBS) = pure undefined
-postSignature (MsgHash msgBS) = do
+postSignature userName (MsgHash msgBS) = do
   vaultConn <- ask
   --Make the url for getting the key
   let url = (vaultUrl vaultConn) <> "/postSignature"
@@ -42,9 +42,10 @@ postSignature (MsgHash msgBS) = do
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = R.header "Authorization" (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
+      userHeadr = R.header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 userName)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
-    response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr)
+    response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr <> userHeadr)
     pure $ R.responseBody response
   --Convert the response to the correct type automatically
   pure makeHttpCall
