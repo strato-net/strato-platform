@@ -23,7 +23,7 @@ import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
 -- import           Strato.VaultProxy.API.Token       as Tok
 import           Strato.VaultProxy.DataTypes
--- import           Data.ByteString                   (ByteString)
+-- import           Data.ByteString                  as B
 -- import           Data.ByteString.Char8             as B
 import           Data.Maybe                        (fromJust, fromMaybe)
 -- import           Data.IORef
@@ -65,14 +65,13 @@ getKey headerUsername queryParamUserName = do --not sure if queryParamUserName i
   --Convert the response to the correct type automatically
   pure makeHttpCall
 
-postKey :: AddressAndKey -> VaultProxyM AddressAndKey
+postKey :: Text -> VaultProxyM AddressAndKey
 -- postKey userName = pure undefined
-postKey addk = do 
+postKey username = do 
   --Get the VaultConnection information
   vaultConn <- ask
   --Make the url for getting the key
   let url = (vaultUrl vaultConn) <> "/key"
-      urlEncodedPart = ReqBodyBs (TE.encodeUtf8 $ T.pack $ show addk)
   uri <- URI.mkURI url
   --Make the other pieces that are needed to connect to the shared vault
   let (ur,_) = fromJust (useHttpsURI $ uri)
@@ -80,9 +79,10 @@ postKey addk = do
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+      userHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 username)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
-    response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr)
+    response <- R.req R.POST ur NoReqBody jsonResponse (authHeadr <> userHeadr)
     pure $ R.responseBody response
   --Convert the response to the correct type automatically
   pure makeHttpCall
