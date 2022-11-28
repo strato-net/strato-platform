@@ -95,14 +95,14 @@ getSharedKey username otherPub = do
   vaultConn <- ask
   --Make the url for getting the key
   let url = (vaultUrl vaultConn) <> "/key"
-      urlEncodedPart = ReqBodyJson pub
+      urlEncodedPart = ReqBodyJson otherPub
   uri <- URI.mkURI url
   --Make the other pieces that are needed to connect to the shared vault
   let (ur,_) = fromJust (useHttpsURI $ uri)
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = header "Authorization" ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
-      pubKeyHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 $ T.pack $ show pub) --TODO: NOT CORRECT BUT WILL FIX LATER
+      pubKeyHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 $ T.pack $ show username)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.GET ur urlEncodedPart jsonResponse (authHeadr <> pubKeyHeadr)
