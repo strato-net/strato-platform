@@ -640,7 +640,7 @@ insertBlock sha b = do
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
-                    (const True)
+                    (isJust . txChainId)
                     (obReceiptTransactions b)
         swapPayload otx = case otPrivatePayload otx of
                                 Nothing -> Nothing
