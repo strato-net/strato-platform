@@ -20,6 +20,7 @@ module Slipstream.Globals
     getSolidVMInfo,
     forceGlobalEval,
     newGlobals,
+    isHistoric,
     module Slipstream.Data.Globals
   ) where
 
@@ -93,6 +94,13 @@ getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColu
 getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
   return $ M.lookup tableName createdTables
+
+isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
+isHistoric globalsIORef name = do
+  Globals{..} <- readIORef globalsIORef
+  let h = M.findWithDefault False name historyList
+  $logInfoS "isHistoric" $ T.pack $ show name ++ ": " ++ show h
+  return h
 
 setHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> Bool -> m ()
 setHistoryTable g tableName b = do

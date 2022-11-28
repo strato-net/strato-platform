@@ -535,14 +535,16 @@ insertHistoryTable :: OutputM m
                    -> [ProcessedContract]
                    -> ConduitM () Text m ()
 insertHistoryTable _ [] = return () --no data, do nothing
-insertHistoryTable _ contracts@(x:_) = do
+insertHistoryTable globalsIORef contracts@(x:_) = do
   let tableName = historyTableName
           (organization x)
           (application x)
           (contractName x)
+  history <- isHistoric globalsIORef tableName
 
-  $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
-  yield $ insertHistoryTableQuery contracts
+  when history $ do
+    $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+    yield $ insertHistoryTableQuery contracts
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
