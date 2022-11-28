@@ -12,6 +12,7 @@ import           Control.Monad
 import           Data.Cache
 -- import           Data.IORef
 -- import           Data.Pool
+import qualified Data.Text                              as T
 import           HFlags
 import           GHC.Conc
 import           Network.HTTP.Client                    hiding (Proxy)
@@ -29,11 +30,15 @@ import           System.IO                              (BufferMode (..),
 
 import           BlockApps.Init
 import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
+import           Servant.Client
+-- import           Servant.Client.Core 
+
 import qualified Strato.VaultProxy.API                    as VaultProxy
 -- import qualified Strato.VaultProxy.Monad                  as VaultProxy
 import qualified Strato.VaultProxy.Server                 as VaultProxy
 import           Strato.VaultProxy.DataTypes              as VaultProxy
 import           Strato.VaultProxy.RawOauth               as RO
+
 
 import           Options
 
@@ -65,9 +70,9 @@ main = do
   rawoauth <- case flags_OAUTH_DISCOVERY_URL of
     "" -> error "No OAuth2 Discovery URL was provided"
     url -> do
-        ourl <- parseBaseUrl url
+        ourl <- parseBaseUrl (T.unpack url)
         rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
-        case rawOAuthInfo of
+        case rawOauthInfo of
             Left err -> error $ "Error connecting to the OAUTH server: " <> show err
             Right val -> return val
   let vaultConnection = VaultConnection {
