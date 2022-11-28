@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: strato-pv-claim
+  name: kafka-pvc
 spec:
   accessModes:
     - ReadWriteOnce

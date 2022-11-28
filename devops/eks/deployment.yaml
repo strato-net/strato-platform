@@ -243,13 +243,13 @@ spec:
           hostPath:
         - name: kafka-data
           persistentVolumeClaim:
-            claimName: kafka-pv-claim
+            claimName: kafka-pvc
         - name: redis-data
           persistentVolumeClaim:
-            claimName: redis-pv-claim
+            claimName: redis-pvc
         - name: zookeeper-data
           persistentVolumeClaim:
-            claimName: zookeeper-pv-claim
+            claimName: zookeeper-pvc
         - name: strato-data
           persistentVolumeClaim:
-            claimName: strato-pv-claim
+            claimName: strato-pvc

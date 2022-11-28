@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: prometheus-pv-claim
+  name: redis-pvc
 spec:
   accessModes:
     - ReadWriteOnce
