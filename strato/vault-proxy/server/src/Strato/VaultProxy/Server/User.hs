@@ -29,21 +29,22 @@ import           Strato.VaultProxy.Server.Token
 import qualified Text.URI                          as URI
 
 --Replace with the bouncer
-getUsers :: Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
+getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultProxyM [User]
 -- getUsers headerUsername mAddr mLimit mOffset = pure undefined
-getUsers mAddr mLimit mOffset = do
+getUsers userName mAddr mLimit mOffset = do
   --Get the VaultConnection information
   vaultConn <- ask
   jwt <- vaulty vaultConn
-  let url = (vaultUrl vaultConn) <> "/password" <> "$address=" <> (T.pack $ show mAddr) <> "&limit=" <> (T.pack $ show mLimit) <> "&offset=" <> (T.pack $ show mOffset)
+  let url = (vaultUrl vaultConn) <> "/users" <> "$address=" <> (T.pack $ show mAddr) <> "&limit=" <> (T.pack $ show mLimit) <> "&offset=" <> (T.pack $ show mOffset)
   uri <- URI.mkURI url
   --Make the other pieces that are needed to connect to the shared vault
   let (ur,_) = fromJust (useHttpsURI $ uri)
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = R.header (B.pack "Authorization") ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = R.header (B.pack "Authorization") (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
+      userHeadr = R.header (B.pack "X-USER-ACCESS-TOKEN") (TE.encodeUtf8 userName)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
-    response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr)
+    response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr <> userHeadr)
     pure $ R.responseBody response
   --Convert the response to the correct type automatically
   pure makeHttpCall
