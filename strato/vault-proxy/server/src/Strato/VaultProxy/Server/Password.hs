@@ -78,7 +78,7 @@ postPassword password = do
   --Get the jwt token from the vaultProxy
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = R.header (B.pack "Bearer") (TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = R.header (B.pack "Authorization") ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr)
@@ -127,7 +127,7 @@ verifyPassword = do
   let (ur,_) = fromJust (useHttpsURI $ uri)
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = R.header (B.pack "Bearer") (TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = R.header (B.pack "Authorization") ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr)

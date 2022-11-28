@@ -78,7 +78,7 @@ postKey username = do
   --Get the jwt token from the vaultProxy
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = header "Authorization" ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
       userHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 username)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
@@ -88,24 +88,24 @@ postKey username = do
   pure makeHttpCall
 
 -- Get an ECDH shared secret from the user's private key and a supplied public key
-getSharedKey :: PublicKey -> VaultProxyM SharedKey
+getSharedKey :: Text -> PublicKey -> VaultProxyM SharedKey
 -- getSharedKey userName otherPub = pure undefined
-getSharedKey pub = do
+getSharedKey username otherPub = do
     --Get the VaultConnection information
   vaultConn <- ask
   --Make the url for getting the key
   let url = (vaultUrl vaultConn) <> "/key"
-      -- urlEncodedPart = ReqBodyJson pub
+      urlEncodedPart = ReqBodyJson pub
   uri <- URI.mkURI url
   --Make the other pieces that are needed to connect to the shared vault
   let (ur,_) = fromJust (useHttpsURI $ uri)
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
-      pubKeyHeadr = header "publicKey" (TE.encodeUtf8 $ T.pack $ show pub) --TODO: NOT CORRECT BUT WILL FIX LATER
+  let authHeadr = header "Authorization" ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
+      pubKeyHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 $ T.pack $ show pub) --TODO: NOT CORRECT BUT WILL FIX LATER
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
-    response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr <> pubKeyHeadr)
+    response <- R.req R.GET ur urlEncodedPart jsonResponse (authHeadr <> pubKeyHeadr)
     pure $ R.responseBody response
   --Convert the response to the correct type automatically
   pure makeHttpCall

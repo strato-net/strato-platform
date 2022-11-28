@@ -41,7 +41,7 @@ postSignature (MsgHash msgBS) = do
   --Get the jwt token from the vaultProxy
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = R.header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = R.header "Authorization" ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr)
