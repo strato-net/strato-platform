@@ -25,7 +25,7 @@ getPing = do
   --Get the jwt token from the vaultProxy
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = R.header (B.pack "Authorization") ("Bearer " <> TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = R.header (B.pack "Authorization") (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr)
