@@ -39,9 +39,10 @@ import           Data.Default
 import           Data.Foldable                         (for_, toList, traverse_)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (fromJust, fromMaybe, isJust)
+import           Data.Maybe                            (fromJust, fromMaybe, isJust, catMaybes)
 import qualified Data.NibbleString                     as N
--- import qualified Data.Set                              as Set
+import           Data.Ranged
+import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
@@ -50,7 +51,7 @@ import           Data.Time.Clock
 import           Data.Traversable                      (for)
 
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate
+import           BlockApps.X509.Certificate            as X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
@@ -179,6 +180,7 @@ data TestContext = TestContext
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String PPeer
+  , _pointPPeerMap         :: Map Point PPeer
   , _pbftMessages          :: S.OSet Keccak256
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
@@ -189,6 +191,8 @@ data TestContext = TestContext
   , _timeoutChan           :: TMChan RoundNumber
   , _vmContext             :: MemContext
   , _apiChainInfoMap       :: Map Word256 ChainInfo
+  , _parsedSetMap          :: Map ChainMemberParsedSet [ChainMemberParsedSet]
+  , _parsedSetToX509Map    :: Map ChainMemberParsedSet X509CertInfoState
   }
 
 makeLenses ''TestContext
@@ -239,8 +243,20 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use trueOrgNameChainsMap
+instance (MonadIO m, MonadLogger m) => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
+  select p ip = do
+    res <- A.selectWithDefault p ip
+    pure $ toMaybe (TrueOrgNameChains Set.empty) res
+  selectWithDefault _ ip = do
+    let mems = Set.toList $ unChainMembers ip
+        cms = ChainMembers . Set.singleton <$> mems
+    trueMap <- use trueOrgNameChainsMap
+    let res = flip M.lookup trueMap <$> cms
+    pure $ TrueOrgNameChains $ Set.fromList $ concatMap (\tr -> 
+      case tr of
+        Just chains -> Set.toList $ unTrueOrgNameChains chains
+        Nothing -> []
+      )res
 
 instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
@@ -265,6 +281,9 @@ instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
 
 instance MonadIO m => Mod.Accessible BestBlockNumber (MonadTest m) where
   access _ = use bestBlockNumber
+
+instance Show TrueOrgNameChains where
+  show (TrueOrgNameChains unchain) = show unchain
 
 instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
   get _ = use actionTimestamp
@@ -311,9 +330,31 @@ instance MonadIO m => (String `A.Alters` PPeer) (MonadTest m) where
   insert _ ip p = do
     mPeer <- use $ stringPPeerMap . at ip
     case mPeer of
-      Nothing -> stringPPeerMap . at ip ?= p
-      Just oldPeer -> stringPPeerMap . at ip ?= oldPeer{pPeerPubkey = pPeerPubkey p, pPeerEnode = pPeerEnode p}
-  delete _ ip   = stringPPeerMap . at ip .= Nothing
+      Nothing -> do
+        stringPPeerMap . at ip ?= p
+        case pPeerPubkey p of
+          Nothing -> pure $ ()
+          Just k -> pointPPeerMap . at k ?= p
+      Just oldPeer -> do
+        stringPPeerMap . at ip ?= oldPeer{pPeerPubkey = pPeerPubkey p, pPeerEnode = pPeerEnode p}
+        case pPeerPubkey p of
+          Nothing -> pure $ ()
+          Just k -> pointPPeerMap . at k ?= oldPeer{pPeerPubkey = pPeerPubkey p, pPeerEnode = pPeerEnode p}
+  delete _ ip   = do
+    stringPPeerMap . at ip .= Nothing
+
+instance MonadIO m => (Point `A.Alters` PPeer) (MonadTest m) where
+  lookup _ p   = use $ pointPPeerMap . at p
+  insert _ _ _ = error "This should not be called."
+  delete _ _   = error "This should not be called."
+
+instance (MonadIO m, (Point `A.Alters` PPeer) m) => (Point `A.Alters` PPeer) (MonadP2PTest m) where
+  lookup p point = lift $ A.lookup p point
+  insert p point = lift . A.insert p point
+  delete p point = lift $ A.delete p point
+
+instance (MonadIO m, (Point `A.Alters` PPeer) m) => A.Selectable Point PPeer (MonadP2PTest m) where
+  select = A.lookup
 
 instance (Monad m, Stacks Block m) => Stacks Block (MonadP2PTest m) where
   takeStack a b = lift $ takeStack a b
@@ -323,6 +364,11 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
+
+instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
+  lookup _ _ = error "lookup P2P ChainMembers Word256" 
+  insert _ _ _ = error "insert P2P ChainMembers Word256" 
+  delete _ _ = error "delete P2P ChainMembers Word256" 
 
 instance (ChainMembers `A.Alters` Word256) m => (ChainMembers `A.Alters` Word256) (MonadP2PTest m) where
   lookup p k   = lift $ A.lookup p k
@@ -451,11 +497,6 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
-instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
-  insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
-  delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
-
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
   insert _ k v = sequencerContext . dbeRegistry . at k ?= v
@@ -517,6 +558,11 @@ instance HasVault m => HasVault (MonadP2PTest m) where
   sign bs = lift $ sign bs
   getPub = lift getPub
   getShared pub = lift $ getShared pub
+
+instance HasVault IO where
+  sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
@@ -982,6 +1028,31 @@ instance MonadIO m => A.Replaceable PPeer TcpEnableTime (MonadTest m) where
 instance (Monad m, A.Replaceable PPeer TcpEnableTime m) => A.Replaceable PPeer TcpEnableTime (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
+instance MonadIO m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadTest m) where
+  select _ cm = do
+    db <- use parsedSetMap
+    case cm of
+      CommonName _ _ _ _ -> do
+          pure $ Just [cm]
+      OrgUnit _ _ _ -> do
+          let mems = fromMaybe [] $ M.lookup cm db
+          pure $ Just mems
+      Org _ _ -> do
+          let units = fromMaybe [] $ M.lookup cm db
+              mems = concat $ catMaybes $ map (flip M.lookup db) units
+          pure $ Just mems
+      Everyone _ ->
+          pure $ Nothing
+
+instance (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadP2PTest m) where
+  select p cm = lift $ A.select p cm
+
+instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadTest m) where
+  select _ cm = M.lookup cm <$> use parsedSetToX509Map 
+
+instance (ChainMemberParsedSet `A.Selectable` X509CertInfoState) m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadP2PTest m) where
+  select p cm = lift $ A.select p cm
+
 instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
   access _ = do
     currentTime <- liftIO getCurrentTime
@@ -1044,6 +1115,9 @@ newSequencerContext bc = do
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
+      , _chainInfoRegistry   = M.empty
+      , _orgNameChainsRegistry = M.empty
+      , _x509certRegistry    = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -1083,6 +1157,7 @@ testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
   , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.fromList $ zip ((\(IPAsText t) -> T.unpack t) <$> bootNodes) $ (\(IPAsText t) -> buildPeer (Nothing, T.unpack t, 30303)) <$> bootNodes
+  , _pointPPeerMap         = M.empty
   , _pbftMessages          = S.empty
   , _unseqEvents           = []
   , _sequencerContext      = seqCtx
@@ -1093,6 +1168,8 @@ testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
   , _timeoutChan           = rNum
   , _vmContext             = vmCtx
   , _apiChainInfoMap       = M.empty
+  , _parsedSetMap          = M.empty
+  , _parsedSetToX509Map    = M.empty
   }
 
 data P2PPeer = P2PPeer
@@ -1271,24 +1348,37 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
                                     $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
-                                    -- AddMember (Right (cId, addr, enode)) -> do
-                                    --   chainMembersMap %= (\m -> case M.lookup cId m of
-                                    --     Nothing -> M.insert cId (ChainMembers $ M.singleton addr enode) m
-                                    --     Just (ChainMembers cm) -> M.insert cId (ChainMembers $ M.insert addr enode cm) m)
-                                    --   ipAddressIpChainsMap %= (\m -> case M.lookup (ipAddress enode) m of
-                                    --     Nothing -> M.insert (ipAddress enode) (IPChains $ Set.singleton cId) m
-                                    --     Just (IPChains s) -> M.insert (ipAddress enode) (IPChains $ Set.insert cId s) m)
-                                    --   orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
-                                    --     Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
-                                    --     Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
-                                    --   atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
-                                    -- RemoveMember (Right (cId, addr)) -> do
-                                    --   mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
-                                    --   chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
-                                    --   for_ mEnode $ \enode -> do
-                                    --     ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
-                                    --     orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
-                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
+                                    AddOrgName (Right (chainId, cm)) -> do
+                                      let org = ChainMembers $ Set.singleton cm
+                                          newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
+                                      chainMembersMap . at chainId %= \case
+                                        Nothing -> Just newMemRset
+                                        Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetUnion rset' newMem
+                                      trueOrgNameChainsMap %= (\m -> case M.lookup org m of
+                                          Nothing -> M.insert org (TrueOrgNameChains $ Set.singleton chainId) m
+                                          Just (TrueOrgNameChains s) -> M.insert org (TrueOrgNameChains $ Set.insert chainId s) m
+                                        )
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
+                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
+                                    RegisterCertificate (Right (_, addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
+                                      let setOrg = Org (T.pack o) True
+                                          setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
+                                          setCommonName = CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+                                      parsedSetMap %= (\m -> case ((M.lookup setOrg m), (M.lookup setOrgUnit m)) of
+                                        (Just _, Just mems) -> case setCommonName `elem` mems of
+                                            True -> m
+                                            False -> M.insert setOrgUnit (mems ++ [setCommonName]) m
+                                        (Just units, Nothing) -> do
+                                          let stageOne = M.insert setOrg (units ++ [setOrgUnit]) m
+                                          M.insert setOrgUnit [setCommonName] stageOne
+                                        (Nothing, Just _) -> m
+                                        (Nothing, Nothing) -> do
+                                          let stageOne = M.insert setOrg [setOrgUnit] m
+                                          M.insert setOrgUnit [setCommonName] stageOne
+                                        )
+                                      x509certMap %= M.insert addr certState
+                                      let theParsedSet = CommonName ((T.pack . X509.orgName) certState) (T.pack $ fromMaybe "Nothing" $ X509.orgUnit certState) ((T.pack . X509.commonName) certState) True
+                                      parsedSetToX509Map %= M.insert theParsedSet certState
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
