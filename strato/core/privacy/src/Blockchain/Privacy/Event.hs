@@ -424,9 +424,7 @@ hydratePrivateHashes chainF b = do
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
-  
-
-  txs'' <- for (zip txs txs') $ \(tx,tx') -> bool tx' tx <$> (return True)
+  txs'' <- for (zip txs txs') $ \(tx,tx') -> bool tx' tx <$> discluded newDiscludes (txChainId tx')
 
   unless (null depTXs) $ do
     logF . concat $
