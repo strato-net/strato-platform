@@ -25,7 +25,7 @@ import           Strato.VaultProxy.Monad
 import           Strato.VaultProxy.DataTypes
 -- import           Data.ByteString                   (ByteString)
 -- import           Data.ByteString.Char8             as B
-import           Data.Maybe                        (fromJust)
+import           Data.Maybe                        (fromJust, fromMaybe)
 -- import           Data.IORef
 import           Data.Text                        as T
 import qualified Data.Text.Encoding               as TE
@@ -45,18 +45,19 @@ import qualified Text.URI                          as URI
 
 --Bounce that request
 getKey :: Text -> Maybe Text -> VaultProxyM AddressAndKey --TODO: Make this able to avoid using providing anything (This should replace getCurrentKey)
-getKey headerUsername = do --not sure if queryParamUserName is needed (haven't seen it used)
+getKey headerUsername queryParamUserName = do --not sure if queryParamUserName is needed (haven't seen it used)
+  let userName = fromMaybe headerUsername queryParamUserName
   --Get the VaultConnection information
   vaultConn <- ask
   --Make the url for getting the key
-  let url = (vaultUrl vaultConn) <> "/key" <> "$username=" <> headerUsername
+  let url = (vaultUrl vaultConn) <> "/key" <> "$username=" <> userName
   uri <- URI.mkURI url
   --Make the other pieces that are needed to connect to the shared vault
   let (ur,_) = fromJust (useHttpsURI $ uri)
   --Get the jwt token from the vaultProxy
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
-  let authHeadr = header "Bearer" (TE.encodeUtf8 $ T.pack $ show jwt)
+  let authHeadr = header "Authorization" ("Bearer " <> (TE.encodeUtf8 $ T.pack $ show jwt))
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr)
