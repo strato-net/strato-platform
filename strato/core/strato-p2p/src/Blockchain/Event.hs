@@ -16,7 +16,6 @@ module Blockchain.Event (
   handleEvents,
   handleGetChainDetails,
   checkPeerIsMember,
-  checkPeerIsMember', -- For testing
   certOrgTuple,
   ) where
 
