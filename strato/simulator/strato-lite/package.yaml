@@ -79,6 +79,7 @@ library:
   - network
   - nibblestring
   - ordered-containers
+  - Ranged-sets
   - raw-strings-qq
   - secp256k1-haskell
   - seqevents
