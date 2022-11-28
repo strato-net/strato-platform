@@ -63,6 +63,8 @@ module Blockchain.Context
     , withActivePeer
     , getPeerX509
     , getPeerByParsedSet
+    , getPeersByParsedSets
+    , toMaybe
     ) where
 
 
@@ -324,6 +326,12 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
 
+instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertFromParsedSet
+
+instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getChainMembersFromSet 
+
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
   lookup _  k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
@@ -511,7 +519,6 @@ type MonadP2P m = ( MonadIO m
                   , All '[Mod.Accessible]
                       '[ MaxReturnedHeaders
                        , ConnectionTimeout
-                       , RBDB.RedisConnection
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
@@ -532,6 +539,8 @@ type MonadP2P m = ( MonadIO m
                        , '((IPAsText, UDPPort, B.ByteString), Point)
                        , '(IPAsText, PPeer)
                        , '(Point, PPeer)
+                       , '(ChainMemberParsedSet, X509CertInfoState)
+                       , '(ChainMemberParsedSet, [ChainMemberParsedSet])
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)
@@ -621,9 +630,16 @@ getPeerX509 peer = case pPeerPubkey peer of
   Nothing -> pure Nothing
   Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
 
+getPeersByParsedSets :: (MonadP2P m) => ChainMemberParsedSet -> m [Maybe PPeer]
+getPeersByParsedSets org = do
+  mems <- A.select (Proxy @[ChainMemberParsedSet]) org
+  case mems of
+    Nothing -> pure $ [Nothing]
+    Just c -> traverse getPeerByParsedSet c
+
 getPeerByParsedSet :: (MonadP2P m) => ChainMemberParsedSet -> m (Maybe PPeer)
-getPeerByParsedSet member = do
-  cert <- RBDB.withRedisBlockDB (RBDB.getCertFromParsedSet member) 
+getPeerByParsedSet mem = do
+  cert <- A.select (Proxy @X509CertInfoState) mem
   case cert of
       Nothing -> pure $ Nothing
       Just c -> do
