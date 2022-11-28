@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -20,19 +21,13 @@ import           Data.Traversable                  (for)
 import qualified Data.Map.Strict                   as M
 import           Data.Maybe                        (fromMaybe)
 import qualified Data.Text                         as T
-import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode            
 import qualified Blockchain.Data.TXOrigin          as Origin
 import           Blockchain.Sequencer.Event
 import           Strato.Lite.Rest.Api
 import           Strato.Lite.Monad
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Servant
-import           Text.RawString.QQ
 import           UnliftIO                          hiding (Handler)
 
 getNodes :: NetworkManager -> Handler ThreadResultMap
@@ -57,24 +52,6 @@ getChainInfo mgr nodeLabel = liftIO . atomically $ do
   ctxt <- (CCS.readTVarSTM . _p2pTestContext) theNode
   let chainInfo = (Just . Left) $ show $ ctxt ^. chainInfoMap
       res = M.singleton nodeLabel chainInfo
-  pure $ res
-
-getEnode :: NetworkManager -> T.Text -> Handler ThreadResultMap
-getEnode mgr nodeLabel = do
-  mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
-  let mPeer' = fromMaybe (error "Node not found.") mPeer
-      enodeString = showEnode $ fromMaybe (error "Enode not found.") $ (pPeerEnode . _p2pPeerPPeer) mPeer' 
-      enodeString' = (Just . Left) enodeString
-      res = M.singleton nodeLabel enodeString'
-  pure $ res
-
-getAddress :: NetworkManager -> T.Text -> Handler ThreadResultMap
-getAddress mgr nodeLabel = liftIO $ atomically $ do
-  ths <- readTVar $ mgr ^. network
-  let theNode = fromMaybe (error "Node not found.") $ M.lookup nodeLabel $ ths ^. nodes
-  ctxt <- (CCS.readTVarSTM . _p2pTestContext) theNode
-  let peaKey = (show . fromPrivateKey . _prvKey) ctxt
-      res = M.singleton nodeLabel $ (Just . Left) peaKey
   pure $ res
 
 getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
@@ -110,52 +87,13 @@ postTx mgr nodeLabel (PostTxParams tx md) = do
     ts <- liftIO $ getCurrentMicrotime
     let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
         ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
-    postEvent ev peer
-
-postBootChain :: NetworkManager -> Handler ()
-postBootChain mgr = do
-  bootNode <- fmap (M.lookup "Boot" . _nodes) . readTVarIO $ mgr ^. network
-  -- nodeOne <- fmap (M.lookup "Node1" . _nodes) . readTVarIO $ mgr ^. network
-  -- nodeThree <- fmap (M.lookup "Node3" . _nodes) . readTVarIO $ mgr ^. network
-  let contractName = "A"
-      src = [r|
-pragma solidvm 3.2;
-contract A {
-  event MemberAdded(address addr, string enode);
-  constructor () {
-  }
-  function addMember(address _addr, string _enode) {
-    emit MemberAdded(_addr, _enode);
-  }
-}
-|]
-      bootNode' = fromMaybe (error "Node not found.") bootNode
-  bootNodeCtxt <- atomically $ (CCS.readTVarSTM . _p2pTestContext) bootNode'
-  let bootPrvKey = _prvKey bootNodeCtxt
-      bootEnode = fromMaybe (error "Enode not found.") $ (pPeerEnode . _p2pPeerPPeer) bootNode' 
-      chainInfo' = ChainInfo
-              UnsignedChainInfo { chainLabel     = "My test chain!"
-                                , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
-                                                   , NonContract (fromPrivateKey bootPrvKey) 1000000000000000000000
-                                                   ]
-                                , codeInfo       = [CodeInfo "" src $ (Just . T.pack) contractName]
-                                , members        = M.fromList [((fromPrivateKey bootPrvKey), bootEnode)]
-                                , parentChain    = Nothing
-                                , creationBlock  = zeroHash
-                                , chainNonce     = 123456789
-                                , chainMetadata  = M.singleton "VM" "SolidVM"
-                                }
-              Nothing
-      chainId = keccak256ToWord256 $ rlpHash chainInfo'
-  liftIO $ flip postEvent bootNode' $ UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')  
+    postEvent ev peer  
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
        getNodes mgr
   :<|> getConnections mgr
   :<|> getChainInfo mgr
-  :<|> getEnode mgr
-  :<|> getAddress mgr
   :<|> getPeers mgr
   :<|> postAddNode mgr
   :<|> postRemoveNode mgr
@@ -163,7 +101,6 @@ stratoLiteRestServer mgr =
   :<|> postRemoveConnection mgr
   :<|> postTimeout mgr
   :<|> postTx mgr
-  :<|> postBootChain mgr
 
 stratoLiteRestApp :: NetworkManager -> Application
 stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer

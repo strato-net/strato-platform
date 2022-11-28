@@ -28,8 +28,6 @@ type ThreadResultMap = M.Map T.Text (Maybe (Either String ()))
 type StratoLiteRestAPI = GetNodes
                     :<|> GetConnections
                     :<|> GetChainInfo
-                    :<|> GetEnode
-                    :<|> GetAddress
                     :<|> GetPeers
                     :<|> PostAddNode
                     :<|> PostRemoveNode
@@ -37,17 +35,12 @@ type StratoLiteRestAPI = GetNodes
                     :<|> PostRemoveConnection
                     :<|> PostTimeout
                     :<|> PostTx
-                    :<|> PostBootChain
 
 type GetNodes = "nodes" :> Get '[JSON] ThreadResultMap
 type GetPeers = "nodes" :> Capture "nodeLabel" T.Text :> "peers" :> Get '[JSON] [T.Text]
 type GetConnections = "connections" :> Get '[JSON] ThreadResultMap
 type GetChainInfo = "chainInfo" :> Capture "nodeLabel" T.Text
                                 :> Get '[JSON] ThreadResultMap
-type GetEnode = "enode" :> Capture "nodeLabel" T.Text
-                        :> Get '[JSON] ThreadResultMap
-type GetAddress = "address" :> Capture "nodeLabel" T.Text
-                        :> Get '[JSON] ThreadResultMap
 type PostAddNode = "node" :> Capture "nodeLabel" T.Text 
                           :> "add"
                           :> ReqBody '[JSON] AddNodeParams
@@ -91,8 +84,6 @@ type PostTx = "node" :> Capture "nodeLabel" T.Text :> "tx" :> ReqBody '[JSON] Po
 -- type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
 -- type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
 -- type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
-
-type PostBootChain = "chain" :> Post '[JSON] ()
 
 stratoLiteRestAPI :: Proxy StratoLiteRestAPI
 stratoLiteRestAPI = Proxy
