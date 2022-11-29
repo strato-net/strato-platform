@@ -15,7 +15,6 @@ import           Control.Monad
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
-import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
@@ -221,10 +220,9 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                   ""
                                   ""
                                   SolidVM
-                                  -- AccountDiff -> storage d -> StorageDiff -> EVMDiff | SolidVMDiff
                                   (case storage d of
                                     SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
-                                    EVMDiff _ -> error "EVMDiff not supported")
+                                    EVMDiff m -> A.EVMDiff $ Map.map fromDiff m)
                                   [A.Create]
             , A._metadata = getMetadata ch
             , A._events = S.empty
@@ -234,7 +232,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                       EVMCode ch' -> ch'
                       SolidVMCode _ ch' -> ch'
                       CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
-          fromDiff :: Diff B.ByteString 'Eventual -> B.ByteString
+          fromDiff :: Diff a 'Eventual -> a
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
       $logInfoS "initgen" $ T.pack $ "##################### fullAddrStates" ++ show fullAddrStates

@@ -252,7 +252,7 @@ genesisInfoToGenesisBlock :: ( MonadLogger m
 genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    initializeCodeDB "EVM" codes
+    initializeCodeDB "SolidVM" codes
     initializeStateDBAndAccountInfos (Nothing :: Maybe Word256) accounts gn
     sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
