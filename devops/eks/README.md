@@ -12,19 +12,12 @@ kubectl delete deployment strato-platform
 
 **Note that** *strato-platform* above is the name of the deployment.
 
-# Create Persistence Volumes
-kubectl apply -f kafka-pv.yaml
-kubectl apply -f prometheus-pv.yaml
-kubectl apply -f redis-pv.yaml
-kubectl apply -f strato-pv.yaml
-kubectl apply -f zookeeper-pv.yaml
-
 # Create Persistence Volume Claims
-kubectl apply -f kafka-pv-claim.yaml
-kubectl apply -f prometheus-pv-claim.yaml
-kubectl apply -f redis-pv-claim.yaml
-kubectl apply -f strato-pv-claim.yaml
-kubectl apply -f zookeeper-pv-claim.yaml
+kubectl apply -f kafka-pvc.yaml
+kubectl apply -f prometheus-pvc.yaml
+kubectl apply -f redis-pvc.yaml
+kubectl apply -f strato-pvc.yaml
+kubectl apply -f zookeeper-pvc.yaml
 
 # Create New Deployment
 kubectl apply -f deployment.yaml 
