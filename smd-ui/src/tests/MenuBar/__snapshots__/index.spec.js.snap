@@ -28,7 +28,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
       <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
       </Link>
     </div>
   </div>
@@ -96,7 +96,7 @@ exports[`MenuBar: index renders non Oauth mode component with values 1`] = `
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
       <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
       </Link>
     </div>
   </div>
@@ -149,7 +149,7 @@ exports[`MenuBar: index renders non Oauth mode component without values 1`] = `
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
       <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
       </Link>
     </div>
   </div>

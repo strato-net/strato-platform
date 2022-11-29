@@ -70,10 +70,10 @@ import qualified LabeledError
 -------------------- THE NEWTYPE WRAPPERS ------------------------
 ------------------------------------------------------------------
 
-newtype PublicKey = PublicKey S.PubKey deriving (Show, Eq)
-newtype PrivateKey = PrivateKey S.SecKey deriving (Show, Eq)
-newtype SharedKey = SharedKey B.ByteString deriving (Show, Eq) 
-newtype Signature = Signature S.CompactRecSig 
+newtype PublicKey  = PublicKey  S.PubKey      deriving (Show, Eq)
+newtype PrivateKey = PrivateKey S.SecKey      deriving (Show, Eq)
+newtype SharedKey  = SharedKey  B.ByteString  deriving (Show, Eq) 
+newtype Signature  = Signature  S.CompactRecSig 
   deriving          (Show, Eq, Generic)
   deriving newtype  (NFData)
 

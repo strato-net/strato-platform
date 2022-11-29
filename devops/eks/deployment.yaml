@@ -18,14 +18,14 @@ spec:
         app: strato-platform
     spec:
       containers:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.6.0
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.9.0-46441c30f
         name: smd
         env:
         - name: NODE_NAME
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.6.0
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.9.0-46441c30f
         name: apex
         env:
         - name: NODE_HOST
@@ -46,8 +46,12 @@ spec:
         - name: STRATO_PORT_VAULT_PROXY
       - image: redis:3.2
         name: redis
-        command:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.6.0
+        command: ["redis-server"]
+        args: ["--appendonly", "yes"]
+        volumeMounts:
+          - mountPath: /data
+            name: redis-data
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.9.0-46441c30f
         name: strato
         ports:
           - containerPort: 30303
@@ -102,7 +106,12 @@ spec:
           value: "false"
         - name: USE_OLD_STRATO_API
           value : "true"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.6.0
+        - name: validatorBehavior
+          value: "true"
+        volumeMounts:
+          - mountPath: /var/lib/strato
+            name: strato-data
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.9.0-46441c30f
         name: postgrest
         env:
         - name: blocHost
@@ -126,14 +135,14 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.6.0
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-46441c30f
         name: nginx
         ports:
           - containerPort: 80
           - containerPort: 443
         env:
         - name: APEX_HOST
-          value: "localhost:3001"
+          value: "localhost:3009"
         - name: blockstanbul
           value: "true"
         - name: DOCS_HOST
@@ -168,6 +177,9 @@ spec:
           value: "localhost:8013"
       - image: wurstmeister/zookeeper:3.4.6
         name: zookeeper
+        volumeMounts:
+          - mountPath: /opt/zookeeper-3.4.6/data
+            name: zookeeper-data
       - image: wurstmeister/kafka:1.1.0
         name: kafka
         env:
@@ -193,12 +205,18 @@ spec:
           value: "100663296"
         - name: KAFKA_MESSAGE_MAX_BYTES
           value: "100663296"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.6.0
+        volumeMounts:
+          - mountPath: /kafka
+            name: kafka-data
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.9.0-46441c30f
         name: prometheus
         env:
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.6.0
+        volumeMounts:
+          - mountPath: /prometheus
+            name: prometheus-data
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.9.0-46441c30f
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout
@@ -220,3 +238,14 @@ spec:
         env:
         - name: API_URL
           value: "/strato-api/eth/v1.2/swagger.json"
+      volumes:
+        - name: prometheus-data
+          hostPath:
+        - name: kafka-data
+          hostPath:
+        - name: redis-data
+          hostPath:
+        - name: strato-data
+          hostPath:
+        - name: zookeeper-data
+          hostPath:

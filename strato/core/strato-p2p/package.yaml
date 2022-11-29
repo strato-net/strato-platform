@@ -71,6 +71,7 @@ library:
     - persistent
     - prometheus-client
     - random
+    - Ranged-sets
     - resourcet
     - seqevents
     - servant-client
@@ -91,48 +92,49 @@ library:
     - x509-certs
 
 
-# tests:
-#   strato-p2p-client-test:
-#     source-dirs: test
-#     ghc-options: -Wall -Werror -dynamic
-#     main: Main.hs
-#     dependencies:
-#       - QuickCheck
-#       - base16-bytestring
-#       - blockapps-datadefs
-#       - blockapps-mpdbs
-#       - blockapps-privacy
-#       - blockstanbul
-#       - bytestring
-#       - conduit
-#       - containers
-#       - data-default
-#       - debugger
-#       - ethereum-discovery
-#       - ethereum-rlp
-#       - hflags
-#       - hspec
-#       - hspec-expectations-lifted
-#       - hourglass
-#       - labeled-error
-#       - lens
-#       - merkle-patricia-db
-#       - monad-alter
-#       - mtl
-#       - nibblestring
-#       - ordered-containers
-#       - raw-strings-qq
-#       - secp256k1-haskell
-#       - seqevents
-#       - stm-chans
-#       - stm-conduit
-#       - strato-index
-#       - strato-model
-#       - strato-p2p
-#       - strato-sequencer
-#       - text
-#       - unliftio
-#       - vm-runner
-#       - vm-tools
-#       - x509-certs
+tests:
+  strato-p2p-client-test:
+    source-dirs: test
+    ghc-options: -Wall -Werror -dynamic
+    main: Main.hs
+    dependencies:
+      - QuickCheck
+      - base16-bytestring
+      - blockapps-datadefs
+      - blockapps-mpdbs
+      - blockapps-privacy
+      - blockstanbul
+      - bytestring
+      - conduit
+      - containers
+      - data-default
+      - debugger
+      - ethereum-discovery
+      - ethereum-rlp
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - hourglass
+      - labeled-error
+      - lens
+      - merkle-patricia-db
+      - monad-alter
+      - mtl
+      - nibblestring
+      - ordered-containers
+      - Ranged-sets
+      - raw-strings-qq
+      - secp256k1-haskell
+      - seqevents
+      - stm-chans
+      - stm-conduit
+      - strato-index
+      - strato-model
+      - strato-p2p
+      - strato-sequencer
+      - text
+      - unliftio
+      - vm-runner
+      - vm-tools
+      - x509-certs
   

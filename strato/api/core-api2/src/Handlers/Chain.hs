@@ -36,10 +36,11 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Control.Lens
 import           Conduit
-import qualified Data.Map                       as M
+-- import qualified Data.Map                       as M
 import           Data.Maybe                     (fromMaybe)
 import           Data.Swagger
 import qualified Data.Text                      as T
+import qualified Data.Set                       as S
 import           Servant
 import           Servant.Client
 
@@ -52,6 +53,7 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), Ingest
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.TypeLits
 import           Control.Monad.Composable.SQL
 import           SQLM
@@ -95,13 +97,15 @@ instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId 
   select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
   selectWithDefault _ (ChainFilterParams cIds lim ofs) = getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
 
+--- get an array of chains
 getChain :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m
          => [ChainId]
          -> Maybe Integer
          -> Maybe Integer
          -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain cIds mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLim mOff
-    
+
+
 postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChainConduit ci = do
     case processChainInfos [ci] of
@@ -152,7 +156,7 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
   \(i, gen@(ChainInfo (UnsignedChainInfo _ acin _ mb _ _ _ _) _)) -> do
     -- add more checks?
     when (length acin == 0) $ Left (i,"account info is empty")
-    when (M.size mb == 0) $ Left (i, "member list is empty")
+    when ((S.size $ unChainMembers mb) == 0) $ Left (i, "member list is empty")
     let cid = rlpHash gen
     return . ChainId $ keccak256ToWord256 cid
 
