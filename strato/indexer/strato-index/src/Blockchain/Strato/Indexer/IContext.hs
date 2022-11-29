@@ -36,11 +36,9 @@ import qualified Data.Text                       as T
 import           BlockApps.Logging
 import           Blockchain.Data.Block           (BestBlock(..), Private(..))
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB     (putChainInfo)
 import           Blockchain.Data.Transaction     (insertTX)
-import           Blockchain.Data.ValidatorRef
 import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
@@ -52,7 +50,6 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Kafka
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -95,11 +92,6 @@ instance (Word256 `A.Alters` API ChainInfo) IContextM where
   lookup _ _               = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
   delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
-
-instance (([Address], [Address]) `A.Alters` API ValidatorRef) IContextM where
-  lookup _ _               = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
-  delete _ _               = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
-  insert _ addrs _    = void . lift $ addRemoveValidator addrs
 
 instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
   lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
@@ -149,15 +141,6 @@ instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
                . RBDB.putChainMembers cId --Uses RedisChainMembers which messes things up
               --  . unChainMembers
                . unP2P
---TODO
--- instance (Word256 `A.Alters` P2P Address) IContextM where
---   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
---   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
---   insert _ cId = void
---                . RBDB.withRedisBlockDB
---                . RBDB.putChainMembers cId
---                . unChainMembers
---                . unP2P
 
 pgPoolSize :: Int
 pgPoolSize = 20

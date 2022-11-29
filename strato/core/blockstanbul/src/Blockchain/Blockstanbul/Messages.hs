@@ -161,7 +161,6 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
-              | ListOfValidators [Address] [Address] --Left list is remove right list is add to current validator list
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
@@ -190,8 +189,6 @@ instance Format OutEvent where
   format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
   format (VoteResponse resp) = "VoteResponse " ++ show resp
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
-  format (ListOfValidators _ _) = "NewValidators "
-
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -228,7 +225,6 @@ outShortLog loc eoev = do
       PendingVote r d s-> prefix ++ CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
       VoteResponse resp -> prefix ++ CL.blue "VOTE_RESPONSE " ++ show resp
       NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
-      ListOfValidators  _ _ -> prefix ++ CL.blue "New Validator(s)"
 
 instance NFData OutEvent
 
