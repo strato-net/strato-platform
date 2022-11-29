@@ -23,11 +23,13 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           BlockApps.Logging
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class      (blockHash)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -48,6 +50,7 @@ indexAPI :: ( MonadLogger m
             , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
             , (Keccak256 `A.Alters` API OutputBlock) m
+            , (([Address],[Address]) `A.Alters` API ValidatorRef) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do

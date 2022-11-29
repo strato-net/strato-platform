@@ -110,6 +110,9 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions  -> "pt:"
             PrivateTxsInBlocks   -> "pb:"
             PrivateOrgNameChains -> "pnc:"
+            -- Validators           -> "v:"
+            PrivateTrueOrgNameChains -> "pnct:"
+            PrivateFalseOrgNameChains -> "pncf:"
             X509Certificates     -> "x509:"
             X509Initialized      -> "x509init:"
 
@@ -122,6 +125,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
+  -- "v" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
@@ -135,8 +139,8 @@ findNamespace key = case S8.takeWhile (/= ':') key of
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
 getChainInfo cId = getInNamespace PrivateChainInfo cId >>= \case
-    Left _             -> return Nothing
-    Right Nothing      -> return Nothing
+    Left _              -> return Nothing
+    Right Nothing       -> return Nothing
     Right (Just rcInfo) -> let (RedisChainInfo cInfo) = fromValue rcInfo in
         return $ Just cInfo
 
@@ -151,6 +155,18 @@ putChainInfo cId cInfo = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
+
+-- putValidator :: Word256
+--           -> ValidatorRef
+--           -> Redis (Either Reply Status)
+-- putChainInfo cId cInfo = do --validator
+--     let rChain    = RedisValidatorRef validator
+
+--     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
+--     case res of
+--         TxSuccess _ -> pure $ Right Ok
+--         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
+--         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
                 -> Redis ChainMemberRSet

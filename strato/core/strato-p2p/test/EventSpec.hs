@@ -469,7 +469,7 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => HasVaultProxy (MonadTest m) where
+instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
@@ -482,7 +482,7 @@ instance MonadIO m => HasVaultProxy (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
-instance HasVaultProxy m => HasVaultProxy (MonadP2PTest m) where
+instance HasVault m => HasVault (MonadP2PTest m) where
   sign bs = lift $ sign bs
   getPub = lift getPub
   getShared pub = lift $ getShared pub
@@ -724,6 +724,11 @@ instance MonadIO m => (Word256 `A.Alters` API ChainInfo) (MonadTest m) where
   insert _ k (API v) = apiChainInfoMap . at k ?= v
 
 instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
+instance MonadIO m => (([Address], [Address])  `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
   lookup _ _   = pure Nothing
   delete _ _   = pure ()
   insert _ _ _ = pure ()
@@ -1164,12 +1169,12 @@ mkSignedTx privKey utx =
                    , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
                    }
 
-instance HasVaultProxy IO where
+instance HasVault IO where
   sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
-instance HasVaultProxy (ReaderT PrivateKey IO) where
+instance HasVault (ReaderT PrivateKey IO) where
   sign bs = ask >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
