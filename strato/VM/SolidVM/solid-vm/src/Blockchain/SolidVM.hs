@@ -27,24 +27,25 @@ import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens                  hiding (from, assign, to, Context)
 import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Extra                  (fromMaybeM, findM)
+import           Control.Monad                        
+import           Control.Monad.Extra                  (fromMaybeM)
+--import           Control.Monad.Extra                  (when, unless, join, fromMaybeM, findM, foldM, forM_, <=< )
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Catch                  as EUnsafe
 import           Control.Monad.Trans.Maybe
 import           Data.Bits
-import           Data.Typeable
+--import           Data.Typeable
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
-import qualified Data.ByteString.UTF8                 as UTF8
-import qualified Numeric                              (readHex)
-import           Data.ByteString.Internal             (c2w)
+--import qualified Data.ByteString.UTF8                 as UTF8
+--import qualified Numeric                              (readHex)
+--import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
@@ -65,7 +66,7 @@ import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe, readEither)
 
-import           Blockchain.Data.Transaction  (whoSignedThisTransactionEcrecover)
+--import           Blockchain.Data.Transaction  (whoSignedThisTransactionEcrecover)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -74,7 +75,7 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
-import           Blockchain.DB.SolidStorageDB
+--import           Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -91,17 +92,17 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.Model.Secp256k1    as SEC
-import           Blockchain.Strato.Model.Util
+--import qualified Blockchain.Strato.Model.Secp256k1    as SEC
+--import           Blockchain.Strato.Model.Util
          
 import           Blockchain.Stream.Action             (Action)
-import qualified Blockchain.Stream.Action             as Action
+--import qualified Blockchain.Stream.Action             as Action
 
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
-import qualified Crypto.Hash.RIPEMD160                as RIPEMD160
-import qualified Crypto.Hash.SHA256                   as SHA256
-import qualified LabeledError
+--import qualified Crypto.Hash.RIPEMD160                as RIPEMD160
+--import qualified Crypto.Hash.SHA256                   as SHA256
+--import qualified LabeledError
 import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
@@ -313,7 +314,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
 
   -- set creator
-  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+  -- (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
 
   -- Run the constructor
@@ -324,7 +325,7 @@ create' creator newAccount ch cc contractName' argExps = do
   addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
   -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+  --(\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
   -- popcallinfo to remove info from stack
   popCallInfo
@@ -449,31 +450,31 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
-setCreator creator contract cntrct blockNumber = do
+-- setCreator :: MonadSM m => Account -> Account -> CC.Contract -> m ()
+-- setCreator creator contract cntrct = do
 
-  let creatorAddress = _accountAddress creator
-  maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
-  let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+--   let creatorAddress = _accountAddress creator
+--   maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
+--   let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
-  case maybeCert of
-    (Just cert) -> do
-      onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-    Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
+--   case maybeCert of
+--     (Just cert) -> do
+--       onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+--     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  -- let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
-  --     hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
-  --     hasSvm3_3 = CC._vmVersion cntrct == "svm3.3"
-  --     hasSvm3_4 = CC._vmVersion cntrct == "svm3.4"
-  -- when (hasSvm3_2 || hasSvm3_3 || hasSvm3_4) $ do
-  --   liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
-  --   putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
-  let putCreatorField org = do
-        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org) ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
-        putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+--   -- let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
+--   --     hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
+--   --     hasSvm3_3 = CC._vmVersion cntrct == "svm3.3"
+--   --     hasSvm3_4 = CC._vmVersion cntrct == "svm3.4"
+--   -- when (hasSvm3_2 || hasSvm3_3 || hasSvm3_4) $ do
+--   --   liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
+--   --   putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
+--   let putCreatorField org = do
+--         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org) ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
+--         putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
-  if _org /= "" then putCreatorField _org else do
-      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
+--   if _org /= "" then putCreatorField _org else do
+--       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
 
       -- hardcoded delete storage value if on the very bad, no good block
       -- when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
@@ -1302,9 +1303,9 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
 
 runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
-  exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM getVar exps
-  expStrs <- mapM showSM expVals
+  -- exps <- mapM (expToVar . snd) exptups
+  -- expVals <- mapM getVar exps
+  -- expStrs <- mapM showSM expVals
 
 
   -- checks that the event is declared and that the number of args match
@@ -1333,7 +1334,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdde
                     _                                                    -> pure "")
 
         -- pair up field names with values one-by-one (no type checking tho, lol)
-        let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
+        --let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
         
         liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
               " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName)
@@ -1367,95 +1368,95 @@ while condition code = do
         _ -> return result
     else return Nothing
 
-doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
-doWhile condition code = do
-  result <- code
-  decrementGas 1000
-  case result of
-    Nothing -> do
-      c <- condition
-      onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-      if c
-        then doWhile condition code
-        else return Nothing
-    Just SBreak -> return Nothing
-    Just SContinue -> doWhile condition code
-    _ -> return result
+-- doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
+-- doWhile condition code = do
+--   result <- code
+--   decrementGas 1000
+--   case result of
+--     Nothing -> do
+--       c <- condition
+--       onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+--       if c
+--         then doWhile condition code
+--         else return Nothing
+--     Just SBreak -> return Nothing
+--     Just SContinue -> doWhile condition code
+--     _ -> return result
 
-getIndexType :: MonadSM m => AccountPath -> m IndexType
-getIndexType (AccountPath addr p) = do
-  let field = MS.getField p
-  mType <- getXabiType addr field
-  let n = MS.size p - 1
-  case mType of
-    Nothing -> todo "getIndexType/unknown storage reference" field
-    Just v -> return $! loop n v
- where loop :: Int -> SVMType.Type -> IndexType
-       loop 0 t = case t of
-         SVMType.Mapping{SVMType.key=SVMType.Int{}} -> MapIntIndex
-         SVMType.Mapping{SVMType.key=SVMType.String{}} -> MapStringIndex
-         SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
-         SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
-         SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
-         SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
-         SVMType.Array{} -> ArrayIndex
-         _ -> typeError "unanticipated index type" t
-       loop n t = case t of
-         SVMType.Mapping{SVMType.value=t'} -> loop (n - 1) t'
-         SVMType.Array{SVMType.entry=t'} -> loop (n - 1) t'
-         _ -> typeError "indexing type in var dec" t
+-- getIndexType :: MonadSM m => AccountPath -> m IndexType
+-- getIndexType (AccountPath addr p) = do
+--   let field = MS.getField p
+--   mType <- getXabiType addr field
+--   let n = MS.size p - 1
+--   case mType of
+--     Nothing -> todo "getIndexType/unknown storage reference" field
+--     Just v -> return $! loop n v
+--  where loop :: Int -> SVMType.Type -> IndexType
+--        loop 0 t = case t of
+--          SVMType.Mapping{SVMType.key=SVMType.Int{}} -> MapIntIndex
+--          SVMType.Mapping{SVMType.key=SVMType.String{}} -> MapStringIndex
+--          SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
+--          SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
+--          SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
+--          SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
+--          SVMType.Array{} -> ArrayIndex
+--          _ -> typeError "unanticipated index type" t
+--        loop n t = case t of
+--          SVMType.Mapping{SVMType.value=t'} -> loop (n - 1) t'
+--          SVMType.Array{SVMType.entry=t'} -> loop (n - 1) t'
+--          _ -> typeError "indexing type in var dec" t
 
 
 
-expToPath :: MonadSM m => CC.Expression -> m AccountPath
-expToPath (CC.Variable _ x) = do
-  callInfo <- getCurrentCallInfo
-  let path = MS.singleton $ BC.pack $ labelToString x
-  case x `M.lookup` localVariables callInfo of
-    Just (_, var) -> do
-      val <- weakGetVar var
-      case val of
-        SReference apt -> return apt
-        _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
-    Nothing -> return $ AccountPath (currentAccount callInfo) path
-expToPath x@(CC.IndexAccess _ parent mIndex) = do
-  parPath  <- do
-    parvar <- expToVar parent
-    case parvar of
-      Constant (SReference apt) -> return apt
-      _ -> expToPath parent
+-- expToPath :: MonadSM m => CC.Expression -> m AccountPath
+-- expToPath (CC.Variable _ x) = do
+--   callInfo <- getCurrentCallInfo
+--   let path = MS.singleton $ BC.pack $ labelToString x
+--   case x `M.lookup` localVariables callInfo of
+--     Just (_, var) -> do
+--       val <- weakGetVar var
+--       case val of
+--         SReference apt -> return apt
+--         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
+--     Nothing -> return $ AccountPath (currentAccount callInfo) path
+-- expToPath x@(CC.IndexAccess _ parent mIndex) = do
+--   parPath  <- do
+--     parvar <- expToVar parent
+--     case parvar of
+--       Constant (SReference apt) -> return apt
+--       _ -> expToPath parent
 
-  idxType <- getIndexType parPath
-  idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
-  apSnoc parPath <$> case idxType of
-    MapAccountIndex -> do
-      idx <- getAccount idxVar
-      return $ case idx of
-        SAccount a _ -> MS.MapIndex $ MS.IAccount a
-        SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
-        _ -> typeError "invalid map of addresses index" idx
-    MapBoolIndex -> do
-      b <- getBool idxVar
-      return $ MS.MapIndex $ MS.IBool b
-    MapIntIndex -> do
-      n <- getInt idxVar
-      return . MS.MapIndex $ MS.INum n
-    MapStringIndex -> do
-      idx <- getString idxVar
-      return $ case idx of
-        SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
-        _ -> typeError "invalid map of strings index" idx
-    ArrayIndex -> do
-      n <- getInt idxVar
-      return . MS.ArrayIndex $ fromIntegral n
-expToPath (CC.MemberAccess _ parent field) = do
-  apt <- do
-    parvar <- expToVar parent
-    case parvar of
-      _ -> expToPath parent
-  return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
+--   idxType <- getIndexType parPath
+--   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+--   apSnoc parPath <$> case idxType of
+--     MapAccountIndex -> do
+--       idx <- getAccount idxVar
+--       return $ case idx of
+--         SAccount a _ -> MS.MapIndex $ MS.IAccount a
+--         SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
+--         _ -> typeError "invalid map of addresses index" idx
+--     MapBoolIndex -> do
+--       b <- getBool idxVar
+--       return $ MS.MapIndex $ MS.IBool b
+--     MapIntIndex -> do
+--       n <- getInt idxVar
+--       return . MS.MapIndex $ MS.INum n
+--     MapStringIndex -> do
+--       idx <- getString idxVar
+--       return $ case idx of
+--         SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
+--         _ -> typeError "invalid map of strings index" idx
+--     ArrayIndex -> do
+--       n <- getInt idxVar
+--       return . MS.ArrayIndex $ fromIntegral n
+-- expToPath (CC.MemberAccess _ parent field) = do
+--   apt <- do
+--     parvar <- expToVar parent
+--     case parvar of
+--       _ -> expToPath parent
+--   return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
 
-expToPath x = todo "expToPath/unhandled" x
+-- expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
@@ -1970,9 +1971,9 @@ expToVar' (CC.FunctionCall _ e args) = do
         argVals <- case args of
                         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
                         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-        let argCount = case args of
-                        CC.OrderedArgs as -> length as
-                        CC.NamedArgs ns -> length ns
+        -- let argCount = case args of
+        --                 CC.OrderedArgs as -> length as
+        --                 CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
             val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
@@ -2005,7 +2006,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
             res <- runTheCall address contract' funcName hsh cc func argVals ro False
-            return . Constant . fromMaybe SNULL $ res
+            --return . Constant . fromMaybe SNULL $ res
             -- res <- do
             --   if (CC._funcIsFree func)
             --     then do
@@ -2034,54 +2035,54 @@ expToVar' (CC.FunctionCall _ e args) = do
             --                               Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
             --                 Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
             return . Constant . fromMaybe SNULL $ res
-            where
-              testMatch :: MonadSM m => CC.Func -> m Bool
-              testMatch tf = do
-                let argMapping = mapArgs tf
-                doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
-                       && ((length argMapping) == (argCount))
-                       && (all (== True) doArgsMatch)
-              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-              testNameAndTypes (_, (t, v)) = 
-                -- These cases might not be all inclusive of all valid combinations.
-                case (v, t) of
-                  (SInteger _, SVMType.Int _ _) -> pure $ True
-                  (SString _, SVMType.String _) -> pure $ True
-                  (SString _, SVMType.Bytes _ _) -> pure $ True
-                  (SBool _, SVMType.Bool) -> pure $ True
-                  (SAccount _ _, SVMType.Address _) -> pure $ True
-                  (SAccount _ _, SVMType.Account _) -> pure $ True
-                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                  (SArray x _, SVMType.Array y _) -> pure $ x == y
-                  (SReference addressedPath, _) -> do
-                    refType <- getXabiValueType addressedPath
-                    if (refType == t)
-                      then pure $ True
-                      else 
-                        case (refType, t) of
-                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
-                          _ -> pure $ False
-                  _ -> pure $ False
-              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-              mapArgs theFunc = case argVals of
-                OrderedVals vs -> let argMeta = 
-                                        map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                        $ CC._funcArgs theFunc
-                                  in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-                NamedVals ns ->
-                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-                      typeAndVal = M.merge (M.dropMissing)
-                                          (M.dropMissing)
-                                          (M.zipWithMatched $ \_k t v -> (t, v))
-                                          strTypes
-                                          $ M.fromList ns
-                      sortedArgs = map snd . sortWith fst
-                                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                                $ M.toList typeAndVal
-                  in sortedArgs
+            --where
+              -- testMatch :: MonadSM m => CC.Func -> m Bool
+              -- testMatch tf = do
+              --   let argMapping = mapArgs tf
+              --   doArgsMatch <- mapM testNameAndTypes argMapping
+              --   pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
+              --          && ((length argMapping) == (argCount))
+              --          && (all (== True) doArgsMatch)
+              -- testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+              -- testNameAndTypes (_, (t, v)) = 
+              --   -- These cases might not be all inclusive of all valid combinations.
+              --   case (v, t) of
+              --     (SInteger _, SVMType.Int _ _) -> pure $ True
+              --     (SString _, SVMType.String _) -> pure $ True
+              --     (SString _, SVMType.Bytes _ _) -> pure $ True
+              --     (SBool _, SVMType.Bool) -> pure $ True
+              --     (SAccount _ _, SVMType.Address _) -> pure $ True
+              --     (SAccount _ _, SVMType.Account _) -> pure $ True
+              --     (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+              --     (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+              --     (SArray x _, SVMType.Array y _) -> pure $ x == y
+              --     (SReference addressedPath, _) -> do
+              --       refType <- getXabiValueType addressedPath
+              --       if (refType == t)
+              --         then pure $ True
+              --         else 
+              --           case (refType, t) of
+              --             (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+              --             (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+              --             _ -> pure $ False
+              --     _ -> pure $ False
+              -- mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+              -- mapArgs theFunc = case argVals of
+              --   OrderedVals vs -> let argMeta = 
+              --                           map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+              --                           $ CC._funcArgs theFunc
+              --                     in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+              --   NamedVals ns ->
+              --     let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
+              --         typeAndVal = M.merge (M.dropMissing)
+              --                             (M.dropMissing)
+              --                             (M.zipWithMatched $ \_k t v -> (t, v))
+              --                             strTypes
+              --                             $ M.fromList ns
+              --         sortedArgs = map snd . sortWith fst
+              --                   . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+              --                   $ M.toList typeAndVal
+              --     in sortedArgs
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
@@ -2818,7 +2819,7 @@ callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
 certificateMap :: Maybe String -> CC.Contract -> Value
-certificateMap maybeCert cntrct = 
+certificateMap maybeCert = 
     case maybeCert of
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
@@ -2842,7 +2843,7 @@ certificateMap maybeCert cntrct =
           --                          , (SString "userAddress", Constant . SString $ "")
           --                          , (SString "certString", Constant . SString $ "")
           --                          , (SString "parent", Constant . SString $ "")
-                                  --  ]
+          --                          ]
           certMap cert sub  = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub) 
                                          , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert ) 
                                          ]
