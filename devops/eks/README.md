@@ -10,10 +10,18 @@ kubectl get deployment strato-platform
 # Delete Existing Deployment
 kubectl delete deployment strato-platform
 
+**Note that** *strato-platform* above is the name of the deployment.
+
+# Create Persistence Volume Claims
+kubectl apply -f kafka-pvc.yaml
+kubectl apply -f prometheus-pvc.yaml
+kubectl apply -f redis-pvc.yaml
+kubectl apply -f strato-pvc.yaml
+kubectl apply -f zookeeper-pvc.yaml
+kubectl apply -f postgres-pvc.yaml
+
 # Create New Deployment
 kubectl apply -f deployment.yaml 
-
-**Note that** *strato-platform* above is the name of the deployment.
 
 # Known Issues
 * We are using old strato api by setting USE_OLD_STRATO_API as true. New strato api is using [hardcoded](https://github.com/blockapps/strato-platform/blob/develop/strato/api/strato-api/app/StratoAPIInit.hs#L26) postgres service. [STRATO-2805](https://blockapps.atlassian.net/browse/STRATO-2805) has been created for the fix.
