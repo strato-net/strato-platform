@@ -47,8 +47,8 @@ library:
   - type-lits
   - unliftio
   - unordered-containers
-  - blockapps-vault-wrapper-api
-  - blockapps-vault-wrapper-client
-  - vault-monad
-  - blockapps-vault-wrapper-server
+  - blockapps-vault-proxy-api
+  - blockapps-vault-proxy-client
+  - vault-proxy-monad
+  - blockapps-vault-proxy-server
   - strato-redis-blockdb

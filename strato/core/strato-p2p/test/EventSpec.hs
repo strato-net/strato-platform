@@ -1174,7 +1174,7 @@ instance HasVaultProxy IO where
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
-instance HasVault (ReaderT PrivateKey IO) where
+instance HasVaultProxy (ReaderT PrivateKey IO) where
   sign bs = ask >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"

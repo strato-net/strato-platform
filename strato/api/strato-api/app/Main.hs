@@ -164,7 +164,7 @@ type CoreAPI =
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-coreServer :: (MonadLogger m, HasSQL m, Accessible VaultData m ) => ServerT CoreAPI m
+coreServer :: (MonadLogger m, HasSQL m, Accessible VaultProxyData m ) => ServerT CoreAPI m
 coreServer = Account.server
   :<|> BatchTransactionResult.server
   :<|> BlkLast.server

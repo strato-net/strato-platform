@@ -29,7 +29,7 @@ import           Data.Swagger                   hiding (url)
        
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Change.Modify
-import           Control.Monad.Composable.Vault
+import           Control.Monad.Composable.VaultProxy
 
 import qualified Database.Esqueleto.Legacy       as E
 
@@ -42,9 +42,9 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatus)
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Strato.Strato23.Client   hiding (verifyPassword)
-import           Strato.Strato23.API.Types 
-import           Strato.Strato23.Monad (VaultWrapperError)
+import           Strato.VaultProxy.Client   hiding (verifyPassword)
+import           Strato.VaultProxy.API.Types 
+import           Strato.VaultProxy.Monad (VaultProxyError)
 import           Servant
 import           Servant.Client
 
@@ -69,7 +69,7 @@ type API = "metadata"
 getMetaDataClient :: Maybe T.Text -> ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
+server :: (HasVaultProxy m, MonadLogger m, HasSQL m) => ServerT API m
 server = getMetaData
 
 instance HasSQL m => Accessible [Address] m where 
@@ -81,7 +81,7 @@ instance ToSchema MetadataResponse
 getMetaData :: (  MonadIO m
                 , MonadLogger m
                 , MonadUnliftIO m
-                , HasVault m
+                , HasVaultProxy m
                 , Accessible [Address] m
                 , HasSQL m )
                 =>   Maybe T.Text  
@@ -98,20 +98,20 @@ getMetaData token =
 
 
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+blocVaultProxy :: (MonadIO m, MonadLogger m, HasVaultProxy m, HasCallStack) =>
                     ClientM x -> m x
-blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
+blocVaultProxy client' = do
+  logInfoCS callStack "Querying Vault Proxy"
+  VaultProxyData url mgr <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (mkClientEnv mgr url)
-  either (blocError . VaultWrapperError) return resultEither
+  either (blocError . VaultProxyError) return resultEither
 
-getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError Address)
+getPubKey ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVaultProxy m) => Maybe T.Text -> m (Either VaultProxyError Address)
 getPubKey mAccessToken =
   case mAccessToken of
     Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" -- This may not be needed
-    Just _  -> try $ fmap Strato.Strato23.API.Types.unAddress . blocVaultWrapper $ getKey  "nodekey" Nothing
+    Just _  -> try $ fmap Strato.VaultProxy.API.Types.unAddress . blocVaultProxy $ getKey "nodekey" Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
 checkIsSynced = (runStratoRedisIO getSyncStatus) >>= \case Nothing -> pure False; Just c ->pure  c; 
