@@ -217,7 +217,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        // sh "sed -i 's/static/default/g' docker-compose.yml"
+        sh "sed -i 's/static/default/g' docker-compose.yml"
         if(appName == 'beanstalk') {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
@@ -346,7 +346,7 @@ def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsP
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        // sh "sed -i 's/static/default/g' docker-compose.yml"
+        sh "sed -i 's/static/default/g' docker-compose.yml"
         writeFile file: "run-app.sh", text: """
 #!/bin/bash
 set -e
@@ -896,17 +896,17 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
     int restartEveryHour = 0
     for (int i = 0; i < 6000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
-        // Restart strato container once sync is done or every 30 mins
-        if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
-            sh "sudo docker restart strato_strato_1"
-        }
-        if(counter != 60) {
-            counter = counter + 1
-        }
-        restartEveryHour = restartEveryHour + 1
-        if(restartEveryHour > 1800) {
-          restartEveryHour = 1
-        }
+        // Restart strato container once sync is done or every 30 mins (USED FOR MEMORY LEAK ISSUE)
+        // if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
+        //     sh "sudo docker restart strato_strato_1"
+        // }
+        // if(counter != 60) {
+        //     counter = counter + 1
+        // }
+        // restartEveryHour = restartEveryHour + 1
+        // if(restartEveryHour > 1800) {
+        //   restartEveryHour = 1
+        // }
         sleep 2
       } else {
         // If healthy - check in few seconds again to make sure it wasn't temporary while syncned to the same block number. Monitor should probably be handling this itself in the future before showing network healthy.

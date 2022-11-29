@@ -178,7 +178,7 @@ initializeCertificateRegistryTX priv addr certs nonce =
 
 certificateRegistryContract :: T.Text
 certificateRegistryContract = [r|
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
@@ -235,13 +235,14 @@ contract Certificate {
     }
 }
 
-pragma solidvm 3.2;
+pragma solidvm 3.4;
 contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
     Certificate[] certificates;
     mapping(address => uint) certificatesMap;
+    address public owner;
 
     bool initialized;
 
@@ -251,7 +252,8 @@ contract CertificateRegistry {
 
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
-        
+        owner = msg.sender;
+
         initialized = false;
     }
 
@@ -264,6 +266,7 @@ contract CertificateRegistry {
             // Register the root certificates and emit event
             certificates.push(c);
             certificatesMap[c.userAddress()] = certificates.length;
+            registerCert(_rootCerts[i]);
             emit CertificateRegistered(_rootCerts[i]);
         }
         
@@ -291,11 +294,16 @@ contract CertificateRegistry {
             certificates.push(c);
             certificatesMap[c.userAddress()] = certificates.length;
             
+            registerCert(newCertificateString);
             emit CertificateRegistered(newCertificateString);
     
             return 200; // 200 = HTTP Status OK
         }
         return 400;
+    }
+
+    function getUserCert(address _address) returns (address) {
+        return certificates[certificatesMap[account(_address)]];
     }
     
     function getCertByAddress(address _address) returns (Certificate) {

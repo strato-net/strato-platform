@@ -208,10 +208,12 @@ function newnode {
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
-  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
+  # Leave the +RTS -N1, it is important
+  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"
+      # Leave the +RTS -N1, it is important
       runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 

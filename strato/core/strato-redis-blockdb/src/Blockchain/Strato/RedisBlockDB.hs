@@ -40,7 +40,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
-    , getSyncStatus, putSyncStatus
+    , getSyncStatus, putSyncStatus, getSyncStatusNow
     ) where
 
 import           BlockApps.X509.Certificate
@@ -115,6 +115,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateIPChains      -> "pic:"
             PrivateOrgIdChains   -> "poc:"
             PrivateOrgNameChains -> "pnc:"
+            -- Validators           -> "v:"
             X509Certificates     -> "x509:"
             X509Initialized      -> "x509init:"
 
@@ -127,6 +128,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
+  -- "v" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
@@ -141,8 +143,8 @@ findNamespace key = case S8.takeWhile (/= ':') key of
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
 getChainInfo cId = getInNamespace PrivateChainInfo cId >>= \case
-    Left _             -> return Nothing
-    Right Nothing      -> return Nothing
+    Left _              -> return Nothing
+    Right Nothing       -> return Nothing
     Right (Just rcInfo) -> let (RedisChainInfo cInfo) = fromValue rcInfo in
         return $ Just cInfo
 
@@ -157,6 +159,18 @@ putChainInfo cId cInfo = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
+
+-- putValidator :: Word256
+--           -> ValidatorRef
+--           -> Redis (Either Reply Status)
+-- putChainInfo cId cInfo = do --validator
+--     let rChain    = RedisValidatorRef validator
+
+--     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
+--     case res of
+--         TxSuccess _ -> pure $ Right Ok
+--         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
+--         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
                 -> Redis (M.Map Address Enode)
@@ -936,6 +950,22 @@ checkAndUpdateSyncStatus = do
         (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
         (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
         _ -> pure ()
+
+getSyncStatusNow :: Redis (Maybe Bool)
+getSyncStatusNow = do
+    status         <- getSyncStatus
+    if case status of Just True -> True; _ -> False; 
+        then pure  $ Just True
+        else do
+            nodeBestBlock  <- getBestBlockInfo
+            worldBestBlock <- getWorldBestBlockInfo
+            let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+                worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+            pure $ Just $  case (status, nodeTotalDiff, worldTotalDiff) of
+                (Just False, Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Nothing,  Just _  ) -> False
+                _ ->  True
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"

@@ -18,8 +18,8 @@ import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
 import { createUrl } from '../../../../lib/url';
 
-export function getState(contractName, contractAddress, chainid) {
-  const options = { params: { contractName, contractAddress }, query: { chainid } };
+export function getState(contractName, contractAddress, chainId) {
+  const options = { params: { contractName, contractAddress }, query: { chainid: chainId } };
   const url = env.BLOC_URL + createUrl("/contracts/::contractName/::contractAddress/state", options);
 
   return fetch(
