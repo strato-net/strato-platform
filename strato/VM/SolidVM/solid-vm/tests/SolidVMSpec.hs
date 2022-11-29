@@ -352,6 +352,64 @@ runArgsWithOrigin orig acc args bs = do
   rethrowEx er
   return er
 
+runArgsWithCertificateRegistry :: String -> ContextM ExecResults
+runArgsWithCertificateRegistry rawString = runArgsWithOrigin rootAcc sender "()" $ [r|
+
+pragma solidvm 3.4;
+contract CertificateRegistry {
+    // The registry maintains a list and mapping of all the certificates
+    // We need the extra array in order for us to iterate through our certificates.
+    // Solidity mappings are non-iterable.
+    mapping(address => Certificate) addressToCertMap;
+
+    bool initialized;
+
+    event CertificateRegistered(string certificate);
+    event CertificateRevoked(address userAddress);
+    event CertificateRegistryInitialized();
+    string rootCert;
+
+    constructor() {
+        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+
+        initialized = false;
+        rootCert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBIMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtFbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQyMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEUMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+        initializeCertificateRegistry(rootCert);
+    }
+
+    function initializeCertificateRegistry(string _rootCert) returns () {
+        require(!initialized, "The CertificateRegistry has already been initialized!");        
+        
+        // Create the Certificate record
+        Certificate c = new Certificate(_rootCert);
+
+        // Register the root certificates and emit event
+        addressToCertMap[c.userAddress()] = c;
+        emit CertificateRegistered(_rootCert);
+        
+
+        initialized = true;
+        emit CertificateRegistryInitialized(); 
+
+        
+        
+    }
+    
+    function registerCertificate(string newCertificateString) returns (address) {
+        // Create the new Certificate record
+        Certificate c = new Certificate(newCertificateString);
+        addressToCertMap[c.userAddress()] = c;
+        emit CertificateRegistered(newCertificateString);
+        return c.userAddress();
+        
+    }
+
+    function getUserCert(address _address) returns (Certificate) {
+        return addressToCertMap[account(_address)];
+    }
+
+}|] ++ rawString
+
 runArgs :: T.Text -> String -> ContextM ExecResults
 runArgs = runArgsWithSender sender
 
@@ -4504,28 +4562,49 @@ contract qq {
       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
       ]
 
-  it "only a contract posted by the root user can call registerCert" $ (runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-contract qq {
-    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
-    constructor() {
-        registerCert(myCertificate);
-    }
-}|]) `shouldThrow` anyInvalidWriteError
+--   it "only a contract posted by the root user can call registerCert" $ (runTest $ do
+--     runBS [r|
+-- pragma solidvm 3.2;
+-- contract qq {
+--     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
+--     constructor() {
+--         registerCert(myCertificate);
+--     }
+-- }|]) `shouldThrow` anyInvalidWriteError
 
   it "can only post X509 certificates to the address of the public key" . runTest $ do
-    void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
-contract qq {
+    void $ runArgsWithCertificateRegistry [r|
+pragma solidvm 3.4;
+contract Certificate {
+    address public userAddress;
+    
+    // Store all the fields of a certificate in a Cirrus record
+    string public commonName;
+    string public organization;
+
+    constructor(string _certificateString) {
+
+        mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        commonName = parsedCert["commonName"];
+        organization = parsedCert["organization"];
+    }
+}
+
+contract qq is CertificateRegistry{
     account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0, "main");
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
     string public certName;
     string public certOrg;
+    address public certRegAddr;
+    Certificate userCert;
+    CertificateRegistry certReg;
     constructor() {
-        registerCert(myCertificate);
-        certName = getUserCert(certAddr)["commonName"];
-        certOrg = getUserCert(certAddr)["organization"];
+        certReg = new CertificateRegistry();
+        certRegAddr = certReg.registerCertificate(myCertificate);
+        userCert = certReg.getUserCert(certRegAddr);
+        certName = userCert.commonName();
+        certOrg = userCert.organization();
     }
 }|]
     getFields ["certName", "certOrg"] `shouldReturn`
@@ -4533,112 +4612,155 @@ contract qq {
         BString "BlockApps"
       ]
 
-  it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
-    void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
-contract qq {
-    account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
-    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
-    string public certName;
-    string public certOrg;
-    constructor() {
-        registerCert(myCertificate);
-        certName = getUserCert(certAddr)["commonName"];
-        certOrg = getUserCert(certAddr)["organization"];
-    }
-}|]) `shouldThrow` anyInvalidCertError
+--   it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
+--     void $ runArgsWithOrigin rootAcc sender "()" [r|
+-- pragma solidvm 3.2;
+-- contract qq {
+--     account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
+--     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
+--     string public certName;
+--     string public certOrg;
+--     constructor() {
+--         registerCert(myCertificate);
+--         certName = getUserCert(certAddr)["commonName"];
+--         certOrg = getUserCert(certAddr)["organization"];
+--     }
+-- }|]) `shouldThrow` anyInvalidCertError
 
-  it "cannot register a x509 certificate on a private chain" $ (runTest $ do
-    void $ runArgsWithOrigin rootAcc privateChainAcc "()" [r|
-pragma solidvm 3.2;
-contract qq {
-    account myAccount = account("deadbeef:feedbeef");
+--   it "cannot register a x509 certificate on a private chain" $ (runTest $ do
+--     void $ runArgsWithOrigin rootAcc privateChainAcc "()" [r|
+-- pragma solidvm 3.2;
+-- contract qq {
+--     account myAccount = account("deadbeef:feedbeef");
     
-    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+--     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
 
-    constructor() {
-        registerCert(myNewCertificate); 
-    }
-}|]) `shouldThrow` anyInvalidWriteError
+--     constructor() {
+--         registerCert(myNewCertificate); 
+--     }
+-- }|]) `shouldThrow` anyInvalidWriteError
 
-  it "cannot use old registerCert on solidvm 3.2" $ (runTest $ do
-      (runBS [r|
-  pragma solidvm 3.2;
-  contract qq {
-      account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
-      string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
-      string public certPubKey;
-      constructor() {
-          registerCert(certAddr, myCertificate);
-          certPubKey = getUserCert(certAddr)["publicKey"];
-      }
-  }|])) `shouldThrow` anyUnknownFunc
+  -- it "cannot use old registerCert on solidvm 3.2" $ (runTest $ do
+  --     (runBS [r|
+  -- pragma solidvm 3.2;
+  -- contract qq {
+  --     account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
+  --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
+  --     string public certPubKey;
+  --     constructor() {
+  --         registerCert(certAddr, myCertificate);
+  --         certPubKey = getUserCert(certAddr)["publicKey"];
+  --     }
+  -- }|])) `shouldThrow` anyUnknownFunc
 
-  it "cannot use new registerCert(string _cert) on solidvm < 3.2" $ (runTest $ do
-      (runBS [r|
-  contract qq {
-      account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
-      string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
-      string public certPubKey;
-      constructor() {
-          registerCert(myCertificate);
-          certPubKey = getUserCert(certAddr)["publicKey"];
-      }
-  }|])) `shouldThrow` anyUnknownFunc
+  -- it "cannot use new registerCert(string _cert) on solidvm < 3.2" $ (runTest $ do
+  --     (runBS [r|
+  -- contract qq {
+  --     account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
+  --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
+  --     string public certPubKey;
+  --     constructor() {
+  --         registerCert(myCertificate);
+  --         certPubKey = getUserCert(certAddr)["publicKey"];
+  --     }
+  -- }|])) `shouldThrow` anyUnknownFunc
   
-  it "cannot use new registerCert(string _cert, Certificate c) on solidvm < 3.2" $ (runTest $ do
-      (runBS [r|
-  contract Certificate {
-    string name;
-    constructor(string _name) {
-      name = _name;
-    }
-  }
-  contract qq {
-      account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
-      string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
-      string public certPubKey;
-      constructor() {
-          Certificate c = new Certificate("foo");
-          registerCert(myCertificate, c);
-          certPubKey = getUserCert(certAddr)["publicKey"];
-      }
-  }|])) `shouldThrow` anyInvalidWriteError
+  -- it "cannot use new registerCert(string _cert, Certificate c) on solidvm < 3.2" $ (runTest $ do
+  --     (runBS [r|
+  -- contract Certificate {
+  --   string name;
+  --   constructor(string _name) {
+  --     name = _name;
+  --   }
+  -- }
+  -- contract qq {
+  --     account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
+  --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
+  --     string public certPubKey;
+  --     constructor() {
+  --         Certificate c = new Certificate("foo");
+  --         registerCert(myCertificate, c);
+  --         certPubKey = getUserCert(certAddr)["publicKey"];
+  --     }
+  -- }|])) `shouldThrow` anyInvalidWriteError
   
   it "can only post X509 certificates to the address of the public key" . runTest $ do
-    void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+    void $ runArgsWithCertificateRegistry [r|
+pragma solidvm 3.4;
 contract Certificate {
-    string name;
-    constructor(string _name) {
-      name = _name;
+    address public userAddress;
+    
+    // Store all the fields of a certificate in a Cirrus record
+    string public commonName;
+    string public organization;
+
+    constructor(string _certificateString) {
+
+        mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        commonName = parsedCert["commonName"];
+        organization = parsedCert["organization"];
     }
-  }
-contract qq {
+}
+
+contract qq is CertificateRegistry{
     event CertificateRegistered(address userAddress, address contractAddress);
     account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0, "main");
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
     string public certName;
     string public certOrg;
+    address public certRegAddr;
+    Certificate userCert;
+    CertificateRegistry certReg;
     constructor() {
-        Certificate c = new Certificate("foo");
-        registerCert(myCertificate, c);
-        certName = getUserCert(certAddr)["commonName"];
-        certOrg = getUserCert(certAddr)["organization"];
+        certReg = new CertificateRegistry();
+        certRegAddr = certReg.registerCertificate(myCertificate);
+        userCert = certReg.getUserCert(certRegAddr);
+        certName = userCert.commonName();
+        certOrg = userCert.organization();
     }
 }|]
     getFields ["certName", "certOrg"] `shouldReturn`
       [ BString "Admin",
         BString "BlockApps"
       ]
-  it "can get a users cert" . runTest $ do
-    void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.3;
-contract qq {
+  fit "can get a users cert" . runTest $ do
+    void $ runArgsWithCertificateRegistry [r|
+pragma solidvm 3.4;
+contract Certificate {
+    address public userAddress;
+    
+    // Store all the fields of a certificate in a Cirrus record
+    string public commonName;
+    string public organization;
+    string public country;
+    string public group;
+    string public organizationalUnit;
+    string public publicKey;
+    string public certString;
+
+    constructor(string _certificateString) {
+
+        mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        commonName = parsedCert["commonName"];
+        organization = parsedCert["organization"];
+        country = parsedCert["country"];
+        group = parsedCert["group"];
+        organizationalUnit = parsedCert["organizationalUnit"];
+        publicKey = parsedCert["publicKey"];
+        certString = parsedCert["certString"];
+
+    }
+}
+contract qq is CertificateRegistry{
     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
     
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
+    address public certRegAddr;
+    Certificate userCert;
+    CertificateRegistry certReg;
 
     string myUsername     = "";
     string myOrganization = "";
@@ -4654,21 +4776,23 @@ contract qq {
     string myCertificate  = "";
 
     constructor() {
-        registerCert(myNewCertificate); 
+        certReg = new CertificateRegistry();
+        certRegAddr = certReg.registerCertificate(myNewCertificate);
+        userCert = certReg.getUserCert(certRegAddr); 
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
         myGroup        = tx.group;
         myOrganizationalUnit = tx.organizationalUnit;
-	
+ 
         certificate    = tx.certificate;
-        myCommonName   = getUserCert(myAccount)["commonName"];
-        myCountry      = getUserCert(myAccount)["country"];
-        myOrganization = getUserCert(myAccount)["organization"];
-        myGroup        = getUserCert(myAccount)["group"];
-        myOrganizationalUnit  = getUserCert(myAccount)["organizationalUnit"];
-        myPublicKey    = getUserCert(myAccount)["publicKey"];
-        myCertificate  = getUserCert(myAccount)["certString"];
+        myCommonName   = userCert.commonName();
+        myCountry      = userCert.country();
+        myOrganization = userCert.organization();
+        myGroup        = userCert.group();
+        myOrganizationalUnit  = userCert.organizationalUnit();
+        myPublicKey    = userCert.publicKey();
+        myCertificate  = userCert.certString();
     }
 }|]
     getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`

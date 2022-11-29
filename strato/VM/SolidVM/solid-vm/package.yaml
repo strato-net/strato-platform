@@ -4,6 +4,7 @@ dependencies:
   - base
   - blockapps-haskoin
   - x509-certs
+  - monad-logger
 
 library:
   source-dirs: src/
