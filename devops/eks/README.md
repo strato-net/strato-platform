@@ -18,6 +18,7 @@ kubectl apply -f prometheus-pvc.yaml
 kubectl apply -f redis-pvc.yaml
 kubectl apply -f strato-pvc.yaml
 kubectl apply -f zookeeper-pvc.yaml
+kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
 kubectl apply -f deployment.yaml 

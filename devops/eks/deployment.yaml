@@ -135,8 +135,10 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
-          - mountPath: /var/lib/postgresql/data
+          - mountPath: /var/lib/postgresql/data/
             name: postgres-data
       - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-46441c30f
         name: nginx
