@@ -13,6 +13,7 @@ import           Data.IORef
 import           Data.Maybe                          (fromMaybe, isNothing)
 import           Data.Time.Clock.POSIX
 import qualified Data.Map                            as M
+import qualified Data.Set                            as S
 import           Data.Maybe                          (isJust)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
@@ -56,6 +57,7 @@ import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
@@ -428,7 +430,7 @@ spec = do
 
     describe "Private Chains" $ do
       let getChainInfo lbl = ChainInfo
-                                 (UnsignedChainInfo lbl [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
+                                 (UnsignedChainInfo lbl [] [] (ChainMembers S.empty) Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                                  Nothing
           getChainIdAndDetails cInfo =
             let chainId = Keccak256.rlpHash cInfo

@@ -16,14 +16,12 @@ module Blockchain.Strato.RedisBlockDB
     , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
-    , addChainMember, removeChainMember
+    , addChainMember -- , removeChainMember
     , registerCertificate
     , revokeCertificate
     , getInitializeCertificateRegistry, initializeCertificateRegistry
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
-    , getIPChains, addIPChain, removeIPChain
-    , getOrgNameChains, addOrgNameChain, removeOrgNameChain
-    , getOrgIdChains, addOrgIdChain, removeOrgIdChain
+    , getTrueOrgNameChains, getFalseOrgNameChains, addOrgNameChain, removeOrgNameChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getPrivateTransactions, addPrivateTransactions, getUncles
@@ -46,7 +44,6 @@ module Blockchain.Strato.RedisBlockDB
 import           BlockApps.X509.Certificate
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Enode
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Partitioner                (partitionWith)
 import           Blockchain.Sequencer.Event
@@ -56,6 +53,7 @@ import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainMember
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
@@ -66,14 +64,13 @@ import qualified Data.ByteString.Char8                 as S8
 
 import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
-import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
-
+import           Data.Ranged
 import           BlockApps.Logging
 
 newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
@@ -112,10 +109,10 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateChainMembers  -> "m:"
             PrivateTransactions  -> "pt:"
             PrivateTxsInBlocks   -> "pb:"
-            PrivateIPChains      -> "pic:"
-            PrivateOrgIdChains   -> "poc:"
             PrivateOrgNameChains -> "pnc:"
             -- Validators           -> "v:"
+            PrivateTrueOrgNameChains -> "pnct:"
+            PrivateFalseOrgNameChains -> "pncf:"
             X509Certificates     -> "x509:"
             X509Initialized      -> "x509init:"
 
@@ -133,9 +130,8 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
   "pb" -> PrivateTxsInBlocks
-  "pic" -> PrivateIPChains
-  "poc" -> PrivateOrgIdChains
-  "pnc" -> PrivateOrgNameChains
+  "pnct" -> PrivateTrueOrgNameChains
+  "pncf" -> PrivateFalseOrgNameChains
   "x509" -> X509Certificates
   "x509init:" -> X509Initialized
   wut -> error $ "unknown namespace: " ++ show wut
@@ -173,64 +169,58 @@ putChainInfo cId cInfo = do
 --         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
-                -> Redis (M.Map Address Enode)
+                -> Redis ChainMemberRSet
 getChainMembers cId = getInNamespace PrivateChainMembers cId >>= \case
-    Left _             -> return M.empty
-    Right Nothing      -> return M.empty
-    Right (Just rmems) -> let RedisChainMembers mems = fromValue rmems
+    Left _             -> return $ ChainMemberRSet $ rSetEmpty
+    Right Nothing      -> return $ ChainMemberRSet $ rSetEmpty
+    Right (Just rmems) -> let RedisChainMemberRSet mems = fromValue rmems
                            in return mems
 
-putChainMembers :: Word256
-          -> M.Map Address Enode
-          -> Redis (Either Reply Status)
-putChainMembers cId mems = do
-    let rmems    = RedisChainMembers mems
 
+putChainMembers :: Word256
+                -> ChainMembers
+                -> Redis (Either Reply Status)
+putChainMembers cId mems = do
+    let rmems = RedisChainMemberRSet $ chainMembersToChainMemberRset mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
-        TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $ \e -> getCompose $
-          Compose (addIPChain (ipAddress e) cId) *>
-          Compose (addOrgIdChain (unOrgId $ pubKey e) cId)
+        TxSuccess _ ->  addOrgNameChain mems cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+        TxError e  -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
 addChainMember :: Word256
-               -> Address
-               -> Enode
+               -> ChainMembers
                -> Redis (Either Reply Status)
-addChainMember cId address enode = do
-    mems <- getChainMembers cId
-    let mems' = RedisChainMembers $ M.insert address enode mems
-    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
+addChainMember cId newMem = do
+    ChainMemberRSet mems <- getChainMembers cId
+    let ChainMemberRSet newMemRset = chainMembersToChainMemberRset newMem
+        mems' = ChainMemberRSet $ mems `rSetUnion` newMemRset
+        rmems = RedisChainMemberRSet mems'
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
-        TxSuccess _ -> getCompose $
-          Compose (addIPChain (ipAddress enode) cId) *>
-          Compose (addOrgIdChain (unOrgId $ pubKey enode) cId) *>
-          Compose (addressToOrg address >>= \case
-                    Nothing -> pure $ Right Ok
-                    Just org -> addOrgNameChain org cId)
+        TxSuccess _ -> addOrgNameChain newMem cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
-removeChainMember :: Word256
-                  -> Address
-                  -> Redis (Either Reply Status)
-removeChainMember cId address = do
-    mems <- getChainMembers cId
-    let mEnode = M.lookup address mems
-        mems' = RedisChainMembers $ M.delete address mems
-    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
-    case res of
-        TxSuccess _ -> case mEnode of
-          Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
-          Just enode -> getCompose $
-            Compose (removeIPChain (ipAddress enode) cId) *>
-            Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId) *>
-            Compose (addressToOrg address >>= \case
-                        Nothing -> pure $ Right Ok
-                        Just org -> removeOrgNameChain org cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+-- removeChainMember :: Word256
+--                   -> Address
+--                   -> Redis (Either Reply Status)
+-- removeChainMember cId address = do
+--     mems <- getChainMembers cId
+--     let mEnode = M.lookup address mems
+--         mems' = RedisChainMembers $ M.delete address mems
+--     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
+--     case res of
+--         TxSuccess _ -> case mEnode of
+--           Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
+--           Just enode -> getCompose $
+--             Compose (removeIPChain (ipAddress enode) cId) *>
+--             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
+--             -- Compose (addressToOrg address >>= \case
+--             --             Nothing -> pure $ Right Ok
+--             --             Just org -> removeOrgNameChain org cId)
+--         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+--         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Account -> Address -> X509CertInfoState -> Redis (Either Reply Status)
 registerCertificate contractAddress userAddr x509CertInfoState = do
@@ -344,94 +334,39 @@ addChainTxsInBlock bHash cId shas = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
-getIPChains :: IPAddress
-            -> Redis (S.Set Word256)
-getIPChains ip = getInNamespace PrivateIPChains ip <&> \case
-    Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
-                             in chains
-    _                    -> S.empty
-
-addIPChain :: IPAddress
-           -> Word256
-           -> Redis (Either Reply Status)
-addIPChain ip cId = do
-    chains <- getIPChains ip
-    let chains' = RedisIPChains $ S.insert cId chains
-    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
-
-removeIPChain :: IPAddress
-              -> Word256
-              -> Redis (Either Reply Status)
-removeIPChain ip cId = do
-    chains <- getIPChains ip
-    let chains' = RedisIPChains $ S.delete cId chains
-    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Error" ++ e)
-
-getOrgIdChains :: S8.ByteString
-               -> Redis (S.Set Word256)
-getOrgIdChains ip = getInNamespace PrivateOrgIdChains ip <&> \case
-    Right (Just rchains) -> let RedisOrgIdChains chains = fromValue rchains
-                             in chains
-    _                    -> S.empty
-
-addOrgIdChain :: S8.ByteString
-              -> Word256
-              -> Redis (Either Reply Status)
-addOrgIdChain ip cId = do
-    chains <- getOrgIdChains ip
-    let chains' = RedisOrgIdChains $ S.insert cId chains
-    res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Error" ++ e)
-
-removeOrgIdChain :: S8.ByteString
-                 -> Word256
-                 -> Redis (Either Reply Status)
-removeOrgIdChain ip cId = do
-    chains <- getOrgIdChains ip
-    let chains' = RedisOrgIdChains $ S.delete cId chains
-    res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
-
-getOrgNameChains :: (String, Maybe String)
+getTrueOrgNameChains :: ChainMembers
                  -> Redis (S.Set Word256)
-getOrgNameChains org = getInNamespace PrivateOrgNameChains org <&> \case
+getTrueOrgNameChains org = getInNamespace PrivateTrueOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-addOrgNameChain :: (String, Maybe String)
+getFalseOrgNameChains :: ChainMembers
+                 -> Redis (S.Set Word256)
+getFalseOrgNameChains org = getInNamespace PrivateFalseOrgNameChains org <&> \case
+    Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
+                            in chains
+    _                    -> S.empty
+
+addOrgNameChain :: ChainMembers
                 -> Word256
                 -> Redis (Either Reply Status)
-addOrgNameChain org cId = do
-    chains <- getOrgNameChains org
-    let chains' = RedisOrgNameChains $ S.insert cId chains
-    res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
+addOrgNameChain cm cId = do
+    chainsTrue <- getTrueOrgNameChains $ getTrueChainMemberParsedSets cm
+    let chains' = RedisOrgNameChains $ S.insert cId chainsTrue 
+    res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
+        TxError e  -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
 
-removeOrgNameChain :: (String, Maybe String)
+removeOrgNameChain :: ChainMembers
                    -> Word256
                    -> Redis (Either Reply Status)
-removeOrgNameChain org cId = do
-    chains <- getOrgNameChains org
-    let chains' = RedisOrgNameChains $ S.delete cId chains
-    res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
+removeOrgNameChain cm cId = do
+    chainsFalse<- getFalseOrgNameChains $ getFalseChainMemberParsedSets cm
+    let chains' = RedisOrgNameChains $ S.insert cId chainsFalse
+    res <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
@@ -987,9 +922,9 @@ runStratoRedisIO r = liftIO $ do
   runRedis conn r
 
 -- Retrieve a organization name and unit associated with an address
-addressToOrg :: Address -> Redis (Maybe (String, Maybe String))
-addressToOrg addr = do
-    cIs <- getCertificate addr
-    case cIs of
-        Nothing -> return Nothing
-        Just c  -> return . Just $ (orgName &&& orgUnit) c
+-- addressToOrg :: Address -> Redis (Maybe ChainMember)
+-- addressToOrg addr = do
+--     cIs <- getCertificate addr
+--     case cIs of
+--         Nothing -> return Nothing
+--         Just c  -> return . Just $ (orgName &&& orgUnit) c

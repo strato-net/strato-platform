@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TemplateHaskell       #-}
+
 
 module Blockchain.RLPx (
   ethCryptConnect,
@@ -20,7 +22,6 @@ import qualified       Data.ByteString.Lazy              as BL
 import                 Data.Conduit
 import qualified       Data.Conduit.Binary               as CB
 import                 Data.Maybe
-
 import qualified       Blockchain.AESCTR                 as AES
 import                 Blockchain.Data.PubKey
 import                 Blockchain.Data.RLP
@@ -51,9 +52,7 @@ ethCryptConnect otherPubKey = do
   yield handshakeInitBytes
 
   handshakeReplyBytes <- CB.take 210
-
-  when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes"
-
+  when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes!!" 
   eAckBS <- ECIES.decrypt handshakeReplyBytes B.empty
 
   let ackMsg = bytesToAckMsg $ either (error . ("error in ethCryptConnect"++)) id eAckBS 

@@ -4,9 +4,13 @@
 .stack-work
 .stack-work-profile
 docker-compose.push.yml
+docker-compose.push.ecr.yml
 docker-compose.yml
+docker-compose.ecr.yml
 docker-compose.vault.push.yml
+docker-compose.vault.push.ecr.yml
 docker-compose.vault.yml
+docker-compose.vault.ecr.yml
 stack.yaml.lock
 configurationCache.log
 dryrun.log

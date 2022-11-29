@@ -42,7 +42,11 @@ pipeline {
             cp docker-compose.yml docker-compose.vault.yml strato-getting-started/
             cd strato-getting-started
             
-            docker-compose -p vault -f docker-compose.vault.yml up -d                             # TODO: The password is being set as part of strato deployment, not Vault. Fix. Or remove the password from Vault ¯\\_(ツ)_/¯
+            HTTP_PORT=8088 \
+              INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \
+              INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \
+              INITIAL_OAUTH_JWT_USERNAME_PROPERTY='sub' \
+              docker-compose -p vault -f docker-compose.vault.yml up -d                             # TODO: The password is being set as part of strato deployment, not Vault. Fix. Or remove the password from Vault ¯\\_(ツ)_/¯
             
             export NODE_HOST=$(</host)
             export genesis=smokeTest
@@ -53,6 +57,7 @@ pipeline {
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
             export VAULT_URL=http://172.17.0.1:8088                                               # TODO: switch to vault's nginx port   #fix-before-shared-vault-done
+            export requireCerts=false
             ./strato --single
             
             docker ps

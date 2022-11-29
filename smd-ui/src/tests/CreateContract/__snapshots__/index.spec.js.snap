@@ -224,6 +224,7 @@ Object {
   },
   "isOpen": true,
   "isToasts": false,
+  "toastsError": undefined,
   "toastsMessage": "message",
   "username": "",
 }
@@ -492,6 +493,7 @@ ShallowWrapper {
       sourceFromEditor={undefined}
       submitting={false}
       textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsError="unable to call the function"
       toastsMessage="message"
       touch={[Function]}
       username="Supplier1"
@@ -750,6 +752,7 @@ ShallowWrapper {
       "sourceFromEditor": undefined,
       "submitting": false,
       "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsError": "unable to call the function",
       "toastsMessage": "message",
       "touch": [Function],
       "username": "Supplier1",
@@ -1005,6 +1008,7 @@ ShallowWrapper {
         "sourceFromEditor": undefined,
         "submitting": false,
         "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsError": "unable to call the function",
         "toastsMessage": "message",
         "touch": [Function],
         "username": "Supplier1",
@@ -1293,6 +1297,7 @@ ShallowWrapper {
       sourceFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
       submitting={false}
       textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsError=""
       toastsMessage="message"
       touch={[Function]}
       username="Supplier1"
@@ -1553,6 +1558,7 @@ ShallowWrapper {
       "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
       "submitting": false,
       "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsError": "",
       "toastsMessage": "message",
       "touch": [Function],
       "username": "Supplier1",
@@ -1810,6 +1816,7 @@ ShallowWrapper {
         "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
         "submitting": false,
         "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsError": "",
         "toastsMessage": "message",
         "touch": [Function],
         "username": "Supplier1",

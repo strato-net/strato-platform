@@ -124,11 +124,11 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
-    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
+    - requireCerts=${requireCerts:-true}
     - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}

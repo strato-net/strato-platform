@@ -35,6 +35,7 @@ import           Data.List                             (intercalate)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import qualified Data.NibbleString                     as N
+import           Data.Ranged
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
@@ -43,7 +44,7 @@ import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Traversable                      (for)
 import           Data.Maybe
-import           Text.Printf
+-- import           Text.Printf
 
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
@@ -77,12 +78,13 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
 --import  BlockApps.X509.Certificate           
+import  BlockApps.X509.Keys
 
 import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
 import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
-import           Blockchain.Options                    (AuthorizationMode(..))
+import           Blockchain.Options                    ()
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
@@ -109,6 +111,7 @@ import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
+import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.TxRunResultCache           as TRC
 
 import           Debugger                              (DebugSettings)
@@ -153,12 +156,11 @@ data TestContext = TestContext
   , _p2pWorldBestBlock     :: WorldBestBlock
   , _bestBlock             :: BestBlock
   , _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData)
-  , _ipAddressIpChainsMap  :: Map IPAddress IPChains
-  , _orgIdChainsMap        :: Map OrgId OrgIdChains
-  , _orgNameChainsMap      :: Map (OrgName, OrgUnit) OrgNameChains
+  , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
+  , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
   , _x509certMap           :: Map Address X509CertInfoState
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
-  , _chainMembersMap       :: Map Word256 ChainMembers
+  , _chainMembersMap       :: Map Word256 ChainMemberRSet
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
@@ -215,22 +217,19 @@ instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
 instance MonadIO m => A.Selectable Integer (Canonical DataDefs.BlockData) (MonadTest m) where
   select _ i = M.lookup i <$> use canonicalBlockDataMap
 
-instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use ipAddressIpChainsMap
+instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use trueOrgNameChainsMap
 
-instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgIdChainsMap
+instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
 
-instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgNameChainsMap
-
-instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+instance (MonadLogger m, MonadIO m) => A.Selectable Address X509CertInfoState (MonadTest m) where
   select _ a = M.lookup a <$> use x509certMap
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (MonadTest m) where
+instance MonadIO m => A.Selectable Word256 ChainMemberRSet (MonadTest m) where
   select _ cid = M.lookup cid <$> use chainMembersMap
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
@@ -299,10 +298,15 @@ instance (Keccak256 `A.Alters` OutputBlock) m => (Keccak256 `A.Alters` OutputBlo
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance ((OrgName, OrgUnit) `A.Alters` Word256) m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadP2PTest m) where
+instance (ChainMembers `A.Alters` Word256) m => (ChainMembers `A.Alters` Word256) (MonadP2PTest m) where
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
+
+-- instance ((P2P ChainMembers) `A.Alters` Word256) m => ((P2P ChainMembers) `A.Alters` Word256) (MonadP2PTest m) where
+--   lookup p k   = lift $ A.lookup p k
+--   insert p k v = lift $ A.insert p k v
+--   delete p k   = lift $ A.delete p k
 
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
@@ -315,16 +319,10 @@ instance Mod.Modifiable BestBlock m => Mod.Modifiable BestBlock (MonadP2PTest m)
 instance A.Selectable Integer (Canonical DataDefs.BlockData) m => A.Selectable Integer (Canonical DataDefs.BlockData) (MonadP2PTest m) where
   select p i = lift $ A.select p i
 
-instance A.Selectable IPAddress IPChains m => A.Selectable IPAddress IPChains (MonadP2PTest m) where
-  select p ip = lift $ A.select p ip
-
-instance A.Selectable OrgId OrgIdChains m => A.Selectable OrgId OrgIdChains (MonadP2PTest m) where
-  select p ip = lift $ A.select p ip
-
 instance A.Selectable Keccak256 ChainTxsInBlock m => A.Selectable Keccak256 ChainTxsInBlock (MonadP2PTest m) where
   select p sha = lift $ A.select p sha
 
-instance A.Selectable Word256 ChainMembers m => A.Selectable Word256 ChainMembers (MonadP2PTest m) where
+instance A.Selectable Word256 ChainMemberRSet m => A.Selectable Word256 ChainMemberRSet (MonadP2PTest m) where
   select p cid = lift $ A.select p cid
 
 instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (MonadP2PTest m) where
@@ -333,7 +331,10 @@ instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (Mon
 instance A.Selectable Keccak256 (Private (Word256, OutputTx)) m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
 
-instance A.Selectable (OrgName, OrgUnit) OrgNameChains m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadP2PTest m) where
+instance A.Selectable ChainMembers TrueOrgNameChains m => A.Selectable ChainMembers TrueOrgNameChains (MonadP2PTest m) where
+  select p org = lift $ A.select p org
+
+instance A.Selectable ChainMembers FalseOrgNameChains m => A.Selectable ChainMembers FalseOrgNameChains (MonadP2PTest m) where
   select p org = lift $ A.select p org
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
@@ -414,7 +415,7 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
-instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadTest m) where
+instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
   insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
   delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
@@ -742,8 +743,11 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
   insert _ _ _ = pure ()
 
-instance Show OrgNameChains where
-  show = intercalate ", " . map show . Set.toList . unOrgNameChains
+instance Show TrueOrgNameChains where
+  show = intercalate ", " . map show . Set.toList . unTrueOrgNameChains
+
+instance Show FalseOrgNameChains where
+  show = intercalate ", " . map show . Set.toList . unFalseOrgNameChains
 
 bestBlockRef :: IORef BestBlock
 bestBlockRef = unsafePerformIO . newIORef $ BestBlock zeroHash 0 0
@@ -763,7 +767,12 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainInfo) (MonadTest m) where
 instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
-  insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
+  insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
+
+-- instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
+--   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
+--   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
+--   insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -812,9 +821,8 @@ testContext prv seqCtx vmCtx = TestContext
   , _p2pWorldBestBlock     = WorldBestBlock (BestBlock zeroHash (-1) 0)
   , _bestBlock             = BestBlock zeroHash (-1) 0
   , _canonicalBlockDataMap = M.empty
-  , _ipAddressIpChainsMap  = M.empty
-  , _orgIdChainsMap        = M.empty
-  , _orgNameChainsMap      = M.empty
+  , _trueOrgNameChainsMap  = M.empty
+  , _falseOrgNameChainsMap = M.empty
   , _x509certMap           = M.empty
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
@@ -1019,41 +1027,28 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                     $logInfoS (T.pack name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
-                                    AddMember (Right (cId, addr, enode)) -> do
-                                      chainMembersMap %= (\m -> case M.lookup cId m of
-                                        Nothing -> M.insert cId (ChainMembers $ M.singleton addr enode) m
-                                        Just (ChainMembers cm) -> M.insert cId (ChainMembers $ M.insert addr enode cm) m)
-                                      ipAddressIpChainsMap %= (\m -> case M.lookup (ipAddress enode) m of
-                                        Nothing -> M.insert (ipAddress enode) (IPChains $ Set.singleton cId) m
-                                        Just (IPChains s) -> M.insert (ipAddress enode) (IPChains $ Set.insert cId s) m)
-                                      orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
-                                        Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
-                                        Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainMember cId addr enode
-                                    RemoveMember (Right (cId, addr)) -> do
-                                      mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
-                                      chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
-                                      for_ mEnode $ \enode -> do
-                                        ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
-                                        orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
-                                    AddOrgName (Right (cid, (n, u))) -> do
-                                      let org = (OrgName n, OrgUnit u)
-                                      orgNameChainsMap %= (\m -> case M.lookup org m of
-                                          Nothing -> M.insert org (OrgNameChains $ Set.singleton cid) m
-                                          Just (OrgNameChains s) -> M.insert org (OrgNameChains $ Set.insert cid s) m
-                                        )
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName cid (n, u)
-                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    RegisterCertificate (Right (_, addr, certState)) -> do x509certMap %= \m -> M.insert addr certState m
-                                    CertificateRevoked _ -> pure () --(Right addr) -> pure ()
-                                    CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
-                                    TerminateChain _ -> pure ()
-                                    PutLogDB _ -> pure ()
-                                    PutEventDB _ -> pure ()
-                                    PutTxResult _ -> pure ()
-                                    ev -> do
-                                      $logInfoS (T.pack name <> "/testTxrIndexer") . T.pack $ show ev
-                                      pure ()
+                                      AddOrgName (Right (chainId, cm)) -> do
+                                        let org = ChainMembers $ Set.singleton cm
+                                            newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
+                                        chainMembersMap . at chainId %= \case
+                                          Nothing -> Just newMemRset
+                                          Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetUnion rset' newMem
+                                        trueOrgNameChainsMap %= (\m -> case M.lookup org m of
+                                            Nothing -> M.insert org (TrueOrgNameChains $ Set.singleton chainId) m
+                                            Just (TrueOrgNameChains s) -> M.insert org (TrueOrgNameChains $ Set.insert chainId s) m
+                                          )
+                                        atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
+                                      RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
+                                      RegisterCertificate (Right (_, addr, certState)) -> x509certMap %= M.insert addr certState
+                                      CertificateRevoked _ -> pure () --(Right addr) -> pure ()
+                                      CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
+                                      TerminateChain _ -> pure ()
+                                      PutLogDB _ -> pure ()
+                                      PutEventDB _ -> pure ()
+                                      PutTxResult _ -> pure ()
+                                      ev -> do
+                                        $logInfoS (T.pack name <> "/testTxrIndexer") . T.pack $ show ev
+                                        pure ()
                                  )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
@@ -1179,6 +1174,11 @@ instance HasVaultProxy IO where
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
+instance HasVault (ReaderT PrivateKey IO) where
+  sign bs = ask >>= \pk -> return $ signMsg pk bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
+
 -- endlessStreamOfIPAddresses :: [String]
 -- endlessStreamOfIPAddresses = generateThem
 --   where galois x = let y = (7*chx) `mod` 256 in x : galois y
@@ -1296,9 +1296,15 @@ spec = do
 
     it "can add a new node to a chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
-      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
-      let validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+      let Right privKey = bsToPriv "-----BEGIN EC PRIVATE KEY-----\nMC4CAQEEIAK4aeMOUuoDv/zOIBypht779qzK44JWbxl2lA7id/amoAcGBSuBBAAK\n-----END EC PRIVATE KEY-----"
+      nodePrivKeys <- (privKey:) <$> traverse (const newPrivateKey) [(2 :: Integer)..3]
+      let nodePubKeys = derivePublicKey <$> nodePrivKeys
+          nodeCertInfos = [ ("BlockApps", "Engineering", "James Hormuzdiar", nodePubKeys !! 0)
+                          , ("Microsoft", "Sales", "Bob Smith", nodePubKeys !! 1)
+                          , ("Amazon", "CEO", "Jeffrey Bezos", nodePubKeys !! 2)
+                          ]
+      let validators' = makeValidators nodePrivKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip nodePrivKeys
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -1308,26 +1314,97 @@ spec = do
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      let runForThreeSeconds = void . timeout 3000000
-          src = [r|
+      let runForSeconds n = void . timeout (n * 1000000)
+      let src =  [r|
+pragma solidvm 3.2;
+contract BlockAppsCertificateRegistry {
+  constructor(string _rootCert) {
+    registerCert(_rootCert);
+  }
+
+  function registerCertificate(string _cert) {
+    registerCert(_cert);
+    new Certificate(_cert);
+  }
+}
+
+contract Certificate {
+    address owner;  // The CertificateRegistery Contract
+    string public certificateString;
+    event CertificateRegistered(string cert);
+
+    constructor(string _certificateString) {
+        owner = msg.sender;
+        certificateString = _certificateString;
+        emit CertificateRegistered(_certificateString);
+    }
+}
+|]
+          contractName = "BlockAppsCertificateRegistry"
+      let issuer = Issuer
+            { issCommonName = "Admin"
+            , issOrg        = "BlockApps"
+            , issUnit       = Just "Engineering"
+            , issCountry    = Just "USA"
+            }
+          subjects = (\(org, unit, cn, pub) -> Subject
+            { subCommonName = cn
+            , subOrg        = org
+            , subUnit       = Just unit
+            , subCountry    = Just "USA"
+            , subPub        = pub
+            }) <$> nodeCertInfos
+      putStrLn $ show rootCert
+      certs <- traverse (\subject -> fmap (T.pack . BC.unpack . certToBytes) $ runReaderT (makeSignedCert Nothing (Just rootCert) issuer subject) privKey) subjects
+
+      let --args addr cert = "(0x" <> T.pack (formatAddressWithoutColor addr) <> ", \"" <> cert <> "\")"
+          utx0 = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack src
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          rootCertStr = T.pack . BC.unpack $ certToBytes rootCert
+          txMd = M.fromList [("VM", "SolidVM"), ("src", src), ("name", contractName), ("args", "(\"" <> rootCertStr <> "\")")]
+          addMd t = t{transactionMetadata = Just txMd}
+          signedTx0 = addMd $ mkSignedTx privKey utx0
+      let args1 cert = "(\"" <> cert <> "\")"
+          utx1 cert i = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce i
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Just $ getNewAddress_unsafe (fromPrivateKey privKey) 0
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack $ T.unpack $ args1 cert
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          txMd1 cert = M.fromList [("VM", "SolidVM"), ("funcName", "registerCertificate"), ("args", args1 cert)]
+          addMd1 cert t = t{transactionMetadata = Just $ txMd1 cert}
+          signedTx1s = (\(cert,i) -> addMd1 cert . mkSignedTx privKey $ utx1 cert i) <$> zip certs [1..]
+
+      let privChainSrc = [r|
 pragma solidvm 3.2;
 contract A {
-  event MemberAdded(address addr, string enode);
-  function addMember(address _addr, string _enode) {
-    emit MemberAdded(_addr, _enode);
+  event OrgAdded(string orgName);
+  function addMember(string _orgName) {
+    emit OrgAdded(_orgName);
   }
 }
 |]
-          contractName = "A"
-          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          enode2 = "enode://abcd@5.6.7.8:30303"
+          privContractName = "A"
+          chainMember1 :: ChainMembers
+          chainMember1 = (ChainMembers $ Set.singleton $ (Org (T.pack "BlockApps") True))
+
           chainInfo' = ChainInfo
             UnsignedChainInfo { chainLabel     = "My test chain!"
-                              , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+                              , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode privContractName $ hash privChainSrc)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
-                              , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.singleton (validators' !! 0) enode1
+                              , codeInfo       = [CodeInfo "" privChainSrc $ Just privContractName]
+                              , members        = chainMember1
                               , parentChain    = Nothing
                               , creationBlock  = zeroHash
                               , chainNonce     = 123456789
@@ -1335,9 +1412,8 @@ contract A {
                               }
             Nothing
           chainId = keccak256ToWord256 $ rlpHash chainInfo'
-      ts <- liftIO getCurrentMicrotime
-      let args = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> ",\"" <> T.pack enode2 <> "\")"
-          utx' = U.UnsignedTransaction
+      let args = "(\"Microsoft\")"
+          privUtx' = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 0
             , U.unsignedTransactionGasPrice   = Wei 1
             , U.unsignedTransactionGasLimit   = Gas 1000000000
@@ -1346,22 +1422,38 @@ contract A {
             , U.unsignedTransactionInitOrData = Code ""
             , U.unsignedTransactionChainId    = Just $ ChainId chainId
             }
-          tx'' = mkSignedTx (privKeys !! 0) utx'
-          txMd = M.fromList [("funcName","addMember"),("args",args)]
-          tx' = tx''{transactionMetadata = M.union txMd <$> transactionMetadata tx''}
-          ietx = IETx ts $ IngestTx Origin.API tx'
+          tx'' = mkSignedTx (nodePrivKeys !! 0) privUtx'
+          privTxMd = M.fromList [("funcName","addMember"),("args",args)]
+          tx' = tx''{transactionMetadata = M.union privTxMd <$> transactionMetadata tx''}
+      let mainChainRoute tx = do
+            threadDelay 500000
+            tsNow <- liftIO getCurrentMicrotime
+            let ietx = IETx tsNow $ IngestTx Origin.API tx
+            flip postEvent (peers !! 0) $ UnseqEvent ietx
           routine = do
+            threadDelay 1000000
+            for_ peers $ postEvent (TimerFire 0)
+            threadDelay 1000000
+            for_ peers $ postEvent (TimerFire 1)
+            threadDelay 1000000
+            for_ peers $ postEvent (TimerFire 2)
+            threadDelay 500000
+            tsNowMain <- liftIO getCurrentMicrotime
+            let ietxMain = IETx tsNowMain $ IngestTx Origin.API signedTx0
+            flip postEvent (peers !! 0) $ UnseqEvent ietxMain
+            for_ signedTx1s $ mainChainRoute
             threadDelay 500000
             flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
             threadDelay 500000
+            tsNow <- liftIO getCurrentMicrotime
+            let ietx = IETx tsNow $ IngestTx Origin.API tx'
             flip postEvent (peers !! 0) $ UnseqEvent ietx
-            for_ peers $ postEvent (TimerFire 0)
 
-      runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
+      runForSeconds 10 $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
-    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
+    xit "can sync a new node to a chain after running multiple transactions on that chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
@@ -1401,8 +1493,14 @@ contract B {
 }
 |]
           mainChainContractName = "B"
-          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          enode2 = readEnode "enode://abcd@5.6.7.8:30303"
+          chainMember1 :: ChainMemberParsedSet
+          chainMember1 = (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "Dustin Norwood") True)
+                              
+          chainMember2 :: ChainMemberParsedSet
+          chainMember2 = (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True)
+
+          -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+          -- enode2 = readEnode "enode://abcd@5.6.7.8:30303"
           enode3 = "enode://abcd@9.10.11.12:30303"
           mkChainInfo bHash = ChainInfo
             UnsignedChainInfo { chainLabel     = "My parent test chain!"
@@ -1411,9 +1509,7 @@ contract B {
                                                  , NonContract (validators' !! 1) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.fromList [ (validators' !! 0, enode1)
-                                                            , (validators' !! 1, enode2)
-                                                            ]
+                              , members        = ChainMembers (Set.fromList [chainMember1, chainMember2])
                               , parentChain    = Nothing
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
@@ -1426,8 +1522,7 @@ contract B {
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.fromList [ (validators' !! 0, enode1)
-                                                            ]
+                              , members        = ChainMembers (Set.fromList [chainMember1])
                               , parentChain    = Just pChain
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
@@ -1654,67 +1749,6 @@ contract RegisterCert {
             `L.shouldReturn` [Left TXQueueTimeout]
 
   describe "Private Chain Authorization" $ do
-    let ip1 = "172.20.44.53"
-        ip2 = "33.4.2.1"
-        ip3 = "5.9.150.40"
-        ip4 = "127.0.0.1"
-        key1 = "3414c01c19aa75a34f2dbd2f8d0898dc79d6b219ad77f8155abf1a287ce2ba60f14998a3a98c0cf14915eabfdacf914a92b27a01769de18fa2d049dbf4c17694"
-        key2 = "f4642fa65af50cfdea8fa7414a5def7bb7991478b768e296f5e4a54e8b995de102e0ceae2e826f293c481b5325f89be6d207b003382e18a8ecba66fbaf6416c0"
-        key3 = "a4de274d3a159e10c2c9a68c326511236381b84c9ec52e72ad732eb0b2b1a2277938f78593cdbe734e6002bf23114d434a085d260514ab336d4acdc312db671b"
-        key4 = "a979fb575495b8d6db44f750317d0f4622bf4c2aa3365d6af7c284339968eef29b69ad0dce72a4d8db5ebb4968de0e3bec910127f134779fbcb0cb6d3331163c"
-        cert1 = Just X509CertInfoState {
-          userAddress = 0x1234 :: Address,
-          certificate = X509Certificate (CertificateChain []),
-          isValid = True,
-          BlockApps.X509.Certificate.children = [],
-          orgName = "Blockapps",
-          orgUnit = Just "engineering"
-        }
-        cert2 = Just X509CertInfoState {
-          userAddress = 0x33beef44 :: Address,
-          certificate = X509Certificate (CertificateChain []),
-          isValid = False,
-          BlockApps.X509.Certificate.children = [],
-          orgName = "Red Bull Racing",
-          orgUnit = Nothing
-        }
-        mkEnode :: String -> String -> Enode
-        mkEnode key ip = readEnode $ printf "enode://%s@%s:30303" key ip
-        chainMembers = M.fromList
-           [ (0xdeadbeef, mkEnode key1 ip1)
-           , (0xddba11, mkEnode key2 ip2)
-           , (0x888, mkEnode key3 ip3)
-           ]
-
-        shouldAccept :: AuthorizationMode -> (String, String) -> IO ()
-        shouldAccept mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert1 (OrgNameChains $ Set.singleton (0xabcdef :: Word256)))
-
-        shouldReject :: AuthorizationMode -> (String, String) -> IO ()
-        shouldReject mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember'' mode p (ChainMembers chainMembers) cert2 (OrgNameChains Set.empty))
-
-    describe "IPOnly" $ do
-      it "should reject the wrong ip" $ IPOnly `shouldReject` (key1, ip4)
-      it "should accept the right ip with the wrong key" $ IPOnly `shouldAccept` (key4, ip2)
-
-    describe "PubkeyOnly" $ do
-      it "should reject the wrong key" $ PubkeyOnly `shouldReject` (key4, ip1)
-      it "should accept the right key with the wrong ip" $ PubkeyOnly `shouldAccept` (key2, ip4)
-
-    describe "X509Only" $ do
-      it "should reject a revoked cert" $ X509Only `shouldReject` (key1, ip1)
-      it "should approve a valid cert" $ X509Only `shouldAccept` (key2, ip2)
-
-    describe "StrongAuth" $ do
-      it "should reject a mismatched ip, key pair" $ StrongAuth `shouldReject` (key3, ip2)
-      it "should accept a matching ip, key pair" $ StrongAuth `shouldAccept` (key3, ip3)
-
-    describe "FlexibleAuth" $ do
-      it "should reject a wrong ip and wrong key" $ FlexibleAuth `shouldReject` (key4, ip4)
-      it "should accept a matching ip" $ FlexibleAuth `shouldAccept` (key4, ip1)
-      it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
-
     describe "X.509 Private Chain exchange" $ do
       it "can add an organization to a private chain" $ do
           let unseqSink = (unseqEvents %=) . (++)
@@ -1734,20 +1768,23 @@ contract RegisterCert {
           dt <- liftIO dateCurrent
           cIdRef <- newIORef undefined
           cInfoRef <- newIORef undefined
-          let runForThreeSeconds = void . timeout 3000000
-              enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+          let runForNineSeconds = void . timeout 9000000
+              -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+              chainMember1 :: ChainMembers
+              chainMember1 = (ChainMembers $ Set.singleton $ (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True))
+           
               toIetx = IETx ts . IngestTx Origin.API
               mkChainId = keccak256ToWord256 . rlpHash
 
           -- Create a certificate registry on the main chain
               iss   = Issuer {  issCommonName = "Dustin"
-                              , issOrg        = "Blockapps"
-                              , issUnit       = Just "engineering"
+                              , issOrg        = "BlockApps"
+                              , issUnit       = Just "Engineering"
                               , issCountry    = Just "USA"
                               }
               subj  = Subject { subCommonName = "Garrett"
-                              , subOrg        = "Blockapps"
-                              , subUnit       = Just "engineering"
+                              , subOrg        = "BlockApps"
+                              , subUnit       = Just "Engineering"
                               , subCountry    = Just "USA"
                               , subPub        = derivePublicKey (privKeys !! 1)
                               } 
@@ -1781,17 +1818,17 @@ contract RegisterCert {
               src = [r|
                     pragma solidvm 3.2;
                     contract A {
-                      event OrganizationAdded(string name, string unit);
+                      event OrgUnitAdded(string name, string unit);
 
                       constructor() {}
 
                       function addOrg(string _name, string _unit) {
-                        emit OrganizationAdded(_name, _unit);
+                        emit OrgUnitAdded(_name, _unit);
                       }
                     }
                     |]
               contractName = "A"
-              args = "(" <> "\"Blockapps\"" <> ", \"engineering\"" <> ")"
+              args = "(" <> "\"BlockApps\"" <> ", \"Engineering\"" <> ")"
               txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
               addMd t = t{transactionMetadata = M.union txMd <$> transactionMetadata t}
               tChainInfo = ChainInfo
@@ -1801,7 +1838,7 @@ contract RegisterCert {
                                                     , NonContract (validators' !! 1) 1000000000000000000000
                                                     ]
                                   , codeInfo       = [CodeInfo "" src $ Just contractName]
-                                  , members        = M.singleton (validators' !! 0) enode1
+                                  , members        = chainMember1
                                   , parentChain    = Nothing
                                   , creationBlock  = zeroHash
                                   , chainNonce     = 123456789
@@ -1833,7 +1870,7 @@ contract RegisterCert {
                 threadDelay 200000
                 flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId -- Add organization to private chain
 
-          runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
+          runForNineSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
           testCid <- readIORef cIdRef
 
@@ -1841,10 +1878,10 @@ contract RegisterCert {
           for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
           -- Node 1's cert was registered in the contract so it should receive the chain ID
-          (ctxs1 !! 1) ^. orgNameChainsMap `shouldBe`
-            M.singleton (OrgName "Blockapps", OrgUnit $ Just "engineering") (OrgNameChains $ Set.singleton testCid)
+          (ctxs1 !! 1) ^. trueOrgNameChainsMap `shouldBe`
+            M.singleton (ChainMembers $ Set.singleton $ (OrgUnit (T.pack "BlockApps") (T.pack "Engineering") True)) (TrueOrgNameChains $ Set.singleton testCid)
 
           -- Node 2's cert is not registered so it should not have any in the set
-          (ctxs1 !! 2) ^. orgNameChainsMap `shouldBe` M.empty
+          (ctxs1 !! 2) ^. falseOrgNameChainsMap `shouldBe` M.empty
 
           -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()
