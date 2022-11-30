@@ -286,7 +286,7 @@ contract A {
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
-    fit "can sync a new node to a chain after running multiple transactions on that chain" $ do
+    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
       peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys

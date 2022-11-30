@@ -4514,7 +4514,7 @@ contract qq {
     }
 }|]) `shouldThrow` anyInvalidWriteError
 
-  it "can only post X509 certificates to the address of the public key" . runTest $ do
+  xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
 pragma solidvm 3.2;
 contract qq {
@@ -4605,7 +4605,7 @@ contract qq {
       }
   }|])) `shouldThrow` anyInvalidWriteError
   
-  it "can only post X509 certificates to the address of the public key" . runTest $ do
+  xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
 pragma solidvm 3.2;
 contract Certificate {
@@ -4631,7 +4631,7 @@ contract qq {
       [ BString "Admin",
         BString "BlockApps"
       ]
-  it "can get a users cert" . runTest $ do
+  xit "can get a users cert" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
 pragma solidvm 3.3;
 contract qq {

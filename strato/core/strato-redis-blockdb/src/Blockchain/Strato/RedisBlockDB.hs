@@ -39,7 +39,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
-    , getSyncStatus, putSyncStatus
+    , getSyncStatus, putSyncStatus, getSyncStatusNow
     ) where
 
 import           BlockApps.X509.Certificate
@@ -999,6 +999,22 @@ checkAndUpdateSyncStatus = do
         (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
         (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
         _ -> pure ()
+
+getSyncStatusNow :: Redis (Maybe Bool)
+getSyncStatusNow = do
+    status         <- getSyncStatus
+    if case status of Just True -> True; _ -> False; 
+        then pure  $ Just True
+        else do
+            nodeBestBlock  <- getBestBlockInfo
+            worldBestBlock <- getWorldBestBlockInfo
+            let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+                worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+            pure $ Just $  case (status, nodeTotalDiff, worldTotalDiff) of
+                (Just False, Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Nothing,  Just _  ) -> False
+                _ ->  True
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"
