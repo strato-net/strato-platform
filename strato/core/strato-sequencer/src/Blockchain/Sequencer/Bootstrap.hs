@@ -65,7 +65,7 @@ bootstrapSequencer Block{blockBlockData = bd,
       
       -- initialize vault client, TODO: make this URL a cl arg
       mgr <- newManager defaultManagerSettings
-      vaultProxyUrl <- parseBaseUrl "http://strato:8013/vault-proxy" --Might have a harder time removing hardcoding here, no real way to implement flags
+      vaultProxyUrl <- parseBaseUrl "http://strato:8013/" --Might have a harder time removing hardcoding here, no real way to implement flags
       let clientEnv = mkClientEnv mgr vaultProxyUrl
 
           dummySequencerCfg = SequencerConfig
