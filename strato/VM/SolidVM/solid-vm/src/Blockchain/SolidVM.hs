@@ -2819,31 +2819,31 @@ callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
 certificateMap :: Maybe String -> CC.Contract -> Value
-certificateMap maybeCert = 
+certificateMap maybeCert cntrct = 
     case maybeCert of
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
           -- pragmaVersion = CC._vmVersion cntrct
-          -- nonEmptyFields cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-          --                                      , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
-          --                                      , (SString "organization", Constant . SString $ subOrg sub)
-          --                                      , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
-          --                                      , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
-          --                                      , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
-          --                                      , (SString "certString", Constant . SString $ cert)
-          --                                      , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
-          --                                      ]
-          -- emptyFields = M.fromList [ (SString "commonName", Constant . SString $ "")
-          --                          , (SString "country", Constant . SString $ "")
-          --                          , (SString "organization", Constant . SString $ "")
-          --                          , (SString "group", Constant . SString $ "")
-          --                          , (SString "publicKey", Constant . SString $ "")
-          --                          , (SString "userAddress", Constant . SString $ "")
-          --                          , (SString "certString", Constant . SString $ "")
-          --                          , (SString "parent", Constant . SString $ "")
-          --                          ]
+          nonEmptyFields cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                               , (SString "organization", Constant . SString $ subOrg sub)
+                                               , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
+                                               , (SString "certString", Constant . SString $ cert)
+                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+                                               ]
+          emptyFields = M.fromList [ (SString "commonName", Constant . SString $ "")
+                                   , (SString "country", Constant . SString $ "")
+                                   , (SString "organization", Constant . SString $ "")
+                                   , (SString "group", Constant . SString $ "")
+                                   , (SString "publicKey", Constant . SString $ "")
+                                   , (SString "userAddress", Constant . SString $ "")
+                                   , (SString "certString", Constant . SString $ "")
+                                   , (SString "parent", Constant . SString $ "")
+                                   ]
           certMap cert sub  = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub) 
                                          , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert ) 
                                          ]
