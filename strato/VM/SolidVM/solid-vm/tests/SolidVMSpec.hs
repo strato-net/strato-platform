@@ -4724,7 +4724,7 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
-  fit "can get a users cert" . runTest $ do
+  xit "can get a users cert" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 pragma solidvm 3.4;
 contract Certificate {
