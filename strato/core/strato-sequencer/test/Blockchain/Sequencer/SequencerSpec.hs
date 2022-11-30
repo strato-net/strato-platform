@@ -170,8 +170,8 @@ feedBackOutputsToInput = map rebox
     where rebox (VmTx ts t) = IETx ts $ unboxTx t
           rebox (VmBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           rebox x = error $ "why are we testing against " ++ show x
-          unboxTx (OutputTx origin _ _ _ base _) = IngestTx origin base
-          unboxBlockTx (OutputTx _ _ _ _ base _) = base
+          unboxTx (OutputTx origin _ _ base _) = IngestTx origin base
+          unboxBlockTx (OutputTx _ _ _ base _) = base
 
 mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do

@@ -241,8 +241,7 @@ contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    Certificate[] certificates;
-    mapping(address => uint) certificatesMap;
+    mapping(address => Certificate) addressToCertMap;
     address public owner;
 
     bool initialized;
@@ -265,9 +264,8 @@ contract CertificateRegistry {
             // Create the Certificate record
             Certificate c = new Certificate(_rootCerts[i]);
             // Register the root certificates and emit event
-            certificates.push(c);
-            certificatesMap[c.userAddress()] = certificates.length;
-            registerCert(_rootCerts[i]);
+            addressToCertMap[c.userAddress()] = c;
+            
             emit CertificateRegistered(_rootCerts[i]);
         }
         
@@ -282,7 +280,7 @@ contract CertificateRegistry {
         
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
-        Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
+        Certificate parentContract = addressToCertMap[account(parentUserAddress)];
         
         if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
             // Create the new Certificate record
@@ -292,10 +290,9 @@ contract CertificateRegistry {
                 parentContract.addChild(c.userAddress());    
             }
 
-            certificates.push(c);
-            certificatesMap[c.userAddress()] = certificates.length;
+            addressToCertMap[c.userAddress()] = c;
             
-            registerCert(newCertificateString);
+            
             emit CertificateRegistered(newCertificateString);
     
             return 200; // 200 = HTTP Status OK
@@ -303,8 +300,8 @@ contract CertificateRegistry {
         return 400;
     }
 
-    function getUserCert(address _address) returns (address) {
-        return certificates[certificatesMap[account(_address)]];
+    function getUserCert(address _address) returns (Certificate) {
+        return addressToCertMap[account(_address)];
     }
     
     function getCertByAddress(address _address) returns (Certificate) {
@@ -312,11 +309,11 @@ contract CertificateRegistry {
     }
     
     function getCertByAccount(address _account) returns (Certificate) {
-        return certificates[certificatesMap[_account]-1];
+        return addressToCertMap[account(_account)];
     }
     
     function revokeCert(address userAddress){
-        Certificate myCert = certificates[certificatesMap[userAddress]-1];
+        Certificate myCert = addressToCertMap[account(userAddress)];
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
 
         int childrenLength = myCert.revoke();
@@ -328,9 +325,9 @@ contract CertificateRegistry {
     }
     
     function isChild(string pCert, address certUserAddress) returns (bool) {
-        Certificate myCert = certificates[certificatesMap[certUserAddress]-1];
+        Certificate myCert = addressToCertMap[account(certUserAddress)];
         address parentUserAddress = myCert.parent();
-        if(myCert.parent() != address(0x0) && pCert == certificates[certificatesMap[parentUserAddress]-1].certificateString()){
+        if(myCert.parent() != address(0x0) && pCert ==  addressToCertMap[account(parentUserAddress)].certificateString()){
             return true;
         }
         

@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE TupleSections         #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS -fno-warn-deprecations #-}
@@ -29,7 +30,6 @@ module Blockchain.VMContext
     , stateDB
     , hashDB
     , codeDB
-    , x509CertDB
     , blockSummaryDB
     , kafkaState
     , redisPool
@@ -38,8 +38,6 @@ module Blockchain.VMContext
     , stateBlockMap
     , storageTxMap
     , storageBlockMap
-    , certTxMap
-    , certBlockMap
     , stateRoots
     , currentBlock
     , memDBs
@@ -71,6 +69,7 @@ module Blockchain.VMContext
     , peekPendingVote
     , clearPendingVote
     , compactContextM
+    , lookupX509AddrFromCBHash
     ) where
 
 import           Control.DeepSeq
@@ -89,7 +88,9 @@ import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
+import           Data.Either.Extra
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
@@ -99,7 +100,9 @@ import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
+import           Text.Read                         (readMaybe)
 
+import           BlockApps.X509.Certificate
 import           BlockApps.Init()
 import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
@@ -121,7 +124,6 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
@@ -157,7 +159,6 @@ data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
   , _codeDB         :: CodeDB
-  , _x509CertDB     :: X509CertDB
   , _blockSummaryDB :: BlockSummaryDB
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
@@ -170,8 +171,6 @@ data MemDBs = MemDBs
   , _stateBlockMap   :: M.Map Account AddressStateModification
   , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
-  , _certTxMap       :: M.Map Address CertModification
-  , _certBlockMap    :: M.Map Address CertModification
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
   } deriving (Generic, NFData, Show)
@@ -183,8 +182,6 @@ instance Default MemDBs where
     , _stateBlockMap   = M.empty
     , _storageTxMap    = M.empty
     , _storageBlockMap = M.empty
-    , _certTxMap       = M.empty
-    , _certBlockMap    = M.empty
     , _stateRoots      = M.empty
     , _currentBlock    = Nothing
     }
@@ -233,27 +230,25 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable BlockHashRoot m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
-                , Mod.Modifiable CertRoot m
                 , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
-                , HasMemCertDB m
                 , A.Selectable (Maybe Word256) ParentChainId m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
-                , HasX509CertDB m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
                 , (Keccak256 `A.Alters` BlockSummary) m
                 , Mod.Accessible (Maybe WorldBestBlock) m
+                , (A.Selectable (Address, T.Text) X509CertificateField) m
+                , (A.Selectable Address X509Certificate) m
                 )
 
 withCurrentBlockHash :: ( MonadLogger m
                         , Mod.Modifiable MemDBs m
                         , Mod.Modifiable CurrentBlockHash m
-                        , Mod.Modifiable CertRoot m
                         , HasMemAddressStateDB m
                         , (Maybe Word256 `A.Alters` MP.StateRoot) m
                         , (MP.StateRoot `A.Alters` MP.NodeData) m
@@ -261,7 +256,6 @@ withCurrentBlockHash :: ( MonadLogger m
                         , (N.NibbleString `A.Alters` N.NibbleString) m
                         , HasMemRawStorageDB m
                         , (RawStorageKey `A.Alters` RawStorageValue) m
-                        , HasMemCertDB m
                         )
                      => Keccak256 -> m a -> m a
 withCurrentBlockHash bh f = do
@@ -270,7 +264,6 @@ withCurrentBlockHash bh f = do
   a <- f
   flushMemStorageDB
   flushMemAddressStateDB
-  flushMemCertDB bh
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
@@ -373,8 +366,6 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
-vmCertRootKey :: B.ByteString
-vmCertRootKey = "cert_root"
 
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _ = do
@@ -400,13 +391,6 @@ instance Mod.Modifiable BestBlockRoot ContextM where
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
 
-instance Mod.Modifiable CertRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    CertRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmCertRootKey
-  put _ (CertRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmCertRootKey sr
 
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = readIORef =<< view (dbs . kafkaState)
@@ -421,12 +405,6 @@ instance HasMemAddressStateDB ContextM where
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
-
-instance HasMemCertDB ContextM where
-  getCertTxDBMap = gets $ view $ memDBs . certTxMap
-  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
-  getCertBlockDBMap = gets $ view $ memDBs . certBlockMap
-  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   lookup _ = MP.genericLookupDB $ getStateDB
@@ -469,6 +447,7 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ k = do
     mBH <- gets $ view $ memDBs . currentBlock
@@ -485,6 +464,34 @@ instance (Address `A.Alters` X509Certificate) ContextM where
     liftIO . appendFile "registrations.txt" $ formatAddressWithoutColor k ++ ": " ++ show v ++ "\n"
     putCert k v
   delete _ = deleteCert
+
+instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
+
+instance (Address `A.Selectable` X509Certificate) ContextM where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+lookupX509AddrFromCBHash ::(
+                     (A.Alters (Account, B.ByteString) B.ByteString) m
+                      )
+      => Address -> m (Maybe Address)
+lookupX509AddrFromCBHash k = do
+  -- do
+  --   mBH <- Mod.get (Mod.Proxy @CurrentBlockHash)
+  --   mbh= 0
+    -- fmap join . for mBH $ \(CurrentBlockHash _) -> do 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+        certRegistryKey = certKey (Address 0x509)
+    maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
@@ -539,7 +546,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       sdb <- openDB stateDBPath
       hdb <- openDB hashDBPath
       cdb <- openDB codeDBPath
-      x509db <- openDB x509CertDBPath
       blksumdb <- openDB blockSummaryCacheDBPath
       rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
         Redis.connectHost = "localhost",
@@ -555,7 +561,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
-            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
@@ -567,8 +572,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
-            , _certTxMap       = M.empty
-            , _certBlockMap    = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
             }
@@ -611,7 +614,6 @@ runContextM dSettings f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-      x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
@@ -621,7 +623,6 @@ runContextM dSettings f = do
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
-            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool

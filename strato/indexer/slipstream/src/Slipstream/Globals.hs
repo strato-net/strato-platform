@@ -14,13 +14,13 @@ module Slipstream.Globals
     xabiToText,
     flushPendingWrites,
     getContractState,
-    isHistoric,
     setHistoryTable,
     historyStatusCreated,
     setSolidVMInfo,
     getSolidVMInfo,
     forceGlobalEval,
     newGlobals,
+    isHistoric,
     module Slipstream.Data.Globals
   ) where
 

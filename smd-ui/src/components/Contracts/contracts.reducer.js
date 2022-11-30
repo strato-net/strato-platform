@@ -15,6 +15,7 @@ const initialState = {
   contracts: {},
   filter: '',
   error: null,
+  isLoading: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -24,6 +25,7 @@ const reducer = function (state = initialState, action) {
         contracts: state.contracts,
         filter: state.filter,
         error: null,
+        isLoading: true
       };
     case FETCH_ACCOUNT_SUCCESS:
       let contracts = state.contracts;
@@ -37,7 +39,7 @@ const reducer = function (state = initialState, action) {
       return {
         contracts,
         filter: state.filter,
-        error: null,
+        error: null
       };
     case FETCH_CONTRACTS_SUCCESSFUL:
       const contractNames = Object.getOwnPropertyNames(action.contracts);
@@ -78,12 +80,14 @@ const reducer = function (state = initialState, action) {
         contracts: updatedContracts,
         filter: state.filter,
         error: state.error,
+        isLoading: false
       };
     case FETCH_CONTRACTS_FAILED:
       return {
         contracts: state.contracts,
         filter: state.filter,
-        error: action.error
+        error: action.error,
+        isLoading: false
       };
     case CHANGE_CONTRACT_FILTER:
       return {
