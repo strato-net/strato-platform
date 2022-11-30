@@ -49,7 +49,7 @@ import qualified Data.Sequence                         as Q
 import           Data.Time.Clock                       (getCurrentTime)
 import           Data.Text (Text)
 import qualified Data.Text                             as T
-import qualified Data.Text.Encoding                 as Text
+import qualified Data.Text.Encoding                    as Text
 import           Data.Traversable                      (for)
 
 import           BlockApps.Logging
@@ -80,7 +80,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
---import  BlockApps.X509.Certificate          
 
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
