@@ -472,7 +472,15 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ k = do
     mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
+      let certKey addr = ((Account addr Nothing),) . encodeUtf8
+          certRegistryKey = certKey (Address 0x509)
+      mCertAddress <- maybe Nothing readMaybe <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+      for mCertAddress $ \certAddress ->
+        maybe Nothing readMaybe <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+    -- mBH <- gets $ view $ memDBs . currentBlock
+    -- fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
   insert _ k v = do
     liftIO . appendFile "registrations.txt" $ formatAddressWithoutColor k ++ ": " ++ show v ++ "\n"
     putCert k v

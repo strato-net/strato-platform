@@ -314,7 +314,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
 
   -- set creator
-  -- (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
 
   -- Run the constructor
@@ -325,19 +325,19 @@ create' creator newAccount ch cc contractName' argExps = do
   addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
   -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
-  --(\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+  env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
   -- popcallinfo to remove info from stack
   popCallInfo
   
-  -- org <- getOrg creator (contract' ^. CC.vmVersion)
-  -- Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --   Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
+  org <- getOrg creator (contract' ^. CC.vmVersion)
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++
-      " in app " ++ (show parentName)
+      " in app " ++ (show parentName) ++ " or org " ++ show org
 
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -450,84 +450,74 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
 
 -- set the hidden ":creator" field
--- setCreator :: MonadSM m => Account -> Account -> CC.Contract -> m ()
--- setCreator creator contract cntrct = do
+setCreator :: MonadSM m => Account -> Account -> CC.Contract -> m ()
+setCreator creator contract cntrct = do
 
---   let creatorAddress = _accountAddress creator
---   maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
---   let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  let creatorAddress = _accountAddress creator
+  maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
+  let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
---   case maybeCert of
---     (Just cert) -> do
---       onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
---     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
-  
---   -- let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
---   --     hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
---   --     hasSvm3_3 = CC._vmVersion cntrct == "svm3.3"
---   --     hasSvm3_4 = CC._vmVersion cntrct == "svm3.4"
---   -- when (hasSvm3_2 || hasSvm3_3 || hasSvm3_4) $ do
---   --   liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
---   --   putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
---   let putCreatorField org = do
---         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org) ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
---         putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  case maybeCert of
+    (Just cert) -> do
+      onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+    Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
 
---   if _org /= "" then putCreatorField _org else do
---       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
+  liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
+  putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
+  let putCreatorField org = do
+        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org) ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
+        putSolidStorageKeyVal'  contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
-      -- hardcoded delete storage value if on the very bad, no good block
-      -- when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
-      --   liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
-      --   deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
+  if _org /= "" then putCreatorField _org else do
+      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
+
+   -- hardcoded delete storage value if on the very bad, no good block
+   -- when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
+   --   liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
+   --   deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
 
 -- ADDED AS A HARDCODED FIX TO SYNC WITH THE DEVNET 
 -- REMOVE ONCE NOT NEEDED
--- computeNetworkID :: Integer
--- computeNetworkID =
---   case (flags_network, flags_networkID) of
---     ("", -1) ->
---       if flags_testnet
---       then 0
---       else 1
---     (network, -1) -> bytes2Integer $ map c2w network
---     (_, _) -> toInteger flags_networkID
+computeNetworkID :: Integer
+computeNetworkID =
+  case (flags_network, flags_networkID) of
+    ("", -1) ->
+      if flags_testnet
+      then 0
+      else 1
+    (network, -1) -> bytes2Integer $ map c2w network
+    (_, _) -> toInteger flags_networkID
 
 -- get the org for the Cirrus table name
--- getOrg :: MonadSM m => Account -> String -> m (String)
--- getOrg caller = do
---   liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
---   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
+getOrg :: MonadSM m => Account -> m (String)
+getOrg caller = do
+  liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
+  callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
 
--- getOrg :: MonadSM m => Account -> m (String)
--- getOrg caller = do
---   liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
---   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
-
-  -- case callerCodeHash of
-  --   EVMCode _ -> do
-  --   -- caller is a user account, so they are creating the first instance of this app
-  --   -- we will look up their cert in the DB and use it to get the org name for this app
-  --     maybeCert <- A.lookup (A.Proxy @X509Certificate) $ caller ^. accountAddress
-  --     let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-  --     liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
-  --     return org'
-  --   x -> do
-  --   -- caller is a contract account, so this app already exists
-  --   -- so we need to find the app contract and get its ":creator"
-  --     mAppAccount <- getAppAccount (caller ^. accountChainId) caller
-  --     case mAppAccount of
-  --       Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
-  --       Just acct -> do
-  --         liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct)
-  --         appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
-  --         case appCreator of
-  --           MS.BString org' -> do
-  --             liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
-  --             return $ BC.unpack org'
-  --           _ -> do
-  --             liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string"
-  --             return ""
+  case callerCodeHash of
+    EVMCode _ -> do
+    -- caller is a user account, so they are creating the first instance of this app
+    -- we will look up their cert in the DB and use it to get the org name for this app
+      maybeCert <- A.lookup (A.Proxy @X509Certificate) $ caller ^. accountAddress
+      let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+      liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
+      return org'
+    x -> do
+    -- caller is a contract account, so this app already exists
+    -- so we need to find the app contract and get its ":creator"
+      mAppAccount <- getAppAccount (caller ^. accountChainId) caller
+      case mAppAccount of
+        Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
+        Just acct -> do
+          liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct)
+          appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+          case appCreator of
+            MS.BString org' -> do
+              liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
+              return $ BC.unpack org'
+            _ -> do
+              liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string"
+              return ""
 
 
 getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
@@ -666,8 +656,6 @@ argsToValsModifiers ctract md args =
 
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = 
-  -- if (CC._vmVersion ctract == "svm3.2" || CC._vmVersion ctract == "svm3.3" || CC._vmVersion ctract == "svm3.4")
-  --   then 
   case args of
     CC.OrderedArgs xs -> do
       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
@@ -679,18 +667,6 @@ argsToVals ctract fn args =
               (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
               strTypes
               $ M.fromList xs
-    -- else
-    --   case args of
-    --     CC.OrderedArgs xs -> do
-    --       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
-    --       OrderedVals <$> zipWithM eval orderedTypes xs
-    --     CC.NamedArgs xs -> NamedVals . M.toList <$> do
-    --       let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
-    --       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
-    --               (M.mapMissing $ curry $ invalidArguments "extra argument")
-    --               (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
-    --               strTypes
-    --               $ M.fromList xs
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
@@ -804,28 +780,26 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      -- isSvm3_2 =  (CC._vmVersion contract == "svm3.2")
-      -- isSvm3_3 =  (CC._vmVersion contract == "svm3.3")
-      -- isSvm3_4 =  (CC._vmVersion contract == "svm3.4")
+" in app " ++ (show parentName)
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
 -- grab the org for this codeAddress
-  -- when (not isRCC) $ do
-  --   org <- getOrg to (contract ^. CC.vmVersion)
-  --   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-  --   liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-  --         " in app " ++ (show parentName) ++ " of org " ++ show org
+  when (not isRCC) $ do
+    org <- getOrg to (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 --  grab the org from the senders account and set it to the codeAddress
-  -- when (isRCC) $ do
-  --   org <- getOrg from (contract ^. CC.vmVersion)
-  --   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-  --   (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
-  --   liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-  --         " in app " ++ (show parentName) ++ " of org " ++ show org
+  when (isRCC) $ do
+    org <- getOrg from (contract ^. CC.vmVersion)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
@@ -844,8 +818,8 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro False
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup functionName $ contract^.CC.storageDefs) of   --(isSvm3_2 || isSvm3_3 || isSvm3_4)
-              (Just _) -> do    --True <-- isSvm 
+            case (M.lookup functionName $ contract^.CC.storageDefs) of
+              Just _ -> do
                   liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
@@ -853,20 +827,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
                   val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName 
                   popCallInfo
                   return (pure val, OrderedVals []) 
-              -- (Just _) -> do 
-              --   return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName, OrderedVals [])
-              (Nothing) -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
-
-              {-
-              Just _ -> do
-                liftIO $ putStrLn ("callWrapper/getter " ++ functionName)
-                addCallInfo to contract functionName hsh cc M.empty True
-                --TODO- this should only exist if the storage variable is declared "public", 
-                -- right now I just ignore this and allow anything to be called as a getter
-                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
-                popCallInfo
-                return (pure val, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
               
   when isRCC (do
                 addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
@@ -1004,21 +965,6 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       dstVar <- expToVar dst
       setVar dstVar srcVal
       return Nothing
-    -- else do 
-    --   case pVal of
-    --     SArray typ fs -> do
-    --       indVal <- getVar =<< expToVar indExp
-    --       case indVal of
-    --         SInteger ind -> do
-    --           when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
-    --           let newVec = fs V.// [(fromIntegral ind, srcVar)]
-    --           setVar pVar (SArray typ newVec)
-    --           return Nothing
-    --         _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
-    --     _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
-    --       dstVar <- expToVar dst
-    --       setVar dstVar srcVal
-    --       return Nothing
   
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _)) pos) = do
   solidVMBreakpoint pos
@@ -1139,12 +1085,6 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
 
 
 runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
-  -- ctract <- getCurrentContract
-  -- currentCallInfo <- getCurrentCallInfo
-
-  -- if (CC._vmVersion ctract /= "svm3.3" && CC._vmVersion ctract /= "svm3.4")
-  --   then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryExpression
-  --   else do
   mRes <- EUnsafe.try $ do
     expResultVal <- getVar =<< expToVar tryExpression
     return expResultVal
@@ -1172,11 +1112,6 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
             _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
 
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do 
-  -- ctract <- getCurrentContract
-  -- currentCallInfo <- getCurrentCallInfo
-  -- if (CC._vmVersion ctract /= "svm3.3" && CC._vmVersion ctract /= "svm3.4")
-  --   then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryBlock
-  --   else do
   mRes <- EUnsafe.try $ do
     val <- runStatements tryBlock
     pure $ val
@@ -1211,12 +1146,12 @@ runStatement (CC.WhileStatement condition code pos) = do
 
       -- TODO: this can loop infinitely
 
--- runStatement x@(CC.DoWhileStatement code condition pos) = do
---   solidVMBreakpoint pos
---   doWhile (getBool =<< expToVar condition) $ do
---       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
---       result <- runStatements code
---       return result
+runStatement x@(CC.DoWhileStatement code condition pos) = do
+  solidVMBreakpoint pos
+  doWhile (getBool =<< expToVar condition) $ do
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
 
     -- TODO: this can loop infinitely
 
@@ -1246,51 +1181,35 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
       _ <- getVar =<< expToVar loopExp
       return result
 
--- runStatement x@(CC.Break _) = do
---   cntrct <- getCurrentContract
---   if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2") || (CC._vmVersion cntrct == "svm3.3") || CC._vmVersion cntrct == "svm3.4") ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
---     return $ Just SBreak
+runStatement x@(CC.Break _) = return $ Just SBreak
 
--- runStatement x@(CC.Continue _) = do 
---   cntrct <- getCurrentContract
---   if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2") || (CC._vmVersion cntrct == "svm3.3") || (CC._vmVersion cntrct == "svm3.4")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
---     return $ Just SContinue
+runStatement x@(CC.Continue _) = return $ Just SContinue
 
--- runStatement (CC.Return maybeExpression pos) = do
---   solidVMBreakpoint pos
---   cntrct <- getCurrentContract
+runStatement (CC.Return maybeExpression pos) = do
+  solidVMBreakpoint pos
+  cntrct <- getCurrentContract
 
---   case maybeExpression of
---     Just e -> do
---       -- if (not ((CC._vmVersion cntrct == "svm3.2") || (CC._vmVersion cntrct == "svm3.3") || (CC._vmVersion cntrct == "svm3.4"))) 
---       --   then do
---       ql <- expToVar e
---       qlql <- getVar ql
---       return $ Just qlql
---         -- else do
---         --   var <- expToVar e
---         --   var' <- getVar var
---         --   onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
---         --   return $ Just var'
---         --   fmap Just $ getVar =<< expToVar e
---     Nothing -> return $ Just SNULL
+  case maybeExpression of
+    Just e -> do
+      var <- expToVar e
+      var' <- getVar var
+      onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
+      return $ Just var'
+      fmap Just $ getVar =<< expToVar e
+    Nothing -> return $ Just SNULL
 
--- runStatement (CC.Throw expr _) = do
---   -- ctract <- getCurrentContract
---   -- if (CC._vmVersion ctract /= "svm3.4")
---     -- then unknownStatement "Throw statements are not supported below pragma solidvm 3.4" expr
---     -- else do
---       (name, args) <- do
---         case expr of
---           CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
---           _ -> invalidArguments "Invalid argument for throw." expr
---       argVals <- case args of
---         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
---         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
---       let listOfVals = case argVals of
---             OrderedVals ov -> map (\x -> toBasic x) ov
---             NamedVals nv -> map (\(_, y) -> toBasic y) nv
---       customError "Custom user error thrown" name listOfVals
+runStatement (CC.Throw expr _) = do
+  (name, args) <- do
+    case expr of
+      CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
+      _ -> invalidArguments "Invalid argument for throw." expr
+  argVals <- case args of
+    CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+    CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+  let listOfVals = case argVals of
+        OrderedVals ov -> map (\x -> toBasic x) ov
+        NamedVals nv -> map (\(_, y) -> toBasic y) nv
+  customError "Custom user error thrown" name listOfVals
 
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
@@ -1368,93 +1287,93 @@ while condition code = do
         _ -> return result
     else return Nothing
 
--- doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
--- doWhile condition code = do
---   result <- code
---   decrementGas 1000
---   case result of
---     Nothing -> do
---       c <- condition
---       onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
---       if c
---         then doWhile condition code
---         else return Nothing
---     Just SBreak -> return Nothing
---     Just SContinue -> doWhile condition code
---     _ -> return result
+doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
+doWhile condition code = do
+  result <- code
+  decrementGas 1000
+  case result of
+    Nothing -> do
+      c <- condition
+      onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+      if c
+        then doWhile condition code
+        else return Nothing
+    Just SBreak -> return Nothing
+    Just SContinue -> doWhile condition code
+    _ -> return result
 
--- getIndexType :: MonadSM m => AccountPath -> m IndexType
--- getIndexType (AccountPath addr p) = do
---   let field = MS.getField p
---   mType <- getXabiType addr field
---   let n = MS.size p - 1
---   case mType of
---     Nothing -> todo "getIndexType/unknown storage reference" field
---     Just v -> return $! loop n v
---  where loop :: Int -> SVMType.Type -> IndexType
---        loop 0 t = case t of
---          SVMType.Mapping{SVMType.key=SVMType.Int{}} -> MapIntIndex
---          SVMType.Mapping{SVMType.key=SVMType.String{}} -> MapStringIndex
---          SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
---          SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
---          SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
---          SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
---          SVMType.Array{} -> ArrayIndex
---          _ -> typeError "unanticipated index type" t
---        loop n t = case t of
---          SVMType.Mapping{SVMType.value=t'} -> loop (n - 1) t'
---          SVMType.Array{SVMType.entry=t'} -> loop (n - 1) t'
---          _ -> typeError "indexing type in var dec" t
+getIndexType :: MonadSM m => AccountPath -> m IndexType
+getIndexType (AccountPath addr p) = do
+  let field = MS.getField p
+  mType <- getXabiType addr field
+  let n = MS.size p - 1
+  case mType of
+    Nothing -> todo "getIndexType/unknown storage reference" field
+    Just v -> return $! loop n v
+ where loop :: Int -> SVMType.Type -> IndexType
+       loop 0 t = case t of
+         SVMType.Mapping{SVMType.key=SVMType.Int{}} -> MapIntIndex
+         SVMType.Mapping{SVMType.key=SVMType.String{}} -> MapStringIndex
+         SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
+         SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
+         SVMType.Array{} -> ArrayIndex
+         _ -> typeError "unanticipated index type" t
+       loop n t = case t of
+         SVMType.Mapping{SVMType.value=t'} -> loop (n - 1) t'
+         SVMType.Array{SVMType.entry=t'} -> loop (n - 1) t'
+         _ -> typeError "indexing type in var dec" t
 
 
 
--- expToPath :: MonadSM m => CC.Expression -> m AccountPath
--- expToPath (CC.Variable _ x) = do
---   callInfo <- getCurrentCallInfo
---   let path = MS.singleton $ BC.pack $ labelToString x
---   case x `M.lookup` localVariables callInfo of
---     Just (_, var) -> do
---       val <- weakGetVar var
---       case val of
---         SReference apt -> return apt
---         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
---     Nothing -> return $ AccountPath (currentAccount callInfo) path
--- expToPath x@(CC.IndexAccess _ parent mIndex) = do
---   parPath  <- do
---     parvar <- expToVar parent
---     case parvar of
---       Constant (SReference apt) -> return apt
---       _ -> expToPath parent
+expToPath :: MonadSM m => CC.Expression -> m AccountPath
+expToPath (CC.Variable _ x) = do
+  callInfo <- getCurrentCallInfo
+  let path = MS.singleton $ BC.pack $ labelToString x
+  case x `M.lookup` localVariables callInfo of
+    Just (_, var) -> do
+      val <- weakGetVar var
+      case val of
+        SReference apt -> return apt
+        _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
+    Nothing -> return $ AccountPath (currentAccount callInfo) path
+expToPath x@(CC.IndexAccess _ parent mIndex) = do
+  parPath  <- do
+    parvar <- expToVar parent
+    case parvar of
+      Constant (SReference apt) -> return apt
+      _ -> expToPath parent
 
---   idxType <- getIndexType parPath
---   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
---   apSnoc parPath <$> case idxType of
---     MapAccountIndex -> do
---       idx <- getAccount idxVar
---       return $ case idx of
---         SAccount a _ -> MS.MapIndex $ MS.IAccount a
---         SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
---         _ -> typeError "invalid map of addresses index" idx
---     MapBoolIndex -> do
---       b <- getBool idxVar
---       return $ MS.MapIndex $ MS.IBool b
---     MapIntIndex -> do
---       n <- getInt idxVar
---       return . MS.MapIndex $ MS.INum n
---     MapStringIndex -> do
---       idx <- getString idxVar
---       return $ case idx of
---         SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
---         _ -> typeError "invalid map of strings index" idx
---     ArrayIndex -> do
---       n <- getInt idxVar
---       return . MS.ArrayIndex $ fromIntegral n
--- expToPath (CC.MemberAccess _ parent field) = do
---   apt <- do
---     parvar <- expToVar parent
---     case parvar of
---       _ -> expToPath parent
---   return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
+  idxType <- getIndexType parPath
+  idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+  apSnoc parPath <$> case idxType of
+    MapAccountIndex -> do
+      idx <- getAccount idxVar
+      return $ case idx of
+        SAccount a _ -> MS.MapIndex $ MS.IAccount a
+        SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
+        _ -> typeError "invalid map of addresses index" idx
+    MapBoolIndex -> do
+      b <- getBool idxVar
+      return $ MS.MapIndex $ MS.IBool b
+    MapIntIndex -> do
+      n <- getInt idxVar
+      return . MS.MapIndex $ MS.INum n
+    MapStringIndex -> do
+      idx <- getString idxVar
+      return $ case idx of
+        SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
+        _ -> typeError "invalid map of strings index" idx
+    ArrayIndex -> do
+      n <- getInt idxVar
+      return . MS.ArrayIndex $ fromIntegral n
+expToPath (CC.MemberAccess _ parent field) = do
+  apt <- do
+    parvar <- expToVar parent
+    case parvar of
+      _ -> expToPath parent
+  return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
 
 -- expToPath x = todo "expToPath/unhandled" x
 
@@ -1497,12 +1416,10 @@ expToVar' (CC.Variable _ "now") =
 expToVar' (CC.Variable _ name) = do
   getVariableOfName name
 
--- expToVar' (CC.Unitary _ "-" e) = do
---   cntrct <- getCurrentContract
---   if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2") || (CC._vmVersion cntrct == "svm3.3") || (CC._vmVersion cntrct == "svm3.4"))) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
---     var <- expToVar e
---     value <- getInt var
---     return $ Constant $ SInteger (value * (-1))
+expToVar' (CC.Unitary _ "-" e) = do
+  var <- expToVar e
+  value <- getInt var
+  return $ Constant $ SInteger (value * (-1))
 
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
@@ -1566,7 +1483,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
   val <- getVar var
   chainId <- view accountChainId <$> getCurrentAccount
-  -- contract'' <- getCurrentContract
 
   case (val, name) of
 --    Constant c -> case (c, name) of
@@ -1588,8 +1504,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do contract' <- getCurrentContract
-                                            --  if CC._vmVersion contract' == "svm3.4"
-                                            --   then do
                                              functionName <- getCurrentFunctionName
                                              callInfo <- getCurrentCallInfo
                                              let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
@@ -1597,17 +1511,13 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                              argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
                                              argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
                                              return . Constant . SString $ "("++argsToStr++")"
-                                              -- else unknownVariable "Builtin `msg.data` is not supported below pragma solidvm 3.4" ()
       (SBuiltinVariable "msg", "sig") -> do functionName <- getCurrentFunctionName
                                             contract' <- getCurrentContract
-                                            -- if CC._vmVersion contract' == "svm3.4"
-                                            --   then do
                                             let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
                                                 argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
                                                 argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
                                                 calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
                                             return . Constant . SString $ take 8 $ keccak256ToHex calldataHash 
-                                              -- else unknownVariable "Builtin `msg.sig` is not supported below pragma solidvm 3.4" ()
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do
         env' <- getEnv
@@ -1621,49 +1531,49 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         env' <- getEnv
         maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
         return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
-      -- m@(SBuiltinVariable "tx", "organizationalUnit") -> do 
-      --   env' <- getEnv
-      --   maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-      --   return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
-      -- m@(SBuiltinVariable "tx", "certificate") -> do 
-      --   env' <- getEnv
-      --   maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-      --   return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
-      -- (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
-      --     Nothing -> missingField "struct member access" fieldName
-      --     Just v -> return v
-      -- (SContractDef contractName', constName) -> do
-      --   --TODO- move all variable name resolution by contract to a function
-      --   (_, cc) <- getCurrentCodeCollection
-      --   cont <- case M.lookup contractName' $ cc^.CC.contracts of
-      --     Nothing -> missingType "contract function lookup" contractName'
-      --     Just ct -> pure ct
-      --   if constName `M.member` CC._functions cont
-      --     then do
-      --       -- TODO: Check that this contract actually is a contractName'
-      --       addr <- accountOnUnspecifiedChain <$> getCurrentAccount
-      --       return $ Constant $ SContractFunction (Just contractName') addr constName
-      --     else case constName `M.lookup` CC._constants cont of
-      --             Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of 
-      --               Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
-      --               Nothing -> unknownConstant "constant member access" (contractName', constName)
-      --             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+      m@(SBuiltinVariable "tx", "organizationalUnit") -> do 
+        env' <- getEnv
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+      m@(SBuiltinVariable "tx", "certificate") -> do 
+        env' <- getEnv
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
+      (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
+          Nothing -> missingField "struct member access" fieldName
+          Just v -> return v
+      (SContractDef contractName', constName) -> do
+        --TODO- move all variable name resolution by contract to a function
+        (_, cc) <- getCurrentCodeCollection
+        cont <- case M.lookup contractName' $ cc^.CC.contracts of
+          Nothing -> missingType "contract function lookup" contractName'
+          Just ct -> pure ct
+        if constName `M.member` CC._functions cont
+          then do
+            -- TODO: Check that this contract actually is a contractName'
+            addr <- accountOnUnspecifiedChain <$> getCurrentAccount
+            return $ Constant $ SContractFunction (Just contractName') addr constName
+          else case constName `M.lookup` CC._constants cont of
+                  Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of 
+                    Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+                    Nothing -> unknownConstant "constant member access" (contractName', constName)
+                  Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
 
-      -- (SBuiltinVariable "block", "timestamp") -> do
-      --   env' <- getEnv
-      --   return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ Env.blockHeader env'
+      (SBuiltinVariable "block", "timestamp") -> do
+        env' <- getEnv
+        return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ Env.blockHeader env'
 
-      -- (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
+      (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
-      -- m@(SBuiltinVariable "block", "coinbase") ->
-      --   (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
-        
+      m@(SBuiltinVariable "block", "coinbase") ->
+        (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+      
 
-      -- m@(SBuiltinVariable "block", "difficulty") -> 
-      --   (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+      m@(SBuiltinVariable "block", "difficulty") -> 
+        (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
 
-      -- m@(SBuiltinVariable "block", "gaslimit") -> 
-      --   (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
+      m@(SBuiltinVariable "block", "gaslimit") -> 
+        (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
         
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
@@ -1680,11 +1590,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SContract _ a, n) -> evaluateAccountMember a True n
 
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
-        {-
-        contract' <- getCurrentContract
-        if (CC._vmVersion contract' == "svm3.2")
-          then return $ Constant $ SPush r Nothing
-          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
@@ -1736,48 +1641,46 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
--- expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
---   var <- expToVar parent
+expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
+  var <- expToVar parent
 
---   case var of
---     (Constant (SReference _)) -> Constant . SReference <$> expToPath x
--- --    (Constant (SArray theType theVector)) -> do
---     _ -> do
---       theIndex <- getVar =<< expToVar mIndex
---       val <- getVar var
---       case (val, theIndex) of
---         (SArray _ theVector, SInteger i) -> do
---           if (fromIntegral i) >= length theVector then
---             indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
---           else
---             return $ theVector V.! fromIntegral i
---         (SMap _ theMap, _) -> do 
---                                 case theMap M.!? theIndex of
---                                   Just v -> return v
---                                   Nothing -> do
-                                    --let theType =   typeOf theIndex
-                                    --let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
-                                    -- let typeNum = theType `elemIndex` typeArray
-                                    -- case typeNum of
-                                    --   Just 0 -> return $ Constant $ SString ""
-                                    --   Just 1 -> return $ Constant $ SInteger 0
-                                    --   Just 2 -> return $ Constant $ SBool False
-                                    --   Just 3 -> do
-                                    --     case theIndex of
-                                    --       (SInteger _) -> return $ Constant $ SInteger 0
-                                    --       (SString _) -> return $ Constant $ SString ""
-                                    --       (SBool _) -> return $ Constant $ SBool False
-                                    --       _ -> internalError "Type of Mapping not allowed" (show theType)
-                                    --   _ -> internalError "Type of Mapping not found" (show theType)
-                                    -- case typeNum of
-                                    --   Just 0 -> return $ Constant $ SString ""
-                                    --   Just 1 -> return $ Constant $ SInteger 0
-                                    --   Just 2 -> return $ Constant $ SBool False
-                                    --   _ -> internalError "Type of Mapping not found" (show theType)
+  case var of
+    (Constant (SReference _)) -> Constant . SReference <$> expToPath x
+    _ -> do
+      theIndex <- getVar =<< expToVar mIndex
+      val <- getVar var
+      case (val, theIndex) of
+        (SArray _ theVector, SInteger i) -> do
+          if (fromIntegral i) >= length theVector then
+            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
+          else
+            return $ theVector V.! fromIntegral i
+        (SMap _ theMap, _) -> do 
+                                case theMap M.!? theIndex of
+                                  Just v -> return v
+                                  Nothing -> do
+                                    let theType =   typeOf theIndex
+                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
+                                     let typeNum = theType `elemIndex` typeArray
+                                     case typeNum of
+                                       Just 0 -> return $ Constant $ SString ""
+                                       Just 1 -> return $ Constant $ SInteger 0
+                                       Just 2 -> return $ Constant $ SBool False
+                                       Just 3 -> do
+                                         case theIndex of
+                                           (SInteger _) -> return $ Constant $ SInteger 0
+                                           (SString _) -> return $ Constant $ SString ""
+                                           (SBool _) -> return $ Constant $ SBool False
+                                           _ -> internalError "Type of Mapping not allowed" (show theType)
+                                       _ -> internalError "Type of Mapping not found" (show theType)
+                                     case typeNum of
+                                       Just 0 -> return $ Constant $ SString ""
+                                       Just 1 -> return $ Constant $ SInteger 0
+                                       Just 2 -> return $ Constant $ SBool False
+                                       _ -> internalError "Type of Mapping not found" (show theType)
 
-        -- (SReference _, _) -> Constant . SReference <$> expToPath x
-        -- _ -> typeError "unsupported types for index access" $ unparseExpression x
---    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
+        (SReference _, _) -> Constant . SReference <$> expToPath x
+        _ -> typeError "unsupported types for index access" $ unparseExpression x
 
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
@@ -1796,11 +1699,6 @@ expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInte
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) expr2 SInteger
-
--- ctract <- getCurrentContract
--- if CC._vmVersion ctract == "svm3.4"
---   then expToVarInteger expr1 (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) expr2 SInteger
---   else unknownStatement "Unsigned shift is not supported below pragma solidvm 3.4" (expr1, expr2)
 
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
@@ -1971,9 +1869,6 @@ expToVar' (CC.FunctionCall _ e args) = do
         argVals <- case args of
                         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
                         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-        -- let argCount = case args of
-        --                 CC.OrderedArgs as -> length as
-        --                 CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
             val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
@@ -2005,84 +1900,82 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
-            res <- runTheCall address contract' funcName hsh cc func argVals ro False
-            --return . Constant . fromMaybe SNULL $ res
-            -- res <- do
-            --   if (CC._funcIsFree func)
-            --     then do
-            --       matchingOverload <- findM testMatch $ CC._funcOverload func
-            --       doesFunctionMatch <- testMatch func
-            --       if (doesFunctionMatch)
-            --         then runTheCall address contract' funcName hsh cc func argVals ro True
-            --         else case matchingOverload of
-            --           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
-            --           Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
-            --     else do
-            --       matchingOverload <- findM testMatch $ CC._funcOverload func
-            --       doesFunctionMatch <- testMatch func
-            --       if (doesFunctionMatch)
-            --         then runTheCall address contract' funcName hsh cc func argVals ro False
-            --         else case matchingOverload of
-            --                 Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
-            --                               Just ff -> do
-            --                                 matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
-            --                                 doesFreeFunctionMatch <- testMatch ff
-            --                                 if (doesFreeFunctionMatch)
-            --                                   then runTheCall address contract' funcName hsh cc ff argVals ro True
-            --                                   else case matchingFreeOverload of
-            --                                     Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-            --                                     Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
-            --                               Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-            --                 Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
+            res <- do
+              if (CC._funcIsFree func)
+                then do
+                  matchingOverload <- findM testMatch $ CC._funcOverload func
+                  doesFunctionMatch <- testMatch func
+                  if (doesFunctionMatch)
+                    then runTheCall address contract' funcName hsh cc func argVals ro True
+                    else case matchingOverload of
+                      Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
+                      Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                else do
+                  matchingOverload <- findM testMatch $ CC._funcOverload func
+                  doesFunctionMatch <- testMatch func
+                  if (doesFunctionMatch)
+                    then runTheCall address contract' funcName hsh cc func argVals ro False
+                    else case matchingOverload of
+                            Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
+                                          Just ff -> do
+                                            matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
+                                            doesFreeFunctionMatch <- testMatch ff
+                                            if (doesFreeFunctionMatch)
+                                              then runTheCall address contract' funcName hsh cc ff argVals ro True
+                                              else case matchingFreeOverload of
+                                                Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                                                Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                                          Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                            Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
             return . Constant . fromMaybe SNULL $ res
-            --where
-              -- testMatch :: MonadSM m => CC.Func -> m Bool
-              -- testMatch tf = do
-              --   let argMapping = mapArgs tf
-              --   doArgsMatch <- mapM testNameAndTypes argMapping
-              --   pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
-              --          && ((length argMapping) == (argCount))
-              --          && (all (== True) doArgsMatch)
-              -- testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-              -- testNameAndTypes (_, (t, v)) = 
-              --   -- These cases might not be all inclusive of all valid combinations.
-              --   case (v, t) of
-              --     (SInteger _, SVMType.Int _ _) -> pure $ True
-              --     (SString _, SVMType.String _) -> pure $ True
-              --     (SString _, SVMType.Bytes _ _) -> pure $ True
-              --     (SBool _, SVMType.Bool) -> pure $ True
-              --     (SAccount _ _, SVMType.Address _) -> pure $ True
-              --     (SAccount _ _, SVMType.Account _) -> pure $ True
-              --     (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-              --     (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-              --     (SArray x _, SVMType.Array y _) -> pure $ x == y
-              --     (SReference addressedPath, _) -> do
-              --       refType <- getXabiValueType addressedPath
-              --       if (refType == t)
-              --         then pure $ True
-              --         else 
-              --           case (refType, t) of
-              --             (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-              --             (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
-              --             _ -> pure $ False
-              --     _ -> pure $ False
-              -- mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-              -- mapArgs theFunc = case argVals of
-              --   OrderedVals vs -> let argMeta = 
-              --                           map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-              --                           $ CC._funcArgs theFunc
-              --                     in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-              --   NamedVals ns ->
-              --     let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-              --         typeAndVal = M.merge (M.dropMissing)
-              --                             (M.dropMissing)
-              --                             (M.zipWithMatched $ \_k t v -> (t, v))
-              --                             strTypes
-              --                             $ M.fromList ns
-              --         sortedArgs = map snd . sortWith fst
-              --                   . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-              --                   $ M.toList typeAndVal
-              --     in sortedArgs
+            where
+              testMatch :: MonadSM m => CC.Func -> m Bool
+              testMatch tf = do
+                let argMapping = mapArgs tf
+                doArgsMatch <- mapM testNameAndTypes argMapping
+                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
+                       && ((length argMapping) == (argCount))
+                       && (all (== True) doArgsMatch)
+              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+              testNameAndTypes (_, (t, v)) = 
+                -- These cases might not be all inclusive of all valid combinations.
+                case (v, t) of
+                  (SInteger _, SVMType.Int _ _) -> pure $ True
+                  (SString _, SVMType.String _) -> pure $ True
+                  (SString _, SVMType.Bytes _ _) -> pure $ True
+                  (SBool _, SVMType.Bool) -> pure $ True
+                  (SAccount _ _, SVMType.Address _) -> pure $ True
+                  (SAccount _ _, SVMType.Account _) -> pure $ True
+                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                  (SArray x _, SVMType.Array y _) -> pure $ x == y
+                  (SReference addressedPath, _) -> do
+                    refType <- getXabiValueType addressedPath
+                    if (refType == t)
+                      then pure $ True
+                      else 
+                        case (refType, t) of
+                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                          _ -> pure $ False
+                  _ -> pure $ False
+              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+              mapArgs theFunc = case argVals of
+                OrderedVals vs -> let argMeta = 
+                                        map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                        $ CC._funcArgs theFunc
+                                  in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+                NamedVals ns ->
+                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
+                      typeAndVal = M.merge (M.dropMissing)
+                                          (M.dropMissing)
+                                          (M.zipWithMatched $ \_k t v -> (t, v))
+                                          strTypes
+                                          $ M.fromList ns
+                      sortedArgs = map snd . sortWith fst
+                                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                                $ M.toList typeAndVal
+                  in sortedArgs
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
@@ -2395,18 +2288,14 @@ evaluateAccountMember a _ "balance" = do
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0 
--- evaluateAccountMember a _ "chainId" = do 
---   contract' <- getCurrentContract
---   if (CC._vmVersion contract' /= "svm3.2" && CC._vmVersion contract' /= "svm3.3" && CC._vmVersion contract' /= "svm3.4")
---     then typeError "illegal member access: svm3.2+ required to use .chainId member" ("parsed as " ++ show a ++ ".chainId")
---     else case (a ^. namedAccountChainId) of
---             UnspecifiedChain -> do 
---               curCid <- view accountChainId <$> getCurrentAccount
---               case curCid of
---                 Nothing -> return $ Constant $ SInteger 0 
---                 Just cid -> return $ Constant $ SInteger $ fromIntegral cid
---             MainChain ->  return $ Constant $ SInteger 0 
---             ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
+evaluateAccountMember a _ "chainId" = case (a ^. namedAccountChainId) of
+  UnspecifiedChain -> do 
+    curCid <- view accountChainId <$> getCurrentAccount
+    case curCid of
+      Nothing -> return $ Constant $ SInteger 0 
+      Just cid -> return $ Constant $ SInteger $ fromIntegral cid
+  MainChain ->  return $ Constant $ SInteger 0 
+  ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
 -- evaluateAccountMember a _ "addressknown" = do
 --   contract' <- getCurrentContract
 --   if (CC._vmVersion contract' /= "svm3.2" && CC._vmVersion contract' /= "svm3.3")
@@ -2514,12 +2403,7 @@ callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifi
 callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
 callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
 callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = do
-  -- contract' <- getCurrentContract
-  -- if (CC._vmVersion contract' == "svm3.2" || CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
-  --   then 
   return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
-    -- else
-    --   return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
@@ -2535,54 +2419,26 @@ callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
--- callBuiltin am@("addmod") [SInteger a, SInteger b, SInteger c] _ = do
---   return . SInteger $ (a + b) `mod` c
-  -- contract' <- getCurrentContract
-  -- if (CC._vmVersion contract' == "svm3.2" || CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
-  -- then 
-  -- else unknownFunction "callBuiltin" am
--- callBuiltin mm@("mulmod") [SInteger a, SInteger b, SInteger c] _ = do 
---   return . SInteger $ (a * b) `mod` c
-  -- contract' <- getCurrentContract
-  -- if (CC._vmVersion contract' == "svm3.2" || CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
-  --   then return . SInteger $ (a * b) `mod` c
-  --   else unknownFunction "callBuiltin" mm
-  
--- callBuiltin bh@("blockhash") [SInteger blockNum] _ = do
---   when (blockNum<0) (invalidArguments "Does not Exist" [blockNum])
---   env' <- getEnv
---   let curBlock = Env.blockHeader env'
---   maybeTheHash  <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
---   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
-  -- contract' <- getCurrentContract
-  -- if (CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
-  --   then do
-  --     when (blockNum<0) (invalidArguments "Does not Exist" [blockNum])
-  --     env' <- getEnv
-  --     let curBlock = Env.blockHeader env'
-  --     maybeTheHash  <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
-  --     maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
-  -- else unknownFunction "callBuiltin" bh
+callBuiltin am@("addmod") [SInteger a, SInteger b, SInteger c] _ = do
+  return . SInteger $ (a + b) `mod` c
+callBuiltin mm@("mulmod") [SInteger a, SInteger b, SInteger c] _ = do 
+  return . SInteger $ (a * b) `mod` c
 
--- callBuiltin sd@("selfdestruct") [SAccount a _] _ = do
---   contract' <- getCurrentAccount
---   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract' 
---   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
---     pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
---   sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
---   _purgeRes <- purgeStorageMap contract'
---   return $ SBool sendRes
-  -- contract'' <- getCurrentContract
-  -- if (CC._vmVersion contract'' == "svm3.3" || CC._vmVersion contract'' == "svm3.4")
-  --   then do
-  --     contract' <- getCurrentAccount
-  --     contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract' 
-  --     _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
-  --       pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
-  --     sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
-  --     _purgeRes <- purgeStorageMap contract'
-  --     return $ SBool sendRes
-  -- else unknownFunction "callBuiltin" sd
+callBuiltin bh@("blockhash") [SInteger blockNum] _ = do
+  when (blockNum<0) (invalidArguments "Does not Exist" [blockNum])
+  env' <- getEnv
+  let curBlock = Env.blockHeader env'
+  maybeTheHash  <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
+  maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
+
+callBuiltin sd@("selfdestruct") [SAccount a _] _ = do
+  contract' <- getCurrentAccount
+  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract' 
+  _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
+    pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
+  sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
+  _purgeRes <- purgeStorageMap contract'
+  return $ SBool sendRes
 
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
@@ -2606,143 +2462,51 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
--- callBuiltin ecrecover@("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
---   let intHash = intBuiltin [SString h]
---   bytestringHash <- encodeForReturn intHash
---   rIntHash <-case Numeric.readHex r of
---     [(x, "")] -> return x
---     _ -> invalidArguments "parseHex: error parsing r: " r
---   sIntHash <- case Numeric.readHex s of
---     [(y, "")] -> return y
---     _ -> invalidArguments "parseHex: error parsing s: " s
---   let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
---   let theZero ::  Integer
---       theZero = 0
---   case theSignerAddress of
---     Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
---     Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
--- callBuiltin sha256@("sha256") args Nothing = do
---   let allStrings [] = True
---       allStrings ((SString _):xs) = True && (allStrings xs)
---       allStrings _ = False
---       customConcat [] = ""
---       customConcat ((SString str):ys) = str ++ customConcat ys
---       customConcat _ = invalidArguments "cannot use a non string arguments in sha256" args
---   case allStrings args of
---     False -> invalidArguments "cannot use a non string arguments in sha256" args
---     True ->  return . SString . BC.unpack . SHA256.hash . BC.pack $ customConcat args
--- callBuiltin ripemd160@("ripemd160") args Nothing = do
---   let allStrings [] = True
---       allStrings ((SString _):xs) = True && (allStrings xs)
---       allStrings _ = False
---       customConcat [] = ""
---       customConcat ((SString str):ys) = str ++ customConcat ys
---       customConcat _ = invalidArguments "cannot use a non string arguments in ripemd160" args
---   case allStrings args of
---     False -> invalidArguments "cannot use a non string arguments in ripemd160" args
---     True ->  return . SString . BC.unpack . RIPEMD160.hash . BC.pack $ customConcat args
--- callBuiltin pb@("payable") [SAccount a _] _ = do 
---   return $ SAccount a True
--- callBuiltin "require" (SBool cond :msg) Nothing = do
---   case msg of
---     [] -> require cond Nothing
---     (m:_) -> require cond (Just $ show m)
---   return SNULL
--- callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
--- callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do 
---   unknownFunction "callBuiltin" rc
-
-
-
-
--- callBuiltin rc'@("registerCert") [SString cert] _ = do
---   let rootAddress = fromPublicKey rootPubKey
---   curAccount <- getCurrentAccount
---   case curAccount of
---     Account{_accountChainId=Just cid} -> invalidWrite "Cannot register X.509 certificates on private chains" cid
---     Account{} -> do
---       mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
---       case mCreatorAddress of
---         (MS.BAccount creatorAccount) -> do
---           onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
---           onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
---           if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount
---           else do
---             let ex509Cert = bsToCert . BC.pack $ cert
---             case ex509Cert of 
---               Left q -> invalidCertificate "Could not parse X.509 certificate" q
---               Right x509Cert -> do
---                 if not $ verifyBlockApps x509Cert 
---                   then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
---                   else do
---                     let mSubject = getCertSubject x509Cert
---                     case mSubject of 
---                       Nothing -> invalidCertificate "No or invalid subject" x509Cert
---                       (Just subject) -> do
---                         let subjectAddress = fromPublicKey $ subPub subject
---                         onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
---                           format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
---                         A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
---                         return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
---         typ -> internalError "creatorAddress field has not been set or is not an account type" typ
-
--- Cert string, contract type
--- callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
---   curContract <- getCurrentContract
---   curAccount <- getCurrentAccount
---   mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
---   let rootAddress = fromPublicKey rootPubKey
---       ex509Cert = bsToCert . BC.pack $ cert
---   case (curAccount, mCreatorAddress, ex509Cert) of 
---     -- eventually use a new solidvm version here :) removed  "svm3.2", 
---     (
---       Account{_accountChainId=Nothing}, 
---       MS.BAccount creatorAddress,
---       Right x509Cert
---       ) | (_namedAccountAddress creatorAddress) == rootAddress -> do
---         onTraced $ liftIO $ putStrLn $ "    Contract Creator Address: " <> (show $ creatorAddress)
---         onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
---         if not $ verifyBlockApps x509Cert 
---           then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
---           else do
---             let mSubject = getCertSubject x509Cert
---             case mSubject of 
---               Nothing -> invalidCertificate "No or invalid subject" x509Cert
---               (Just subject) -> do
---                 let subjectAddress = fromPublicKey $ subPub subject
---                 onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
---                   format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
-                
---                -- org <- getOrg curAccount (curContract) -- ^. CC.vmVersion -- the org of the app
-
---                 parentName <- fromMaybeM (return "") $ runMaybeT 
---                     $   pure curAccount
---                     >>= MaybeT . A.lookup (A.Proxy @AddressState)
---                     >>= pure  .  addressStateCodeHash
---                     >>= MaybeT . resolveCodePtrParent (curAccount ^. accountChainId)
---                     >>= (\case     
---                             SolidVMCode name _ | name /= (labelToString $ CC._contractName curContract) -> pure name
---                             _                                                    -> pure "")
-                
---                 A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
-                
---                 -- addEvent $ Event parentName (labelToString $ CC._contractName curContract) curAccount "CertificateRegistered" [
---                 --       ("userAddress", show subjectAddress)
---                 --     , ("contractAddress", show (_namedAccountAddress na))
---                 --     ]
-                
---                 liftIO $ putStrLn $ "Emit Event/identity ---> we are emitting event CertificateRegistered" ++ 
---                     " in contract " ++ labelToString (CC._contractName curContract) ++ " in app " ++ (show parentName)
-                
---                 return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
-
---     -- (acc, caddr, ccert) -> do
---     --   invalidWrite ("Cannot call registerCertificate here: " <> (T.unpack $ T.intercalate "\n" (map T.pack [
---     --     show acc
---     --     , show caddr
---     --     , show ccert
---     --     ])))
-
+callBuiltin ecrecover@("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
+  let intHash = intBuiltin [SString h]
+  bytestringHash <- encodeForReturn intHash
+  rIntHash <-case Numeric.readHex r of
+    [(x, "")] -> return x
+    _ -> invalidArguments "parseHex: error parsing r: " r
+  sIntHash <- case Numeric.readHex s of
+    [(y, "")] -> return y
+    _ -> invalidArguments "parseHex: error parsing s: " s
+  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
+  let theZero ::  Integer
+      theZero = 0
+  case theSignerAddress of
+    Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
+    Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
+callBuiltin sha256@("sha256") args Nothing = do
+  let allStrings [] = True
+      allStrings ((SString _):xs) = True && (allStrings xs)
+      allStrings _ = False
+      customConcat [] = ""
+      customConcat ((SString str):ys) = str ++ customConcat ys
+      customConcat _ = invalidArguments "cannot use a non string arguments in sha256" args
+  case allStrings args of
+    False -> invalidArguments "cannot use a non string arguments in sha256" args
+    True ->  return . SString . BC.unpack . SHA256.hash . BC.pack $ customConcat args
+callBuiltin ripemd160@("ripemd160") args Nothing = do
+  let allStrings [] = True
+      allStrings ((SString _):xs) = True && (allStrings xs)
+      allStrings _ = False
+      customConcat [] = ""
+      customConcat ((SString str):ys) = str ++ customConcat ys
+      customConcat _ = invalidArguments "cannot use a non string arguments in ripemd160" args
+  case allStrings args of
+    False -> invalidArguments "cannot use a non string arguments in ripemd160" args
+    True ->  return . SString . BC.unpack . RIPEMD160.hash . BC.pack $ customConcat args
+callBuiltin pb@("payable") [SAccount a _] _ = do 
+  return $ SAccount a True
+callBuiltin "require" (SBool cond :msg) Nothing = do
+  case msg of
+    [] -> require cond Nothing
+    (m:_) -> require cond (Just $ show m)
+  return SNULL
+callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
+callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do 
+  unknownFunction "callBuiltin" rc
 
 callBuiltin "getUserCert" [SAccount a _] _ = do
   curContract <- getCurrentContract
@@ -2754,18 +2518,18 @@ callBuiltin "getUserCert" [SAccount a _] _ = do
 -- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
--- callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
---     let ex509Cert = bsToCert . BC.pack $ cert
---     let ePublicKey = bsToPub $ BC.pack pubkey
---     case (ex509Cert, ePublicKey) of 
---       (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
---       (_, Left r) -> malformedData "Could not parse public key" r
---       (Right x509Cert, Right publicKey) -> do
---         let isValid = verifyCert publicKey x509Cert
---         onTraced $ liftIO $ putStrLn $ (if isValid then 
---                 C.green "The certificate is valid."
---                 else C.red "The certificate is invalid")
---         return $ SBool isValid
+callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    let ePublicKey = bsToPub $ BC.pack pubkey
+    case (ex509Cert, ePublicKey) of 
+      (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
+      (_, Left r) -> malformedData "Could not parse public key" r
+      (Right x509Cert, Right publicKey) -> do
+        let isValid = verifyCert publicKey x509Cert
+        onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The certificate is valid."
+                else C.red "The certificate is invalid")
+        return $ SBool isValid
 
 
 -- SolidVM built in function that verifies a cert that if it's signed by a given key
@@ -2773,42 +2537,42 @@ callBuiltin "getUserCert" [SAccount a _] _ = do
 -- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
--- callBuiltin vc@"verifyCertSignedBy" [SString cert, SString pubkey] _ = do
---     let ex509Cert = bsToCert . BC.pack $ cert
---     let ePublicKey = bsToPub $ BC.pack pubkey
---     case (ex509Cert, ePublicKey) of 
---       (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
---       (_, Left r) -> malformedData "Could not parse public key" r
---       (Right x509Cert, Right publicKey) -> do
---         let isValid = verifyCertSignedBy publicKey x509Cert
---         onTraced $ liftIO $ putStrLn $ (if isValid then 
---                 C.green "The certificate is valid."
---                 else C.red "The certificate is invalid")
---         return $ SBool isValid
+callBuiltin vc@"verifyCertSignedBy" [SString cert, SString pubkey] _ = do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    let ePublicKey = bsToPub $ BC.pack pubkey
+    case (ex509Cert, ePublicKey) of 
+      (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
+      (_, Left r) -> malformedData "Could not parse public key" r
+      (Right x509Cert, Right publicKey) -> do
+        let isValid = verifyCertSignedBy publicKey x509Cert
+        onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The certificate is valid."
+                else C.red "The certificate is invalid")
+        return $ SBool isValid
 
 
 -- SolidVM builtin function that verifies a ECSDA non-recoverable signature is signed by a given key with on the SECP256k1 curve
 -- Expects the signature as a DER/PEM format encoded string
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
--- callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey] _ = do
---     let eMesgBs = B16.decode $ BC.pack msg 
---     case eMesgBs of 
---       Right mesgBs -> do
---         if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
---         else do
---           let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
---           let ePublicKey = bsToPub $ BC.pack pubkey
---           case (mSignature, ePublicKey) of 
---             (Nothing, _) -> malformedData "Could not parse EC Signature " signature
---             (_, Left pk) -> malformedData "Could not parse public key" pk
---             (Just sig, Right publicKey) -> do
---               let isValid = SEC.verifySig publicKey sig mesgBs
---               onTraced $ liftIO $ putStrLn $ (if isValid then 
---                 C.green "The signature is valid."
---                 else C.red "The signature is invalid")
---               return $ SBool isValid
---       Left err -> malformedData "Could not decode hex string" err
+callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey] _ = do
+    let eMesgBs = B16.decode $ BC.pack msg 
+    case eMesgBs of 
+      Right mesgBs -> do
+        if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
+        else do
+          let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
+          let ePublicKey = bsToPub $ BC.pack pubkey
+          case (mSignature, ePublicKey) of 
+            (Nothing, _) -> malformedData "Could not parse EC Signature " signature
+            (_, Left pk) -> malformedData "Could not parse public key" pk
+            (Just sig, Right publicKey) -> do
+              let isValid = SEC.verifySig publicKey sig mesgBs
+              onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The signature is valid."
+                else C.red "The signature is invalid")
+              return $ SBool isValid
+      Left err -> malformedData "Could not decode hex string" err
   
 callBuiltin "parseCert" [SString cert] _ = do
   curContract <- getCurrentContract
@@ -2825,25 +2589,24 @@ certificateMap maybeCert =
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
-          -- pragmaVersion = CC._vmVersion cntrct
-          -- nonEmptyFields cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-          --                                      , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
-          --                                      , (SString "organization", Constant . SString $ subOrg sub)
-          --                                      , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
-          --                                      , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
-          --                                      , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
-          --                                      , (SString "certString", Constant . SString $ cert)
-          --                                      , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
-          --                                      ]
-          -- emptyFields = M.fromList [ (SString "commonName", Constant . SString $ "")
-          --                          , (SString "country", Constant . SString $ "")
-          --                          , (SString "organization", Constant . SString $ "")
-          --                          , (SString "group", Constant . SString $ "")
-          --                          , (SString "publicKey", Constant . SString $ "")
-          --                          , (SString "userAddress", Constant . SString $ "")
-          --                          , (SString "certString", Constant . SString $ "")
-          --                          , (SString "parent", Constant . SString $ "")
-          --                          ]
+          nonEmptyFields cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                               , (SString "organization", Constant . SString $ subOrg sub)
+                                               , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
+                                               , (SString "certString", Constant . SString $ cert)
+                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+                                               ]
+          emptyFields = M.fromList [ (SString "commonName", Constant . SString $ "")
+                                   , (SString "country", Constant . SString $ "")
+                                   , (SString "organization", Constant . SString $ "")
+                                   , (SString "group", Constant . SString $ "")
+                                   , (SString "publicKey", Constant . SString $ "")
+                                   , (SString "userAddress", Constant . SString $ "")
+                                   , (SString "certString", Constant . SString $ "")
+                                   , (SString "parent", Constant . SString $ "")
+                                   ]
           certMap cert sub  = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub) 
                                          , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert ) 
                                          ]
@@ -2918,9 +2681,6 @@ runTheConstructors from to hsh cc contractName' argExps = do
                                         $ CC._constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-  -- let svm3_2 = CC._vmVersion contract' == "svm3.2"
-  -- let svm3_3 = CC._vmVersion contract' == "svm3.3"
-  -- let svm3_4 = CC._vmVersion contract' == "svm3.4"
   zipped <-
     case argVals of
       OrderedVals vals ->
@@ -2972,15 +2732,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
   _ <-
     case contract'^.CC.constructor of
       Just theFunction -> do
-        -- if (CC._vmVersion contract' == "svm3.3" || CC._vmVersion contract' == "svm3.4")
-        --   then do
-            --argVals <- forM argExps evaluate
-            --_ <- call' address contract' theFunction argVals
         let theModifierNames =  map fst $ (CC._funcModifiers theFunction) 
         !theModifiers' <- forM theModifierNames $ \name -> do
           case M.lookup name (contract'^.CC.modifiers) of
             Just theModifier -> do
-              --args' <- argsToVals contract' theModifier argExps
               return $ Just theModifier
             Nothing -> do
               return Nothing
@@ -2988,7 +2743,6 @@ runTheConstructors from to hsh cc contractName' argExps = do
         !commands <- case CC._funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
-      -- let modifierArgs = map CC.modifierArgs theModifiers
         let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
         let isNotModExec = \case
               CC.ModifierExecutor _ -> False
@@ -2999,28 +2753,8 @@ runTheConstructors from to hsh cc contractName' argExps = do
         _ <- pushSender from $ runStatements commands
         _ <- runStatements' rhs
         return ()
-      -- else do
-      --   let theModifierNames =  map fst $ (CC._funcModifiers theFunction) 
-      --   !_ <- forM theModifierNames $ \name -> do
-      --     case M.lookup name (contract'^.CC.modifiers) of
-      --       Just _ -> do
-      --         --args' <- argsToVals contract' theModifier argExps
-      --         unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
-      --       Nothing -> do
-      --         return Nothing
-      --   commands <- case CC._funcContents theFunction of
-      --     Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-      --     Just cms -> pure cms
         _ <- pushSender from $ runStatements commands
         return ()
-        -- --argVals <- forM argExps evaluate
-        -- --_ <- call' address contract' theFunction argVals
-        -- commands <- case CC._funcContents theFunction of
-        --   Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-        --   Just cms -> pure cms
-
-        -- _ <- pushSender from $ runStatements commands
-        -- return ()
 
       Nothing -> return ()
 
