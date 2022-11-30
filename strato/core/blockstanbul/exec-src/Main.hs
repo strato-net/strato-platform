@@ -36,7 +36,7 @@ import qualified Strato.VaultProxy.Client     as VP
 instance HasVaultProxy IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://strato:8013/vault-proxy" -----No real way to get this to be dynamically generated, no flags are passed to the executable, leave for now
+    url <- parseBaseUrl (optVaultProxyUrl <> optVaultProxyPort <> "/") -----No real way to get this to be dynamically generated, no flags are passed to the executable, leave for now
     --Need to change this to get not search the hardcoded "nodekey"
     nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr url)
     nodeKey <- case (nk) of
@@ -56,6 +56,8 @@ data Options = Options
   , optRecipient :: Address
   , optNodes     :: [String]
   , optNonce     :: Int
+  , optVaultProxyUrl :: String
+  , optVaultProxyPort :: Int
   } deriving Show
 
 defaultOptions :: Options
@@ -65,6 +67,8 @@ defaultOptions  = Options
   , optRecipient = throw $ userError "Give me a recipient address."
   , optNodes     = throw $ userError "Give me the node(s) to whom I'll send the vote."
   , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
+  , optVaultProxyUrl = "http://strato"
+  , optVaultProxyPort = 8013
   }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -100,6 +104,17 @@ options =
       (NoArg
        (\ opts -> return opts { optHTTPS = True}))
       "Whether to use HTTPS"
+  , Option ['u'] ["vurl"]
+      (OptArg
+       (\ url opts -> return opts { vaultProxyUrl = vurl })
+       "URL")
+      "The URL of the vault proxy"
+  , Option ['p'] ["vport"]
+      (OptArg
+       (\ port opts -> return opts { vaultProxyPort = vport })
+       "PORT")
+      "The port of the vault proxy"
+  ]
  ]
 
 helpMessage :: String

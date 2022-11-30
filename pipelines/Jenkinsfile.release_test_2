@@ -253,6 +253,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script{
+                        // Add vault proxy information to the following items, new flags look like: --vurl=http://strato --vport=8013
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node2Address} --nonce=100 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node3Address} --nonce=150 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT} --https"
