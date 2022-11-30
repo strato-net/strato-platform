@@ -324,6 +324,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           [x] -> do
             p <- fromContract x
             let md = contractpayloadMetadata p
+                cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
                 bcp = ContractParameters
                         addr
                         (getSrc p)
@@ -331,7 +332,14 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
-                        (contractpayloadMetadata p)
+                        {-
+                          History tables are always enabled
+                          'contractpayloadContract p' should always return a name but in the case that it doesn't 
+                            it will go in the history table unnamed
+                        -}
+                        (case md of 
+                          Nothing -> Just $ Map.singleton "history" cn
+                          Just m -> Just $ Map.insert "history" cn m)
                         (contractpayloadChainid p <|> chainId)
                         resolve
                 poster = case Map.lookup "VM" =<< md of
@@ -348,12 +356,18 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\p@(ContractPayload _ c a v x cid m) ->
+                        (map (\p@(ContractPayload _ c a v x cid m) -> do
+                                let cn = fromMaybe "unnamed_contract" c
                                 UploadListContract (fromJust c)
                                                    (getSrc p)
                                                    (fromMaybe Map.empty a)
                                                    (mergeTxParams x txParams)
-                                                   v cid m) ps)
+                                                   v 
+                                                   cid 
+                                                   (case m of
+                                                    Nothing -> Just $ Map.singleton "history" cn
+                                                    Just h -> Just $ Map.insert "history" cn h)) 
+                                                   ps)
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list

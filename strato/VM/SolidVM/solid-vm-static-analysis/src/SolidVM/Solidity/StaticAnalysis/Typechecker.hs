@@ -932,11 +932,11 @@ requireArgs x = Sum $ boolType' x :|
 assertArgs :: SourceAnnotation Text -> Type'
 assertArgs x = boolType' x
 
-registerCertArgs :: SourceAnnotation Text -> Type'
-registerCertArgs x = Sum $ stringType' x :| 
-                        [ Product [stringType' x, contractType' x] x
-                        , Product [accountType' x, stringType' x] x
-                        ]
+-- registerCertArgs :: SourceAnnotation Text -> Type'
+-- registerCertArgs x = Sum $ stringType' x :| 
+--                         [ Product [stringType' x, contractType' x] x
+--                         , Product [accountType' x, stringType' x] x
+--                         ]
 
 verifyCertArgs :: SourceAnnotation Text -> Type'
 verifyCertArgs x = Product [stringType' x, stringType' x] x
@@ -1002,7 +1002,7 @@ getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' 
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx  [] []
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx [] []
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx [] []
-getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx [] []
+-- getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx [] []
 getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx [] []
 getVarType' "verifyCertSignedBy" ctx =  pure $ Function (verifyCertSignedByArgs ctx) (boolType' ctx) ctx [] []
 getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx [] []

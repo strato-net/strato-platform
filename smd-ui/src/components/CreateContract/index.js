@@ -449,33 +449,6 @@ class CreateContract extends Component {
                   {this.props.codeType}
                 </div>
               </div>}
-              {contracts && <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    History
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  {contracts.map((value, index) => {
-                    return (
-                      <label className="pt-control pt-checkbox">
-                        <Field
-                          id={value}
-                          className="form-width"
-                          name={"history@" + value}
-                          type="checkbox"
-                          component="input"
-                          dir="auto"
-                          title="History"
-                        />
-                        <span className="pt-control-indicator"></span>
-                        {value}
-                      </label>
-                    )
-                  })
-                  }
-                </div>
-              </div>}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
