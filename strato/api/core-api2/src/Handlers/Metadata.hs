@@ -93,7 +93,7 @@ getMetaData token =
   case mAddressAndKey of
     Left  _      -> pure $ (MetadataResponse " "  "Error" validators False False) 
     Right addressAndKey -> pure $ (MetadataResponse 
-          ((\l -> drop 1 $ take ((length l) -1 )  l )  $ ((\(PublicKey pubkey) ->   show  pubkey ) $ fst addressAndKey )) --probably a better way to pretty print pubkey
+          ((\l -> drop 1 $ init  l )  $ ((\(PublicKey pubkey) ->   show  pubkey ) $ fst addressAndKey )) --pretty prints pubkey
           (show $ snd  addressAndKey) 
           validators  
           isSynced 
