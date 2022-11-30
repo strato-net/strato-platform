@@ -18,3 +18,5 @@ import           HFlags
 --defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
 --defineFlag "txQueueSize" (4096::Integer) "The maximum number of requests to queue"
 defineFlag "gasOn" (True :: Bool) "Whether or not to throw an error if an account sending a TX has no balance - used in conjunction with the VM gasOn flag"
+defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
+defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."

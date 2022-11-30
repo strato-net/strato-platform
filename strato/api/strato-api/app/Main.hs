@@ -213,7 +213,7 @@ hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI)
         runSQLMUsingEnv sqlEnv .
         flip runReaderT blocEnv .
         runBlocSQLMUsingEnv blocSQLEnv .
-        runVaultProxyM "http://strato:8013/vault-proxy" .
+        runVaultProxyM (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/") .
         runCoreAPIM "http://strato:3000/eth/v1.2" $ f
 
 fullAPI :: Proxy FullAPI

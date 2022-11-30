@@ -102,7 +102,7 @@ defaultConfig =
 getNodeKey :: IO (VP.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultProxyUrl <- parseBaseUrl flags_vaultProxyUrl 
+  vaultProxyUrl <- parseBaseUrl (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/") 
   let clientEnv = mkClientEnv mgr vaultProxyUrl
   putStrLn "asking vault-proxy for the node's key, or to create one, if it does not exist"
     --TODO: need to remove hardcoded "nodekey"

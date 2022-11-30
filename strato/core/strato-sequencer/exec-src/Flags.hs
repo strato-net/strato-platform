@@ -35,7 +35,8 @@ defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's adm
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of admins. Admins can, for instance, nominate a new validator"
 defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node's address as an admin account"
 defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
-defineFlag "vaultProxyUrl" ("http://strato:8013/vault-proxy" :: String) "The Vault-Proxy URL"
+defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
+defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
@@ -67,7 +68,7 @@ exportFlagsAsMetrics = do
   set "blockstanbul_admins" flags_blockstanbul_admins
   set "isAdmin" $ show flags_isAdmin
   set "isRootNode" $ show flags_isRootNode
-  set "vaultProxyUrl" $ flags_vaultProxyUrl
+  set "vaultProxyUrl" $ (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
   set "validatorBehavior" $ show flags_validatorBehavior 
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter

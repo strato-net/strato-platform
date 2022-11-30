@@ -36,7 +36,7 @@ import qualified Strato.VaultProxy.Client     as VP
 instance HasVaultProxy IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://strato:8013/vault-proxy"
+    url <- parseBaseUrl "http://strato:8013/vault-proxy" -----No real way to get this to be dynamically generated, no flags are passed to the executable, leave for now
     --Need to change this to get not search the hardcoded "nodekey"
     nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr url)
     nodeKey <- case (nk) of
@@ -118,7 +118,7 @@ main :: IO ()
 main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://strato:8013/vault-proxy"
+  vaultUrl <- parseBaseUrl "http://strato:8013/" --------Can't remove the hardcoded vault proxy url, no flags are passed to the executable, leave for now
   nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr vaultUrl)
   nodeKey <- case nk of
     Left err -> die $ "failed to get the node's name from vault proxy: " ++ show err

@@ -513,7 +513,7 @@ initConfig wireMessagesRef maxHeaders = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl flags_vaultProxyUrl
+    url <- liftIO $ parseBaseUrl (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
     return $ mkClientEnv mgr url
 
   initState <- newIORef initContext

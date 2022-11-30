@@ -23,9 +23,9 @@ ethereumDiscovery :: LoggingT IO ()
 ethereumDiscovery = do
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-proxy at " ++ flags_vaultProxyUrl
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-proxy at " ++ (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
   _ <- runResourceT $ do
-    cxt <- initContextLite flags_vaultProxyUrl
+    cxt <- initContextLite (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
 
     bracket
       (connectMe $ discoveryPort $ discoveryConfig ethConf)
