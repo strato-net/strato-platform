@@ -30,16 +30,15 @@ import           Data.Text.Encoding
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
-import           Blockchain.Data.AddressStateDB
+-- import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction  as U
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.BlockDB()
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
-import  BlockApps.X509.Certificate           
+import           BlockApps.X509.Certificate           
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
@@ -47,7 +46,9 @@ import           Blockchain.Sequencer.Monad
 import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import qualified Blockchain.Strato.Model.ChainMember   as CM
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -65,11 +66,6 @@ import           Text.RawString.QQ
 
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
-
-instance HasVault IO where
-  sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
-  getPub = error "called getPub, but this should never happen"
-  getShared _ = error "called getShared, but this should never happen"
 
 createPeer' :: PrivateKey -> [Address] -> T.Text -> T.Text -> IO P2PPeer
 createPeer' pk as n ip = do
@@ -193,26 +189,69 @@ spec = do
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
+      
+      registryTs <- liftIO getCurrentMicrotime
+
       let runForThreeSeconds = void . timeout 3000000
+          toIetx = IETx registryTs . IngestTx Origin.API
+          chainMember1 = (CM.ChainMembers $ Set.singleton $ (CM.CommonName (T.pack "BlockApps") (T.pack "engineering") (T.pack "David Nallapu") True))
+                -- Create a certificate registry on the main chain
+          iss   = Issuer {  issCommonName = "David Nallapu"
+                          , issOrg        = "Blockapps"
+                          , issUnit       = Just "engineering"
+                          , issCountry    = Just "USA"
+                          }
+          subj  = Subject { subCommonName = "Garrett"
+                          , subOrg        = "Blockapps"
+                          , subUnit       = Just "engineering"
+                          , subCountry    = Just "USA"
+                          , subPub        = derivePublicKey (privKeys !! 1)
+                          } 
+      cert <- makeSignedCert Nothing (Just rootCert) iss subj
+      let cert' = decodeUtf8 . certToBytes $ cert
+          args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
+          registry = [r|
+                pragma solidvm 3.0;
+                contract CertRegistry {
+                  event CertificateRegistered(string cert);
+                  constructor(address _user, string _cert) {
+                    registerCert(_user, _cert);
+                    emit CertificateRegistered(_cert);
+                  }
+                }
+                |]
+          contractName' = "CertRegistry"
+          txMd' = M.fromList [("src", registry), ("name", contractName'), ("args", args')]
+          mkRegistryTx = mkSignedTx (privKeys !! 0) (U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack registry
+            , U.unsignedTransactionChainId    = Nothing
+            }) txMd'
+        
           src = [r|
 pragma solidvm 3.2;
 contract A {
-  event MemberAdded(address addr, string enode);
-  function addMember(address _addr, string _enode) {
-    emit MemberAdded(_addr, _enode);
+  event OrgUnitAdded(string name, string unit);
+
+  constructor() {}
+
+  function addOrg(string _name, string _unit) {
+    emit OrgUnitAdded(_name, _unit);
   }
 }
 |]
           contractName = "A"
-          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          enode2 = "enode://abcd@5.6.7.8:30303"
           chainInfo' = ChainInfo
             UnsignedChainInfo { chainLabel     = "My test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.singleton (validators' !! 0) enode1
+                              , members        = chainMember1
                               , parentChain    = Nothing
                               , creationBlock  = zeroHash
                               , chainNonce     = 123456789
@@ -221,7 +260,7 @@ contract A {
             Nothing
           chainId = keccak256ToWord256 $ rlpHash chainInfo'
       ts <- liftIO getCurrentMicrotime
-      let args = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> ",\"" <> T.pack enode2 <> "\")"
+      let args = "(" <> "\"Blockapps\", \"engineering\")"
           utx' = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 0
             , U.unsignedTransactionGasPrice   = Wei 1
@@ -232,9 +271,11 @@ contract A {
             , U.unsignedTransactionChainId    = Just $ ChainId chainId
             }
           tx' = mkSignedTx (privKeys !! 0) utx' txMd
-          txMd = M.fromList [("funcName","addMember"),("args",args)]
+          txMd = M.fromList [("funcName","addOrg"),("args",args)]
           ietx = IETx ts $ IngestTx Origin.API tx'
           routine = do
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx mkRegistryTx
             threadDelay 500000
             flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
             threadDelay 500000
@@ -245,7 +286,7 @@ contract A {
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
-    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
+    fit "can sync a new node to a chain after running multiple transactions on that chain" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
       peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
@@ -258,35 +299,79 @@ contract A {
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      let src = [r|
+      
+      registryTs <- liftIO getCurrentMicrotime
+
+      -- let toIetxRegistry = IETx registryTs . IngestTx Origin.API
+                -- Create a certificate registry on the main chain
+      let iss   = Issuer {  issCommonName = "Dustin"
+                          , issOrg        = "Blockapps"
+                          , issUnit       = Just "engineering"
+                          , issCountry    = Just "USA"
+                          }
+          subj  = Subject { subCommonName = "Garrett"
+                          , subOrg        = "Blockapps"
+                          , subUnit       = Just "engineering"
+                          , subCountry    = Just "USA"
+                          , subPub        = derivePublicKey (privKeys !! 1)
+                          }
+      cert <- makeSignedCert Nothing (Just rootCert) iss subj
+      let cert' = decodeUtf8 . certToBytes $ cert
+          args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <> "\")"
+          registry = [r|
+pragma solidvm 3.0;
+contract CertRegistry {
+  event CertificateRegistered(string cert);
+  
+  constructor(address _user, string _cert) {
+    registerCert(_user, _cert);
+    emit CertificateRegistered(_cert);
+  }
+}
+|]
+          contractName' = "CertRegistry"
+          txMd' = M.fromList [("src", registry), ("name", contractName'), ("args", args')]
+          mkRegistryTx = mkSignedTx (privKeys !! 0) (U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack registry
+            , U.unsignedTransactionChainId    = Nothing
+            }) txMd'
+          src = [r|
 pragma solidvm 3.2;
 contract A {
-  event MemberAdded(address addr, string enode);
+  event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
-  function addMember(address _addr, string _enode) {
-    emit MemberAdded(_addr, _enode);
+
+  constructor() {}
+
+  function addMember(string _name, string _unit, string _commonName) {
+    emit CommonNameAdded(_name, _unit, _commonName);
   }
 
   function incX() {
     x++;
   }
-}
-|]
-          contractName = "A"
-          mainChainSrc = [r|
-pragma solidvm 3.2;
-contract B {
-  uint y;
 
-  constructor() {
-    y = 47;
-  }
-}
-|]
-          mainChainContractName = "B"
-          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          enode2 = readEnode "enode://abcd@5.6.7.8:30303"
-          enode3 = "enode://abcd@9.10.11.12:30303"
+}|]
+          contractName = "A"
+--           mainChainSrc = [r|
+-- pragma solidvm 3.2;
+-- contract B {
+--   uint y;
+
+--   constructor() {
+--     y = 47;
+--   }
+-- }
+-- |]
+          -- mainChainContractName = "B"
+          chainMember1 = CM.ChainMembers $ Set.fromList  [(CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "David Nallapu") True)
+                                                         ,(CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "Garrett") True)]
+          chainMember2 = CM.ChainMembers $ Set.singleton (CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "David Nallapu") True)
           mkChainInfo bHash = ChainInfo
             UnsignedChainInfo { chainLabel     = "My parent test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
@@ -294,9 +379,7 @@ contract B {
                                                  , NonContract (validators' !! 1) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.fromList [ (validators' !! 0, enode1)
-                                                            , (validators' !! 1, enode2)
-                                                            ]
+                              , members        = chainMember1
                               , parentChain    = Nothing
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
@@ -309,8 +392,7 @@ contract B {
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.fromList [ (validators' !! 0, enode1)
-                                                            ]
+                              , members        = chainMember2
                               , parentChain    = Just pChain
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
@@ -340,24 +422,24 @@ contract B {
           incXTx2 = flip (mkSignedTx (privKeys !! 0)) txMd . incXUtx2
           incXTx3 = flip (mkSignedTx (privKeys !! 0)) txMd . incXUtx3
           incXTx4 = flip (mkSignedTx (privKeys !! 0)) txMd . incXUtx4
-      let mainChainArgs = "()"
-          mainChainUtx = U.UnsignedTransaction
-            { U.unsignedTransactionNonce      = Nonce 0
-            , U.unsignedTransactionGasPrice   = Wei 1
-            , U.unsignedTransactionGasLimit   = Gas 1000000000
-            , U.unsignedTransactionTo         = Nothing
-            , U.unsignedTransactionValue      = Wei 0
-            , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
-            , U.unsignedTransactionChainId    = Nothing
-            }
-          mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
-          mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
-                             in mkSignedTx (privKeys !! 0) utx mainChainTxMd
+      -- let mainChainArgs = "()"
+      --     mainChainUtx = U.UnsignedTransaction
+      --       { U.unsignedTransactionNonce      = Nonce 0
+      --       , U.unsignedTransactionGasPrice   = Wei 1
+      --       , U.unsignedTransactionGasLimit   = Gas 1000000000
+      --       , U.unsignedTransactionTo         = Nothing
+      --       , U.unsignedTransactionValue      = Wei 0
+      --       , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+      --       , U.unsignedTransactionChainId    = Nothing
+      --       }
+      --     mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
+      --     mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
+      --                        in mkSignedTx (privKeys !! 0) utx mainChainTxMd
       cIdRef <- newIORef undefined
       cInfoRef <- newIORef undefined
       cId2Ref <- newIORef undefined
       cInfo2Ref <- newIORef undefined
-      let addMemberArgs = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 2)) <> ",\"" <> T.pack enode3 <> "\")"
+      let addMemberArgs = "(" <> "\"Blockapps\", \"engineering\", \"Garrett\")"
           addMemberUtx chainId = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 5
             , U.unsignedTransactionGasPrice   = Wei 1
@@ -369,15 +451,16 @@ contract B {
             }
           addMemberTxMd = M.fromList [("funcName","addMember"),("args",addMemberArgs)]
           addMemberTx cId = mkSignedTx (privKeys !! 0) (addMemberUtx cId) addMemberTxMd
-          toIetx = IETx ts . IngestTx Origin.API
-          mainChainRoutine n = do
-            threadDelay 200000
-            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx n
-            mainChainRoutine $ n + 1
-          routine = do
-            threadDelay 5000000
+      let toIetx = IETx ts . IngestTx Origin.API
+      -- let mainChainRoutine n = do
+      --       threadDelay 200000
+      --       flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx n
+      --       mainChainRoutine $ n + 1
+      let routine = do
+            threadDelay 2000000
             for_ peers $ postEvent (TimerFire 0)
-            threadDelay 5000000
+            threadDelay 2000000
+            flip postEvent (peers !! 0) . UnseqEvent $ IETx registryTs $ IngestTx Origin.API mkRegistryTx
             bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 0
             let cInfo = mkChainInfo bHash
                 cId = mkChainId cInfo
@@ -415,14 +498,15 @@ contract B {
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
           
-      void . timeout 80000000 $ concurrently_ (runNetworkOld peers connections') (concurrently_ routine $ mainChainRoutine 0)
+      void . timeout 80000000 $ concurrently_ (runNetworkOld peers connections') routine
       cId <- readIORef cIdRef
       cInfo <- readIORef cInfoRef
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
-      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId) `shouldBe` (i, Just cInfo)
+      for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId) `shouldBe` (i, if i == 2 then Nothing else Just cInfo)
       cId2 <- readIORef cId2Ref
       cInfo2 <- readIORef cInfo2Ref
-      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 1 then Nothing else Just cInfo2)
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 2 then Nothing else Just cInfo2)
       --privKey4 <- newPrivateKey
       --peer4 <- createPeer' privKey4 validators' "node4" "13.14.15.16"
       --let peers' = peers ++ [peer4]
@@ -449,9 +533,11 @@ contract B {
 pragma solidvm 3.0;
 
 contract RegisterCert {
+  event CertificateRegistered(string cert);
 
   constructor(address _user, string _cert) {
     registerCert(_user, _cert);
+    emit CertificateRegistered(_cert);
   }
 }
 |]
@@ -491,7 +577,8 @@ contract RegisterCert {
             threadDelay 1000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
       void . timeout 3000000 $ concurrently_ (runNetworkOld peers connections') routine
-      True `shouldBe` True
+      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
   describe "X.509 Private Chain exchange" $ do
     it "can add an organization to a private chain" $ do
@@ -510,8 +597,7 @@ contract RegisterCert {
         ts <- liftIO getCurrentMicrotime
         cIdRef <- newIORef undefined
         cInfoRef <- newIORef undefined
-        let runForThreeSeconds = void . timeout 3000000
-            enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+        let runForThreeSeconds = void . timeout 5000000
             toIetx = IETx ts . IngestTx Origin.API
             mkChainId = keccak256ToWord256 . rlpHash
 
@@ -529,13 +615,14 @@ contract RegisterCert {
                             } 
         cert <- makeSignedCert Nothing (Just rootCert) iss subj
         let cert' = decodeUtf8 . certToBytes $ cert
-            args' = "(\"" <> cert' <>"\")"
+            args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
             registry = [r|
-                  pragma solidvm 3.2;
+                  pragma solidvm 3.0;
                   contract CertRegistry {
                     event CertificateRegistered(string cert);
 
-                    constructor(string _cert) {
+                    constructor(address _user, string _cert) {
+                      registerCert(_user, _cert);
                       emit CertificateRegistered(_cert);
                     }
                   }
@@ -556,17 +643,18 @@ contract RegisterCert {
             src = [r|
                   pragma solidvm 3.2;
                   contract A {
-                    event OrganizationAdded(string name, string unit);
+                    event OrgAdded(string name);
 
                     constructor() {}
 
-                    function addOrg(string _name, string _unit) {
-                      emit OrganizationAdded(_name, _unit);
+                    function addOrg(string _name) {
+                      emit OrgAdded(_name);
                     }
                   }
                   |]
             contractName = "A"
-            args = "(" <> "\"Blockapps\"" <> ", \"engineering\"" <> ")"
+            chainMember1 = (CM.ChainMembers $ Set.singleton $ CM.CommonName (T.pack "BlockApps") (T.pack "engineering") (T.pack "Dustin") True)
+            args = "(" <> "\"Blockapps\")"
             txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
             tChainInfo = ChainInfo
               UnsignedChainInfo { chainLabel     = "My organization's private chain"
@@ -575,7 +663,7 @@ contract RegisterCert {
                                                   , NonContract (validators' !! 1) 1000000000000000000000
                                                   ]
                                 , codeInfo       = [CodeInfo "" src $ Just contractName]
-                                , members        = M.singleton (validators' !! 0) enode1
+                                , members        = chainMember1
                                 , parentChain    = Nothing
                                 , creationBlock  = zeroHash
                                 , chainNonce     = 123456789
@@ -615,10 +703,147 @@ contract RegisterCert {
         for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
         -- Node 1's cert was registered in the contract so it should receive the chain ID
-        (ctxs1 !! 1) ^. orgNameChainsMap `shouldBe`
-          M.singleton (OrgName "Blockapps", OrgUnit $ Just "engineering") (OrgNameChains $ Set.singleton testCid)
+        (ctxs1 !! 1) ^. trueOrgNameChainsMap `shouldBe`
+          M.singleton (CM.ChainMembers $ Set.singleton $ CM.Org (T.pack "Blockapps") True) (CM.TrueOrgNameChains $ Set.singleton testCid)
 
         -- Node 2's cert is not registered so it should not have any in the set
-        (ctxs1 !! 2) ^. orgNameChainsMap `shouldBe` M.empty
+        (ctxs1 !! 2) ^. trueOrgNameChainsMap `shouldBe` M.empty
 
         -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()
+
+-- postBootChain :: NetworkManager -> Handler ()
+-- postBootChain mgr = do
+--   bootNode <- fmap (M.lookup "Boot" . _nodes) . readTVarIO $ mgr ^. network
+--   node1 <- fmap (M.lookup "Node1" . _nodes) . readTVarIO $ mgr ^. network
+--   node2 <- fmap (M.lookup "Node2" . _nodes) . readTVarIO $ mgr ^. network
+--   node3 <- fmap (M.lookup "Node3" . _nodes) . readTVarIO $ mgr ^. network
+--   let contractName = "A"
+--       certContractSrc = [r|
+-- pragma solidvm 3.0;
+-- contract BlockAppsCertificateRegistry {
+--   constructor(address _user, string _rootCert) {
+--     registerCert(_user, _rootCert);
+--   }
+
+--   function registerCertificate(address _user, string _cert) {
+--     registerCert(_user, _cert);
+--     new Certificate(_cert);
+--   }
+-- }
+
+-- contract Certificate {
+--     address owner;  // The CertificateRegistery Contract
+--     string public certificateString;
+--     event CertificateRegistered(string cert);
+
+--     constructor(string _certificateString) {
+--         owner = msg.sender;
+--         certificateString = _certificateString;
+--         emit CertificateRegistered(_certificateString);
+--     }
+-- }|]
+--       src = [r|
+-- pragma solidvm 3.2;
+-- contract A {
+--   event CommonNameAdded(string name, string unit, string common);
+--   event OrgUnitAdded(string name, string unit);
+--   event OrgAdded(string name);
+
+--   constructor() {}
+
+--   function addMember(string _name, string _unit, string _common) {
+--     emit CommonNameAdded(_name, _unit, _common);
+--   }
+
+--   function addUnit(string _name, string _unit) {
+--     emit OrgUnitAdded(_name, _unit);
+--   }
+
+--   function addOrg(string _name) {
+--     emit OrgAdded(_name);
+--   }
+-- }|]
+--       bootNode' = fromMaybe (error "Node not found.") bootNode
+--       node1' = fromMaybe (error "Node not found.") node1
+--       node2' = fromMaybe (error "Node not found.") node2
+--       node3' = fromMaybe (error "Node not found.") node3
+--   bootNodeCtxt <- atomically $ (CCS.readTVarSTM . _p2pTestContext) bootNode'
+--   node1Ctxt <- atomically $ (CCS.readTVarSTM . _p2pTestContext) node1'
+--   node2Ctxt <- atomically $ (CCS.readTVarSTM . _p2pTestContext) node2'
+--   node3Ctxt <- atomically $ (CCS.readTVarSTM . _p2pTestContext) node3'
+--   let bootPrvKey = _prvKey bootNodeCtxt
+--       node1PrvKey = _prvKey node1Ctxt
+--       node2PrvKey = _prvKey node2Ctxt
+--       node3PrvKey = _prvKey node3Ctxt
+--       bootPubKey = derivePublicKey bootPrvKey
+--       node1PubKey = derivePublicKey node1PrvKey
+--       node2PubKey = derivePublicKey node2PrvKey
+--       node3PubKey = derivePublicKey node3PrvKey
+--       nodeCertInfos = [ ("BlockApps", "Engineering", "Dustin", bootPubKey)
+--                       , ("BlockApps", "Engineering", "Jin", node1PubKey)
+--                       , ("BlockApps", "Product", "Troy", node2PubKey)
+--                       , ("BlockApps", "Engineering", "Ben", node3PubKey)]
+--       issuer = Issuer
+--             { issCommonName = "Dustin"
+--             , issOrg        = "BlockApps"
+--             , issUnit       = Just "Engineering"
+--             , issCountry    = Just "USA"
+--             }
+--       subjects = (\(org, unit, cn, pub) -> Subject
+--             { subCommonName = cn
+--             , subOrg        = org
+--             , subUnit       = Just unit
+--             , subCountry    = Just "USA"
+--             , subPub        = pub
+--             }) <$> nodeCertInfos
+
+--   certs <- liftIO $ traverse (\subject -> fmap (T.pack . BC.unpack . certToBytes) $ makeSignedCert Nothing (Just rootCert) issuer subject) subjects
+--   let utx0 = U.UnsignedTransaction
+--         { U.unsignedTransactionNonce      = Nonce 0
+--         , U.unsignedTransactionGasPrice   = Wei 1
+--         , U.unsignedTransactionGasLimit   = Gas 1000000000
+--         , U.unsignedTransactionTo         = Nothing
+--         , U.unsignedTransactionValue      = Wei 0
+--         , U.unsignedTransactionInitOrData = Code $ BC.pack certContractSrc
+--         , U.unsignedTransactionChainId    = Nothing
+--         }
+--       rootCertStr = T.pack . BC.unpack $ certToBytes rootCert
+--       bootAddr = fromPrivateKey bootPrvKey
+--       txMd = M.fromList [("VM", "SolidVM"), ("src", src), ("name", "BlockAppsCertificateRegistry"), ("args", args1 bootAddr rootCertStr)]
+--       signedTx0 = mkSignedTx bootPrvKey utx0 txMd
+--       args1 addr cert = "(0x" <> T.pack (formatAddressWithoutColor addr) <> ", \"" <> cert <> "\")"
+--       utx1 cert i = U.UnsignedTransaction
+--         { U.unsignedTransactionNonce      = Nonce i
+--         , U.unsignedTransactionGasPrice   = Wei 1
+--         , U.unsignedTransactionGasLimit   = Gas 1000000000
+--         , U.unsignedTransactionTo         = Just $ getNewAddress_unsafe (fromPrivateKey bootPrvKey) 0
+--         , U.unsignedTransactionValue      = Wei 0
+--         , U.unsignedTransactionInitOrData = Code $ BC.pack $ T.unpack $ args1 bootAddr cert
+--         , U.unsignedTransactionChainId    = Nothing
+--         }
+--       txMd1 cert = M.fromList [("VM", "SolidVM"), ("funcName", "registerCertificate"), ("args", args1 bootAddr cert)]
+--       addMd1 cert i = mkSignedTx bootPrvKey (utx1 cert i) (txMd1 cert)
+--       signedTx1s = (\(cert,i) -> addMd1 cert i) <$> zip certs [1..]
+--       chainMember1 = (ChainMembers $ Set.singleton $ (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "Dustin") True))
+--       chainInfo' = ChainInfo
+--               UnsignedChainInfo { chainLabel     = "My test chain!"
+--                                 , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+--                                                    , NonContract (fromPrivateKey bootPrvKey) 1000000000000000000000
+--                                                    ]
+--                                 , codeInfo       = [CodeInfo "" src $ (Just . T.pack) contractName]
+--                                 , members        = chainMember1
+--                                 , parentChain    = Nothing
+--                                 , creationBlock  = zeroHash
+--                                 , chainNonce     = 123456789
+--                                 , chainMetadata  = M.singleton "VM" "SolidVM"
+--                                 }
+--               Nothing
+--       chainId = keccak256ToWord256 $ rlpHash chainInfo'
+--   tsNowMain <- liftIO getCurrentMicrotime
+--   liftIO $ flip postEvent bootNode' $ UnseqEvent . IETx tsNowMain $ IngestTx Origin.API signedTx0
+--   for_ signedTx1s $ \tx -> do
+--     threadDelay 500000
+--     tsNow <- liftIO getCurrentMicrotime
+--     liftIO $ flip postEvent bootNode' $ UnseqEvent . IETx tsNow $ IngestTx Origin.API tx
+--   threadDelay 50000
+--   liftIO $ flip postEvent bootNode' $ UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
