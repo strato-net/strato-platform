@@ -10,6 +10,7 @@ dependencies:
   - common-log
   - extra
   - vm-tools
+  - x509-certs
 
 ghc-options: -Wall -threaded
 
