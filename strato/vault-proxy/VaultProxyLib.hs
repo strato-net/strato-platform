@@ -114,16 +114,11 @@ instance FromJSON RawOauth where
 
 data VaultConnection = VaultConnection {
     _vaultUrl :: T.Text,
-    _vaultPassword :: T.Text,
-    _vaultPort :: Int,
     _httpManager :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
-    _oauthEnabled :: Bool,
     _oauthUrl :: T.Text,
     _oauthClientId :: T.Text,
     _oauthClientSecret :: T.Text,
     _oauthReserveSeconds :: Int,
-    _oauthServiceClientId :: T.Text,
-    _oauthServiceClientSecret :: T.Text,
     _vaultProxyUrl :: T.Text,
     _vaultProxyPort :: Int
 }

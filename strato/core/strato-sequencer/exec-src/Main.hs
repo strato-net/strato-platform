@@ -11,7 +11,7 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
--- import qualified Data.Text                  as T
+import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -62,7 +62,7 @@ main = do
   putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
-  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
+  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show (T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/"))
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   
   pkg <- atomically newCablePackage
@@ -80,8 +80,8 @@ main = do
   
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
-  vaultProxyUrl <- parseBaseUrl (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
-  let clientEnv = mkClientEnv mgr (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
+  vaultProxyUrl <- parseBaseUrl $ T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/")
+  let clientEnv = mkClientEnv mgr vaultProxyUrl
   
   selfAddress <- do
     nk <- runClientM (VP.getCurrentUser) clientEnv

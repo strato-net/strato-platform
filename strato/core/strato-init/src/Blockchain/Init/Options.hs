@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Init.Options where
 
+import Data.Text as T
 import HFlags
 
 parseBootnodeString :: String -> [String]

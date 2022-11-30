@@ -4,6 +4,7 @@
 module Options where
 
 import           HFlags
+import           Data.Text       as T
 
 --defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 --defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"

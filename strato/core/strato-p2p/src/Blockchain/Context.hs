@@ -513,7 +513,9 @@ initConfig wireMessagesRef maxHeaders = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/")
+    --TODO: remove hardcoded values, leftover from vault-wrapper
+    -- url <- liftIO $ parseBaseUrl (T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/"))
+    url <- liftIO $ parseBaseUrl "http://strato:8013/"
     return $ mkClientEnv mgr url
 
   initState <- newIORef initContext

@@ -3,6 +3,7 @@
 module Blockchain.Options where
 
 import           Data.ByteString.Internal
+-- import           Data.Text      as T hiding (map)
 import           HFlags
 
 import           Blockchain.CoreFlags
@@ -23,8 +24,8 @@ defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from 
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
-defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
-defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."
+-- defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
+-- defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."

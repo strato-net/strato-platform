@@ -77,15 +77,11 @@ main = do
             Right val -> return val
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
-      vaultPassword = flags_VAULT_PASSWORD,
-      vaultPort = flags_VAULT_PORT,
       httpManager = mgr,
       oauthUrl = flags_OAUTH_DISCOVERY_URL,
       oauthClientId = flags_OAUTH_CLIENT_ID,
       oauthClientSecret = flags_OAUTH_CLIENT_SECRET,
       oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
-      oauthServiceClientId = flags_OAUTH_SERVICE_USER_CLIENT_ID,
-      oauthServiceClientSecret = flags_OAUTH_SERVICE_USER_CLIENT_SECRET,
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
       tokenCache = tokenCash,
@@ -93,7 +89,8 @@ main = do
   }
 
   --Actually run the app and keep it alive
-  run (vaultPort vaultConnection) (appVaultProxy vaultConnection)
+  --Was instructed to hardcode the vault port, previous implementation, first arguement for the run command should be the foreign vault port
+  run 8000 (appVaultProxy vaultConnection)
 
 appVaultProxy :: VaultProxy.VaultConnection -> Application
 appVaultProxy env =

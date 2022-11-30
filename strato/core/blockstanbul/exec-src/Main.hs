@@ -9,10 +9,12 @@ module Main where
 
 import           Control.Exception
 import           Control.Monad
+-- import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
+import           Data.Maybe
 -- import qualified Data.Text                  as T
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Network.HTTP.Simple
@@ -36,7 +38,7 @@ import qualified Strato.VaultProxy.Client     as VP
 instance HasVaultProxy IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl (optVaultProxyUrl <> optVaultProxyPort <> "/") -----No real way to get this to be dynamically generated, no flags are passed to the executable, leave for now
+    url <- parseBaseUrl ("http://strato:8013/") -----No real way to get this to be dynamically generated, will need to change HasVaultProxy to take a URL
     --Need to change this to get not search the hardcoded "nodekey"
     nk <- runClientM (VP.getCurrentUser) (mkClientEnv mgr url)
     nodeKey <- case (nk) of
@@ -57,7 +59,7 @@ data Options = Options
   , optNodes     :: [String]
   , optNonce     :: Int
   , optVaultProxyUrl :: String
-  , optVaultProxyPort :: Int
+  , optVaultProxyPort :: String
   } deriving Show
 
 defaultOptions :: Options
@@ -68,7 +70,7 @@ defaultOptions  = Options
   , optNodes     = throw $ userError "Give me the node(s) to whom I'll send the vote."
   , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
   , optVaultProxyUrl = "http://strato"
-  , optVaultProxyPort = 8013
+  , optVaultProxyPort = "8013"
   }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -106,15 +108,14 @@ options =
       "Whether to use HTTPS"
   , Option ['u'] ["vurl"]
       (OptArg
-       (\ url opts -> return opts { vaultProxyUrl = vurl })
+       (\ url opts -> return opts { optVaultProxyUrl = (fromMaybe "http://strato" url) })
        "URL")
       "The URL of the vault proxy"
   , Option ['p'] ["vport"]
       (OptArg
-       (\ port opts -> return opts { vaultProxyPort = vport })
+       (\ port opts -> return opts { optVaultProxyPort = (fromMaybe "8013" port) })
        "PORT")
       "The port of the vault proxy"
-  ]
  ]
 
 helpMessage :: String

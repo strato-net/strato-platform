@@ -6,6 +6,7 @@ module Slipstream.Options where
 
 import HFlags
 import BlockApps.Logging() -- For --minLogLevel
+import Data.Text as T
 
 defineFlag "pguser" ("postgres" :: String) "Postgres user"
 defineFlag "pghost" ("postgres" :: String) "Postgres hostname"

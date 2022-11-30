@@ -29,6 +29,7 @@ import qualified Data.HashMap.Strict.InsOrd      as H
 import           Data.Maybe                      (listToMaybe, maybeToList)
 import           Data.Source.Map
 import           Data.Swagger                    hiding (delete)
+-- import           Data.Text                       as T hiding (unlines)
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -213,7 +214,9 @@ hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI)
         runSQLMUsingEnv sqlEnv .
         flip runReaderT blocEnv .
         runBlocSQLMUsingEnv blocSQLEnv .
-        runVaultProxyM (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/") .
+        --TODO: Remove hardcoding of the vault proxy
+        --runVaultProxyM $ T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/") .
+        runVaultProxyM "http://strato:8013/" .
         runCoreAPIM "http://strato:3000/eth/v1.2" $ f
 
 fullAPI :: Proxy FullAPI

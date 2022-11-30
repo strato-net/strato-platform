@@ -6,7 +6,7 @@ import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
--- import qualified Data.Text                          as T
+import qualified Data.Text                          as T
 import           Network.HTTP.Client                (newManager, defaultManagerSettings)
 import           Network.HTTP.Types.Status
 import           Servant.Client
@@ -102,7 +102,7 @@ defaultConfig =
 getNodeKey :: IO (VP.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultProxyUrl <- parseBaseUrl (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/") 
+  vaultProxyUrl <- parseBaseUrl $ (T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> T.pack "/"))
   let clientEnv = mkClientEnv mgr vaultProxyUrl
   putStrLn "asking vault-proxy for the node's key, or to create one, if it does not exist"
     --TODO: need to remove hardcoded "nodekey"

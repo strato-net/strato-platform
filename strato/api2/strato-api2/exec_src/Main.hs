@@ -11,6 +11,7 @@ import           Control.Lens.Operators
 import           Control.Monad.Trans.Except
 import           Data.Proxy
 import           Data.Swagger
+-- import           Data.Text                      as T
 import           HFlags
 import           Network.Wai
 import           Network.Wai.Handler.Warp
@@ -44,8 +45,9 @@ hoistCoreServer sqlEnv = hoistServer (Proxy :: Proxy API) (convertErrors runM) s
     runM f =
       runLoggingT .
         runSQLMUsingEnv sqlEnv .
-        runVaultProxyM (flags_VAULT_PROXY_URL <> flags_VAULT_PROXY_PORT <> "/") $ f ---TODO: make this pull data from the getting started file
-
+        --TODO: remove the hardcoded value for the vaultproxy
+        -- runVaultProxyM (T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/")) $ f 
+        runVaultProxyM "http://strato:8013/" $ f 
 api :: Proxy API
 api = Proxy
 
