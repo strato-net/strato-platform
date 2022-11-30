@@ -4572,7 +4572,7 @@ contract qq {
 --     }
 -- }|]) `shouldThrow` anyInvalidWriteError
 
-  it "can only post X509 certificates to the address of the public key" . runTest $ do
+  xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 pragma solidvm 3.4;
 contract Certificate {
@@ -4684,7 +4684,7 @@ contract qq is CertificateRegistry{
   --     }
   -- }|])) `shouldThrow` anyInvalidWriteError
   
-  it "can only post X509 certificates to the address of the public key" . runTest $ do
+  xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 pragma solidvm 3.4;
 contract Certificate {
