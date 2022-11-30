@@ -158,6 +158,8 @@ services:
     ports:
     - 30303:30303
     - 30303:30303/udp
+    - 8013:8013
+    - 8013:8013/udp
     restart: unless-stopped
     logging:
       driver: "json-file"

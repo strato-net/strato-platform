@@ -28,7 +28,7 @@ STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
-STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8000} # TODO: change-vault-proxy-port-when-known
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013} # TODO: change-vault-proxy-port-when-known
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then

@@ -134,7 +134,7 @@ oneTimeSetup genesisBlockName = do
 
 
      {- CONFIG: create database and write default config files, including strato-api -}
-
+      -- **************
       ethconf <- genEthConf
 
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf

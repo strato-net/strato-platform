@@ -11,8 +11,8 @@ import           Servant
 
 --This will get the username that is stored in the vaultproxy cache
 type GetCurrentUser = "currentUser"
-              :> Post '[JSON] Text
+              :> Get '[JSON] Text
 
 --This will get the token that is stored in the vault proxy cache (in case something is wanting to use)
 type GetRawToken = "rawToken"
-              :> Post '[JSON] Text
+              :> Get '[JSON] Text

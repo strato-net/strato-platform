@@ -6,7 +6,7 @@ set -x
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
 STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
-STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8000} # TODO: change-vault-proxy-port-when-known
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013} # TODO: change-vault-proxy-port-when-known
 
 source set-aux-env-vars.sh
 

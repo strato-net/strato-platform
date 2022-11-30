@@ -1,3 +1,6 @@
+--This test framework is identical to the testing suite of the vault-wrapper,
+--This should be changed to all for testing of the vault-proxy
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}

@@ -12,11 +12,12 @@ import           Control.Monad
 import           Data.Cache
 -- import           Data.IORef
 -- import           Data.Pool
-import qualified Data.Text                              as T
+-- import qualified Data.Text                              as T
+import           Debug.Trace
 import           HFlags
 import           GHC.Conc
 import           Network.HTTP.Client                    hiding (Proxy)
--- import           Network.HTTP.Conduit                   hiding (Proxy)
+import           Network.HTTP.Conduit                   hiding (Proxy)
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
@@ -64,17 +65,15 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
-  mgr <- newManager defaultManagerSettings
+  mgr <- newManager tlsManagerSettings
   tokenCash <- atomically $ newCacheSTM Nothing
-  --make the connection to the OAUTH provider to get the information we need to connect to the shared vault
-  rawoauth <- case flags_OAUTH_DISCOVERY_URL of
-    "" -> error "No OAuth2 Discovery URL was provided"
-    url -> do
-        ourl <- parseBaseUrl (T.unpack url)
-        rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
-        case rawOauthInfo of
-            Left err -> error $ "Error connecting to the OAUTH server: " <> show err
-            Right val -> return val
+  ourl <- parseBaseUrl "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration" 
+  rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
+  noErrorOauth <- case rawOauthInfo of
+          Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
+          Right val -> return val
+  traceShowM noErrorOauth
+  traceM "Able to get all of the OAUTH information"
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -85,12 +84,14 @@ main = do
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
       tokenCache = tokenCash,
-      additionalOauth = rawoauth
+      additionalOauth = noErrorOauth
   }
 
   --Actually run the app and keep it alive
   --Was instructed to hardcode the vault port, previous implementation, first arguement for the run command should be the foreign vault port
-  run 8000 (appVaultProxy vaultConnection)
+  traceM "VaultProxy is trying to start up"
+  run 8013 (appVaultProxy vaultConnection)
+  traceM "VaultProxy is shutting down"
 
 appVaultProxy :: VaultProxy.VaultConnection -> Application
 appVaultProxy env =

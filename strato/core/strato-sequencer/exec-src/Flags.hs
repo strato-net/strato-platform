@@ -68,7 +68,7 @@ exportFlagsAsMetrics = do
   set "blockstanbul_admins" flags_blockstanbul_admins
   set "isAdmin" $ show flags_isAdmin
   set "isRootNode" $ show flags_isRootNode
-  set "vaultProxyUrl" $ T.unpack (flags_VAULT_PROXY_URL <> T.pack (show flags_VAULT_PROXY_PORT) <> "/")
+  set "vaultProxyUrl" $ T.unpack (flags_VAULT_PROXY_URL <> T.pack ":" <> T.pack (show flags_VAULT_PROXY_PORT) <> "/")
   set "validatorBehavior" $ show flags_validatorBehavior 
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
