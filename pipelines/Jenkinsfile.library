@@ -892,7 +892,7 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
     echo "Waiting for network nodes to be in-sync and healthy..."
     int counter = 0
     int restartEveryHour = 0
-    for (int i = 0; i < 6000; i++) {
+    for (int i = 0; i < 12000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         // Restart strato container once sync is done or every 30 mins (USED FOR MEMORY LEAK ISSUE)
         // if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
