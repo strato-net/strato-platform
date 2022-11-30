@@ -14,6 +14,7 @@
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS -fno-warn-deprecations #-}
+{-# LANGUAGE TupleSections         #-}
 
 module Blockchain.VMContext
     ( CurrentBlockHash(..)
@@ -71,6 +72,7 @@ module Blockchain.VMContext
     , peekPendingVote
     , clearPendingVote
     , compactContextM
+    , lookupX509AddrFromCBHash
     ) where
 
 import           Control.DeepSeq
@@ -89,7 +91,9 @@ import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
+import           Data.Either.Extra
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
@@ -99,6 +103,7 @@ import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
+import           Text.Read                          (readMaybe)
 
 import           BlockApps.Init()
 import           BlockApps.Logging
@@ -243,6 +248,8 @@ type VMBase m = ( MonadIO m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
                 , HasX509CertDB m
+                , HasSelectX509CertDB m 
+                , HasSelectX509FieldDB m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -469,6 +476,32 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
+
+instance (Address `A.Selectable` X509Certificate) ContextM where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+lookupX509AddrFromCBHash ::(
+                     (A.Alters (Account, B.ByteString) B.ByteString) m
+                      )
+      => Address -> m (Maybe Address)
+lookupX509AddrFromCBHash k = do
+  -- do
+  --   mBH <- Mod.get (Mod.Proxy @CurrentBlockHash)
+  --   mbh= 0
+    -- fmap join . for mBH $ \(CurrentBlockHash _) -> do 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+        certRegistryKey = certKey (Address 0x509)
+    maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ k = do
     mBH <- gets $ view $ memDBs . currentBlock

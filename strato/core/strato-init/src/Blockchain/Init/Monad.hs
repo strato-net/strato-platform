@@ -15,6 +15,7 @@ import qualified Data.ByteString                    as B
 import           Data.IORef
 import qualified Data.Map                           as M
 import qualified Data.NibbleString                  as N
+import qualified Data.Text                          as T
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
 
@@ -117,6 +118,12 @@ instance (Address `A.Alters` X509Certificate) SetupDBM where
   lookup _ = error "SetupDBM lookup @X509Certificate"
   insert _ = error "SetupDBM insert @X509Certificate"
   delete _ = error "SetupDBM delete @X509Certificate"
+
+instance (Address `A.Selectable` X509Certificate) SetupDBM where
+  select _ = error "SetupDBM select @X509Certificate"
+
+instance ((Address, T.Text) `A.Selectable` X509CertificateField) SetupDBM where
+  select _ = error "SetupDBM select @X509CertificateField"
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB
