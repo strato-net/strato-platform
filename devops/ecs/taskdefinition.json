@@ -245,10 +245,6 @@
                     "value": "strato:3000"
                 },
                 {
-                    "name": "vaultProxyHost",
-                    "value": "strato:8013"
-                },
-                {
                     "name": "zkHost",
                     "value": "zookeeper"
                 },

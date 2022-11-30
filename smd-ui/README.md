@@ -45,7 +45,7 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     ```
     cd strato-platform/smd-ui
     npm i
-    REACT_APP_NODE_HOST=localhost:8080 REACT_APP_OAUTH_ENABLED=true npm run start
+    REACT_APP_NODE_HOST=localhost:8080 npm run start
     ```
     (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 

@@ -41,7 +41,7 @@ getUsers userName mAddr mLimit mOffset = do
   let (ur,_) = fromJust (useHttpsURI $ uri)
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = R.header (B.pack "Authorization") (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
-      userHeadr = R.header (B.pack "X-USER-ACCESS-TOKEN") (TE.encodeUtf8 userName)
+      userHeadr = R.header (B.pack "X-USER-UNIQUE-NAME") (TE.encodeUtf8 userName)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.GET ur NoReqBody jsonResponse (authHeadr <> userHeadr)

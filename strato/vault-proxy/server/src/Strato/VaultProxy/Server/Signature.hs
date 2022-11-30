@@ -42,7 +42,7 @@ postSignature userName (MsgHash msgBS) = do
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = R.header "Authorization" (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
-      userHeadr = R.header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 userName)
+      userHeadr = R.header "X-USER-UNIQUE-NAME" (TE.encodeUtf8 userName)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr <> userHeadr)

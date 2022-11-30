@@ -235,7 +235,6 @@ pipeline {
 module.exports = {
   stratoConfig: {
     "PASSWORD": '1234',
-    "OAUTH_ENABLED": 'true',
     "OAUTH_CLIENT_ID": "dev",
     "OAUTH_CLIENT_SECRET": "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
     "OAUTH_DISCOVERY_URL": "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",

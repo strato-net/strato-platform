@@ -6,7 +6,6 @@ module Options where
 import           HFlags
 import           Data.Text       as T
 
-defineFlag "OAUTH_ENABLED" (True :: Bool) "Enable OAuth2"
 defineFlag "OAUTH_DISCOVERY_URL" (T.pack "" :: Text) "OAuth2 Discovery URL"
 defineFlag "OAUTH_CLIENT_ID" (T.pack "" :: Text) "OAuth2 Client ID"
 defineFlag "OAUTH_CLIENT_SECRET" (T.pack "" :: Text) "OAuth2 Client Secret"

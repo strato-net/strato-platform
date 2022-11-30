@@ -80,7 +80,6 @@ main = do
       vaultPassword = flags_VAULT_PASSWORD,
       vaultPort = flags_VAULT_PORT,
       httpManager = mgr,
-      oauthEnabled = flags_OAUTH_ENABLED,
       oauthUrl = flags_OAUTH_DISCOVERY_URL,
       oauthClientId = flags_OAUTH_CLIENT_ID,
       oauthClientSecret = flags_OAUTH_CLIENT_SECRET,

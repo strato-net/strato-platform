@@ -8,7 +8,6 @@ const apexUrl = "/apex-api";
 const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
-const vaultProxyUrl = "/vault-proxy";
 const cirrusUrl = "/cirrus/search";
 const externalStorageUrl = "/apex-api/bloc/file";
 const debugUrl = "/vm-debug";

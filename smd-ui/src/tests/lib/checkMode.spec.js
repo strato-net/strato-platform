@@ -8,7 +8,6 @@ describe('Lib: checkMode', () => {
   });
 
   test('is oauth enabled', () => {
-    enviorment.env.OAUTH_ENABLED = true;
     expect(isOauthEnabled()).toMatchSnapshot();
   });
 

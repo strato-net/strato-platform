@@ -79,7 +79,7 @@ postKey username = do
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = header "Authorization" (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
-      userHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 username)
+      userHeadr = header "X-USER-UNIQUE-NAME" (TE.encodeUtf8 username)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.POST ur NoReqBody jsonResponse (authHeadr <> userHeadr)
@@ -102,7 +102,7 @@ getSharedKey username otherPub = do
   jwt <- vaulty vaultConn
   --Make the jwt header to allow for the connecting of the foreign vault
   let authHeadr = header "Authorization" (TE.encodeUtf8 $ T.pack $ "Bearer " <> show jwt)
-      pubKeyHeadr = header "X-USER-ACCESS-TOKEN" (TE.encodeUtf8 $ T.pack $ show username)
+      pubKeyHeadr = header "X-USER-UNIQUE-NAME" (TE.encodeUtf8 $ T.pack $ show username)
   --make a req request to the shared vault
   makeHttpCall <- runReq defaultHttpConfig $ do
     response <- R.req R.POST ur urlEncodedPart jsonResponse (authHeadr <> pubKeyHeadr)

@@ -1,7 +1,6 @@
 ./strato --wipe
 HTTP_PORT=8080 \
   NODE_HOST=localhost:8080 \
-  OAUTH_ENABLED=true \
   OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/genesis-for-beef/.well-known/openid-configuration \
   OAUTH_CLIENT_ID=dev \
   OAUTH_CLIENT_SECRET=940c2271-baa2-4b3d-84b9-49145c01586d \
