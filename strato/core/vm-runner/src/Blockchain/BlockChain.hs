@@ -280,7 +280,7 @@ addTransactions blockData txs =
       flushMemStorageTxDBToBlockDB
       flushMemCertTxToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      let chainId = txChainId t
+      let chainId = txChainId =<< otPrivatePayload t
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
 
       afterMap <- getAddressStateTxDBMap

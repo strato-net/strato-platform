@@ -650,8 +650,8 @@ insertBlock sha b = do
         inNS'   = flip inNamespace sha
     unless (null fullPrivateTxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& ((fromJust . txChainId) &&& id)) fullPrivateTxs 
-      forM_ (partitionWith txChainId fullPrivateTxs) $ \(cId, ptxs') ->
+        map (txHash &&& ((fromJust . (txChainId <=< otPrivatePayload)) &&& id)) fullPrivateTxs 
+      forM_ (partitionWith (txChainId <=< otPrivatePayload)  fullPrivateTxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do
