@@ -173,8 +173,6 @@ spec:
           value: "7065"
         - name: STRATO_PORT_BLOCKSTANBUL_VOTE
           value: "8050"
-        - name: VAULT_PROXY_HOST
-          value: "localhost:8013"
       - image: wurstmeister/zookeeper:3.4.6
         name: zookeeper
         volumeMounts:

@@ -86,13 +86,7 @@
                 {
                     "name": "stratoHost",
                     "value": "strato:3000"
-                },
-                // I have no idea if this is correct, not enough time to review
-                {
-                    "name": "vaultProxyHost",
-                    "value": "strato:8013"
                 }
-
             ],
             "mountPoints": [],
             "memoryReservation": 512,

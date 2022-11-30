@@ -104,8 +104,8 @@ appVaultProxy env =
   . cors (const $ Just policy)
   . provideOptions (Proxy @ VaultProxy.VaultProxyAPI)
   . serve (Proxy @ (
-              "vault-proxy" :> VaultProxy.VaultProxyAPI
-         :<|> "vault-proxy" :> VaultProxy.VaultProxyDocsAPI
+              VaultProxy.VaultProxyAPI
+         :<|> VaultProxy.VaultProxyDocsAPI
               ))
   $ VaultProxy.serveVaultProxy env
      :<|> return VaultProxy.vaultProxySwagger
