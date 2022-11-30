@@ -11,6 +11,8 @@
 module Blockchain.DB.X509CertDB
   ( X509CertDB(..)
   , HasX509CertDB
+  , HasSelectX509CertDB
+  , HasSelectX509FieldDB
   , HasMemCertDB(..)
   , CertModification(..)
   , getCertTxMap
@@ -30,6 +32,7 @@ module Blockchain.DB.X509CertDB
   , putX509Cert
   , deleteX509Cert
   , X509Certificate(..)
+  , X509CertificateField(..)
   , Subject(..)
   , certToBytes
   , bsToCert
@@ -57,6 +60,7 @@ import           Data.Foldable                        (for_)
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromMaybe, isJust)
 import qualified Data.NibbleString                    as N
+import qualified Data.Text                            as T
 import           Data.Traversable                     (for)
 import qualified Database.LevelDB                     as DB
 
@@ -78,6 +82,10 @@ instance NFData X509CertDB where
   rnf (X509CertDB a) = a `seq` ()
 
 type HasX509CertDB m = (Address `Alters` X509Certificate) m
+
+type HasSelectX509CertDB m = (Address `Selectable` X509Certificate) m
+
+type HasSelectX509FieldDB m = ((Address, T.Text) `Selectable` X509CertificateField) m
 
 data CertModification = Modification X509Certificate | Deletion deriving (Show, Eq, Generic)
 

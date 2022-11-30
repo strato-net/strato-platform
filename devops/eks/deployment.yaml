@@ -135,6 +135,11 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+          - mountPath: /var/lib/postgresql/data/
+            name: postgres-data
       - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-46441c30f
         name: nginx
         ports:
@@ -242,10 +247,17 @@ spec:
         - name: prometheus-data
           hostPath:
         - name: kafka-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: kafka-pvc
         - name: redis-data
-          hostPath:
-        - name: strato-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: redis-pvc
         - name: zookeeper-data
-          hostPath:
+          persistentVolumeClaim:
+            claimName: zookeeper-pvc
+        - name: strato-data
+          persistentVolumeClaim:
+            claimName: strato-pvc
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
