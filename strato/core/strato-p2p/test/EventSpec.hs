@@ -693,10 +693,6 @@ instance MonadIO m => Mod.Modifiable BestBlockRoot (MonadTest m) where
   get _     = dbsGets $ Lens.view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
-instance MonadIO m => Mod.Modifiable X509.CertRoot (MonadTest m) where
-  get _     = dbsGets $ Lens.view certRoot
-  put _ bbr = dbsModify' $ certRoot .~ bbr
-
 instance MonadIO m => Mod.Modifiable CurrentBlockHash (MonadTest m) where
   get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ Lens.view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -707,11 +703,6 @@ instance MonadIO m => HasMemAddressStateDB (MonadTest m) where
   getAddressStateBlockDBMap = gets $ Lens.view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance MonadIO m => X509.HasMemCertDB (MonadTest m) where
-  getCertTxDBMap = gets $ Lens.view $ memDBs . certTxMap
-  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
-  getCertBlockDBMap = gets $ Lens.view $ memDBs . certBlockMap
-  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
   lookup _ sr    = dbsGets $ Lens.view (stateDB . at sr)
@@ -1339,10 +1330,8 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
         writeBlockSummary genesisOutputBlock
         for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
-        (X509.CertRoot cr) <- X509.bootstrapCertDB genHash
         putContextBestBlockInfo $ ContextBestBlockInfo (genHash, genesisBlock, 0, 0, 0)
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
-        Mod.put (Mod.Proxy @X509.CertRoot) $ X509.CertRoot cr
         processNewBestBlock genHash genesisBlock [] -- bootstrap Bagger with genesis block
         runConduit $ sourceTQueue seqVmSource
                   .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)

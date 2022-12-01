@@ -739,6 +739,11 @@ putBlocks :: Traversable t
           -> Redis (t (Either Reply Status))
 putBlocks = mapM putBlock
 
+
+--partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
+-- partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
+
+
 insertBlock :: Keccak256
             -> OutputBlock
             -> Redis (Either Reply Status)
@@ -749,7 +754,7 @@ insertBlock sha b = do
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
-                    (isJust . txAnchorChain)
+                    (isJust . (txChainId <=< otPrivatePayload))
                     (obReceiptTransactions b)
         swapPayload otx = case otPrivatePayload otx of
                                 Nothing -> Nothing
@@ -759,8 +764,8 @@ insertBlock sha b = do
         inNS'   = flip inNamespace sha
     unless (null fullPrivateTxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) fullPrivateTxs
-      forM_ (partitionWith txAnchorChain fullPrivateTxs) $ \(cId, ptxs') ->
+        map (txHash &&& ((fromJust . (txChainId <=< otPrivatePayload)) &&& id)) fullPrivateTxs 
+      forM_ (partitionWith (txChainId <=< otPrivatePayload)  fullPrivateTxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do

@@ -175,8 +175,6 @@ newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
 newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
 --newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
 
-
-
     -- instance RLPSerializable RedisChainMemberRSet where
     --   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
     --   rlpDecode = RedisChainMemberRSet . rlpDecode
