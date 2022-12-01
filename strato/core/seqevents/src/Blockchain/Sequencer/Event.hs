@@ -28,7 +28,6 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified GHC.Generics                              as GHCG
 
 import qualified Blockchain.Strato.Model.Address           as A
-import           Blockchain.Strato.Model.Account
 import           BlockApps.X509.Certificate
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
@@ -112,7 +111,6 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
                  | IENewCertRegistered  A.Address X509CertInfoState
-                --  | IENewChainMember Word256 A.Address Enode
                  | IENewChainOrgName Word256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
@@ -124,7 +122,6 @@ data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
                      | IETNewCertRegistered
-                    --  | IETNewChainMember
                      | IETNewChainOrgName
                      | IETBlockstanbul
                      | IETForcedConfigChange
@@ -136,7 +133,6 @@ iEventType = \case
   IETx{}                 -> IETTransaction
   IEBlock{}              -> IETBlock
   IEGenesis{}            -> IETGenesis
-  -- IENewChainMember{}     -> IETNewChainMember
   IENewCertRegistered{}     -> IETNewCertRegistered
   IENewChainOrgName{}    -> IETNewChainOrgName
   IEBlockstanbul{}       -> IETBlockstanbul
@@ -148,7 +144,6 @@ instance Format IngestEvent where
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
   format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
-  -- format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
@@ -191,7 +186,6 @@ data P2pEvent =
   | P2pGenesis OutputGenesis
   | P2pGetChain [Word256]
   | P2pGetTx [Keccak256]
-  -- | P2pNewChainMember Word256 A.Address Enode
   | P2pNewOrgName Word256 ChainMemberParsedSet
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
@@ -205,7 +199,6 @@ instance Format P2pEvent where
   format (P2pGenesis o)            = show o
   format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  -- format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
@@ -218,7 +211,7 @@ data VmEvent =
   | VmCreateBlockCommand
   | VmVoteToMake { voteRecipient :: ChainMemberParsedSet, voteVotingDir :: Bool, voteSender :: ChainMemberParsedSet }
   | VmPrivateTx OutputTx
-  | VmValidatorList [A.Address] [A.Address]
+  | VmValidatorList [ChainMemberParsedSet] [ChainMemberParsedSet]
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where

@@ -132,9 +132,9 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signBenfInfo  :: (HasVault m) => (Address, Bool, Int) -> m (Signature)
+signBenfInfo  :: (HasVault m) => (ChainMemberParsedSet, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
-  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
+  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode bnf
   in sign mesg
 
 verifyBenfInfo :: (ChainMemberParsedSet, Bool, Int) -> Signature -> Maybe Address

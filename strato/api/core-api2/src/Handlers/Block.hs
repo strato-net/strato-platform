@@ -36,7 +36,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import           Control.Monad.Composable.SQL
@@ -48,7 +47,9 @@ import           UnliftIO
 
 type API = 
   "block" :> QueryParam "txaddress" Address
-          -- :> QueryParam "coinbase" ChainMemberParsedSet
+          :> QueryParam "coinbaseOrg" Text
+          :> QueryParam "coinbaseOrgUnit" Text
+          :> QueryParam "coinbaseCommonName" Text
           :> QueryParam "address" Address
           :> QueryParam "blockid" Text
           :> QueryParam "hash" Keccak256
@@ -70,7 +71,9 @@ type API =
 
 data BlocksFilterParams = BlocksFilterParams
   { qbTxAddress  :: Maybe Address
-  , qbCoinbase   :: Maybe ChainMemberParsedSet
+  , qbCoinbaseOrg        :: Maybe Text
+  , qbCoinbaseOrgUnit    :: Maybe Text
+  , qbCoinbaseCommonName :: Maybe Text
   , qbAddress    :: Maybe Address
   , qbBlockId    :: Maybe Text
   , qbHash       :: Maybe Keccak256
@@ -95,14 +98,15 @@ blocksFilterParams :: BlocksFilterParams
 blocksFilterParams = BlocksFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing
 
 getBlocksFilter :: BlocksFilterParams -> ClientM [Block']
 getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
   where
     getBlocksFilter' = client (Proxy @API)
     uncurryBlocksFilterParams f BlocksFilterParams{..} = f
-      qbTxAddress qbCoinbase qbAddress qbBlockId qbHash qbMinDiff
+      qbTxAddress qbCoinbaseOrg qbCoinbaseOrgUnit qbCoinbaseCommonName
+      qbAddress qbBlockId qbHash qbMinDiff
       qbMaxDiff qbDiff qbGasUsed qbMinGasUsed qbMaxGasUsed qbGasLim
       qbMinGasLim qbMaxGasLim qbNumber qbMinNumber qbMaxNumber
       qbIndex qbChainId qbSortby
@@ -138,7 +142,9 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
                     fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> qbDiff),
                     fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> qbMinDiff),
                     fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> qbMaxDiff),
-                    fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) qbCoinbase,
+                    fmap (\v -> bdRef E.^. BlockDataRefCoinbaseOrg E.==. E.val v) qbCoinbaseOrg,
+                    fmap (\v -> bdRef E.^. BlockDataRefCoinbaseOrgUnit E.==. E.val v) qbCoinbaseOrgUnit,
+                    fmap (\v -> bdRef E.^. BlockDataRefCoinbaseCommonName E.==. E.val v) qbCoinbaseCommonName,
                     fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qbAddress,
   --                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,
                     fmap (\v -> (rawTX E.^. RawTransactionFromAddress E.==. E.val v)
@@ -174,20 +180,23 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
     return . Just $ map (uncurry blockDataRefToBlock) modBlocks
 
 getBlockInfo :: Selectable BlocksFilterParams [Block] m =>
-  Maybe Address -> Maybe Address -> Maybe Text ->
+  Maybe Address -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Address -> Maybe Text ->
   Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
   m [Block']
-getBlockInfo a c d e f g h i j k l m n o p q r s t =
-  getBlockInfo' (BlocksFilterParams a Nothing c d e f g h i j k l m n o p q r s t)
+getBlockInfo a b c d e f g h i j k l m n o p q r s t u v =
+  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t u v)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
 
 blockQueryParams:: [Text]
 blockQueryParams = [ "txaddress",
+                     "coinbaseOrg",
+                     "coinbaseOrgUnit",
+                     "coinbaseOrgCommonName",
                      "address",
                      "blockid",
                      "hash",

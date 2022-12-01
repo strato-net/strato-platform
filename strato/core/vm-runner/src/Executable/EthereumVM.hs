@@ -44,6 +44,7 @@ import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.BlockChain
 import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
@@ -85,6 +86,7 @@ import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
@@ -164,7 +166,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    hasVotes <- (/= 0) . fst <$> peekPendingVote
+    hasVotes <- (/= emptyChainMember) . fst <$> peekPendingVote
     let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
@@ -266,6 +268,7 @@ processBlockSummaries :: ( MonadIO m
                          , MonadLogger m
                          , HasBlockSummaryDB m
                          , Mod.Modifiable ContextState m
+                         , (Address `A.Alters` X509Certificate) m
                          )
                       => [OutputBlock]
                       -> m ()
@@ -354,7 +357,7 @@ runChainConstructors cId cInfo = do
          (BlockData
             (Keccak256.unsafeCreateKeccak256FromWord256 0)
             (Keccak256.unsafeCreateKeccak256FromWord256 0)
-            (Address 0)
+            emptyChainMember
             MP.emptyTriePtr
             MP.emptyTriePtr
             MP.emptyTriePtr

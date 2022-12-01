@@ -38,6 +38,7 @@ import           Prometheus                                as P
 import           Text.Printf
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.StateMachine (validators)
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
@@ -61,6 +62,7 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
 import           Blockchain.Partitioner
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -256,7 +258,10 @@ checkForUnseq inEvents = do
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
-  _ <- get >>= (\sequencerContext -> traverse_  (\x -> writeSeqVmEvents [VmValidatorList [] (S.toList $ x ^. validators) ])  (_blockstanbulContext  sequencerContext) )-- add first validator to validators DB
+  seqCtx <- get
+  traverse_ 
+    (\x -> writeSeqVmEvents [VmValidatorList [] (S.toList . unChainMembers $ x ^. validators)])
+    (_blockstanbulContext  seqCtx) -- add first validator to validators DB
   createFirstTimer
 
 blockstanbulSend :: ( MonadLogger m
@@ -613,7 +618,6 @@ transformGenesis chains = forM_ chains $ \ig -> do
 splitEvents :: ( MonadLogger m
                , MonadMonitor m
                , MonadBlockstanbul m
-              --  , MonadSequencer m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
@@ -638,10 +642,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
       transformGenesis $ map (\(IEGenesis og) -> og) events
     IETNewCertRegistered -> do
       record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-      yieldMany $ map (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
-    -- IETNewChainMember -> do
-    --   record "inevent_type_new_chain_member" "IngestNewChainMembers"
-    --   yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
+      traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
       yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events

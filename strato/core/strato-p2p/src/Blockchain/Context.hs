@@ -168,9 +168,9 @@ emptyActionTimestamp = ActionTimestamp Nothing
 newtype RemainingBlockHeaders = RemainingBlockHeaders { unRemainingBlockHeaders :: [BlockData] }
 newtype MaxReturnedHeaders = MaxReturnedHeaders { unMaxReturnedHeaders :: Int }
 newtype ConnectionTimeout = ConnectionTimeout { unConnectionTimeout :: Int }
-newtype PeerAddress = PeerAddress { unPeerAddress :: Maybe Address }
+newtype PeerAddress = PeerAddress { unPeerAddress :: Maybe ChainMemberParsedSet }
 
-withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddress
+withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) -> PeerAddress -> PeerAddress
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
@@ -537,13 +537,13 @@ getPeerX509 peer = case pPeerPubkey peer of
   Nothing -> pure Nothing
   Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
 
-setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
+setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => ChainMemberParsedSet -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
 
-shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
+shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => ChainMemberParsedSet -> m Bool
 shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Proxy @PeerAddress)
         -- 0x0 is for a broadcast sync message.
-  where zeroOrArg addr' = addr' == 0x0 || addr' == addr
+  where zeroOrArg addr' = addr' == emptyChainMember || addr' == addr
 
 withActivePeer :: ( MonadUnliftIO m
                   , ((T.Text, Int) `A.Alters` ActivityState) m

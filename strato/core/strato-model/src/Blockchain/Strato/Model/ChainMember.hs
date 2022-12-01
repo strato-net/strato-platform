@@ -39,13 +39,15 @@ module Blockchain.Strato.Model.ChainMember (
   ) where
 
 import           Control.DeepSeq
+import           Control.Lens                         hiding ((.=))
 import qualified Database.Persist.Sql                 as DPS
 import           Data.Aeson                           hiding (Array, String)
 import qualified Data.Aeson                           as A (Value(..))
 import           Data.Binary                          
 import           Data.Function                        (on)
 import           Data.Ranged
-import           Data.Swagger                         (ToSchema, NamedSchema(..), declareNamedSchema)
+import           Data.Aeson.Casing.Internal           (camelCase, dropFPrefix)
+import           Data.Swagger                         hiding (get, name, put, url, Format)
 import qualified Data.ByteString.Lazy.Internal        as BSLI
 import           Data.Data
 import qualified Data.Default                         as D
@@ -121,6 +123,24 @@ instance PrintfArg ChainMemberParsedSet where
     Org o a-> "ORG" ++ T.unpack o ++ (show a) 
     OrgUnit o u a-> "ORGUNIT" ++ T.unpack o ++ T.unpack u  ++ (show a)
     CommonName o u c a -> "COMMONNAME" ++ T.unpack o ++ T.unpack u  ++ T.unpack c ++ (show a))
+
+instance ToSchema ChainMemberParsedSet where
+  declareNamedSchema proxy = genericDeclareNamedSchema cmpsSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainMemberParsedSet"
+    & mapped.schema.example ?~ toJSON exCMPSRespone
+
+exCMPSRespone :: ChainMemberParsedSet
+exCMPSRespone = CommonName "BlockApps" "Engineering" "Admin" True
+
+-- | The model's field modifiers will match the JSON instances
+cmpsSchemaOptions :: SchemaOptions
+cmpsSchemaOptions = SchemaOptions
+  { fieldLabelModifier = camelCase . dropFPrefix
+  , constructorTagModifier = id
+  , datatypeNameModifier = id
+  , allNullaryToStringTag = True
+  , unwrapUnaryRecords = True
+  }
 
 type ChainMemberBounded = ChainMemberF BoundedData
 

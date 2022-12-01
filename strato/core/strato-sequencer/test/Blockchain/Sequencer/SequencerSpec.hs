@@ -146,7 +146,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , maxEventsPerIter = 10
                                , vaultClient = Nothing
                                }
-        myAddr = fromPrivateKey myPriv
+        myAddr = CommonName "BlockApps" "Engineering" "Admin" True
         vals = [myAddr]
         auSenders = [myAddr]
         ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) myAddr
@@ -296,8 +296,8 @@ spec = do
           Nothing ->
             expectationFailure "BlockstanbulContext required"
           Just bct -> do
-            let addr = fromPrivateKey myPriv
-                (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
+            let addr = CommonName "BlockApps" "Engineering" "Admin" True
+                testAddr = CommonName "Microsoft" "Research" "Simon Peyton-Jones" True
             esign <- signBenfInfo (testAddr, True, 1)
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr

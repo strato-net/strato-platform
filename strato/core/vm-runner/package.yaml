@@ -57,6 +57,7 @@ library:
   - unliftio
   - util
   - vm-tools
+  - x509-certs
 
 executables:
   vm-runner:

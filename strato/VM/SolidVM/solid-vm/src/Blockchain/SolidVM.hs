@@ -1728,7 +1728,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       m@(SBuiltinVariable "block", "coinbase") ->
         if (CC._vmVersion contract'' == "svm3.2" || CC._vmVersion contract'' == "svm3.3" || CC._vmVersion contract'' == "svm3.4")
-          then (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+          then pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
         
 

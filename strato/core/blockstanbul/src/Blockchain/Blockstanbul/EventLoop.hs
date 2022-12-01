@@ -63,7 +63,7 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (addr `S.member`)
+    ret <- uses validators (S.member addr . unChainMembers)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
@@ -109,21 +109,22 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
     -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do     
       vals <- use validators            -- this is _validators from bloctanbul context?
-      let ChainMembers payloadVals = (getValidatorList pp)  -- getvalslsit::Block -> [Address] to word256 x 2
+      let valSet = unChainMembers vals
+      let payloadVals = getValidatorList pp  -- getvalslsit::Block -> [Address] to word256 x 2
           validatorsMatch = vals == payloadVals          -- if validators match perform getvalslist
           mSignatory = verifyProposerSeal pp =<< getProposerSeal pp  -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
           mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
-          let signerExists = maybe False (`S.member` vals) mChainMember
+          let signerExists = maybe False (`S.member` valSet) mChainMember
           unless signerExists $
             raiseInProd $ "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
                       ++ " is not a known validator"
           unless validatorsMatch $
             raiseInProd $ "Rejecting Preprepare; payload validators "
-                      ++ show (S.map format payloadVals) ++ " are not expected validators "
-                      ++ show (S.map format vals)
+                      ++ show (S.map format $ unChainMembers payloadVals) ++ " are not expected validators "
+                      ++ show (S.map format valSet)
     IMsg (MsgAuth addr _) (Commit _ di seal) -> case verifyCommitmentSeal di seal of
       Nothing -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
       Just signatory -> do
@@ -167,11 +168,11 @@ roundChange = do
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
   --update validators list
-  val <- uses validators S.toList
+  val <- uses validators $ S.toList . unChainMembers
   vot <- use voted
-  let (newVals, toDrop, toAdd) = (updateValidator val vot)
+  let (newVals, toDrop, toAdd) = updateValidator val vot
   when (val /= newVals) $ do
-    validators .= S.fromList newVals
+    validators .= ChainMembers (S.fromList newVals)
     yieldR $ ListOfValidators toDrop toAdd
   $logInfoS "blockstanbul/voting" . T.pack $
                  "nextRound: voted map" ++ show vot
@@ -184,7 +185,7 @@ nextRound nt = do
       view . round .= r
       yieldR $ ResetTimer r
   use view >>= recordView
-  vals <- use validators
+  vals <- unChainMembers <$> use validators
   thisR <- use $ view . round
   epocheck <- use $ view . sequence
   when (epocheck `mod` 10000 == 0) $ do
@@ -219,7 +220,7 @@ nextRound nt = do
 
   yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
                                               (use voted)
-                                              (uses validators S.toList)
+                                              (uses validators (S.toList . unChainMembers))
                                               (uses authSenders M.keys)
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
@@ -263,7 +264,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
-      eNextSeqNo <- lift . lift $ replayHistoricBlock (ChainMembers(realValidators)) seqNo blk
+      eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
       let blockNo = blockDataNumber . blockBlockData $ blk
       recordMaxBlockNumber "pbft_previousblock" blockNo
       case eNextSeqNo of
@@ -283,7 +284,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       self <- use selfAddr
       when (isNothing ppl && leader == self) $ do
         vs <- use validators
-        let blockWithVs = addValidators (ChainMembers vs) blk
+        let blockWithVs = addValidators vs blk
         pseal <- proposerSeal blockWithVs 
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock

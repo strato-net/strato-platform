@@ -29,7 +29,7 @@ import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class      (blockHash)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -50,17 +50,17 @@ indexAPI :: ( MonadLogger m
             , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
             , (Keccak256 `A.Alters` API OutputBlock) m
-            , (([Address],[Address]) `A.Alters` API ValidatorRef) m
+            , (([ChainMemberParsedSet],[ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
-  let (txs, chainInfos, blocks, validatorAddresses) = filterHelper idxEvents ([],[],[],[])
+  let (txs, chainInfos, blocks, validators) = filterHelper idxEvents ([],[],[],[])
       insertCount = length blocks
 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
 
-  when (length validatorAddresses > 0) $ do forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
+  when (length validators > 0) . forM_ validators $ \x -> A.insert (A.Proxy @(API (A.Proxy ValidatorRef))) x $ API A.Proxy
 
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $ do
@@ -68,7 +68,7 @@ indexAPI idxEvents = do
     A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
   
   where
-    filterHelper :: [IndexEvent] -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])]) -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])])
+    filterHelper :: [IndexEvent] -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([ChainMemberParsedSet], [ChainMemberParsedSet])]) -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([ChainMemberParsedSet], [ChainMemberParsedSet])])
     filterHelper (indxEv:xs) (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs) = 
       case indxEv of  
         IndexTransaction _ tx  -> filterHelper xs  (tx : indexTransactions,  newChainInfos, ranBlocksLs, validatorLs)

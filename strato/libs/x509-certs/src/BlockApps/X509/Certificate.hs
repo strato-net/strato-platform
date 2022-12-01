@@ -17,6 +17,7 @@ module BlockApps.X509.Certificate (
   SignedCertificate,
   Issuer(..),
   Subject(..),
+  x509CertToCertInfoState,
   rootCert,
   certToBytes,
   bsToCert,
@@ -47,7 +48,7 @@ module BlockApps.X509.Certificate (
 
 
 import qualified Control.Monad.Change.Alter         as A
-import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.ChainMember hiding (orgName, orgUnit, commonName)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
@@ -152,6 +153,23 @@ signedsToX509 = X509Certificate . CertificateChain
 
 x509ToSigneds :: X509Certificate -> [SignedCertificate]
 x509ToSigneds (X509Certificate (CertificateChain cs)) = cs
+
+x509CertToCertInfoState :: X509Certificate -> X509CertInfoState
+x509CertToCertInfoState cert =
+  let sub = getCertSubject cert
+      ua = maybe (Address 0) (fromPublicKey . subPub) sub
+      o = maybe "" subOrg sub
+      ou = maybe Nothing subUnit sub
+      cn = maybe "" subCommonName sub
+   in X509CertInfoState
+        { userAddress = ua
+        , certificate = cert
+        , isValid = True
+        , children = []
+        , orgName = o
+        , orgUnit = ou
+        , commonName = cn
+        }
 
 getAddressFromCM :: ChainMemberParsedSet -> X509CertInfoState ->  Maybe Address 
 getAddressFromCM (Everyone _) (X509CertInfoState ua _ _ _ _ _ _) = Just ua 

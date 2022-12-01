@@ -5,13 +5,11 @@
 module Main where
 
 import           Control.Monad
-import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -20,7 +18,7 @@ import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.EthConf         as EC
 import qualified Blockchain.Network         as Net
 import           Blockchain.Sequencer
@@ -32,24 +30,8 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Servant.Client
-import qualified Strato.Strato23.API.Types  as VC
-import qualified Strato.Strato23.Client     as VC
 
 import           Flags
-
-
-
-waitOnVault :: (Show a) => IO (Either a b) -> IO b
-waitOnVault action = do
-  putStrLn "asking vault-wrapper for the node address"
-  res <- action
-  case res of
-    Left err -> do 
-      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
-      threadDelay 2000000 -- 2 seconds
-      waitOnVault action
-    Right val -> return val
-
 
 main :: IO ()
 main = do
@@ -87,7 +69,7 @@ main = do
   let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
       !validators' =
         case (maybeNetworkParams, eValidators) of
-          (Just networkParams, Right []) -> map Net.ethAddress networkParams
+          (Just networkParams, Right []) -> map Net.identity networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid validators: " ++ e
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
@@ -125,7 +107,7 @@ main = do
                    return authSenders'
 
                unless (self `elem` validators) . putStrLn
-                    $ "WARNING: NODEKEY does not correspond to an address within the validators.\
+                    $ "WARNING: NODEKEY does not correspond to a validator identity.\
                       \ This probably means that you are connecting to an existing network,\
                       \ and you are not one of the original validators of that network.\
                       \ If this is the case, please disregard this message. Otherwise,\

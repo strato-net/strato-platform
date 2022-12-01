@@ -156,6 +156,8 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
+                           , (Address `A.Alters` X509CertInfoState) m
+                           , (Address `A.Selectable` X509CertInfoState) m
                            , HasVault m
                            )
 
@@ -369,6 +371,9 @@ instance (Address `A.Alters` X509CertInfoState) SequencerM where
     genericDeleteSequencer x509certInfoState p k
     sz <- M.size <$> use x509certInfoState
     liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
+
+instance A.Selectable Address X509CertInfoState SequencerM where 
+  select = A.lookup
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do

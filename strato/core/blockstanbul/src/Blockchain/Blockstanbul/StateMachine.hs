@@ -56,7 +56,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The designated participant to suggest a block for this round
   , _proposer :: ChainMemberParsedSet
   -- The total group of participants
-  , _validators :: S.Set ChainMemberParsedSet
+  , _validators :: ChainMembers
   -- Validators who have sent us a prepare for this round
   , _prepared :: M.Map ChainMemberParsedSet Keccak256
   -- Validators who have sent us a commitment seal for this round
@@ -92,7 +92,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer (printf "%x")
-  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMemberParsedSet -> String) . S.toList)
+  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMemberParsedSet -> String) . S.toList . unChainMembers)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
@@ -111,7 +111,7 @@ newContext (Checkpoint v pendingVotes as senderlist) chainm =
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
-     , _validators = valSet
+     , _validators = ChainMembers valSet
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPreprepared = False
@@ -133,11 +133,7 @@ generateNonceMap = M.fromList . flip zip (repeat 0)
 
 
 poolSize :: (StateMachineM m) => m Int
-poolSize = uses validators S.size
-  --do 
-  --vals <- validators
-
-  --uses (validators >>= (\x -> (unChainMembers x)  S.size)) 
+poolSize = uses validators (S.size . unChainMembers)
 
 clearLock :: (StateMachineM m) => m ()
 clearLock = do

@@ -103,6 +103,7 @@ import           Blockchain.Strato.Indexer.TxrIndexer
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
@@ -774,10 +775,10 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
 --   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
 --   insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
 
-startingCheckpoint :: [Address] -> Checkpoint
+startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
-newBlockstanbulContext :: Address -> [Address] -> BlockstanbulContext
+newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
 newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
   in newContext ckpt paddr
@@ -801,6 +802,7 @@ newSequencerContext bc = do
       , _chainInfoRegistry   = M.empty
       , _orgNameChainsRegistry  = M.empty
       , _x509certRegistry    = M.empty
+      , _x509certInfoState   = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -950,7 +952,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
       genesisBlock = DataDefs.BlockData
         zeroHash
         zeroHash
-        (Address 0)
+        emptyChainMember
         stateRoot
         MP.emptyTriePtr
         MP.emptyTriePtr
@@ -1270,10 +1272,10 @@ spec = do
         , (peers !! 1, peers !! 2)
         ]
       atomically $ modifyTVar' ((peers !! 1) ^. p2pTestContext)
-                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorAddresses))
                                . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
       atomically $ modifyTVar' ((peers !! 2) ^. p2pTestContext)
-                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorAddresses))
                                . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
       let runForTwoSeconds = void . timeout 2000000
           postTimeoutPrimary1 = do
@@ -1289,7 +1291,7 @@ spec = do
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       atomically $ modifyTVar' ((peers !! 0) ^. p2pTestContext)
-                               (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               (sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorAddresses))
       runForTwoSeconds $ concurrently_ (runNetwork peers connections) (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)

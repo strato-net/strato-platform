@@ -28,6 +28,7 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
 defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
+defineFlag "rootCerts" ("{}" :: String) "JSON encoded addresses to X509CertInfoState map"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)

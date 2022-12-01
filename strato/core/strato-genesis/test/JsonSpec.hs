@@ -13,6 +13,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 
@@ -87,7 +88,7 @@ spec = do
           want = Right $ GenesisInfo {
             genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
-            genesisInfoCoinbase = Address 0,
+            genesisInfoCoinbase = emptyChainMember,
             genesisInfoAccountInfo = [
               NonContract
                   (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
@@ -139,7 +140,7 @@ spec = do
           want = [GenesisInfo {
             genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
-            genesisInfoCoinbase = Address 0,
+            genesisInfoCoinbase = emptyChainMember,
             genesisInfoAccountInfo = [
               NonContract
                   (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)

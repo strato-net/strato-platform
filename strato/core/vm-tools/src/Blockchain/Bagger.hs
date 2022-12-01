@@ -28,7 +28,6 @@ import qualified Data.Set                           as S
 import           Data.Word
 
 import           BlockApps.Logging
-import           Blockchain.Constants
 import           Blockapps.Crossmon
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -43,7 +42,6 @@ import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB, flushMemCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -549,7 +547,7 @@ buildFromMiningCache = do
     let nextDiff     = 1 --nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
-    rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
+    rewardedBlockData <- buildRewardedBlockHeader nextBlockData
     when isPBFT $
       cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
     return OutputBlock { obOrigin = TO.Quarry
@@ -592,12 +590,12 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataNonce            = nonce
                         }
 
-buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
-buildRewardedBlockHeader bd uncles = do
+buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> m DD.BlockData
+buildRewardedBlockHeader bd = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
   oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
-  let rewardedStateRoot = oldSR -- <- rewardCoinbases (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  let rewardedStateRoot = oldSR
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) oldSR
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   return bd{DD.blockDataStateRoot = rewardedStateRoot}

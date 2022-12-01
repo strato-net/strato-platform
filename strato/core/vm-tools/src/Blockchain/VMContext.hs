@@ -102,6 +102,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 
 import           BlockApps.Init()
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
@@ -196,7 +197,7 @@ data ContextState = ContextState
   , _bestBlockInfo     :: ContextBestBlockInfo
   , _hasBlockstanbul   :: Bool
   , _blockRequested    :: Bool
-  , _coinbaseQueue     :: Q.Seq ((ChainMemberParsedSet,Word64), Address)
+  , _coinbaseQueue     :: Q.Seq ((ChainMemberParsedSet,Word64), ChainMemberParsedSet)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
   } deriving (Generic, NFData)
@@ -685,7 +686,7 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 queuePendingVote :: ( MonadLogger m
                     , Mod.Modifiable ContextState m
                     )
-                 => ChainMemberParsedSet -> Bool -> Address -> m ()
+                 => ChainMemberParsedSet -> Bool -> ChainMemberParsedSet -> m ()
 queuePendingVote a r s = do
   let voteDir = case r of
         True -> maxBound
@@ -712,12 +713,14 @@ peekPendingVote = do
 -- mark the vote as committed and remove it from the queue.
 clearPendingVote :: ( MonadLogger m
                     , Mod.Modifiable ContextState m
+                    , (Address `A.Alters` X509Certificate) m
                     )
                  => Block -> m ()
 clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
   let bd = blockBlockData b
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
-      sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
+      senderAddr = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
+  sender <- lift $ maybe emptyChainMember (getChainMemberFromX509 . x509CertToCertInfoState) <$> A.lookup (A.Proxy @X509Certificate) senderAddr
   ctxCoinbaseQ <- use coinbaseQueue
   let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
         Just i -> Q.deleteAt i ctxCoinbaseQ
