@@ -92,8 +92,6 @@ newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [
 newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
 
-
-
 instance Default ChainTxsInBlock  where def = ChainTxsInBlock M.empty
 instance Default IPChains         where def = IPChains S.empty
 instance Default OrgIdChains     where def = OrgIdChains S.empty

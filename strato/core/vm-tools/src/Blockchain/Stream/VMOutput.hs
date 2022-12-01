@@ -18,8 +18,7 @@ module Blockchain.Stream.VMOutput (
   fetchLastVMOutputs,
 --  fetchVMOutputsFromTopic,
 --  defaultVMOutputsTopicName,
-  getBestKafkaBlockNumber,
-  HasVMOutputsSink(..)
+  getBestKafkaBlockNumber
 ) where
 
 import           Conduit
@@ -69,9 +68,6 @@ bytesToVMOutput = Binary.decode . BL.fromStrict
 
 vmOutputToBytes :: VMOutput -> B.ByteString
 vmOutputToBytes = BL.toStrict . Binary.encode
-
-class HasVMOutputsSink k where
-  getVMOutputsSink :: k ([VMOutput] -> k ())
 
 produceVMOutputsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMOutput] -> m Offset
 produceVMOutputsM vmOutputs = do

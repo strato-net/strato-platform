@@ -54,8 +54,6 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
-  , chainInfoRegistry
-  , orgNameChainsRegistry
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -365,12 +363,6 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   delete _ k = do
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
-
--- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
---   -- TODO: Just using this to sneak past the compiler... actually completethese these out
---   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
---   insert _ _ _ = pure ()
---   delete _ _ = pure ()
 
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
