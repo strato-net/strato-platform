@@ -44,8 +44,9 @@ main = do
   conn <- connect dbConnectInfo
   
 
-  let pw    = VC.textPassword $ T.pack flags_pw
-  let pwOld = VC.textPassword $ T.pack flags_pwOld
+  let pw             = VC.textPassword $ T.pack flags_pw
+  let pwOld          = VC.textPassword $ T.pack flags_pwOld
+  let indexToStartAt = (fromIntegral flags_indexToStartAt) :: Int32
   
   
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQueryAll
@@ -70,7 +71,9 @@ main = do
           -- let newEncKey =  VC.encrypt pwKey nonce (exportPrivateKey decKey) -- Won't we use the new table 
           pure (newEncKey, i)
 
-  let idsAndNewEncKeys = catMaybes $  map (\(i, s, n, k) -> reencrypt i s n k) allUsers
+  let allIdsAndNewEncKeys = catMaybes $  map (\(i, s, n, k) -> reencrypt i s n k) allUsers
+
+  let idsAndNewEncKeys = filter (\(_, i) -> i > indexToStartAt) allIdsAndNewEncKeys
 
   putStrLn $ (show $ length idsAndNewEncKeys) ++ " of those keys can be reencrypted"
   putStrLn $ "\nFound " ++ (show $ length allUsers) ++ " keys"
