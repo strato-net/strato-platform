@@ -70,6 +70,12 @@ get_solcs:
 		" ;\
 	fi
 
+eks:
+	@echo Now generating eks-deployment.yaml file
+	cd devops/eks
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml
+	cat eks-deployment.yaml
+
 build_buildbase:
 	@echo building buildbase...
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} - < Dockerfile.buildbase
