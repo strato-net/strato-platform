@@ -35,51 +35,6 @@ import           Strato.VaultProxy.DataTypes
 import qualified LabeledError
 
 
-vaultProxySchemaOptions :: SchemaOptions
-vaultProxySchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
-
-
-data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PublicKey } deriving (Show, Generic)
-
-instance ToJSON AddressAndKey where
-  toJSON (AddressAndKey a k) = object
-                              [ "status" .= ("success" :: T.Text) -- hey, don't blame me, this is part of the spec
-                              , "address" .= a
-                              , "pubkey" .= k
-                              ]
-
-instance FromJSON AddressAndKey where
-  parseJSON (Object o) = do 
-    a <- o .: "address"
-    k <- o .: "pubkey"
-    return $ AddressAndKey a k 
-  parseJSON o = error $ "parseJSON AddressAndKey: expected object, but got " ++ show o
-
-
-instance ToSchema AddressAndKey where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "AddressAndKey")
-      ( mempty
-        & type_ ?~ SwaggerString
-        & example ?~ "address : 186aaf1491177570eab131275a678ded7cf8157f, pubkey : 04642f59c13697153aed4ebf469c31ede0b36551d7a253601a6cd1997dd53d0952e884aa07a71aecce9562b5954e62788990cd872eeff52477ff657933fadb51ea"
-        & description ?~ "Ethereum address and public key")
-
-
-data MsgHash = MsgHash B.ByteString deriving (Eq, Show, Generic)
-
-instance ToJSON MsgHash where
-  toJSON (MsgHash bs) = object 
-                        [ "msgHash" .= (T.pack $ C8.unpack $ B16.encode bs)]
-
-instance FromJSON MsgHash where
-  parseJSON (Object o) = do 
-    hsh <- o .: "msgHash" 
-    return $ MsgHash $ LabeledError.b16Decode "FromJSON<MsgHash>" $ C8.pack $ T.unpack hsh
-  parseJSON x = error $ "parseJSON for MsgHash: expected object, got " ++ (show x)
-
-instance ToSchema MsgHash where
-  declareNamedSchema = const . pure $ named "MsgHash bytestring" binarySchema
-
 data User = User
   { username :: T.Text
   , address :: Address

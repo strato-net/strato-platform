@@ -10,39 +10,22 @@
 module Strato.VaultProxy.Server.Token where
 
 import           Control.Concurrent.STM
--- import           Control.Lens
 import           Control.Monad.Catch
--- import           Control.Monad.Composable.VaultProxy
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
--- import           Control.Monad.Reader
--- import           Control.Monad.Change.Modify
--- import           Data.Aeson  
--- import           Data.Aeson.Types
 import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
 import           Data.Cache.Internal      as C
--- import           Data.Map                 as Map
 import           Data.Maybe
--- import           Data.Proxy
--- import qualified Data.Scientific         as Scientific
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
--- import           GHC.Generics
--- import           GHC.Conc
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
--- import           Servant.API             as SA
--- import           Servant.Auth            as SAA
--- import           Servant.Auth.Server     as SAS
--- import           Servant.Client
--- import           Servant.Server          as SS
 import           Strato.VaultProxy.API
 import           Strato.VaultProxy.Monad
 import           System.Clock
 import           Text.URI                as URI
 import           Web.JWT                 as JWT
--- import           Yesod.Core.Types        as YC
 
 import           Strato.VaultProxy.DataTypes
 
@@ -111,30 +94,3 @@ vaulty vaultConn = getAwesomeToken tc cid csec rs ao
         ao = additionalOauth vaultConn
         rs = oauthReserveSeconds vaultConn
         tc = tokenCache vaultConn
-
---ask function will get the information from the ReaderT monad VaultProxyM
-getRawToken :: VaultProxyM T.Text
-getRawToken = do
-    vaultConn <- ask
-    tok <- vaulty vaultConn
-    pure $ T.pack $ show tok
-
-getCurrentUser :: VaultProxyM T.Text
-getCurrentUser = do
-    vaultConn <- ask
-    tok <- vaulty vaultConn
-    let jwt = JWT.decode $ accessToken tok 
-        cl = JWT.claims $ fromJust jwt
-        user = iss cl
-    result <- case (user) of
-        Nothing -> error "User information from Oauth Provider is not readable."
-        Just u -> pure u
-    pure $ stringOrURIToText result
-
---Useful function for looking inside the JWT token
--- lookupKey :: Eq v => v -> Map.Map k v -> [k]
--- lookupKey val = Map.foldrWithKey go [] where
---   go key value found =
---     if value == val
---     then key:found
---     else found
