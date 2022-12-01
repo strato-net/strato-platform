@@ -215,7 +215,6 @@ spec = do
                 contract CertRegistry {
                   event CertificateRegistered(string cert);
                   constructor(address _user, string _cert) {
-                    registerCert(_user, _cert);
                     emit CertificateRegistered(_cert);
                   }
                 }
@@ -323,7 +322,6 @@ contract CertRegistry {
   event CertificateRegistered(string cert);
   
   constructor(address _user, string _cert) {
-    registerCert(_user, _cert);
     emit CertificateRegistered(_cert);
   }
 }
@@ -535,7 +533,6 @@ contract RegisterCert {
   event CertificateRegistered(string cert);
 
   constructor(address _user, string _cert) {
-    registerCert(_user, _cert);
     emit CertificateRegistered(_cert);
   }
 }
@@ -621,7 +618,6 @@ contract RegisterCert {
                     event CertificateRegistered(string cert);
 
                     constructor(address _user, string _cert) {
-                      registerCert(_user, _cert);
                       emit CertificateRegistered(_cert);
                     }
                   }

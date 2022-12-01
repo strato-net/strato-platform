@@ -80,7 +80,6 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
-import qualified Blockchain.DB.X509CertDB              as X509
 
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
@@ -741,13 +740,6 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
   lookup _ k   = dbsGets $ Lens.view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
-
-instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) where
-  lookup _ k = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> X509.getCertMaybe k bh
-  insert _ = X509.putCert
-  delete _ = X509.deleteCert
 
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
@@ -1720,12 +1712,12 @@ spec = do
       let src =  [r|
 pragma solidvm 3.2;
 contract BlockAppsCertificateRegistry {
+  event CertificateRegistered(string cert);
   constructor(string _rootCert) {
-    registerCert(_rootCert);
+    emit CertificateRegistered(_rootCert);
   }
 
   function registerCertificate(string _cert) {
-    registerCert(_cert);
     new Certificate(_cert);
   }
 }
@@ -1892,7 +1884,6 @@ contract CertRegistry {
   event CertificateRegistered(string cert);
   
   constructor(address _user, string _cert) {
-    registerCert(_user, _cert);
     emit CertificateRegistered(_cert);
   }
 }
@@ -2111,7 +2102,6 @@ contract RegisterCert {
   event CertificateRegistered(string cert);
 
   constructor(address _user, string _cert) {
-    registerCert(_user, _cert);
     emit CertificateRegistered(_cert);
   }
 }
