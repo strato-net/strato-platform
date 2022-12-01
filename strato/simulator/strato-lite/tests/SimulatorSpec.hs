@@ -302,8 +302,7 @@ contract A {
       
       registryTs <- liftIO getCurrentMicrotime
 
-      -- let toIetxRegistry = IETx registryTs . IngestTx Origin.API
-                -- Create a certificate registry on the main chain
+      -- Create a certificate registry on the main chain
       let iss   = Issuer {  issCommonName = "Dustin"
                           , issOrg        = "Blockapps"
                           , issUnit       = Just "engineering"

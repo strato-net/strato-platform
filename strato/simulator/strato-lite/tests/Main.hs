@@ -10,7 +10,11 @@ import Test.Hspec.Runner
 
 import qualified Spec
 
+predicate :: Path -> Bool
+predicate (_, _) = True
+predicate _ = False
+
 main :: IO ()
 main = do
-  void $ $initHFlags "debugger spec"
-  hspecWith defaultConfig Spec.spec
+  void $ $initHFlagsDependentDefaults "debugger spec" (const $ const $ const $ [("requireCerts", "False")])
+  hspecWith (configAddFilter predicate defaultConfig)Spec.spec

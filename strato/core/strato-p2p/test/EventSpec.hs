@@ -85,6 +85,7 @@ import qualified Blockchain.DB.X509CertDB              as X509
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
 import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
+import           Blockchain.Options()
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
@@ -123,9 +124,11 @@ import           Time.System
 
 import           Debugger                              (DebugSettings)
 
+import           Executable.EthereumDiscovery
 import           Executable.EthereumVM
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
+import           Executable.StratoP2P
 
 import           Network.Socket
 import           UnliftIO
@@ -1214,15 +1217,27 @@ data P2PPeer = P2PPeer
   }
 makeLenses ''P2PPeer
 
-runNode :: P2PPeer -> IO ()
-runNode p = do
+runNodeWithoutP2P :: P2PPeer -> IO ()
+runNodeWithoutP2P p = do
   concurrently_
-    (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
+    (concurrently_ (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
+                                  (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
                    (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
-    (concurrently_
+    (concurrently_ 
       (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
                      (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
       (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
+
+runNode :: P2PPeer -> IO ()
+runNode p = do
+  chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
+  let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
+  ctx <- newIORef $ def & unseqSink .~ p ^. p2pPeerUnseqSource
+  concurrently_
+    (runNodeWithoutP2P p)
+    (concurrently_
+      (stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
+      (runLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1864,13 +1879,58 @@ contract A {
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
+
+      registryTs <- liftIO getCurrentMicrotime
+
+      -- Create a certificate registry on the main chain
+      let iss   = Issuer {  issCommonName = "Dustin Norwood"
+                          , issOrg        = "BlockApps"
+                          , issUnit       = Just "Engineering"
+                          , issCountry    = Just "USA"
+                          }
+          subj  = Subject { subCommonName = "David Nallapu"
+                          , subOrg        = "BlockApps"
+                          , subUnit       = Just "Engineering"
+                          , subCountry    = Just "USA"
+                          , subPub        = derivePublicKey (privKeys !! 1)
+                          }
+      cert <- makeSignedCert Nothing (Just rootCert) iss subj
+      let cert' = Text.decodeUtf8 . certToBytes $ cert
+          args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <> "\")"
+          registry = [r|
+pragma solidvm 3.0;
+contract CertRegistry {
+  event CertificateRegistered(string cert);
+  
+  constructor(address _user, string _cert) {
+    registerCert(_user, _cert);
+    emit CertificateRegistered(_cert);
+  }
+}
+|]
+          contractName' = "CertRegistry"
+          txMd' = M.fromList [("src", registry), ("name", contractName'), ("args", args')]
+          addRegistryMd t =  t{transactionMetadata = M.union txMd' <$> transactionMetadata t}
+          mkRegistryTx = addRegistryMd $ mkSignedTx (privKeys !! 0) (U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack registry
+            , U.unsignedTransactionChainId    = Nothing
+            })
+
       let src = [r|
 pragma solidvm 3.2;
 contract A {
-  event MemberAdded(address addr, string enode);
+  event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
-  function addMember(address _addr, string _enode) {
-    emit MemberAdded(_addr, _enode);
+
+  constructor() {}
+
+  function addMember(string _name, string _unit, string _commonName) {
+    emit CommonNameAdded(_name, _unit, _commonName);
   }
 
   function incX() {
@@ -1879,26 +1939,23 @@ contract A {
 }
 |]
           contractName = "A"
-          mainChainSrc = [r|
-pragma solidvm 3.2;
-contract B {
-  uint y;
+--           mainChainSrc = [r|
+-- pragma solidvm 3.2;
+-- contract B {
+--   uint y;
 
-  constructor() {
-    y = 47;
-  }
-}
-|]
-          mainChainContractName = "B"
+--   constructor() {
+--     y = 47;
+--   }
+-- }
+-- |]
+          -- mainChainContractName = "B"
           chainMember1 :: ChainMemberParsedSet
           chainMember1 = (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "Dustin Norwood") True)
                               
           chainMember2 :: ChainMemberParsedSet
           chainMember2 = (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True)
 
-          -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          -- enode2 = readEnode "enode://abcd@5.6.7.8:30303"
-          enode3 = "enode://abcd@9.10.11.12:30303"
           mkChainInfo bHash = ChainInfo
             UnsignedChainInfo { chainLabel     = "My parent test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
@@ -1950,25 +2007,25 @@ contract B {
           incXTx2 = addMd . mkSignedTx (privKeys !! 0) . incXUtx2
           incXTx3 = addMd . mkSignedTx (privKeys !! 0) . incXUtx3
           incXTx4 = addMd . mkSignedTx (privKeys !! 0) . incXUtx4
-      let mainChainArgs = "()"
-          mainChainUtx = U.UnsignedTransaction
-            { U.unsignedTransactionNonce      = Nonce 0
-            , U.unsignedTransactionGasPrice   = Wei 1
-            , U.unsignedTransactionGasLimit   = Gas 1000000000
-            , U.unsignedTransactionTo         = Nothing
-            , U.unsignedTransactionValue      = Wei 0
-            , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
-            , U.unsignedTransactionChainId    = Nothing
-            }
-          mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
-          mainChainAddMd t = t{transactionMetadata = M.union mainChainTxMd <$> transactionMetadata t}
-          mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
-                             in mainChainAddMd $ mkSignedTx (privKeys !! 0) utx
+      -- let mainChainArgs = "()"
+      --     mainChainUtx = U.UnsignedTransaction
+      --       { U.unsignedTransactionNonce      = Nonce 0
+      --       , U.unsignedTransactionGasPrice   = Wei 1
+      --       , U.unsignedTransactionGasLimit   = Gas 1000000000
+      --       , U.unsignedTransactionTo         = Nothing
+      --       , U.unsignedTransactionValue      = Wei 0
+      --       , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+      --       , U.unsignedTransactionChainId    = Nothing
+      --       }
+      --     mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
+      --     mainChainAddMd t = t{transactionMetadata = M.union mainChainTxMd <$> transactionMetadata t}
+      --     mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
+      --                        in mainChainAddMd $ mkSignedTx (privKeys !! 0) utx
       cIdRef <- newIORef undefined
       cInfoRef <- newIORef undefined
       cId2Ref <- newIORef undefined
       cInfo2Ref <- newIORef undefined
-      let addMemberArgs = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 2)) <> ",\"" <> T.pack enode3 <> "\")"
+      let addMemberArgs = "(" <> "\"BlockApps\", \"Engineering\", \"David Nallapu\")"
           addMemberUtx chainId = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 5
             , U.unsignedTransactionGasPrice   = Wei 1
@@ -1982,14 +2039,15 @@ contract B {
           addMemberMd t = t{transactionMetadata = M.union addMemberTxMd <$> transactionMetadata t}
           addMemberTx cId = addMemberMd $ mkSignedTx (privKeys !! 0) (addMemberUtx cId)
           toIetx = IETx ts . IngestTx Origin.API
-          mainChainRoutine n = do
-            threadDelay 200000
-            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx n
-            mainChainRoutine $ n + 1
+          -- mainChainRoutine n = do
+          --   threadDelay 200000
+          --   flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx n
+          --   mainChainRoutine $ n + 1
           routine = do
             threadDelay 5000000
             for_ peers $ postEvent (TimerFire 0)
             threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ IETx registryTs $ IngestTx Origin.API mkRegistryTx
             bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 0
             let cInfo = mkChainInfo bHash
                 cId = mkChainId cInfo
@@ -2027,14 +2085,14 @@ contract B {
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
 
-      void . timeout 80000000 $ concurrently_ (runNetwork peers connections) (concurrently_ routine $ mainChainRoutine 0)
+      void . timeout 80000000 $ concurrently_ (runNetwork peers connections) routine
       cId <- readIORef cIdRef
       cInfo <- readIORef cInfoRef
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
-      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId) `shouldBe` (i, Just cInfo)
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId) `shouldBe` (i, if i == 2 then Nothing else Just cInfo)
       cId2 <- readIORef cId2Ref
       cInfo2 <- readIORef cInfo2Ref
-      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 1 then Nothing else Just cInfo2)
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 2 then Nothing else Just cInfo2)
       --privKey4 <- newPrivateKey
       --peer4 <- createPeer privKey4 validators' unseqSink "node4" "13.14.15.16"
       --let peers' = peers ++ [peer4]
@@ -2061,9 +2119,11 @@ contract B {
 pragma solidvm 3.0;
 
 contract RegisterCert {
+  event CertificateRegistered(string cert);
 
   constructor(address _user, string _cert) {
     registerCert(_user, _cert);
+    emit CertificateRegistered(_cert);
   }
 }
 |]
@@ -2104,7 +2164,8 @@ contract RegisterCert {
             threadDelay 1000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
       void . timeout 3000000 $ concurrently_ (runNetwork peers connections) routine
-      True `shouldBe` True
+      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
   -- describe "handleEvents" $ do
   --   it "should pong a ping" $
