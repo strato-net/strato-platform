@@ -57,7 +57,7 @@ handleEvents ev sSource runner = do
   case ev of
     P2pNewOrgName cId org -> do
       peers <- getPeersByParsedSets org
-      $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack $ show peers
+      $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack $ show peers
       void . for peers $ \p -> do
         void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
           runPeer p
@@ -71,7 +71,7 @@ handleEvents ev sSource runner = do
 
               let isRunning = pPeerActiveState peer == 1
 
-              $logInfoS "stratoP2PClientDirect/handleEvents/isRunning" . T.pack $ show isRunning
+              $logDebugS "stratoP2PClientDirect/handleEvents/isRunning" . T.pack $ show isRunning
 
               if isRunning then do
                 $logInfoS "stratoP2PClientDirect/handleEvents" "Peer is already active. Skipping direct connection."
@@ -94,7 +94,7 @@ handleEvents ev sSource runner = do
                 orgChains <- selectWithDefault (Proxy @ChainMemberRSet) cId
                 let peerCheck = checkPeerIsMember peerX509 orgChains
 
-                $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.red $ show peerCheck
+                $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack . C.red $ show peerCheck
                 
                 if peerCheck then do
                   $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.blue  $ "Welcome to strato-p2p-client-DIRECT"
