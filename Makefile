@@ -72,15 +72,7 @@ get_solcs:
 
 eks:
 	@echo Now generating eks-deployment.yaml file
-	echo $PWD
-	echo ${PWD}
-	ls
-	cd devops/eks && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml && ls -l
-	#ls -l devops/eks/eks-deployment.tpl.yaml
-	#ls -l ./devops/eks/eks-deployment.tpl.yaml
-	#ls -l eks-deployment.tpl.yaml
-	#sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml
-	#cat ./devops/eks/eks-deployment.yaml
+	cd devops/eks && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml && cat eks-deployment.yaml
 
 build_buildbase:
 	@echo building buildbase...
