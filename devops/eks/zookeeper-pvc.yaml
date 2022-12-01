@@ -4,7 +4,7 @@ metadata:
   name: zookeeper-pvc
 spec:
   accessModes:
-    - ReadWriteOncePod
+    - ReadWriteMany
   resources:
     requests:
       storage: 5Gi

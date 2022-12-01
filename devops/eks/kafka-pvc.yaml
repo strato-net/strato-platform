@@ -4,7 +4,7 @@ metadata:
   name: kafka-pvc
 spec:
   accessModes:
-    - ReadWriteOncePod
+    - ReadWriteMany
   resources:
     requests:
       storage: 5Gi
