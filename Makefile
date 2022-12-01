@@ -76,6 +76,8 @@ eks:
 	echo ${PWD}
 	ls
 	cd devops/eks
+	ls -l devops/eks/eks-deployment.tpl.yaml
+	ls -l ./devops/eks/eks-deployment.tpl.yaml
 	ls -l eks-deployment.tpl.yaml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml
 	cat ./devops/eks/eks-deployment.yaml
