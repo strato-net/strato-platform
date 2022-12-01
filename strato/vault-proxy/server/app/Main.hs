@@ -4,25 +4,31 @@
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Main where
 
 import           Control.Monad
 -- import           Database.PostgreSQL.Simple
+import           Data.ByteString                        as B hiding (putStrLn)
 import           Data.Cache
 -- import           Data.IORef
 -- import           Data.Pool
 -- import qualified Data.Text                              as T
+import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
 import           GHC.Conc
 import           Network.HTTP.Client                    hiding (Proxy)
 import           Network.HTTP.Conduit                   hiding (Proxy)
-import           Network.Wai.Handler.Warp
-import           Network.Wai.Middleware.Cors
-import           Network.Wai.Middleware.Prometheus
-import           Network.Wai.Middleware.RequestLogger
-import           Network.Wai.Middleware.Servant.Options
+import           Network.HTTP.Req                       as R
+import           Network.HTTP.ReverseProxy
+import           Network.HTTP.Types.Header             as TH
+import           Network.Wai.Handler.Warp              (run)
+-- import           Network.Wai.Middleware.Cors
+-- import           Network.Wai.Middleware.Prometheus
+-- import           Network.Wai.Middleware.RequestLogger
+-- import           Network.Wai.Middleware.Servant.Options
 import           Servant
 -- import           System.Clock
 import           System.IO                              (BufferMode (..),
@@ -39,7 +45,25 @@ import qualified Strato.VaultProxy.API                    as VaultProxy
 import qualified Strato.VaultProxy.Server                 as VaultProxy
 import           Strato.VaultProxy.DataTypes              as VaultProxy
 import           Strato.VaultProxy.RawOauth               as RO
+import           Strato.VaultProxy.Server.Token
 
+-- import System.Environment (getArgs)
+-- import System.IO (Handle, hSetBuffering, BufferMode(NoBuffering))
+
+-- import Network (listenOn, accept, PortID(..), Socket)
+-- import Network.Socket hiding (recv, accept)
+-- import Network.Socket.ByteString (recv, sendAll)
+
+-- import Control.Concurrent (forkIO)
+
+-- import Data.Monoid
+-- import Data.Maybe
+-- import Data.Attoparsec.ByteString (maybeResult, parseWith, parse)
+-- import qualified Data.ByteString as BS
+
+-- import Types
+-- import Parser
+-- import PrettyPrinter
 
 import           Options
 
@@ -72,8 +96,6 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
-  traceShowM noErrorOauth
-  traceM "Able to get all of the OAUTH information"
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -86,26 +108,22 @@ main = do
       tokenCache = tokenCash,
       additionalOauth = noErrorOauth
   }
+  let app' = waiProxyTo (app vaultConnection) defaultOnExc
+  print $ "Running the vault proxy on port " ++ show flags_VAULT_PROXY_PORT
+  run (vaultProxyPort vaultConnection) app'
 
-  --Actually run the app and keep it alive
-  --Was instructed to hardcode the vault port, previous implementation, first arguement for the run command should be the foreign vault port
-  traceM "VaultProxy is trying to start up"
-  run 8013 (appVaultProxy vaultConnection)
-  traceM "VaultProxy is shutting down"
-
-appVaultProxy :: VaultProxy.VaultConnection -> Application
-appVaultProxy env =
-    prometheus def{ prometheusEndPoint = ["vault-proxy", "metrics"]
-                  , prometheusInstrumentApp = False}
-  . instrumentApp "vault-proxy"
-  . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
-  . cors (const $ Just policy)
-  . provideOptions (Proxy @ VaultProxy.VaultProxyAPI)
-  . serve (Proxy @ (
-              VaultProxy.VaultProxyAPI
-         :<|> VaultProxy.VaultProxyDocsAPI
-              ))
-  $ VaultProxy.serveVaultProxy env
-     :<|> return VaultProxy.vaultProxySwagger
-  where
-    policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
+app :: VaultConnection -> Request -> IO WaiProxyResponse
+app vc req = do
+  --Get the JWT token
+  jwt <- vaulty vc
+  --This will forcibly add the JWT token to outside requests quit if it is not available
+  goodJwt <- case jwt of
+    Nothing -> error "No JWT token available"
+    Just val -> return (accessToken val)
+  let authHeadr = R.header (B.pack "X-USER-UNIQUE-NAME") (TE.encodeUtf8 jwt)
+      auth = (hAuthorization,) . TE.encodeUtf8 "Bearer " <> goodJwt
+      modReq = case auth of
+        Nothing -> "OOOOOOOO MMMMYYYYY GOOOODDDDDDD, the jwt is invalid in the vault proxy." 
+        Just a -> req { requestHeaders = authHeadr : requestHeaders req }
+    --Assuming the port is 8094 for the shared vault
+  pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ vaultUrl vc) 8094

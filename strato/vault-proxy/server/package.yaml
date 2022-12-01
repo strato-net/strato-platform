@@ -21,12 +21,16 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-vault-proxy-api
+- bytestring
 - common-log
 - postgresql-simple
 - text
 - http-conduit
 - servant-client
 - servant-client-core
+- http-reverse-proxy
+- http-types
+- req
 
 ghc-options: -Wall -Werror -threaded
 
