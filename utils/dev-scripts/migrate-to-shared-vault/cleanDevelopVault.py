@@ -44,7 +44,8 @@ def getAccessToken():
 
 
 
-
+#This function is needed because sometimes converting the jwt from base64 fails
+#If it fails, this just trys again till it succeeds.
 def getCorrectResult():
     resFromGet  = getAccessToken()
     if False ==  resFromGet:
@@ -62,10 +63,10 @@ for col in db.columns: print(col)
 print()
 
 
-db['id'] = db.apply( lambda x: x['id'] + index, axis=1) # This needs to be modified to fit the correct 
+db['id'] = db.apply( lambda x: x['id'] + index, axis=1)
 
 db['x_user_unique_name'] = db.apply( lambda x: nodeKeyName  if x['x_user_unique_name'] == "nodekey" else x['x_user_unique_name'] , axis=1)
-db['oauth_provider_id'] = db.apply( lambda x: oauthProviderM , axis=1) # Wait should this column name be oauth_provider_id or x_identity_provider_id
+db['oauth_provider_id'] = db.apply( lambda x: oauthProviderM , axis=1) 
 db = db.drop(['enc_sec_key'], axis=1)
 
 
@@ -74,7 +75,7 @@ for col in db.columns: print(col)
 print()
 
 
-db.to_csv("userTableModfied.csv", header=False, index=False)#Add nodeRelated to this to file name?
+db.to_csv("userTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
 print("Clean headers and indexed-index column for user table")
 db       = pd.read_csv("messageTable.csv")
 print()
@@ -83,7 +84,7 @@ print()
 db['id'] = db.apply( lambda x: x['id'] + 1, axis=1)
 
 
-db.to_csv("messageTableModfied.csv", header=False, index=False)#Add nodeRelated to this to file name?
+db.to_csv("messageTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
 
 
 print("Cleaned headers from message table")
