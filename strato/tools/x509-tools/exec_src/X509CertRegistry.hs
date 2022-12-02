@@ -242,7 +242,7 @@ contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    mapping(address => Certificate) addressToCertMap
+    mapping(address => Certificate) addressToCertMap;
     address public owner;
 
     bool initialized;
@@ -266,7 +266,7 @@ contract CertificateRegistry {
             Certificate c = new Certificate(_rootCerts[i]);
             // Register the root certificates and emit event
             addressToCertMap[c.userAddress()] = c;
-            registerCert(_rootCerts[i]);
+            
             emit CertificateRegistered(_rootCerts[i]);
         }
         
@@ -293,7 +293,7 @@ contract CertificateRegistry {
 
             addressToCertMap[c.userAddress()] = c;
             
-            registerCert(newCertificateString);
+            
             emit CertificateRegistered(newCertificateString);
     
             return 200; // 200 = HTTP Status OK
@@ -301,7 +301,7 @@ contract CertificateRegistry {
         return 400;
     }
 
-    function getUserCert(address _address) returns (address) {
+    function getUserCert(address _address) returns (Certificate) {
         return addressToCertMap[account(_address)];
     }
     

@@ -15,6 +15,8 @@ module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
+  checkPeerIsMember,
+  certOrgTuple,
   ) where
 
 import           Control.Arrow                         ((&&&), second)
@@ -131,7 +133,7 @@ handleEvents peer = awaitForever $ \case
     MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do
-        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s)"
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ (intercalate "\n" (format <$> txs))
         lift stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
         ts <- liftIO getCurrentMicrotime
@@ -359,7 +361,7 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetTransactions trHashes) -> do
       lift stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
-        ++ (intercalate "\n" (format <$> trHashes))
+        ++ (intercalate "\n" (format <$> trHashes)) ++ " from peer " ++ peerString peer
       ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
       mems <- lift . selectMany (Proxy @ChainMemberRSet) $ map fst ptrs
       peerX509 <- lift $ getPeerX509 peer
