@@ -14,25 +14,25 @@ module Strato.VaultProxy.API.Types
   , SharedKey(..) --       same
   ) where
 
-import           Control.Lens                 hiding ((.=))
-import           Data.Aeson.Casing
-import           Data.Aeson.Casing.Internal   (dropFPrefix)
+-- import           Control.Lens                 hiding ((.=))
+-- import           Data.Aeson.Casing
+-- import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
-import qualified Data.ByteString              as B
-import qualified Data.ByteString.Base16       as B16
-import qualified Data.ByteString.Char8        as C8
+-- import qualified Data.ByteString              as B
+-- import qualified Data.ByteString.Base16       as B16
+-- import qualified Data.ByteString.Char8        as C8
 import           Data.Cache
 -- import           Data.Scientific              as Scientific
 import qualified Data.Text                    as T
 import           Data.Swagger
-import           Data.Swagger.Internal.Schema (named)
+-- import           Data.Swagger.Internal.Schema (named)
 
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
 import           Strato.VaultProxy.DataTypes
-import qualified LabeledError
+-- import qualified LabeledError
 
 
 data User = User

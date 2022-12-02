@@ -31,8 +31,8 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 
 import           Servant.Client
-import qualified Strato.VaultProxy.API        as VP
-import qualified Strato.VaultProxy.Client     as VP
+-- import qualified Strato.VaultProxy.API        as VP
+-- import qualified Strato.VaultProxy.Client     as VP
 
 
 instance HasVaultProxy IO where
