@@ -27,6 +27,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
+    - blockapps-vault-proxy-api
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring

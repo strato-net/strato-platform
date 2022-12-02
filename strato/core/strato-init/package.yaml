@@ -11,7 +11,7 @@ ghc-options: -Wall -O2 -threaded
 
 dependencies:
   - base
-  - x509-certs
+
 
 library:
   source-dirs: src/
@@ -21,8 +21,9 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
-  - blockapps-vault-wrapper-api
+  - blockapps-vault-proxy-api
   - blockapps-vault-wrapper-client
+  - blockapps-vault-wrapper-api
   - bytestring
   - common-log
   - conduit
@@ -66,6 +67,7 @@ library:
   - unliftio
   - unliftio-core
   - vm-tools
+  - x509-certs 
   - yaml
 
 executables:

@@ -15,8 +15,10 @@ dependencies:
   - bloc2api
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-vault-wrapper-api
+  - blockapps-vault-proxy-api
+  - blockapps-vault-proxy-server
   - blockapps-vault-wrapper-server
+  - blockapps-vault-wrapper-api
   - bytestring
   - containers
   - cryptonite
