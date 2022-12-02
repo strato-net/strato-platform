@@ -84,7 +84,7 @@ function newnode {
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover --VAULT_PROXY_PORT=$VAULT_PROXY_PORT --VAULT_PROXY_URL=$VAULT_PROXY_URL &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
@@ -116,7 +116,6 @@ function newnode {
      --maxConn=$maxConn \
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
-     --VAULT_PROXY_PORT=$VAULT_PROXY_PORT --VAULT_PROXY_URL=$VAULT_PROXY_URL \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -160,13 +159,13 @@ function newnode {
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
-  vwFlag="--VAULT_PROXY_PORT=${VAULT_PROXY_PORT} --VAULT_PROXY_URL=${VAULT_PROXY_URL}"
+
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" \
-    "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -222,7 +221,7 @@ function newnode {
 
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-    --stratourl=${STRATO_API_LOCAL_ROOT_PATH} --VAULT_PROXY_PORT=$VAULT_PROXY_PORT --VAULT_PROXY_URL=$VAULT_PROXY_URL  \
+    --stratourl=${STRATO_API_LOCAL_ROOT_PATH}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -302,7 +301,7 @@ function doInit {
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-        --addBootnodes=$addBootnodes $stratoBootnode --VAULT_PROXY_PORT=$VAULT_PROXY_PORT --VAULT_PROXY_URL=$VAULT_PROXY_URL \
+        --addBootnodes=$addBootnodes $stratoBootnode \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
         --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag}"
 

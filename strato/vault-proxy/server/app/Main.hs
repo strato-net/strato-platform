@@ -112,8 +112,9 @@ main = do
       additionalOauth = noErrorOauth
   }
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
-  print $ "Running the vault proxy on port " ++ show flags_VAULT_PROXY_PORT
-  run (vaultProxyPort vaultConnection) (app' $ httpManager vaultConnection)
+      vport = vaultProxyPort vaultConnection
+  print $ "Running the vault proxy on port " ++ show vport
+  run vport (app' $ httpManager vaultConnection)
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
