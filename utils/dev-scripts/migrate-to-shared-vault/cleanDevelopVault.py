@@ -4,15 +4,19 @@ from collections import defaultdict
 import requests
 import sys
 from requests.exceptions import HTTPError
+from requests.auth import HTTPBasicAuth
+
 import base64
 import json
 
 
 
 
-keycloackRel           = sys.argv[1]
-index               = int(sys.argv[2])
-indexOfMessageTable = int(sys.argv[3])
+keycloackRel        = sys.argv[1]
+user                = sys.argv[2]
+secret              = sys.argv[3]
+index               = int(sys.argv[4])
+
 
 db = pd.read_csv("userTable.csv")
 
@@ -20,10 +24,7 @@ db = pd.read_csv("userTable.csv")
 
 def getAccessToken():
     try:
-        r = requests.post(keycloackRel,
-            headers= { 'Content-Type': 'application/x-www-form-urlencoded','Authorization': 'Basic ZGV2OmQ1ZTY3YjhjLTRmYmYtNDJjNi1hOGQ5LTI5YTRkZDEzNTc1Zg=='},
-            data={"grant_type" : "client_credentials"}
-            )
+        r = requests.post(keycloackRel, auth=HTTPBasicAuth(user, secret), data={"grant_type" : "client_credentials"})
         r.raise_for_status()
         middlePartOfToken = (r.json()['access_token']).split('.')[1]
         print(base64.urlsafe_b64decode(middlePartOfToken))
