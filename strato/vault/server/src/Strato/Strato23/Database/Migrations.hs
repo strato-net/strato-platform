@@ -36,6 +36,9 @@ migrations = [ (Throw, createTables)
              , (Throw, insertSecPrvKey)
              , (Throw, insertPublicKey)
              , (Throw, removePublicKey)
+             , (Throw, insertOauthProvider)
+             , (Throw, modifytOauthProvider)
+             , (Throw, removeEncKey)
              ]
 
 getSchemaVersion :: Query
@@ -58,3 +61,12 @@ insertPublicKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS pub_key bytea
 
 removePublicKey :: Query
 removePublicKey = [sql| ALTER TABLE users DROP COLUMN IF EXISTS pub_key; |]
+
+insertOauthProvider :: Query
+insertOauthProvider = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS x_identity_provider_id varchar(512) NOT NULL DEFAULT 'keycloak.blockapps.net'; |]
+
+modifytOauthProvider :: Query
+modifytOauthProvider = [sql| ALTER TABLE users ALTER COLUMN x_identity_provider_id DROP DEFAULT; |]
+
+removeEncKey :: Query
+removeEncKey = [sql| ALTER TABLE users DROP COLUMN IF EXISTS enc_sec_key; |]
