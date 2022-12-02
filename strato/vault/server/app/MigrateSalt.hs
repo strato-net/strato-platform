@@ -21,6 +21,8 @@ import           Strato.Strato23.Database.Tables
 import qualified Strato.Strato23.Server.Password    as VP
 import           HFlags
 import           Options
+import Control.Concurrent
+import Control.Monad
 
 
 
@@ -35,7 +37,7 @@ import           Options
 
 getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
 getUsersQuery conn = runSelect conn $ proc () -> do
-  (userId, _, salt, nonce, _, encKey, _) <- selectTable usersTable -< ()
+  (userId, _,  salt, nonce, encKey, _, _) <- selectTable usersTable -< ()
   returnA -< (userId, salt, nonce, encKey)
 
 
@@ -74,13 +76,18 @@ main = do
   -- then, reencrypt with the global password Secretbox.key and the original user nonce
   let reencrypt :: Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, Int32)
       reencrypt i salt nonce encKey = do
-          let sbKey = VP.getKeyFromPasswordAndSalt pw salt
-          decKey <- VC.decryptSecKey sbKey nonce encKey
+          let sbKey    =  VP.getKeyFromPasswordAndSalt pw salt
+          decKey       <- VC.decryptSecKey sbKey nonce encKey
           let newEncKey = VC.encrypt pwKey nonce (exportPrivateKey decKey)
           pure (newEncKey, i)
  
   let idsAndNewEncKeys = catMaybes $ map (\(i, s, n, k) -> reencrypt i s n k) allUsers
-  
+  forM_ allUsers $ \_ -> forkIO $ (print (show $  pw))
+  --forM_ allUsers $ \x -> forkIO $ (print (show $ (\(_, s, _, _) -> (VP.getKeyFromPasswordAndSalt pw s)) x))
+
+  --putStrLn $ (" Garrett was here sbKey") ++ (show VP.getKeyFromPasswordAndSalt pw salt)
+  forM_ allUsers $ \x -> forkIO $ (print (show $ (\(i, s, n, k) -> reencrypt i s n k) x))
+  putStrLn $ (show $ length idsAndNewEncKeys) ++ " of those keys can be reencrypted"
   putStrLn $ "\nFound " ++ (show $ length allUsers) ++ " keys"
   putStrLn $ (show $ length idsAndNewEncKeys) ++ " of those keys can be reencrypted"
 

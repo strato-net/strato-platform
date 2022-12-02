@@ -26,9 +26,14 @@ import Strato.Strato23.Database.Create as C
 import Strato.Strato23.Database.Tables as TS
 import Strato.Strato23.Server.Password
 
+
+-- This does not work as of now
+-- We took out public keys from vault db
+-- This logic below is using private key
+-- If concerned about old usage, you git log to find the orignal status if this needs to be resurrection 
 getUserOldKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserOldKeyQuery username = proc () -> do
-  (_, name, salt, nonce, encSecKey, _, address) <- selectTable TS.usersTable -< ()
+  (_, name, salt, nonce, encSecKey, address, _) <- selectTable TS.usersTable -< ()
   restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecKey, address)
 

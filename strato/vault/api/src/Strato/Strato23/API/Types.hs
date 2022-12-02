@@ -83,3 +83,9 @@ data User = User
   { username :: T.Text
   , address :: Address
   } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
+
+data User' = User'
+  { username'      :: T.Text
+  , oauthProvider' :: T.Text
+  , address'       :: Address
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)

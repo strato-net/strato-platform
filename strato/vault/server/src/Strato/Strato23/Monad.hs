@@ -216,6 +216,14 @@ vaultQuery1 q = vaultQuery q >>= \case
     [y] -> return y
     _:_:_ -> throwIO $ DBError "vaultQuery1: Multiple results, expected one row"
 
+vaultQueryMany
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  => Query x
+  -> VaultM [y]
+vaultQueryMany q = vaultQuery q >>= \case
+    []     -> vaultWrapperError $ DBError "No result, expected atleast one"
+    (x:xs) -> return (x:xs)
+
 vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
 vaultModify modify = do
   logInfoCS callStack "Updating the database"

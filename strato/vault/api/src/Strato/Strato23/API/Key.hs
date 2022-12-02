@@ -26,3 +26,28 @@ type GetSharedKey = "sharedkey"
                  :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
                  :> ReqBody '[JSON] PublicKey
                  :> Get '[JSON] SharedKey
+
+
+--------------------------------------------------------------------------------
+type GetKey' = "key"
+            :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME"  Text
+            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+            :> QueryParam "username" Text
+            :> Get '[JSON] AddressAndKey
+
+type GetKeys' = "key"
+            :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME"  Text
+            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+            :> QueryParam "username" Text
+            :> Get '[JSON] [AddressAndKey]
+
+type PostKey' = "key"
+            :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+            :> Post '[JSON] AddressAndKey
+
+type GetSharedKey' = "sharedkey"
+                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+                 :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+                 :> ReqBody '[JSON] PublicKey
+                 :> Get '[JSON] SharedKey
