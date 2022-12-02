@@ -191,11 +191,14 @@ insertCertRegistryContract gi =
       initialCode     = genesisInfoCodeInfo gi
       encoded         = encodeUtf8 certificateRegistryContract
       rlpWrap         = rlpSerialize . rlpEncode 
-      elfdod'         = fromJust . stringAddress $ "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859"
-      elfdod          = BAccount $ NamedAccount elfdod' UnspecifiedChain
+      elfdod'         = (fromJust . stringAddress) "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859"
+      elfdod          = BAccount (NamedAccount elfdod' UnspecifiedChain)
       certAccount     = SolidVMContractWithStorage 0x509 509 
         (SolidVMCode "CertificateRegistry" (KECCAK256.hash encoded)) 
-        [(".owner", rlpWrap elfdod)]
+        [
+            (".owner", rlpWrap elfdod),
+            (".initialized", rlpWrap (BBool True))
+        ]
   in gi {genesisInfoAccountInfo = initialAccounts ++ [certAccount],
          genesisInfoCodeInfo    = initialCode ++ [CodeInfo encoded certificateRegistryContract (Just "CertificateRegistry")]}
 
