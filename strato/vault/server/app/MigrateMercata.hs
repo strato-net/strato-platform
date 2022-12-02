@@ -33,7 +33,7 @@ getUsersQuery conn = runSelect conn $ proc () -> do
 main :: IO () 
 main = do
   _ <- $initHFlags "mercata-migrate"
-  putStrLn "Usage: mercata-migrate --pw=<vault_password>  pwOld=<vault_password> --index to start at?"
+  putStrLn "Usage: mercata-migrate --pw=<vault_password>  pwOld=<vault_password> --indexToStartAt=<shared_vault_largest_index_prior_to_import>"
   
   let dbConnectInfo = ConnectInfo { connectHost     = "postgres"
                                   , connectPort     = 5432
@@ -61,14 +61,13 @@ main = do
         _ -> error "couldn't decrypt the secret message, probably you entered the wrong vault password"
     _ -> error ("Not right number of  rows in message table, something is not right" ++ (show  $ length mMsgLst ))
   
-  allUsers <- getUsersQuery conn --Also drop all without index of--- Needs to take an index arguement
+  allUsers <- getUsersQuery conn
 
   let reencrypt ::   Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, Int32)
       reencrypt  i _ nonce encKey = do
           let sbKey     =  VP.getKeyFromPasswordAndSalt pwOld globaOldSalt
           decKey        <- VC.decryptSecKey sbKey nonce encKey
           let newEncKey =  VC.encrypt pwKey nonce (exportPrivateKey decKey)
-          -- let newEncKey =  VC.encrypt pwKey nonce (exportPrivateKey decKey) -- Won't we use the new table 
           pure (newEncKey, i)
 
   let allIdsAndNewEncKeys = catMaybes $  map (\(i, s, n, k) -> reencrypt i s n k) allUsers
