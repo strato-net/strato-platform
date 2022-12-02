@@ -42,7 +42,8 @@ library:
       - strato-model
       - text
       - raw-strings-qq
-
+      - solid-vm-model
+      - ethereum-rlp
 
 
 executables:

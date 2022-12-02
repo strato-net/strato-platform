@@ -22,6 +22,7 @@ module Blockchain.Generation (
 import qualified Data.Aeson as Ae
 import qualified Data.JsonStream.Parser as JS
 import Data.Bits
+import Data.Maybe
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
@@ -39,8 +40,12 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256              as KECCAK256
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.Data.RLP
 import           Blockchain.Data.ChainInfo
+
+import           SolidVM.Model.Storable         hiding (size)
 
 data Type = Number Integer
           | Stryng Text
@@ -185,10 +190,12 @@ insertCertRegistryContract gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode     = genesisInfoCodeInfo gi
       encoded         = encodeUtf8 certificateRegistryContract
+      rlpWrap         = rlpSerialize . rlpEncode 
+      elfdod'         = fromJust . stringAddress $ "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859"
+      elfdod          = BAccount $ NamedAccount elfdod' UnspecifiedChain
       certAccount     = SolidVMContractWithStorage 0x509 509 
         (SolidVMCode "CertificateRegistry" (KECCAK256.hash encoded)) 
-        []
-        --[("owner", "3282791d6fd713f1e94f4bfd565eaa78b3a0599d")]
+        [(".owner", rlpWrap elfdod)]
   in gi {genesisInfoAccountInfo = initialAccounts ++ [certAccount],
          genesisInfoCodeInfo    = initialCode ++ [CodeInfo encoded certificateRegistryContract (Just "CertificateRegistry")]}
 
