@@ -355,7 +355,6 @@ runArgsWithOrigin orig acc args bs = do
 runArgsWithCertificateRegistry :: String -> ContextM ExecResults
 runArgsWithCertificateRegistry rawString = runArgsWithOrigin rootAcc sender "()" $ [r|
 
-pragma solidvm 3.4;
 contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
@@ -802,7 +801,6 @@ contract qq {
 
     it "can declare negative numbers" . runTest $ do
       runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint x;
   uint y;
@@ -839,7 +837,6 @@ contract qq {
 
     it "throw an error when there is an 'block_timestamp' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    string block_timestamp;
@@ -851,7 +848,6 @@ contract qq {
 
     it "throw an error when there is an 'block_hash' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    string block_hash;
@@ -863,7 +859,6 @@ contract qq {
 
     it "throw an error when there is an 'block_number' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    string block_number;
@@ -882,7 +877,6 @@ contract qq {
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    uint record_id;
@@ -890,7 +884,6 @@ contract qq {
 
     it "throw an error when there is an 'transaction_hash' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    uint transaction_hash;
@@ -898,7 +891,6 @@ contract qq {
 
     it "throw an error when there is an 'transaction_sender' variable name" $ runTest (do
       runBS [r|
-pragma solidvm 3.3;
 
 contract qq {
    uint transaction_sender;
@@ -943,7 +935,6 @@ contract qq {
 
     it "can index into maps with bool" . runTest $ do
       runBS [r|
-pragma solidvm 3.0;
 contract qq {
   mapping(bool => uint) bs;
   constructor() public {
@@ -1027,7 +1018,6 @@ contract qq {
 
   it "can array index with uninitialized numbers" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint[] xs;
   uint y;
@@ -1040,7 +1030,6 @@ contract qq {
 
   it "can map index with uninitialized numbers" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) xs;
   uint y;
@@ -1053,7 +1042,6 @@ contract qq {
 
   it "can map index with uninitialized strings 3.2" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   mapping(string => address) xs;
   address y;
@@ -1153,7 +1141,6 @@ contract qq {
 
   it "can detect nulls" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) ns;
   bool found;
@@ -1185,10 +1172,8 @@ contract qq {
 
   it "supports contract equality" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract A {
 }
-pragma solidvm 3.0;
 contract qq {
   constructor() {
     A a1 = new A();
@@ -1248,7 +1233,6 @@ contract qq {
   
   it "can throw exception if omitted parameter name and types are different" $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint x = 0;
 
@@ -1262,7 +1246,6 @@ contract qq {
 
   it "can handle omitted parameter names with correct types" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint x = 0;
 
@@ -1363,7 +1346,6 @@ contract qq {
 
   it "can continue in a for-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1380,7 +1362,6 @@ contract qq {
 
   it "can continue in a while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1398,7 +1379,6 @@ contract qq {
 
   it "can continue in a do-while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1416,7 +1396,6 @@ contract qq {
 
   it "can break from a for-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i = 25;
   constructor() public {
@@ -1432,7 +1411,6 @@ contract qq {
 
   it "can break from a while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i = 0;
   constructor() public {
@@ -1448,7 +1426,6 @@ contract qq {
 
   it "can break from a do-while loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i = 0;
   constructor() public {
@@ -1464,7 +1441,6 @@ contract qq {
 
   it "can break immediately from a loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint i = 25;
   constructor() public {
@@ -1547,14 +1523,12 @@ contract qq {
 
   it "can call external getters by variable name" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract S {
   string public s;
   constructor() public {
     s = "Blockapps";
   }
 }
-pragma solidvm 3.2;
 contract qq {
   string local_s;
   S myS;
@@ -1697,7 +1671,6 @@ contract qq {
 
   it "can push to memory arrays" . runTest $ do
     runCall "pushMem" "([3, 5])" [r|
-pragma solidvm 3.2;
 contract qq {
   uint x;
   function pushMem(uint[] memory ts) public {
@@ -1721,7 +1694,6 @@ contract qq {
 
   it "can accept nested arrays" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   bool[2][] pairs;
 
@@ -1816,7 +1788,6 @@ contract qq {
 
   it "can call a remote function" . runTest $ do
     let qq = [r|
-pragma solidvm 3.0;
 contract qq {
   qq x;
   uint num;
@@ -1962,7 +1933,6 @@ contract qq {
 
   it "can pass local arrays as arguments" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract Validator {
   function isEmptyArray(bytes32[] memory _arr) pure internal returns (bool) {
     return _arr.length == 0;
@@ -2069,7 +2039,6 @@ contract qq {
 
   it "can use hexadecimal string literals" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq {
   string x;
   constructor() public {
@@ -2080,7 +2049,6 @@ contract qq {
   
   it "can use hexadecimal string literals double quotes" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq {
   string x;
   constructor() public {
@@ -2101,7 +2069,6 @@ contract qq {
 
   it "parser can accept variable names without consuming hex" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq {
   string hexString;
   constructor() public {
@@ -2288,7 +2255,6 @@ contract qq {
 
   it "can compare contracts to int literals" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   bool eq;
   bool neq;
@@ -2359,7 +2325,6 @@ contract qq {
 
   it "can compare ints to enums" . runTest $ do
     runCall "f" "(1)" [r|
-pragma solidvm 3.0;
 contract qq {
   enum E {A, B, C, D}
   bool is_a;
@@ -2426,7 +2391,6 @@ contract qq {
 
   it "can return state variables in tuples" . runTest $ do
     runCall "getSAndB" "()" [r|
-pragma solidvm 3.2;
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
   function getSAndB() public returns (string, string) {
@@ -2482,7 +2446,6 @@ contract qq {
 
   it "can call boolean arguments" . runTest $ do
     runCall "set" "(true,false)" [r|
-pragma solidvm 3.0;
 contract qq {
   bool a;
   bool b;
@@ -2570,7 +2533,6 @@ contract qq {
   it "can have a for loop with no fields" . runTest $ do
     liftIO $ pendingWith "re-fix loops"
     runBS [r|
-    pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -2587,7 +2549,6 @@ contract qq {
   it "can have a while loop" . runTest $ do
     liftIO $ pendingWith "re-fix loops"
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint i;
   constructor() public {
@@ -2600,7 +2561,6 @@ contract qq {
 
   it "can accept modifiers" $ runTest (do
       runBS [r| 
-  pragma solidvm 3.3; 
   contract qq { 
     modifier m() {
        _; 
@@ -2617,21 +2577,18 @@ contract qq {
 
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
 contract A {
   uint account;
 }|]) `shouldThrow` anyReservedWordError
 
   it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
 contract account {
   uint a;
 }|]) `shouldThrow` anyReservedWordError
 
   it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
 contract A {
   function account() {
   }
@@ -2931,7 +2888,6 @@ contract qq {
 
   it "can cast empty bytes32 to int" . runTest $ do
     void $ runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint public x;
   constructor() public {
@@ -2974,26 +2930,24 @@ contract qq {
 
   it "can properly handle bytes setting" . runTest $ do
     void $ runBS [r|
-pragma solidvm 3.2;
 contract Bite_Test {
     bytes public b;
     function set(bytes _b) public {
         b = _b;
     }
 }
-pragma solidvm 3.2;
 contract qq {
-	Bite_Test bContract;
-	bytes c;
-	bytes d;	
-	int  e;
-	constructor (){
-		bContract = new Bite_Test();
-		d = 'ab';
-		bContract.set(d);
-		c = bContract.b();
-		e = int(c) + int(d);	
-		}
+  Bite_Test bContract;
+  bytes c;
+  bytes d;  
+  int  e;
+  constructor (){
+    bContract = new Bite_Test();
+    d = 'ab';
+    bContract.set(d);
+    c = bContract.b();
+    e = int(c) + int(d);  
+    }
 } |]
     getFields ["e"] `shouldReturn` [BInteger 342]
 
@@ -3138,7 +3092,6 @@ contract qq {
 
   it "supports while loops" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint x = 0;
 
@@ -3178,7 +3131,6 @@ contract qq {
 
   it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -3220,7 +3172,6 @@ contract qq {
 
   it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -3424,7 +3375,6 @@ contract qq {
 
   it "can cast strings to bool" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
 contract qq {
   bool control;
   bool t;
@@ -3443,7 +3393,6 @@ contract qq {
 
   it "will not transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq{
   account a;
   account payable aPay;
@@ -3469,7 +3418,6 @@ contract qq{
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3496,7 +3444,6 @@ contract qq{
 
   it "will allow for sending to self" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3523,7 +3470,6 @@ contract qq{
 
   it "will not send when there is not anything to send between account" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract qq{
   account a;
   account payable aPay;
@@ -3550,7 +3496,6 @@ contract qq{
 
   it "cannot send to a non account payable type" $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
 contract qq{
   account a;
   uint bal;
@@ -3574,7 +3519,6 @@ contract qq{
 
   it "cannot transfer for non account payable types" $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
 contract qq{
   account a;
   uint bal;
@@ -3598,11 +3542,9 @@ contract qq{
 
   it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract Test {
   constructor(){}
 }
-pragma solidvm 3.2;
 contract qq{
   account a;
   account payable aPay;
@@ -3646,11 +3588,9 @@ contract qq{
 
   it "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract Test {
   constructor(){}
 }
-pragma solidvm 3.2;
 contract qq{
   account a;
   account payable aPay;
@@ -3692,11 +3632,9 @@ contract qq{
 
   it "cannot over transfer from an account." $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
 contract Test {
   constructor(){}
 }
-pragma solidvm 3.2;
 contract qq{
   account a;
   account payable aPay;
@@ -3736,11 +3674,9 @@ contract qq{
 
   it "cannot over send from an account." . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
 contract Test {
   constructor(){}
 }
-pragma solidvm 3.2;
 contract qq{
   account a;
   account payable aPay;
@@ -3786,7 +3722,6 @@ contract qq{
 
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   account a1;
   account a2;
@@ -3814,7 +3749,6 @@ contract qq {
       ]
   it "can get the chainId directly from the account constructor" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
 contract qq {
   uint a1;
   uint a2;
@@ -3836,7 +3770,6 @@ contract qq {
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
-pragma solidvm 3.2;
 contract qq{
   account a;
   uint bal;
@@ -3856,12 +3789,10 @@ contract qq{
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
   it "can get the codehash from an address" . runTest $ do
     let contract = [r|
-pragma solidvm 3.2;
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.2;
 contract qq{
   string codeHashTest;
   constructor() public {
@@ -3876,7 +3807,6 @@ contract qq{
 
   it "can the codehash from this an address" . runTest $ do
     let contract = [r|
-pragma solidvm 3.2;
 contract qq{
   string codeHashTest;
   constructor() public {
@@ -3897,7 +3827,7 @@ contract qq{
 |]
         codeSnippet :: String
         codeSnippet = [r|
-pragma solidvm 3.4;
+
 contract Test {
   uint bana = 13;
   uint x = 6;
@@ -3938,7 +3868,7 @@ function addToNum (uint x, string z) public {
 |]
         codeSnippet :: String
         codeSnippet = [r|
-pragma solidvm 3.4;
+
 contract Test {
   uint myNum = 13;
   bool myStatus;
@@ -3963,7 +3893,7 @@ contract Test {
   }
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -3982,7 +3912,7 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   event x(uint v);
   constructor(){
@@ -3990,7 +3920,7 @@ contract Test {
   }
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4012,7 +3942,7 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract anotherThing {
   uint x = 3;
   modifier myModifier() {  
@@ -4034,7 +3964,7 @@ contract anotherThing {
   }
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4056,12 +3986,12 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4083,12 +4013,12 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
 }
 
-pragma solidvm 3.4;
+
 contract qq {
   string codeTest;
   constructor() public {
@@ -4106,12 +4036,12 @@ contract qq {
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.3;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8+10-661;
@@ -4130,13 +4060,13 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   uint constant public testConst = 136546546541654654324765441651684354646468435468;
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4152,12 +4082,12 @@ contract qq{
   it "can get the current contract code without supplying anything to the code using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
-pragma solidvm 3.2;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.2;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4167,12 +4097,12 @@ contract qq{
 }|]
         contract :: String
         contract = [r|
-pragma solidvm 3.2;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.2;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4187,12 +4117,12 @@ contract qq{
   it "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
     let contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4216,12 +4146,12 @@ contract qq{
 |]
         collection :: String
         collection = [r|
-pragma solidvm 3.4;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4242,12 +4172,12 @@ contract qq{
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   uint sixtyNine = 69;
 }
 
-pragma solidvm 3.4;
+
 contract qq {
   string codeTest;
   constructor(){
@@ -4272,7 +4202,7 @@ contract qq {
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   uint sixtyNine = 69;
   uint weed = 11;
@@ -4282,7 +4212,7 @@ contract Test {
   uint seventyNine = 79;
 }
 
-pragma solidvm 3.4;
+
 contract qq {
   string codeTest;
   constructor(){
@@ -4307,7 +4237,7 @@ contract qq {
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   function myFunction() public returns (uint) {
     uint x = 13;
@@ -4320,7 +4250,7 @@ contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq {
   string codeTest;
   constructor(){
@@ -4345,7 +4275,7 @@ contract qq {
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   function myFunction() public returns (uint) {
     uint x = 13;
@@ -4358,7 +4288,7 @@ contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq {
   string codeTest;
   constructor(){
@@ -4389,12 +4319,12 @@ contract qq {
 |]
         contract :: String
         contract = [r|
-pragma solidvm 3.4;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.4;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4411,12 +4341,12 @@ contract qq{
       [ BString $ UTF8.fromString codeSnippet]
 
   it "Can throw an error if more than one item is given to the code member function, using .code" $ (runTest (runBS [r|
-pragma solidvm 3.3;
+
 contract Test {
   constructor(){}
 }
 
-pragma solidvm 3.3;
+
 contract qq{
   string codeTest;
   constructor() public {
@@ -4430,7 +4360,7 @@ contract qq{
 }|])) `shouldThrow` anyTypeError
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
-pragma solidvm 3.0;
+
 contract qq {
   uint z;
   uint[] x;
@@ -4450,7 +4380,7 @@ contract qq {
   it "can transfer value from account a to account b" . runTest $ do
     -- Post contract
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
   account a;
   account payable aPay;
@@ -4486,7 +4416,7 @@ contract qq{
     getFields ["bala", "balb"] `shouldReturn` [ BInteger 1, BInteger 13  ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
-pragma solidvm 3.0;
+
 contract qq {
   uint z;
   uint[] x;
@@ -4503,8 +4433,8 @@ contract qq {
   }
   }|])) `shouldThrow` anyInvalidWriteError
 
-  it "can run the typechecker when using pragma solidvm 3.2" $ (runTest (runBS [r|
-pragma solidvm 3.2;
+  it "can run the typechecker" $ (runTest (runBS [r|
+
 contract qq {
   uint x = "hello";
   string y = true;
@@ -4525,7 +4455,7 @@ contract qq {
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
 
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
@@ -4564,7 +4494,7 @@ contract qq {
 
 --   it "only a contract posted by the root user can call registerCert" $ (runTest $ do
 --     runBS [r|
--- pragma solidvm 3.2;
+-- 
 -- contract qq {
 --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
 --     constructor() {
@@ -4574,7 +4504,7 @@ contract qq {
 
   xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
-pragma solidvm 3.4;
+
 contract Certificate {
     address public userAddress;
     
@@ -4614,7 +4544,7 @@ contract qq is CertificateRegistry{
 
 --   it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
 --     void $ runArgsWithOrigin rootAcc sender "()" [r|
--- pragma solidvm 3.2;
+-- 
 -- contract qq {
 --     account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
 --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
@@ -4629,7 +4559,7 @@ contract qq is CertificateRegistry{
 
 --   it "cannot register a x509 certificate on a private chain" $ (runTest $ do
 --     void $ runArgsWithOrigin rootAcc privateChainAcc "()" [r|
--- pragma solidvm 3.2;
+-- 
 -- contract qq {
 --     account myAccount = account("deadbeef:feedbeef");
     
@@ -4642,7 +4572,7 @@ contract qq is CertificateRegistry{
 
   -- it "cannot use old registerCert on solidvm 3.2" $ (runTest $ do
   --     (runBS [r|
-  -- pragma solidvm 3.2;
+  -- 
   -- contract qq {
   --     account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
   --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
@@ -4686,7 +4616,7 @@ contract qq is CertificateRegistry{
   
   xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
-pragma solidvm 3.4;
+
 contract Certificate {
     address public userAddress;
     
@@ -4726,7 +4656,7 @@ contract qq is CertificateRegistry{
       ]
   xit "can get a users cert" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
-pragma solidvm 3.4;
+
 contract Certificate {
     address public userAddress;
     
@@ -4824,7 +4754,7 @@ contract qq is CertificateRegistry{
 
   it "can call builtin function verifyCert" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
     bool isValid = false;
     constructor() {
@@ -4837,7 +4767,7 @@ contract qq {
 
   it "verifyCert fails for hex-encoded public keys" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
     constructor () {
@@ -4865,7 +4795,7 @@ oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49
 DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
 2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
         contract = T.unpack $ T.replace "$CERT" cert [r|
-pragma solidvm 3.2;
+
 contract qq {
     bool isValid = false;
     constructor() {
@@ -4895,7 +4825,7 @@ oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49
 DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
 2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
         contract = T.unpack $ T.replace "$CERT" cert [r|
-pragma solidvm 3.2;
+
 contract qq {
     bool isValid = false;
     constructor() {
@@ -4910,7 +4840,7 @@ contract qq {
     
   it "can call builtin function verifyCertSignedBy" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
     bool isValid = false;
     constructor() {
@@ -4923,7 +4853,7 @@ contract qq {
     
   it "verifyCertSignedBy fails for hex-encoded public keys" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
     constructor () {
@@ -4953,7 +4883,7 @@ oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49
 DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
 2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
         contract = T.unpack $ T.replace "$CERT" cert [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
   constructor() {
@@ -4984,7 +4914,7 @@ oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49
 DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
 2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
         contract = T.unpack $ T.replace "$CERT" cert [r|
-pragma solidvm 3.2;
+
 contract qq {
     bool isValid = false;
     constructor() {
@@ -4998,7 +4928,7 @@ contract qq {
 
   it "can call builtin function verifySignature" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
   constructor () {
@@ -5012,7 +4942,7 @@ contract qq {
   
   it "verifySignature fails for an incorrect message hash" $ (runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
   constructor () {
@@ -5025,7 +4955,7 @@ contract qq {
 
   it "verifySignature fails for an incorrect signature" $ (runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
   constructor () {
@@ -5038,7 +4968,7 @@ contract qq {
   
   it "verifySignature fails for a hex-encoded public key" $ (runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   bool isValid = false;
   constructor () {
@@ -5051,7 +4981,7 @@ contract qq {
 
   it "can properly preform complex tuple destructuring" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
     uint index;
     uint xr;
@@ -5076,7 +5006,7 @@ contract qq{
 
   it "can use the attributes of the block variable e.g. block.coinbase, block.timestamp, block.number, block.difficulty and block.gaslimit" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
   uint blockNumber;
   account payable a1;
@@ -5096,7 +5026,7 @@ contract qq{
 
   it "can use the builtin addmod function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
     uint x;
     constructor() public returns (uint) {
@@ -5107,7 +5037,7 @@ contract qq{
 
   it "can use the builtin mulmod function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
     uint x;
     constructor() public returns (uint) {
@@ -5118,7 +5048,7 @@ contract qq{
 
   it "can set values in a mapping that's a member of a struct" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
   struct Data {
     mapping(uint => bool) flags;
@@ -5132,7 +5062,7 @@ contract qq {
 
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
   function a() public returns (bool) {
     mapping(int => bool) flags;
@@ -5143,7 +5073,7 @@ contract qq {
 
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
   mapping(int => bool) flags;
   function a() public returns (bool) {
@@ -5154,7 +5084,7 @@ contract qq {
 
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
   function a() public {
     string x = "hello";
@@ -5169,7 +5099,7 @@ contract qq {
 
   it "can use the builtin keccak256 function with any amount of string arguments" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+
 contract qq {
   function a() public returns (bytes32) {
     return keccak256("hello", "world");
@@ -5178,7 +5108,7 @@ contract qq {
 
   it "cant use  a commented pragma" . runTest $ do
     runCall "a" "()" [r|
-//pragma solidvm 3.2;
+//
 contract qq {
   function a() public returns (string) {
     return 2;
@@ -5186,7 +5116,7 @@ contract qq {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   modifier myModifier() {  // line 4
     require(false);
@@ -5202,7 +5132,7 @@ contract qq {
 
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -5220,7 +5150,7 @@ contract qq {
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall "decrement" "(1)" [r|
-pragma solidvm 3.3;
+
 contract qq {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -5275,7 +5205,7 @@ contract qq {
 
   it "can use a modifier and require something after and before the function is run" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -5294,7 +5224,7 @@ contract qq {
 
   it "can use a modifier multiple modifiers and they occur in order" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -5320,7 +5250,7 @@ contract qq {
 
   it "can use a modifier that takes arguments as part of a function" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.3;
+
 contract qq {
   uint x = 3;
   modifier myModifier(uint _x) {  
@@ -5338,7 +5268,7 @@ contract qq {
 
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   constructor() public returns (bytes32) {
     return blockhash(-1);
@@ -5347,7 +5277,7 @@ contract qq {
 
   it "return default value for index not present-In-Memory Check" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
 
   bool x;
@@ -5371,7 +5301,7 @@ contract qq {
     getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
   it "return default value for index not present" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
 
   mapping(uint=>bool) booleanTest;
@@ -5396,7 +5326,7 @@ contract qq {
 
   it "returns owner's address for valid ecrecover call" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   address addr;
@@ -5408,7 +5338,7 @@ contract qq {
 
 --   it "returns 0  for invalid ecrecover call" . runTest $ do
 --     runBS [r|
--- pragma solidvm 3.4;
+-- 
 -- contract qq {
   
 --   address addr;
@@ -5420,7 +5350,7 @@ contract qq {
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   bytes32 hsh;
   constructor() public {
@@ -5433,7 +5363,7 @@ contract qq {
 
   it "can use the builtin ripemd160 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   bytes20 hsh;
   constructor() public {
@@ -5445,7 +5375,7 @@ contract qq {
 
   it "can use the selfdestruct function" . runTest $ do
     let contract = [r|
-pragma solidvm 3.3;
+
 contract qq {
   account contract';
   account payable contractPay;
@@ -5480,28 +5410,28 @@ contract qq {
   
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint account;
 }|]) `shouldThrow` anyReservedWordError
 
   it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
+
 contract account {
   uint a;
 }|]) `shouldThrow` anyReservedWordError
 
   it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
       runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   function account() {
   }
 }|]) `shouldThrow` anyReservedWordError
   it "can use 1e_ notation to get a number" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq{
   uint mynum;
   constructor() public {
@@ -5512,7 +5442,7 @@ contract qq{
 
   it "can use ether number unit suffixes" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq{
   uint weiUnit;
   uint szaboUnit;
@@ -5538,7 +5468,7 @@ contract qq {
 
   it "an assign an immutable" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint t1a = 2022;
   uint immutable t1x = 2022;
@@ -5549,7 +5479,7 @@ contract qq {
 
   it "can assign an already declared, but unassigned immutable in a constructor" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint immutable t2a;
   uint t2x = 2022;
@@ -5561,7 +5491,7 @@ contract qq {
 
   it "can create salted contract" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract X {
   string public xNum;
 }
@@ -5591,7 +5521,7 @@ contract qq {
       
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq{
   uint mynum = 5;
   constructor() public {
@@ -5606,7 +5536,7 @@ contract qq{
 
   it "can use a try catch statment to catch any error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq{
   uint mynum = 5;
   constructor() public {
@@ -5621,7 +5551,7 @@ contract qq{
 
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
     runBS [r| 
-pragma solidvm 3.3;
+
 contract Divisor {
   function doTheDivide() public returns (uint) {
     return (1 / 0);
@@ -5662,7 +5592,7 @@ contract qq {
 
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect) in a function" . runTest $ do
     runCall "tryTheDivide" "()" [r|
-pragma solidvm 3.3;
+
 contract Divisor {
   function doTheDivide() public returns (uint) {
     return (1 / 0);
@@ -5706,7 +5636,7 @@ contract qq {
 
   it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5732,7 +5662,7 @@ contract qq{
 
   it "allows overloading functions with same number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq{
   uint myNum = 0;
   string myString = "";
@@ -5765,7 +5695,7 @@ contract qq{
 
   it "can use randomly ordered named argument function calls" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq{
   uint myNum = 0;
   bool myStatus;
@@ -5783,7 +5713,7 @@ contract qq{
 
   it "can use randomly ordered named argument function calls with overloading" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq{
   uint myNum = 0;
   bool myStatus;
@@ -5809,7 +5739,7 @@ contract qq{
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -5854,7 +5784,7 @@ contract qq is Validator {
 
   it "can run this for loop and increment the counter" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq{
   uint mynum = 0;
   constructor() public {
@@ -5867,7 +5797,7 @@ contract qq{
 
   it "can use a modifier with a functions argument as it's argument" $ runTest (do
     runCall "changeHost" "(0)" [r|
-pragma solidvm 3.3;
+
 contract qq {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -5900,7 +5830,7 @@ contract qq {
 
   it "can use msg.data" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract X {
   function func2(uint _a, string _b, bool _c) pure public returns (string) {
     return msg.data;
@@ -5918,7 +5848,7 @@ contract qq {
 
   it "can use msg.sig" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract X {
   function func2(uint _a, string _b, bool _c) pure public returns (bytes4) {
     return msg.sig;
@@ -5937,7 +5867,7 @@ contract qq {
 
   it "can use free functions, free functions can access this" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -5962,7 +5892,7 @@ contract qq{
 
   it "free functions cannot access state variables" $ runTest ( do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function setNum() {
   myNum = 4;
@@ -5977,7 +5907,7 @@ contract qq{
 
   it "free functions cannot access internal functions of contracts" $ runTest ( do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function callInternal() {
   setNum(4);
@@ -5995,7 +5925,7 @@ contract qq{
 
   it "contracts will prioritize contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function setNum(uint x) returns (uint s) {
   s = x + 2;
@@ -6015,7 +5945,7 @@ contract qq{
 
   it "contracts will prioritize overloaded contract functions over free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function setNum(uint x, uint y) returns (uint s) {
   s = x + y + 2;
@@ -6040,7 +5970,7 @@ contract qq{
 
   it "can overload free functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -6065,7 +5995,7 @@ contract qq{
 
   it "cannot overload free functions with same types and same number of parameters" $ runTest (do
     runBS [r|
-pragma solidvm 3.3;
+
 
 function sum(uint[] memory arr) pure returns (uint s) {
   for (uint i = 0; i < arr.length; i++) {
@@ -6090,7 +6020,7 @@ contract qq{
   
   it "can declare a constant at the file level and use it" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 uint constant myconst = 5;
 contract qq{
   uint mynum = myconst;
@@ -6104,7 +6034,7 @@ contract qq{
 
   it "can declare enums at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.4;
+
 enum Color { red, green, blue }
 contract A {
     function value() public returns (uint) {
@@ -6128,7 +6058,7 @@ contract qq {
 
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.4;
+
 
 struct Point {
   uint x;
@@ -6146,7 +6076,7 @@ contract qq {
 
   it "should bitshift assign" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   int solidty = 3;  //  00000000000000000000000000000101
   int haskell = 1; //  00000000000000000000000000000010
@@ -6162,7 +6092,7 @@ contract qq {
 
   it "can unsigned bit shift" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   int result1 = 0;
   int result2 = 0;
@@ -6179,7 +6109,7 @@ contract qq {
 
   it "uint to string convertion test " . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   uint a = 0;
   uint b = 0;
@@ -6196,7 +6126,7 @@ contract qq {
 
   it "can declare custom errors and file level custom errors" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 error flError(string someString);
 
 contract qq {
@@ -6207,7 +6137,7 @@ contract qq {
 
   it "can throw custom errors" $ runTest ( do
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract qq {
   error myError (string message);
@@ -6222,7 +6152,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract qq {
   error IsTen (int ten, string message);
@@ -6259,7 +6189,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY, also allows less aliases" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract qq {
   error IsTen (int ten, string message);
@@ -6288,7 +6218,7 @@ contract qq {
 
   it "can catch custom errors the SOLIDVM WAY and catch too many aliases" $ runTest ( do
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract qq {
   error IsTen (int ten, string message);
@@ -6323,7 +6253,7 @@ contract qq {
 
   it "revert sucessfully when invoked without arguments" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   uint a;
@@ -6343,7 +6273,7 @@ contract qq {
 
   it "revert sucessfully when invoked with arguments" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   uint a;
@@ -6363,7 +6293,7 @@ contract qq {
 
   it "revert sucessfully when invoked with namedargs" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   uint a;
@@ -6383,7 +6313,7 @@ contract qq {
 
   it "Revert customError" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   uint a;
@@ -6403,7 +6333,7 @@ contract qq {
 
   it "Revert customError  namedargs" $ runTest (do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   
   uint a;
@@ -6423,7 +6353,7 @@ contract qq {
 
   it "Supports pure functions in 3.3" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
     function f(uint a, uint b) public pure returns (uint) {
         return a * (b + 42);
@@ -6436,7 +6366,7 @@ contract qq {
 
   it "Supports pure functions in 3.2" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
     function f(uint a, uint b) public pure returns (uint) {
         return a * (b + 42);
@@ -6448,7 +6378,7 @@ contract qq {
 
   it "can write pure and view functions" .runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6463,7 +6393,7 @@ contract qq {
 
   it "error when reading from contract state in a pure function" $ (runTest $
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6474,7 +6404,7 @@ contract qq {
 
   it "error when writing to contract state from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6490,7 +6420,7 @@ contract qq {
 
   it "error when using assembly code from a pure or view function" $ (runTest $
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6509,7 +6439,7 @@ contract qq {
 
   it "can resolve state variables inherited from a contract" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract A {
   uint x = 7;
 }
@@ -6523,7 +6453,7 @@ contract qq is A {
 
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract A {
   uint x = 7;
 }
@@ -6539,7 +6469,7 @@ contract qq is B {
 
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract A {
   uint x = 7;
 }
@@ -6557,7 +6487,7 @@ contract qq is A, B {
 
   it "error when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
-pragma solidvm 3.3;
+
 contract A {
   uint x = 7;
 }
@@ -6572,7 +6502,7 @@ contract B {
 
   it "can write pure and view functions" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6587,7 +6517,7 @@ contract qq {
 
   it "doesn't warn when reading from contract state in a pure function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6599,7 +6529,7 @@ contract qq {
 
   it "doesn't warn when writing to contract state from a pure or view function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6616,7 +6546,7 @@ contract qq {
 
   it "warns when using assembly code from a pure or view function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6636,7 +6566,7 @@ contract qq {
 
   it "can resolve state variables inherited from a contract". runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6650,7 +6580,7 @@ contract qq is A {
 
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6666,7 +6596,7 @@ contract qq is B {
 
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6684,7 +6614,7 @@ contract qq is A, B {
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6698,7 +6628,7 @@ contract B {
 
   it "can't write pure and view functions in solidvm 3.2" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6713,7 +6643,7 @@ contract qq {
 
   it "Can't warn when reading from contract state in a pure function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6725,7 +6655,7 @@ contract qq {
 
   it "Can't warn when writing to contract state from a pure or view function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6742,7 +6672,7 @@ contract qq {
 
   it "Can't warn when using assembly code from a pure or view function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
   uint x = 5;
   function f(uint y) pure returns (uint) {
@@ -6762,7 +6692,7 @@ contract qq {
 
   it "can't resolve state variables inherited from a contract" .runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6776,7 +6706,7 @@ contract qq is A {
 
   it "Can't resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6792,7 +6722,7 @@ contract qq is B {
 
   it "Can't inherit from multiple contracts" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6810,7 +6740,7 @@ contract qq is A, B {
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = 7;
 }
@@ -6824,7 +6754,7 @@ contract B {
 
   it "can detect duplicate declarations" $ (runTest $
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   function f(){
     uint x = 9;
@@ -6837,7 +6767,7 @@ contract qq {
 
   it "Supports view functions in 3.3" . runTest $ do
     runBS [r|
-pragma solidvm 3.3;
+
 contract qq {
     function f(uint a, uint b) public view returns (uint) {
         return a * (b + 42);
@@ -6849,7 +6779,7 @@ contract qq {
 
   it "View functions unsupported in 3.2" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+
 contract qq {
     uint x = 10;
     function f(uint a, uint b) public view returns (uint) {
@@ -6862,7 +6792,7 @@ contract qq {
 
   it "View functions enforced in 3.4" $ (runTest $
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract qq {
     uint x = 10;
@@ -6878,7 +6808,7 @@ contract qq {
 
   it "can get code from other contracts using type function" . runTest $ do
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   string  bb = type(qq).creationCode;
   string  dd = type(C).name;
@@ -6902,7 +6832,7 @@ contract C {
 
   it "can detect when referencing a contract not at file level using type function" $ (runTest $
     runBS [r|
-pragma solidvm 3.2;
+
 contract A {
   uint x = type(B).name;
 
@@ -6910,7 +6840,7 @@ contract A {
 
   it "cant infinite loop" $ (runTestWithTimeout 20000000 $
     runBS [r|
-pragma solidvm 3.4;
+
 contract qq {
   uint x = 3;
   constructor() public returns () {
@@ -6922,7 +6852,7 @@ contract qq {
 
   it "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
     runBS [r|
-pragma solidvm 3.4;
+
 
 contract A {
   uint x = 3;

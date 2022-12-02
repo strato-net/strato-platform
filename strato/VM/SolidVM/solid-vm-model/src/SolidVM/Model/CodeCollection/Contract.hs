@@ -22,7 +22,6 @@ module SolidVM.Model.CodeCollection.Contract (
   functions,
   modifiers,
   constructor,
-  vmVersion,
   contractContext
   ) where
 
@@ -59,7 +58,6 @@ data ContractF a =
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _modifiers :: Map SolidString (ModifierF a),
-    _vmVersion :: String,
     _contractContext :: a
   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
 
@@ -89,7 +87,6 @@ instance Arbitrary Contract  where
     _functions =  empty ,
     _constructor  =  Nothing ,
     _modifiers  =  empty ,
-    _vmVersion  =  "" ,
     _contractContext = a
   }]
 

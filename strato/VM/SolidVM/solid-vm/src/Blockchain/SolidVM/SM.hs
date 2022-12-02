@@ -425,7 +425,6 @@ getVariableOfName name = do
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
-                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
                               }

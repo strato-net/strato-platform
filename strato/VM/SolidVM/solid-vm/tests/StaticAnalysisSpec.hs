@@ -36,27 +36,8 @@ forContract detector c = case compileSourceWithAnnotations True (M.fromList [(""
 spec :: Spec
 spec = describe "Static analysis detectors" $ do
   describe "Incorrect SolidVM version detector" $ do
-    it "can use pragma solidvm 3.0 without warning" $
-      let anns = IncorrectSolidityVersion.detector `forSource` [r|
-pragma solidvm 3.0;
-contract A {
-  constructor() {
-  }
-}
-|]
-       in length anns `shouldBe` 0
-    it "warns when using a solidvm minor version other than 3.0 or 3.2" $
-      let anns = IncorrectSolidityVersion.detector `forSource` [r|
-pragma solidvm 3.3;
-contract A {
-}
-contract B {
-  constructor() A() {
-  }
-}
-|]
-       in length anns `shouldBe` 1
-    it "warns when using a solidvm major version other than 3.0 or 3.2" $
+
+    it "warns when using a solidvm pragma" $
       let anns = IncorrectSolidityVersion.detector `forSource` [r|
 pragma solidvm 4.0;
 contract A {
