@@ -1843,7 +1843,7 @@ contract A {
             let ietx = IETx tsNow $ IngestTx Origin.API tx'
             flip postEvent (peers !! 0) $ UnseqEvent ietx
 
-      runForSeconds 10 $ concurrently_ (runNetwork peers connections) routine
+      runForSeconds 15 $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
@@ -2065,7 +2065,7 @@ contract A {
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
 
-      void . timeout 80000000 $ concurrently_ (runNetwork peers connections) routine
+      void . timeout 100000000 $ concurrently_ (runNetwork peers connections) routine
       cId <- readIORef cIdRef
       cInfo <- readIORef cInfoRef
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
@@ -2142,7 +2142,7 @@ contract RegisterCert {
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx1
             threadDelay 1000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
-      void . timeout 3000000 $ concurrently_ (runNetwork peers connections) routine
+      void . timeout 5000000 $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
@@ -2203,7 +2203,7 @@ contract RegisterCert {
           dt <- liftIO dateCurrent
           cIdRef <- newIORef undefined
           cInfoRef <- newIORef undefined
-          let runForNineSeconds = void . timeout 9000000
+          let runForTwelveSeconds = void . timeout 12000000
               -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
               chainMember1 :: ChainMembers
               chainMember1 = (ChainMembers $ Set.singleton $ (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True))
@@ -2305,7 +2305,7 @@ contract RegisterCert {
                 threadDelay 200000
                 flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId -- Add organization to private chain
 
-          runForNineSeconds $ concurrently_ (runNetwork peers connections) routine
+          runForTwelveSeconds $ concurrently_ (runNetwork peers connections) routine
           ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
           testCid <- readIORef cIdRef
 
