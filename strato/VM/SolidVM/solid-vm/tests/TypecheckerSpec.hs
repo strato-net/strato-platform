@@ -512,7 +512,7 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 3 -- TODO: this should be 1
+     in length anns `shouldBe` 4 -- TODO: this should be 1
   it "cannot access missing struct elements" $
     let anns = runTypechecker [r|
 contract A {
@@ -1029,7 +1029,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "Does not warn when reading from contract state in a pure function" $
+    it "Warns when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1039,8 +1039,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Does not warn when writing to contract state from a pure or view function" $
+       in length anns `shouldBe` 1
+    it "Warns when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1055,8 +1055,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Does not warn when using assembly code from a pure or view function" $
+       in length anns `shouldBe` 2
+    it "Warns when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1073,9 +1073,9 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
+       in length anns `shouldBe` 2
 
-  describe "Check contract inheritance solidvm 3.2" $ do
+  describe "Check contract inheritance" $ do
     it "can resolve state variables inherited from a contract" $
       let anns = runTypechecker [r|
 
@@ -1133,7 +1133,7 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 1
+       in length anns `shouldBe` 2
 
 
   describe "Constant function detectors" $ do
@@ -1151,7 +1151,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "Does not warn when reading from contract state in a pure function" $
+    it "Warns when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1161,8 +1161,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Does not warn when writing to contract state from a pure or view function" $
+       in length anns `shouldBe` 1
+    it "Warns when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1177,8 +1177,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Does not warn when using assembly code from a pure or view function" $
+       in length anns `shouldBe` 2
+    it "Warns when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
 
 contract A {
@@ -1195,7 +1195,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
+       in length anns `shouldBe` 2
 
   describe "Missing inheritance detectors" $ do
     it "can resolve state variables inherited from a contract" $
@@ -1255,7 +1255,7 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 1
+       in length anns `shouldBe` 2
 
 
   describe "User Defined Value Types" $ do

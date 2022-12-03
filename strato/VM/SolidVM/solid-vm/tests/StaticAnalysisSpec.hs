@@ -312,7 +312,7 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 1
+       in length anns `shouldBe` 2
 
   describe "State variable shadowing" $ do
     it "can create local variables that don't shadow state variable names" $
@@ -535,4 +535,4 @@ contract A {
   }
 }
 |]
-      in length anns `shouldBe` 1
+      in length anns `shouldBe` 3
