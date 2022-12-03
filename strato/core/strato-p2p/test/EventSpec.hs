@@ -1710,7 +1710,6 @@ spec = do
         ]
       let runForSeconds n = void . timeout (n * 1000000)
       let src =  [r|
-pragma solidvm 3.2;
 contract BlockAppsCertificateRegistry {
   event CertificateRegistered(string cert);
   constructor(string _rootCert) {
@@ -1780,7 +1779,6 @@ contract Certificate {
           signedTx1s = (\(cert,i) -> addMd1 cert . mkSignedTx privKey $ utx1 cert i) <$> zip certs [1..]
 
       let privChainSrc = [r|
-pragma solidvm 3.2;
 contract A {
   event OrgAdded(string orgName);
   function addMember(string _orgName) {
@@ -1879,7 +1877,6 @@ contract A {
       let cert' = Text.decodeUtf8 . certToBytes $ cert
           args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <> "\")"
           registry = [r|
-pragma solidvm 3.0;
 contract CertRegistry {
   event CertificateRegistered(string cert);
   
@@ -1902,7 +1899,6 @@ contract CertRegistry {
             })
 
       let src = [r|
-pragma solidvm 3.2;
 contract A {
   event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
@@ -1920,7 +1916,6 @@ contract A {
 |]
           contractName = "A"
 --           mainChainSrc = [r|
--- pragma solidvm 3.2;
 -- contract B {
 --   uint y;
 
@@ -2096,7 +2091,6 @@ contract A {
         [ (peers !! 0, peers !! 1)
         ]
       let src = [r|
-pragma solidvm 3.0;
 
 contract RegisterCert {
   event CertificateRegistered(string cert);
@@ -2227,7 +2221,6 @@ contract RegisterCert {
           let cert' = Text.decodeUtf8 . certToBytes $ cert
               args' = "(\"" <> cert' <>"\")"
               registry = [r|
-                    pragma solidvm 3.2;
                     contract CertRegistry {
                       event CertificateRegistered(string cert);
 
@@ -2251,7 +2244,6 @@ contract RegisterCert {
 
               -- Post a mock dApp to a private chain
               src = [r|
-                    pragma solidvm 3.2;
                     contract A {
                       event OrgUnitAdded(string name, string unit);
 

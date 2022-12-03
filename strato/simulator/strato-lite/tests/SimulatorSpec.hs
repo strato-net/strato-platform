@@ -211,7 +211,6 @@ spec = do
       let cert' = decodeUtf8 . certToBytes $ cert
           args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
           registry = [r|
-                pragma solidvm 3.0;
                 contract CertRegistry {
                   event CertificateRegistered(string cert);
                   constructor(address _user, string _cert) {
@@ -232,7 +231,6 @@ spec = do
             }) txMd'
         
           src = [r|
-pragma solidvm 3.2;
 contract A {
   event OrgUnitAdded(string name, string unit);
 
@@ -317,7 +315,6 @@ contract A {
       let cert' = decodeUtf8 . certToBytes $ cert
           args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <> "\")"
           registry = [r|
-pragma solidvm 3.0;
 contract CertRegistry {
   event CertificateRegistered(string cert);
   
@@ -338,7 +335,6 @@ contract CertRegistry {
             , U.unsignedTransactionChainId    = Nothing
             }) txMd'
           src = [r|
-pragma solidvm 3.2;
 contract A {
   event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
@@ -356,7 +352,6 @@ contract A {
 }|]
           contractName = "A"
 --           mainChainSrc = [r|
--- pragma solidvm 3.2;
 -- contract B {
 --   uint y;
 
@@ -527,7 +522,6 @@ contract A {
         [ (peers !! 0, peers !! 1)
         ]
       let src = [r|
-pragma solidvm 3.0;
 
 contract RegisterCert {
   event CertificateRegistered(string cert);
@@ -613,7 +607,6 @@ contract RegisterCert {
         let cert' = decodeUtf8 . certToBytes $ cert
             args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
             registry = [r|
-                  pragma solidvm 3.0;
                   contract CertRegistry {
                     event CertificateRegistered(string cert);
 
@@ -636,7 +629,6 @@ contract RegisterCert {
 
             -- Post a mock dApp to a private chain
             src = [r|
-                  pragma solidvm 3.2;
                   contract A {
                     event OrgAdded(string name);
 

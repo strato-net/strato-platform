@@ -42,20 +42,19 @@ type FullSolidStorage m = ( HasMemAddressStateDB m
 toKey :: Account -> StoragePath -> RawStorageKey
 toKey =  curry $ fmap unparsePath
 
-toVal :: Bool -> BasicValue -> RawStorageValue
-toVal svm3_0 bv
-    | svm3_0 == True =  let v = if isDefault bv
-                                    then BDefault
-                                    else bv
-                        in rlpSerialize $ rlpEncode v
-    | otherwise = rlpSerialize $ rlpEncode bv
+toVal :: BasicValue -> RawStorageValue
+toVal bv =
+  let v = if isDefault bv
+            then BDefault
+            else bv
+   in rlpSerialize $ rlpEncode v
 
 fromVal :: RawStorageValue -> BasicValue
 fromVal = rlpDecode . rlpDeserialize
 
-putSolidStorageKeyVal' :: HasSolidStorageDB m => Bool -> Account -> StoragePath -> BasicValue -> m ()
-putSolidStorageKeyVal' svm3_0 acct key val = do
-  putRawStorageKeyVal' (toKey acct key) (toVal svm3_0 val)
+putSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> BasicValue -> m ()
+putSolidStorageKeyVal' acct key val = do
+  putRawStorageKeyVal' (toKey acct key) (toVal val)
 
 getSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m BasicValue
 getSolidStorageKeyVal' acct key = do

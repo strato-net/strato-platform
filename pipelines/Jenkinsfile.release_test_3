@@ -454,7 +454,7 @@ pipeline {
                             -H \"Authorization: Bearer ${accessToken}\"  \
                             -H 'Accept: application/json;charset=utf-8' \
                             -H 'Content-Type: application/json' \
-                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
                     ).trim()
                     if(txResponse != 'Success') {
                         assert condition : "Build failed to accept new Transaction"
@@ -531,7 +531,7 @@ pipeline {
                             -H \"Authorization: Bearer ${accessToken}\"  \
                             -H 'Accept: application/json;charset=utf-8' \
                             -H 'Content-Type: application/json' \
-                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
                     ).trim()
                     if(txResponse != 'Success') {
                         assert condition : "Build failed to accept new Transaction"
