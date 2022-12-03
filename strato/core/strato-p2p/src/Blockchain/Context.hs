@@ -298,7 +298,7 @@ instance MonadIO m => A.Selectable Word256 ParentChainIds (ReaderT Config m) whe
 instance (MonadIO m, MonadLogger m) => A.Selectable Word256 ChainMemberRSet (ReaderT Config m) where
   select p cid = Just <$> A.selectWithDefault p cid
   selectWithDefault _ cid = do
-    ancestors <- catMaybes <$> getAncestorChains (Just cid)
+    ancestors <- toList <$> getAncestorChains cid
     allRSets <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
     case allRSets of
       [] -> pure $ ChainMemberRSet rSetEmpty

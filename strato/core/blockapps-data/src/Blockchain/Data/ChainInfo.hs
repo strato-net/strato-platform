@@ -22,13 +22,12 @@ module Blockchain.Data.ChainInfo
   , CodeInfo (..)
   , isAncestorChainOf
   , getAncestorChains
---  , getNthAncestorChain
+  , getAncestorChainByName
   , accountExtractor
   , whoSignedThisChainInfo
   ) where
 
 import           Control.Applicative               (many)
-import           Control.Arrow                     ((&&&))
 import qualified Control.Monad.Change.Alter        as A
 import qualified Crypto.Secp256k1                  as SEC
 import           Test.QuickCheck
@@ -59,7 +58,7 @@ import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromMaybe)
 import qualified Data.Set                             as S
-import           Data.Swagger                         hiding (Format, format)
+import           Data.Swagger                         hiding (Format, format, name)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
@@ -397,16 +396,21 @@ isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = p
 isAncestorChainOf (Just ancestor) (Just descendent) = S.member ancestor <$> getAncestorChains descendent -- I don't feel like writing a more efficient function right now
 
 getAncestorChains :: A.Selectable Word256 ParentChainIds m => Word256 -> m (S.Set Word256)
-getAncestorChains = uncurry go . (id &&& S.singleton)
-  where go descendent seen = A.select (A.Proxy @ParentChainIds) descendent >>= \case
+getAncestorChains cId = go cId S.empty
+  where
+    go chainId seen =
+      if chainId `S.member` seen
+        then pure seen
+        else A.select (A.Proxy @ParentChainIds) chainId >>= \case
           Nothing -> pure seen
           Just (ParentChainIds parents) ->
-            let parentSet = S.fromList $ M.elems parents
-                newSeen = seen <> parentSet
-             in foldrM go newSeen $ S.toList parentSet
+            let newSeen = seen <> S.singleton chainId
+             in foldrM go newSeen $ M.elems parents
 
--- getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainIds m => Int -> Maybe Word256 -> m (Maybe Word256)
--- getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
+getAncestorChainByName :: A.Selectable Word256 ParentChainIds m => T.Text -> Word256 -> m (Maybe Word256)
+getAncestorChainByName name descendent = A.select (A.Proxy @ParentChainIds) descendent >>= \case
+  Nothing -> pure Nothing
+  Just (ParentChainIds parents) -> pure $ M.lookup name parents
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)

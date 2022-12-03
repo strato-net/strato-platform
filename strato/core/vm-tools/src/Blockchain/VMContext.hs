@@ -440,7 +440,7 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
         deleteChainStateRoot chainId bh
 
 instance A.Selectable Word256 ParentChainIds ContextM where
-  select _ chainId = fmap (\(_,_,p) -> ParentChainIds p) <$> getChainGenesisInfo chainId
+  select _ chainId = fmap (\(_,_,p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ = genericLookupCodeDB $ getCodeDB

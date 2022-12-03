@@ -161,7 +161,7 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} ChainSignature{.
         parseMetadata chi (k, v) =
           ChainMetadataRef chi (T.unpack k) (T.unpack v)
 
-addParent :: HasSQLDB m => Word256 -> Text -> Word256 -> m ()
+addParent :: HasSQLDB m => Word256 -> T.Text -> Word256 -> m ()
 addParent chainId parentName parentChainId = do
   sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do

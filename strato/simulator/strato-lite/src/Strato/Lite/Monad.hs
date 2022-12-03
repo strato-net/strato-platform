@@ -1465,6 +1465,12 @@ createConnection server' client' = do
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
 
+signChain :: PrivateKey -> UnsignedChainInfo -> ChainInfo
+signChain privKey u =
+  let (r', s', v') = getSigVals . signMsg privKey . keccak256ToByteString $ rlpHash u
+      chainSig = ChainSignature r' s' v'
+   in ChainInfo u chainSig
+
 mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
 mkSignedTx privKey utx md =
   let Nonce n = U.unsignedTransactionNonce utx

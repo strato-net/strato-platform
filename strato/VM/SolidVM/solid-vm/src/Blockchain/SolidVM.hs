@@ -2331,14 +2331,17 @@ parseBaseInt s n =
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
-castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
-castToAncestor a n = do
+castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
+castToAncestor a name = do
   cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  pChain <- getNthAncestorChain (fromIntegral n) currentChainId
-  case pChain of
+  let mCurrentChainId = join $ _accountChainId . currentAccount <$> listToMaybe cInfo
+  case mCurrentChainId of
     Nothing -> return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-    Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
+    Just currentChainId -> do
+      pChain <- getAncestorChainByName (T.pack name) currentChainId
+      case pChain of
+        Nothing -> return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
+        Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
@@ -2361,27 +2364,31 @@ callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
                                                  $ readMaybe s
 callBuiltin "account" [SInteger a, SInteger b] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString "self"] _                 = unspecifiedChain (fromIntegral a) `castToAncestor` 0
-callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifiedChain (fromIntegral a) `castToAncestor` 1
-callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
-callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
+callBuiltin "account" [SInteger a, SString "self"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pure . ((flip SAccount) False) $ case currentChainId of
+    Nothing -> mainChain (fromIntegral a)
+    Just cid -> explicitChain (fromIntegral a) cid
 callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = do
   return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
-callBuiltin "account" [SInteger _, SString b] _  = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b 
+callBuiltin "account" [SInteger a, SString name] _ = unspecifiedChain (fromIntegral a) `castToAncestor` name
 callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a 
 callBuiltin "account" [(SAccount a _), SString "main"] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [(SAccount a _), SString "self"] _                 = a `castToAncestor` 0
-callBuiltin "account" [(SAccount a _), SString "parent"] _               = a `castToAncestor` 1
-callBuiltin "account" [(SAccount a _), SString "grandparent"] _          = a `castToAncestor` 2
-callBuiltin "account" [(SAccount a _), SString "ancestor", SInteger n] _ = a `castToAncestor` n
+callBuiltin "account" [(SAccount a _), SString "self"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pure . ((flip SAccount) False) $ case currentChainId of
+    Nothing -> (namedAccountChainId .~ MainChain) a
+    Just cid -> (namedAccountChainId .~ ExplicitChain cid) a
 callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a 
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
-callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
+callBuiltin "account" [(SAccount a _), SString name] _ = a `castToAncestor` name
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
   

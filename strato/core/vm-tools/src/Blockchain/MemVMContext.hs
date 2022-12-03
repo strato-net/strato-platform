@@ -287,7 +287,7 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
         deleteChainStateRoot chainId bh
 
 instance A.Selectable Word256 ParentChainIds MemContextM where
-  select _ chainId = fmap (\(_,_,p) -> ParentChainIds p) <$> getChainGenesisInfo chainId
+  select _ chainId = fmap (\(_,_,p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance (Keccak256 `A.Alters` DBCode) MemContextM where
   lookup _ k   = dbsGets $ view (codeDB . at k)
