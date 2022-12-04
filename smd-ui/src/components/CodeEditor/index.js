@@ -7,6 +7,7 @@ import { Button, Tab2, Tabs2, Popover, Position, Icon} from '@blueprintjs/core';
 import { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
+import DeployDapp from '../DeployDapp';
 import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js';
 import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
@@ -213,6 +214,12 @@ class CodeEditor extends Component {
                   <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
               </Button>
             </Popover>
+            <DeployDapp
+              onChangeEditorContractName={this.props.contractNameChange}
+              contractNameFromEditor={this.props.codeEditorData.contractName}
+              enableCreateContract={this.props.codeEditorData.enableCreateAction}
+              textFromEditor={sourceCode}
+              sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
             <CreateContract
               onChangeEditorContractName={this.props.contractNameChange}
               contractNameFromEditor={this.props.codeEditorData.contractName}

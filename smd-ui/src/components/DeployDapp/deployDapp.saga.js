@@ -1,26 +1,20 @@
+import { takeLatest, put, call } from 'redux-saga/effects';
 import {
-  takeLatest,
-  put,
-  call
-} from 'redux-saga/effects';
+  DEPLOY_DAPP_REQUEST,
+  deployDappSuccess,
+  deployDappFailure,
+} from './deployDapp.actions';
 import { delay } from "redux-saga"
-import {
-  CREATE_CHAIN_REQUEST,
-  createChainSuccess,
-  createChainFailure,
-} from './createChain.actions';
-
+import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 import {
   fetchChains,
   fetchChainIds
 } from '../Chains/chains.actions';
 
-import { env } from '../../env';
-import { handleErrors } from '../../lib/handleErrors';
-
 const url = env.BLOC_URL + "/chain"
 
-export function createChainApiCall(label, members, balances, integrations, src, args, vm) {
+export function deployDappApiCall(label, members, balances, integrations, src, contract, args, vm) {
   return fetch(
     url,
     {
@@ -35,6 +29,7 @@ export function createChainApiCall(label, members, balances, integrations, src, 
         "members": members,
         "parentChains": integrations,
         "src": src,
+        "contract": contract,
         "label": label,
         "metadata": {
           VM: vm ? 'SolidVM' : 'EVM' 
@@ -56,24 +51,24 @@ export function createChainApiCall(label, members, balances, integrations, src, 
     });
 }
 
-export function* createChain(action) {
+export function* deployDapp(action) {
   try {
-    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.integrations, action.src, action.args, action.vm);
+    let response = yield call(deployDappApiCall, action.label, action.members, action.balances, action.integrations, action.src, action.contract, action.args, action.vm);
     // TODO: Change when when we start getting actual error messages
     if (response.status === 200) {
-      yield put(createChainSuccess(response));
+      yield put(deployDappSuccess(response));
       yield call(delay, 2000);
       yield put(fetchChains());
       yield put(fetchChainIds())
     } else {
-      yield put(createChainFailure(response));
+      yield put(deployDappFailure(response));
     }
   }
   catch (err) {
-    yield put(createChainFailure(err));
+    yield put(deployDappFailure(err));
   }
 }
 
-export default function* watchCreateChain() {
-  yield takeLatest(CREATE_CHAIN_REQUEST, createChain);
+export default function* watchDeployDapp() {
+  yield takeLatest(DEPLOY_DAPP_REQUEST, deployDapp);
 }
