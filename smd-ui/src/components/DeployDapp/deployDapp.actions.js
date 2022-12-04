@@ -1,7 +1,5 @@
 export const DEPLOY_DAPP_OPEN_MODAL = "DEPLOY_DAPP_OPEN_MODAL";
 export const DEPLOY_DAPP_CLOSE_MODAL = "DEPLOY_DAPP_CLOSE_MODAL";
-export const OPEN_OVERLAY = "OPEN_CHAIN_MODAL";
-export const CLOSE_OVERLAY = "CLOSE_CHAIN_MODAL";
 export const OPEN_ADD_MEMBER_MODAL = "OPEN_ADD_MEMBER_MODAL";
 export const CLOSE_ADD_MEMBER_MODAL = "CLOSE_ADD_MEMBER_MODAL";
 export const OPEN_ADD_INTEGRATION_MODAL = "OPEN_ADD_INTEGRATION_MODAL";
@@ -9,9 +7,6 @@ export const CLOSE_ADD_INTEGRATION_MODAL = "CLOSE_ADD_INTEGRATION_MODAL";
 export const DEPLOY_DAPP_REQUEST = "DEPLOY_DAPP_REQUEST";
 export const DEPLOY_DAPP_SUCCESS = "DEPLOY_DAPP_SUCCESS";
 export const DEPLOY_DAPP_FAILURE = "DEPLOY_DAPP_FAILURE";
-export const COMPILE_CONTRACT_REQUEST = "COMPILE_CONTRACT_REQUEST";
-export const COMPILE_CONTRACT_SUCCESS = "COMPILE_CONTRACT_SUCCESS";
-export const COMPILE_CONTRACT_FAILURE = "COMPILE_CONTRACT_FAILURE";
 export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
 export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
 export const CHAIN_NAME_CHANGE = "CHAIN_NAME_CHANGE";
@@ -49,20 +44,6 @@ export const deployDappOpenModal = function() {
 export const deployDappCloseModal = function() {
   return {
     type: DEPLOY_DAPP_CLOSE_MODAL,
-    isOpen: false
-  }
-}
-
-export const openCreateChainOverlay = function () {
-  return {
-    type: OPEN_OVERLAY,
-    isOpen: true
-  }
-}
-
-export const closeCreateChainOverlay = function () {
-  return {
-    type: CLOSE_OVERLAY,
     isOpen: false
   }
 }
@@ -138,32 +119,6 @@ export const deployDappFailure = function(error) {
     isOpen: false,
     toasts: true,
     toastsMessage: `DApp deployment failed: ${error}`
-  }
-}
-
-export const compileContract = function(name, contract, solidvm) {
-  return {
-    type: COMPILE_CONTRACT_REQUEST,
-    name: name,
-    contract: contract,
-    solidvm: solidvm,
-    isOpen: true,
-  }
-}
-
-export const compileContractSuccess = function(response) {
-  return {
-    type: COMPILE_CONTRACT_SUCCESS,
-    response: response,
-    isOpen: true,
-  }
-}
-
-export const compileContractFailure = function(error) {
-  return {
-    type: COMPILE_CONTRACT_FAILURE,
-    error: error,
-    isOpen: false,
   }
 }
 

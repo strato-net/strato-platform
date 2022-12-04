@@ -3,14 +3,11 @@ import {
   deployDappOpenModal,
   deployDappCloseModal,
   deployDapp,
-  compileContract,
   contractFormChange,
   usernameChange,
   chainNameChange,
   resetError
 } from './deployDapp.actions';
-import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
-import { fetchContracts } from '../Contracts/contracts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
@@ -19,7 +16,6 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
-import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import AddMember from '../CreateChain/components/AddMember';
 import AddIntegration from '../CreateChain/components/AddIntegration';
@@ -55,27 +51,6 @@ class DeployDapp extends Component {
     }
   }
 
-  renderDropzoneInput = (field) => {
-    const touchedAndHasErrors = field.meta.touched && field.meta.error
-    return (
-      <div className="dropzoneContainer text-center">
-        <Dropzone
-          className="dropzone"
-          name={field.name}
-          onDrop={(filesToUpload, e) => this.handleFileDrop(filesToUpload, field)}
-        >
-          {({ isDragActive, isDragReject, acceptedFiles }) => {
-            if (isDragActive) {
-              return (<p className="pt-intent-success">Drop to Upload!</p>);
-            }
-            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
-          }}
-        </Dropzone>
-        {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
-      </div>
-    );
-  };
-
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
     this.props.fetchUserAddresses(e.target.value, true)
@@ -88,28 +63,6 @@ class DeployDapp extends Component {
         e.target.value
       );
   }
-
-  handleFileDrop = (files, dropZoneField) => {
-    this.props.touch('dapp');
-    dropZoneField.input.onChange(files);
-    const contract = files[0];
-
-    let reader = new FileReader();
-    const self = this;
-    reader.onload = function (event) {
-      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-      mixpanelWrapper.track("deploy_dapp_file_upload");
-      self.props.contractFormChange(
-        fileContents
-      );
-      self.props.compileContract(
-        contract.name.substring(0, contract.name.indexOf('.')),
-        fileContents,
-        self.props.solidvm
-      );
-    };
-    reader.readAsText(contract);
-  };
 
   isValidFileType = (files) => {
     if (!files || !files[0])
@@ -130,7 +83,6 @@ class DeployDapp extends Component {
 
     const args = {};
     const abi = this.props.sourceFromEditor ? this.props.sourceFromEditor : this.props.abi.src;
-    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName;
     Object.values(abi).forEach(val => {
       if (val.constr && val.constr.args !== undefined) {
         return Object.getOwnPropertyNames(val.constr.args).forEach((arg) => {
@@ -267,7 +219,7 @@ class DeployDapp extends Component {
           <div className="row smd-margin-8 integration smd-vertical-center" key={index}>
             <div className="col-sm-1"></div>
             <div className="col-sm-9">
-              <span>{`${integration.name} ${integration.chainId}`
+              <span>{`${integration.name}: ${integration.chainId.slice(0,16)}...`
               }</span>
             </div>
             <div className="col-sm-2">
@@ -355,7 +307,6 @@ class DeployDapp extends Component {
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
 
   compilation() {
@@ -557,8 +508,8 @@ class DeployDapp extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("create_contract_cancel");
-                  this.props.contractCloseModal()
+                  mixpanelWrapper.track("deploy_dapp_cancel");
+                  this.props.deployDappCloseModal()
                 }} />
                 <Button
                   type="submit"
@@ -614,8 +565,6 @@ export function mapStateToProps(state) {
     codeType: state.codeEditor.codeType,
     initialValues: {
     },
-    chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
   };
 }
 
@@ -624,11 +573,7 @@ const connected = connect(mapStateToProps, {
   deployDappOpenModal,
   deployDappCloseModal,
   deployDapp,
-  compileContract,
   contractFormChange,
-  fetchContracts,
-  fetchAccounts,
-  fetchUserAddresses,
   usernameChange,
   chainNameChange,
   resetError,

@@ -1,0 +1,281 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DeployDapp: index errorMessageFor 1`] = `null`;
+
+exports[`DeployDapp: index errorMessageFor 2`] = `"required"`;
+
+exports[`DeployDapp: index isValidFileType 1`] = `undefined`;
+
+exports[`DeployDapp: index isValidFileType 2`] = `"It should be an .sol extention file"`;
+
+exports[`DeployDapp: index isValidFileType 3`] = `"Please add contract source file"`;
+
+exports[`DeployDapp: index mapStateToProps with default state 1`] = `
+Object {
+  "abi": Object {
+    "src": Object {
+      "Governance": Object {
+        "constr": Object {},
+        "events": Object {},
+        "funcs": Object {},
+        "isLibrary": false,
+        "modifiers": Object {},
+        "types": Object {},
+        "using": Object {},
+        "vars": Object {
+          "addRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "removeRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "temp": Object {
+            "atBytes": 0,
+            "constant": null,
+            "dynamic": true,
+            "initialValue": null,
+            "public": null,
+            "type": "String",
+          },
+        },
+      },
+    },
+  },
+  "chainName": undefined,
+  "codeType": "SolidVM",
+  "contract": undefined,
+  "createDisabled": undefined,
+  "initialValues": Object {},
+  "isOpen": true,
+  "isToasts": undefined,
+  "toastsError": null,
+  "toastsMessage": undefined,
+}
+`;
+
+exports[`DeployDapp: index remove members 1`] = `
+Array [
+  Object {
+    "access": undefined,
+    "commonName": undefined,
+    "orgName": "BlockApps",
+    "orgUnit": "Engineering",
+  },
+]
+`;
+
+exports[`DeployDapp: index remove members 2`] = `Array []`;
+
+exports[`DeployDapp: index render component with empty values 1`] = `
+"<div className=\\"smd-pad-16\\" style={{...}}>
+  <Blueprint.Button onClick={[Function: onClick]} id=\\"tour-deploy-dapp-button\\" className=\\"pt-intent-primary pt-icon-add\\" text=\\"Deploy DApp\\" disabled={false} />
+  <form>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[undefined]} title=\\"Deploy New DApp\\" className=\\"pt-dark deploy-dapp-dialog\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              DApp Name
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"dappName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"DApp Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\" style={{...}}>
+              Source file
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Compilation
+            </label>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12 smd-scrollable\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Arg
+                  </th>
+                  <th>
+                    Type
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={3}>
+                    <div className=\\"text-center\\">
+                      Upload Contract
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Members
+            </label>
+            <div className=\\"pt-dialog-header no-member\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No Members
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No App Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button type=\\"submit\\" onClick={[Function]} disabled={true} text=\\"Deploy DApp\\" />
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`DeployDapp: index render component with values 1`] = `
+"<div className=\\"smd-pad-16\\" style={{...}}>
+  <Blueprint.Button onClick={[Function: onClick]} id=\\"tour-deploy-dapp-button\\" className=\\"pt-intent-primary pt-icon-add\\" text=\\"Deploy DApp\\" disabled={false} />
+  <form>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[undefined]} title=\\"Deploy New DApp\\" className=\\"pt-dark deploy-dapp-dialog\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              DApp Name
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"dappName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"DApp Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\" style={{...}}>
+              Source file
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Compilation
+            </label>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12 smd-scrollable\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Arg
+                  </th>
+                  <th>
+                    Type
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={3}>
+                    <div className=\\"text-center\\">
+                      Upload Contract
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Members
+            </label>
+            <div className=\\"pt-dialog-header no-member\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No Members
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No App Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button type=\\"submit\\" onClick={[Function]} disabled={true} text=\\"Deploy DApp\\" />
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;

@@ -2335,13 +2335,18 @@ castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
 castToAncestor a name = do
   cInfo <- Mod.get (Mod.Proxy @[CallInfo])
   let mCurrentChainId = join $ _accountChainId . currentAccount <$> listToMaybe cInfo
-  case mCurrentChainId of
-    Nothing -> return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-    Just currentChainId -> do
-      pChain <- getAncestorChainByName (T.pack name) currentChainId
-      case pChain of
-        Nothing -> return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-        Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
+  case a ^. namedAccountChainId of
+    MainChain -> returnMainChain
+    UnspecifiedChain -> case mCurrentChainId of
+      Nothing -> returnMainChain
+      Just currentChainId -> resolveChain currentChainId
+    ExplicitChain specifiedChain -> resolveChain specifiedChain
+  where returnMainChain = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
+        resolveChain cId = do
+          pChain <- getAncestorChainByName (T.pack name) cId
+          case pChain of
+            Nothing -> returnMainChain
+            Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s

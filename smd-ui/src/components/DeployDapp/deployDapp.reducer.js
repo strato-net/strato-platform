@@ -104,30 +104,6 @@ const reducer = function (state = initialState, action) {
         isToasts: action.toasts,
         toastsMessage: action.response && action.response.status ? 'DApp Deployed' : action.response
       };
-    case COMPILE_CONTRACT_REQUEST:
-      return {
-        ...state,
-        isOpen: true,
-        response: "Uploading Contract...",
-      };
-    case COMPILE_CONTRACT_FAILURE:
-      return {
-        ...state,
-        isOpen: true,
-        response: "Error Uploading Contract...: " + action.error,
-        error: action.error,
-        contractCompileErrors: `Unable to compile contract: ${action.error}`,
-      };
-    case COMPILE_CONTRACT_SUCCESS:
-      let contracts = action.response && action.response.src && Object.keys(action.response.src);
-      return {
-        ...state,
-        isOpen: true,
-        abi: action.response,
-        createDisabled: false,
-        contractName: contracts && contracts[0],
-        contractCompileErrors: undefined,
-      };
     case RESET_ERROR:
       return {
         ...state,
