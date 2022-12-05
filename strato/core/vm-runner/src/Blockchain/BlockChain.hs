@@ -385,7 +385,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
         coinbaseAcct = Account (blockDataCoinbase b) chainId
     lift $ P.incCounter txTypeCounter
-    if success
+    if success --this should handle exceptions,shouldnt it?
         then do
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
