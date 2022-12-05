@@ -69,7 +69,7 @@ function newnode {
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
   runBackgroundProcess blockapps-vault-proxy-server \
       --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="$VAULT_URL" \
+      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="${VAULT_URL}" \
       --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}"  \
       --minLogLevel="${minLogLevel}"
       
@@ -427,6 +427,7 @@ setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 setEnv VAULT_PROXY_ROOT_PATH http://multinode202.ci.blockapps.net:8093/ # TODO: change-vault-proxy-port-when-known
+setEnv VAULT_URL VAULT_PROXY_ROOT_PATH
 
 if [[ -z $VAULT_URL ]] ; then
   echo -e "Error: VAULT_URL is required"
