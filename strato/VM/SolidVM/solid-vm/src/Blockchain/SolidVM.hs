@@ -1485,15 +1485,10 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "tx", "username") -> do
         env' <- getEnv
         maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-        -- $logInfoS "CERT IN QUESTION USERNAME" . T.pack $ (show (Env.origin env' ^. accountAddress))
-        -- $logInfoS "CERT IN QUESTION USERNAME" . T.pack $ (show env') 
-        -- $logInfoS "CERT IN QUESTION USERNAME returns: " . T.pack $ (show (Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert)) 
         return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do
         env' <- getEnv
         maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-        -- $logInfoS "CERT IN QUESTION ORG" . T.pack $ (show maybeCert) 
-        -- $logInfoS "CERT IN QUESTION ORG returns: " . T.pack $ (show (Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert))
         return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do
         env' <- getEnv
