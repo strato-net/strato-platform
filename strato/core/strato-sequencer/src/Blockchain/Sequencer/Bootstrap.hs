@@ -63,10 +63,11 @@ bootstrapSequencer Block{blockBlockData = bd,
       rch <- atomically newTQueue
       
       -- initialize vault client, TODO: make this URL a cl arg
-      mgr <- newManager defaultManagerSettings
+      let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+      mgr <- liftIO $ newManager setting
       vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+      
       let clientEnv = mkClientEnv mgr vaultWrapperUrl
-
           dummySequencerCfg = SequencerConfig
             { depBlockDBCacheSize   = 0
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
