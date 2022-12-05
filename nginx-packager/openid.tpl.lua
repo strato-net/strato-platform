@@ -134,13 +134,7 @@ else
   end
 end
 
--- set request headers to forward to APIs
-<<<<<<< HEAD
 
-ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name) -- TODO: legacy support, remove before release #fix-before-shared-vault-done
-ngx.req.set_header("X-USER-ACCESS-TOKEN", unique_name) -- TODO: pass the token instead https://blockapps.atlassian.net/browse/STRATO-2843
-=======
 ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
->>>>>>> STRATO-2576-shared-vault
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")
