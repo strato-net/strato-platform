@@ -4,7 +4,10 @@ module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
 import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.Text                      as T
+import           Data.Text.Encoding             as TE
 
 import           BlockApps.Logging
 import           Blockchain.Constants
@@ -25,7 +28,7 @@ import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Strato.Model.Address
 
-import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Network.HTTP.Client       
 import           Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
@@ -63,10 +66,10 @@ bootstrapSequencer Block{blockBlockData = bd,
       rch <- atomically newTQueue
       
       -- initialize vault client, TODO: make this URL a cl arg
-      let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+      let setting = managerSetProxy (proxyEnvironment $ Just $ Proxy (TE.encodeUtf8 $ T.pack "http://localhost") 8013) defaultManagerSettings 
       mgr <- liftIO $ newManager setting
       vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-      
+
       let clientEnv = mkClientEnv mgr vaultWrapperUrl
           dummySequencerCfg = SequencerConfig
             { depBlockDBCacheSize   = 0

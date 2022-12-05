@@ -9,12 +9,13 @@ module Main where
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
 import qualified Data.Text                  as T
-import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Network.HTTP.Client        (newManager, defaultManagerSettings, managerSetProxy, proxyEnvironment)
 import           Network.HTTP.Simple
 import           Network.HTTP.Types.Status
 import           System.Console.GetOpt
@@ -36,7 +37,7 @@ import qualified Strato.Strato23.Client     as VC
 instance HasVault IO where
   sign bs = do
     --Set the proxy for the manager to point in the correct direction
-    let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+    let setting = managerSetProxy (proxyEnvironment $ Just $ Proxy "http://localhost" 8013) defaultManagerSettings 
     mgr <- liftIO $ newManager setting
     url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
     eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
@@ -114,9 +115,8 @@ parseArgs = do
 main :: IO ()
 main = do
   Options{..} <- parseArgs
-  mgr <- newManager defaultManagerSettings
   --Set the proxy for the manager to point in the correct direction
-  let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+  let setting = managerSetProxy (proxyEnvironment $ Just $ Proxy "http://localhost" 8013) defaultManagerSettings 
   vaultMgr <- liftIO $ newManager setting
   vaultUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
   optSender <- do 
