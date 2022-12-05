@@ -67,8 +67,12 @@ function newnode {
 
   echo "Starting vault-proxy"
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
-  runBackgroundProcess vault-proxy  --oidcUrl=$oidcUrl --oidcContentType=$oidcContentType --oidcAuthorization=$oidcAuthorization --oidcGrantType=$oidcGrantType &>> logs/vault-proxy
-
+  runBackgroundProcess blockapps-vault-proxy-server \
+      --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="${VAULT_URL}" \
+      --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}"  \
+      --minLogLevel="${minLogLevel}"
+      
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
