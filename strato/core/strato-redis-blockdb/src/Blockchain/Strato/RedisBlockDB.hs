@@ -397,14 +397,14 @@ removeOrgNameChain cm cId = do
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
 
 getOrgUnitsForOrg :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
-getOrgUnitsForOrg (CM.Org o _) = getInNamespace ParsedSetWhitePage (CM.Org o False) <&> \case
+getOrgUnitsForOrg (CM.Org o _) = getInNamespace ParsedSetWhitePage (CM.Org o True) <&> \case
     Right (Just runits) -> let RedisOrgUnits units = fromValue runits
                            in units
     _ -> []
 getOrgUnitsForOrg _ = pure $ []
 
 getMembersInOrgUnit :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
-getMembersInOrgUnit (CM.OrgUnit o u _) = getInNamespace ParsedSetWhitePage (CM.OrgUnit o u False) <&> \case
+getMembersInOrgUnit (CM.OrgUnit o u _) = getInNamespace ParsedSetWhitePage (CM.OrgUnit o u True) <&> \case
     Right (Just rmems) -> let RedisOrgUnitMembers mems = fromValue rmems
                           in mems
     _ -> []
@@ -426,7 +426,7 @@ getChainMembersFromSet cm =
             pure $ Nothing
 
 getCertFromParsedSet :: CM.ChainMemberParsedSet -> Redis (Maybe X509CertInfoState)
-getCertFromParsedSet (CM.CommonName o u c _) = getInNamespace ParsedSetToX509 (CM.CommonName o u c False) >>= \case
+getCertFromParsedSet (CM.CommonName o u c _) = getInNamespace ParsedSetToX509 (CM.CommonName o u c True) >>= \case
     Right (Just state) -> let certInfoState = fromValue state
                           in pure $ Just certInfoState
     _ -> pure $ Nothing
@@ -478,7 +478,7 @@ modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
 
 removeCertFromParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
 removeCertFromParsedSet (X509CertInfoState addr cert _ children o u c) = do
-    let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) False
+    let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
     res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) $ toValue (X509CertInfoState addr cert False children o u c)
     case res of
         TxSuccess _ -> pure $ Right Ok

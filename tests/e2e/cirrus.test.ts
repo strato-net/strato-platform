@@ -13,7 +13,6 @@ let config:Config = fsUtil.getYaml("config.yaml");
 const options = { config };
 const contractName = 'CirrusAccessTest';
 const contractSrc = `
-pragma solidvm 3.0;
 contract ${contractName} {
   int x;
   constructor(int _x) {

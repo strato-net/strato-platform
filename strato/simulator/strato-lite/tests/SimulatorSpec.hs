@@ -192,7 +192,7 @@ spec = do
       
       registryTs <- liftIO getCurrentMicrotime
 
-      let runForThreeSeconds = void . timeout 3000000
+      let runForSeconds n = void . timeout (n * 1000000)
           toIetx = IETx registryTs . IngestTx Origin.API
           chainMember1 = (CM.ChainMembers $ Set.singleton $ (CM.CommonName (T.pack "BlockApps") (T.pack "engineering") (T.pack "David Nallapu") True))
                 -- Create a certificate registry on the main chain
@@ -211,7 +211,6 @@ spec = do
       let cert' = decodeUtf8 . certToBytes $ cert
           args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
           registry = [r|
-                pragma solidvm 3.0;
                 contract CertRegistry {
                   event CertificateRegistered(string cert);
                   constructor(address _user, string _cert) {
@@ -232,7 +231,6 @@ spec = do
             }) txMd'
         
           src = [r|
-pragma solidvm 3.2;
 contract A {
   event OrgUnitAdded(string name, string unit);
 
@@ -281,7 +279,7 @@ contract A {
             flip postEvent (peers !! 0) $ UnseqEvent ietx
             for_ peers $ postEvent (TimerFire 0)
 
-      runForThreeSeconds $ concurrently_ (runNetworkOld peers connections') routine
+      runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
@@ -317,7 +315,6 @@ contract A {
       let cert' = decodeUtf8 . certToBytes $ cert
           args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <> "\")"
           registry = [r|
-pragma solidvm 3.0;
 contract CertRegistry {
   event CertificateRegistered(string cert);
   
@@ -338,7 +335,6 @@ contract CertRegistry {
             , U.unsignedTransactionChainId    = Nothing
             }) txMd'
           src = [r|
-pragma solidvm 3.2;
 contract A {
   event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
@@ -356,7 +352,6 @@ contract A {
 }|]
           contractName = "A"
 --           mainChainSrc = [r|
--- pragma solidvm 3.2;
 -- contract B {
 --   uint y;
 
@@ -495,7 +490,7 @@ contract A {
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
           
-      void . timeout 80000000 $ concurrently_ (runNetworkOld peers connections') routine
+      void . timeout 100000000 $ concurrently_ (runNetworkOld peers connections') routine
       cId <- readIORef cIdRef
       cInfo <- readIORef cInfoRef
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
@@ -527,7 +522,6 @@ contract A {
         [ (peers !! 0, peers !! 1)
         ]
       let src = [r|
-pragma solidvm 3.0;
 
 contract RegisterCert {
   event CertificateRegistered(string cert);
@@ -572,7 +566,7 @@ contract RegisterCert {
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx1
             threadDelay 1000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx tx2
-      void . timeout 3000000 $ concurrently_ (runNetworkOld peers connections') routine
+      void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
@@ -593,7 +587,7 @@ contract RegisterCert {
         ts <- liftIO getCurrentMicrotime
         cIdRef <- newIORef undefined
         cInfoRef <- newIORef undefined
-        let runForThreeSeconds = void . timeout 5000000
+        let runForTwelveSeconds = void . timeout 12000000
             toIetx = IETx ts . IngestTx Origin.API
             mkChainId = keccak256ToWord256 . rlpHash
 
@@ -613,7 +607,6 @@ contract RegisterCert {
         let cert' = decodeUtf8 . certToBytes $ cert
             args' = "(0x" <> (T.pack $ (formatAddressWithoutColor . fromPrivateKey) (privKeys !! 0)) <> ", \"" <> cert' <>"\")"
             registry = [r|
-                  pragma solidvm 3.0;
                   contract CertRegistry {
                     event CertificateRegistered(string cert);
 
@@ -636,7 +629,6 @@ contract RegisterCert {
 
             -- Post a mock dApp to a private chain
             src = [r|
-                  pragma solidvm 3.2;
                   contract A {
                     event OrgAdded(string name);
 
@@ -690,7 +682,7 @@ contract RegisterCert {
               threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ signedPrivTx cId -- Add organization to private chain
 
-        runForThreeSeconds $ concurrently_ (runNetworkOld peers connections') routine
+        runForTwelveSeconds $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         testCid <- readIORef cIdRef
 
