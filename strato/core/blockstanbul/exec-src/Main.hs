@@ -35,7 +35,9 @@ import qualified Strato.Strato23.Client     as VC
 
 instance HasVault IO where
   sign bs = do
-    mgr <- newManager defaultManagerSettings
+    --Set the proxy for the manager to point in the correct direction
+    let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+    mgr <- liftIO $ newManager setting
     url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
     eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
