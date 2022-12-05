@@ -364,7 +364,6 @@ runChainConstructors cId cInfo = do
             100000000000
             0
             (bSumTimestamp curBlockSummary)
-           -- (posixSecondsToUTCTime $ bSumTimestamp curBlockSummary )
             ""
             0
             (Keccak256.unsafeCreateKeccak256FromWord256 0))
