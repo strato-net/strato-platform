@@ -47,7 +47,9 @@ import           Numeric
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
+
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
@@ -62,6 +64,8 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
+
+
 
 share [mkPersist sqlSettings, mkMigrate "migrateAuto"]  -- annoying: postgres doesn't like tables called user
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")

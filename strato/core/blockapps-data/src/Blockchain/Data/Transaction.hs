@@ -98,7 +98,6 @@ instance TransactionLike Transaction where
     txMetadata    = \case
                        PrivateHashTX{} -> Nothing
                        t -> transactionMetadata t
-    txAnchorChain = const Nothing -- raw transactions don't have an AnchorChain
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation
@@ -269,13 +268,11 @@ whoSignedThisTransaction tx = case tx of
           sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
 
-whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
+whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer  -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
         where
           intToBSS = BSS.toShort . word256ToBytes . fromInteger
-          newV :: Word8
-          newV = fromInteger v
-          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) ((newV) - 0x1b))
+          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
           mesg = keccak256ToByteString $ hsh
 {-
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe

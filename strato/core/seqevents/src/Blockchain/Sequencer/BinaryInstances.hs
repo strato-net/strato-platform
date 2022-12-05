@@ -10,7 +10,6 @@ import           GHC.Generics                ()
 import           Blockchain.Strato.Model.Address   ()
 import           Blockchain.Strato.Model.Keccak256 ()
 import           Blockchain.Strato.Model.ExtendedWord ()
-
 import           Data.ByteString             ()
 
 instance Binary CI.ChainSignature where

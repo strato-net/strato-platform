@@ -744,7 +744,7 @@ functionHelper :: Annotated CodeCollectionF
 functionHelper cc c funcName f@Func{..} = case _funcContents of
   Nothing -> Function (Product [] _funcContext) (Product [] _funcContext) _funcContext [] []
   Just stmts ->
-    if (funcName == "receive" && (_vmVersion c == "svm3.3" || _vmVersion c == "svm3.4"))
+    if (funcName == "receive")
       then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
         ([], [], Just Payable, Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
                                                      swap = uncurry $ flip (,)
@@ -767,7 +767,7 @@ functionHelper cc c funcName f@Func{..} = case _funcContents of
                           , T.pack $ show fVal 
                           ]) <$ _funcContext 
         _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
-    else if ((_vmVersion c == "svm3.4") && (funcName == "fallback"))
+    else if (funcName == "fallback")
           then case (_funcArgs, _funcVals, _funcVisibility) of 
                 ([], [], Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
                                                swap = uncurry $ flip (,)
@@ -932,11 +932,11 @@ requireArgs x = Sum $ boolType' x :|
 assertArgs :: SourceAnnotation Text -> Type'
 assertArgs x = boolType' x
 
-registerCertArgs :: SourceAnnotation Text -> Type'
-registerCertArgs x = Sum $ stringType' x :| 
-                        [ Product [stringType' x, contractType' x] x
-                        , Product [accountType' x, stringType' x] x
-                        ]
+-- registerCertArgs :: SourceAnnotation Text -> Type'
+-- registerCertArgs x = Sum $ stringType' x :| 
+--                         [ Product [stringType' x, contractType' x] x
+--                         , Product [accountType' x, stringType' x] x
+--                         ]
 
 verifyCertArgs :: SourceAnnotation Text -> Type'
 verifyCertArgs x = Product [stringType' x, stringType' x] x
@@ -960,7 +960,7 @@ blockhashArgs :: SourceAnnotation Text -> Type'
 blockhashArgs x = intType' x
 
 ecrecoverArgs :: SourceAnnotation Text -> Type'
-ecrecoverArgs x = Product [stringType' x, intType' x, intType' x, intType' x] x
+ecrecoverArgs x = Product [stringType' x, intType' x, stringType' x, stringType' x] x
 
 addmodArgs  :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x
@@ -1002,7 +1002,7 @@ getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' 
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx  [] []
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx [] []
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx [] []
-getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx [] []
+-- getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx [] []
 getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx [] []
 getVarType' "verifyCertSignedBy" ctx =  pure $ Function (verifyCertSignedByArgs ctx) (boolType' ctx) ctx [] []
 getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx [] []
@@ -1020,25 +1020,22 @@ getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block" Nothing) c
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super" Nothing) ctx
 getVarType' name ctx = do
   c <- asks contract
-  if _vmVersion c == "svm3.4"
-    then do
-      let varDefy =  M.lookup name (_storageDefs c)
-      case varDefy of
-        Just _ -> do
-          case _varType <$> varDefy of
-            Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
-            _ -> getVarTypeByName' (stringToLabel name) ctx
-        Nothing -> do
-          let ls = filter (userDefinedHelper name )  [ _varType x | x <- (M.elems (_storageDefs c)) ] 
-          if  length ls > 0
-            then do
-              let ls2 = head (filter (userDefinedHelper name . _varType )  [  x | x <- (M.elems (_storageDefs c)) ])
-              case _varInitialVal ls2 of
-                Just _ -> pure $ (Static (head ls)  ctx)
-                _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
-          else do
-            getVarTypeByName' (stringToLabel name) ctx
-    else getVarTypeByName' (stringToLabel name) ctx
+  let varDefy =  M.lookup name (_storageDefs c)
+  case varDefy of
+    Just _ -> do
+      case _varType <$> varDefy of
+        Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
+        _ -> getVarTypeByName' (stringToLabel name) ctx
+    Nothing -> do
+      let ls = filter (userDefinedHelper name )  [ _varType x | x <- (M.elems (_storageDefs c)) ] 
+      if  length ls > 0
+        then do
+          let ls2 = head (filter (userDefinedHelper name . _varType )  [  x | x <- (M.elems (_storageDefs c)) ])
+          case _varInitialVal ls2 of
+            Just _ -> pure $ (Static (head ls)  ctx)
+            _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
+      else do
+        getVarTypeByName' (stringToLabel name) ctx
 
 
 userDefinedHelper :: String -> Type  -> Bool
@@ -1358,61 +1355,57 @@ tcExpr (MemberAccess _ a fieldName) = do
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
   c <- asks contract
-  if _vmVersion c == "svm3.4"
-    then if M.member nam (_userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
-            then do
-              case args of
-                OrderedArgs es -> do
-                  let check = case  M.lookup nam (_userDefined c)  of
-                        Just "int" ->  intType' x ~>  tcExpr (head es)
-                        Just "string" -> stringType' x ~>  tcExpr (head es)
-                        Just "bool" -> boolType' x ~>  tcExpr  (head es)
-                        Just "bytes" -> bytesType' x ~>  tcExpr  (head es)
-                        _ ->  pure . bottom $ "type not supported for user defined types" <$ x 
-                  let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
-                  check !>  (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
-                _ ->  pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
-              else do 
-                e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
-                a <- case args of
-                  OrderedArgs es -> productType' x <$> traverse tcExpr es
-                  NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-                case args of
-                  NamedArgs es -> apply e a $ Just (fst <$> es)
-                  _ -> apply e a Nothing
-    else pure . bottom $ "User defined type alias and wrapping are not supported below pragma solidvm 3.4" <$ x
+  if M.member nam (_userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
+    then do
+      case args of
+        OrderedArgs es -> do
+          let check = case  M.lookup nam (_userDefined c)  of
+                Just "int" ->  intType' x ~>  tcExpr (head es)
+                Just "string" -> stringType' x ~>  tcExpr (head es)
+                Just "bool" -> boolType' x ~>  tcExpr  (head es)
+                Just "bytes" -> bytesType' x ~>  tcExpr  (head es)
+                _ ->  pure . bottom $ "type not supported for user defined types" <$ x 
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          check !>  (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
+        _ ->  pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
+      else do 
+        e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
+        a <- case args of
+          OrderedArgs es -> productType' x <$> traverse tcExpr es
+          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+        case args of
+          NamedArgs es -> apply e a $ Just (fst <$> es)
+          _ -> apply e a Nothing
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
   c <- asks contract
-  if _vmVersion c == "svm3.4"
-    then if (M.member nam $ _userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False)
-          then do
-            case args of
-              OrderedArgs es -> do
-                expressionResult <- tcExpr (head es)
-                let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
-                let check  =  (case expressionResult of 
-                      (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
-                        then case actual of 
-                          (SVMType.Int  _ _) ->  pure $ (intType' x)
-                          (SVMType.String  _) -> pure $ (stringType' x)
-                          SVMType.Bool -> pure $ (boolType' x) 
-                          (SVMType.Bytes _ _ ) -> pure $ (bytesType' x)
+  if (M.member nam $ _userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False)
+    then do
+      case args of
+        OrderedArgs es -> do
+          expressionResult <- tcExpr (head es)
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          let check  =  (case expressionResult of 
+                (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
+                  then case actual of 
+                    (SVMType.Int  _ _) ->  pure $ (intType' x)
+                    (SVMType.String  _) -> pure $ (stringType' x)
+                    SVMType.Bool -> pure $ (boolType' x) 
+                    (SVMType.Bytes _ _ ) -> pure $ (bytesType' x)
 
-                          _ ->  pure . bottom $ "Not supported for casting such type to user defined type" <$ x
-                        else pure . bottom $ "Wrong User defined type" <$ x
-                      _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x)
-                check !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
-              _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
-          else do  --Case of no user defines
-            e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
-            a <- case args of
-              OrderedArgs es -> productType' x <$> traverse tcExpr es
-              NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-            case args of
-              NamedArgs es -> apply e a $ Just (fst <$> es)
-              _ -> apply e a Nothing
-    else pure . bottom $ "User defined type alias and unwrapping are not supported below pragma solidvm 3.4" <$ x
+                    _ ->  pure . bottom $ "Not supported for casting such type to user defined type" <$ x
+                  else pure . bottom $ "Wrong User defined type" <$ x
+                _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x)
+          check !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
+        _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+    else do  --Case of no user defines
+      e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
+      a <- case args of
+        OrderedArgs es -> productType' x <$> traverse tcExpr es
+        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+      case args of
+        NamedArgs es -> apply e a $ Just (fst <$> es)
+        _ -> apply e a Nothing
 
 tcExpr (FunctionCall x (Variable _ "type") args) =
   pure $ case args  of 

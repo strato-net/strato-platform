@@ -51,6 +51,8 @@ executables:
     - wai-extra
     - wai-middleware-prometheus
     - warp
+    # Don't touch this next setting, leave -threaded, otherwise it WILL NOT WORK
+    # https://blockappsdev.slack.com/archives/G5E7K3ETX/p1645104924934129
     ghc-options: -threaded
 
   strato-api-init:

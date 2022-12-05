@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators  #-}
 module Blockchain.SolidVM.Simple
   ( SolidVM.SolidVMBase
   , SolidVMTxArgs(..)
@@ -29,6 +30,7 @@ module Blockchain.SolidVM.Simple
   , module Blockchain.Data.ExecResults
   , module Blockchain.Strato.Model.ExtendedWord
   , module Blockchain.Strato.Model.Account
+  , module Blockchain.Strato.Model.Gas
   , module Blockchain.Strato.Model.Keccak256
   , module Blockchain.VM.SolidException
   , module Data.Default
@@ -47,6 +49,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM                as SolidVM
 import           Blockchain.VM.SolidException
@@ -131,7 +134,7 @@ createErr = err "create"
 callErr :: String -> a
 callErr = err "call"
 
-create :: SolidVM.SolidVMBase m
+create :: (SolidVM.SolidVMBase m)
        => SolidVMCreateArgs
        -> m ExecResults
 create s = SolidVM.create
@@ -144,14 +147,14 @@ create s = SolidVM.create
   (s ^. createArgs . argsOrigin)
   (createErr "value")
   (createErr "gasPrice")
-  (createErr "availableGas")
+  (Gas 100000000)
   (s ^. createNewAddress)
   (s ^. createCode)
   (s ^. createArgs . argsTxHash)
   (s ^. createArgs . argsChainId)
   (s ^. createArgs . argsMetadata)
 
-call :: SolidVM.SolidVMBase m
+call :: (SolidVM.SolidVMBase m)
      => SolidVMCallArgs
      -> m ExecResults
 call s = SolidVM.call
@@ -168,7 +171,7 @@ call s = SolidVM.call
   (callErr "value")
   (callErr "gasPrice")
   (callErr "theData")
-  (callErr "availableGas")
+  (Gas 100000000)
   (s ^. callArgs . argsOrigin)
   (s ^. callArgs . argsTxHash)
   (s ^. callArgs . argsChainId)

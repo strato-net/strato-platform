@@ -95,4 +95,4 @@ instance Arbitrary CodeCollection where
     , _flEnums     = M.empty
     , _flStructs   = M.empty
     , _flErrors    = M.empty
-    , _pragmas     = [("solidvm","3.4")]}]
+    , _pragmas     = []}]

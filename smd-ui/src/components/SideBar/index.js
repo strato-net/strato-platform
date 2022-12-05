@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
-import logo from './blockapps-logo-horizontal-white.png';
+import logo from './BlockAppsLogos_DarkBG-Horizontal.png';
 
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';

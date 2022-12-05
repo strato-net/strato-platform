@@ -25,7 +25,8 @@ describe('Contracts: reducer', () => {
       const action = fetchContracts();
       const initialState = {
         contracts: contractsState,
-        filter
+        filter,
+        isLoading: true
       }
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
@@ -38,7 +39,8 @@ describe('Contracts: reducer', () => {
         const initialState = {
           contracts: {},
           filter: '',
-          error: null
+          error: null,
+          isLoading: false
         }
         expect(reducer(initialState, action)).toMatchSnapshot();
       });
@@ -70,7 +72,8 @@ describe('Contracts: reducer', () => {
         const initialState = {
           contracts: deepClone(contractsState),
           filter: '',
-          error: null
+          error: null,
+          isLoading: false
         }
 
         expect(reducer(initialState, action)).toMatchSnapshot();
@@ -84,7 +87,8 @@ describe('Contracts: reducer', () => {
       const initialState = {
         contracts: {},
         filter: '',
-        error
+        error,
+        isLoading: false
       };
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
@@ -96,7 +100,8 @@ describe('Contracts: reducer', () => {
     const action = changeContractFilter(filter);
     const initialState = {
       contracts: contractsState,
-      error: null
+      error: null,
+      isLoading: false
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
@@ -167,7 +172,8 @@ describe('Contracts: reducer', () => {
     const initialState = {
       contracts: contractsState,
       filter,
-      error
+      error,
+      isLoading: false
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
   });

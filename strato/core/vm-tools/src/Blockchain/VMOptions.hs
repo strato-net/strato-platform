@@ -21,7 +21,8 @@ module Blockchain.VMOptions (
   flags_gasOn,
   flags_evmCompatible,
   flags_network,
-  flags_networkID
+  flags_networkID,
+  flags_requireCerts
   ) where
 
 import           Blockchain.Mining
@@ -47,8 +48,9 @@ defineFlag "miningVerification" True "Flag to turn mining verification or/off"
 defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
 defineFlag "startingBlock" (-1::Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False::Bool) "Whether to crash on SolidVM exceptions"
-defineFlag "svmTrace" (False::Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "svmTrace" (True::Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU cache to avoid reruns"
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "evmCompatible" (False::Bool) "Whether to turn off STRATO enhancements or not"
+defineFlag "requireCerts" (True::Bool) "Flag to enable the requirement of a cert to send transactions"

@@ -115,13 +115,9 @@ main = do
     (fn:_) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) "" contents
-  let pragmas' = \case
-        Pragma _ n v -> Just (n, v)
-        _ -> Nothing
-  let vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas' <$> parsedFile) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas' <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas' <$> parsedFile) then "svm3.0" else ""))
-      namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' M.empty xabi) | NamedXabi name (xabi, parents') <- parsedFile]
+  let namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') M.empty xabi) | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) []
-      typecheck = if (vmVersion' == "svm3.2" || vmVersion' == "svm3.3") then TC.detector cc else []
+      typecheck = TC.detector cc
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)
   mapM_ (putStrLn . T.unpack) nodes
