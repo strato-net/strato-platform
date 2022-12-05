@@ -115,9 +115,12 @@ main :: IO ()
 main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
+  --Set the proxy for the manager to point in the correct direction
+  let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+  vaultMgr <- liftIO $ newManager setting
   vaultUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
   optSender <- do 
-    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
+    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv vaultMgr vaultUrl)
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
       Right adAndKey -> return $ VC.unAddress adAndKey
