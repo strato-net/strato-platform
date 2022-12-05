@@ -100,7 +100,7 @@ exports[`DeployDapp: index render component with empty values 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
           </div>
         </div>
         <div className=\\"row\\">
@@ -202,7 +202,7 @@ exports[`DeployDapp: index render component with values 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
           </div>
         </div>
         <div className=\\"row\\">

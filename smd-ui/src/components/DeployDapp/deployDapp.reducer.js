@@ -24,7 +24,7 @@ const initialState = {
   isOpen: false,
   contractCompileErrors: undefined,
   abi: undefined,
-  response: "Status: Upload Contract",
+  response: "Status: Deploy DApp",
   contract: '',
   chainName: '',
   createDisabled: true,

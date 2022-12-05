@@ -125,9 +125,9 @@ Object {
   "filename": undefined,
   "isAddIntegrationModalOpen": false,
   "isAddMemberModalOpen": false,
-  "isOpen": true,
+  "isOpen": false,
   "isToasts": false,
-  "response": "Uploading Contract...",
+  "response": "Status: Deploy DApp",
   "toastsMessage": "",
 }
 `;
