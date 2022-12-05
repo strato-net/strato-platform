@@ -31,7 +31,6 @@ packages:
 - core/strato-statediff
 - core/vm-runner/
 - core/vm-tools/
-- core/vault-proxy/
 
 - indexer/slipstream
 - indexer/strato-index
