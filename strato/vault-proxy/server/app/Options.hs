@@ -1,0 +1,16 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
+
+module Options where
+
+import           HFlags
+import           Data.Text       as T
+
+defineFlag "OAUTH_DISCOVERY_URL" (T.pack "" :: Text) "OAuth2 Discovery URL"
+defineFlag "OAUTH_CLIENT_ID" (T.pack "" :: Text) "OAuth2 Client ID"
+defineFlag "OAUTH_CLIENT_SECRET" (T.pack "" :: Text) "OAuth2 Client Secret"
+defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reserve for the token to expire, default is 13 seconds."
+defineFlag "VAULT_URL" (T.pack "http://vault-wrapper:8000/strato/v2.3" :: Text) "The place where I go to visit THE VAULT 🔒."
+defineFlag "VAULT_PASSWORD" (T.pack "" :: Text) "This is the password that is used to log into the shared vault."
+defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
+defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."
