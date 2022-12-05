@@ -25,8 +25,10 @@ type HasVault m = Accessible VaultData m
 
 runVaultM :: MonadIO m => String -> VaultM m a -> m a
 runVaultM url f = do
-  mgr <- liftIO $ newManager defaultManagerSettings
+  --Forward vault requests to the vault-proxy
+  let setting = managerSetProxy (proxyEnvironment $ Proxy "http://localhost" 8013) defaultManagerSettings 
+  vaultMgr <- liftIO $ newManager setting
   vaultWrapperUrl <- liftIO $ parseBaseUrl url
 
-  runReaderT f $ VaultData vaultWrapperUrl mgr
+  runReaderT f $ VaultData vaultWrapperUrl vaultMgr
 
