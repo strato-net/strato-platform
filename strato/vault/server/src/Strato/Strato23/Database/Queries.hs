@@ -130,6 +130,12 @@ getMessageQuery = proc () -> do
   restrict -< id' .== toFields (1 :: Int)
   returnA -< (salt, nonce, enc_msg)
 
+-- Used for the mercata migration. --Can be deleted
+getMessageQueryAll :: Query (Column PGBytea, Column PGBytea, Column PGBytea)
+getMessageQueryAll = proc () -> do
+  (_, salt, nonce, enc_msg) <- selectTable messageTable -< ()
+  returnA -< (salt, nonce, enc_msg)
+
 postMessageQuery :: ByteString
                  -> SecretBox.Nonce
                  -> ByteString
