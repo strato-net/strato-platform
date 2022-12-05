@@ -17,3 +17,4 @@ dryrun.log
 targets.log
 *.cabal
 *~
+devops/eks/eks-deployment.yaml
