@@ -69,10 +69,10 @@ function newnode {
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
   runBackgroundProcess blockapps-vault-proxy-server \
       --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="$VAULT_URL" \
+      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="${VAULT_URL}" \
       --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}"  \
       --minLogLevel="${minLogLevel}"
-
+      
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
@@ -160,7 +160,7 @@ function newnode {
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
-  vwFlag="--vaultWrapperUrl=$VAULT_URL"
+  vwFlag="--vaultWrapperUrl=${VAULT_URL_ROOT_PATH}"
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
@@ -222,7 +222,7 @@ function newnode {
 
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-    --stratourl=${STRATO_API_LOCAL_ROOT_PATH} --vaultwrapperurl=$VAULT_URL  \
+    --stratourl=${STRATO_API_LOCAL_ROOT_PATH} --vaultwrapperurl=${VAULT_URL_ROOT_PATH}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -428,10 +428,10 @@ setEnv debugWSPort ${debugWSPort:-8052}
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 setEnv VAULT_PROXY_ROOT_PATH http://localhost:8000/strato/v2.3 # TODO: change-vault-proxy-port-when-known
 
-# if [[ -z $VAULT_URL ]] ; then
-#   echo -e "Error: VAULT_URL is required"
-#   exit 1
-# fi
+if [[ -z ${VAULT_URL} ]] ; then
+  echo -e "Error: VAULT_URL is required"
+  exit 1
+fi
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
