@@ -34,7 +34,6 @@ import           Data.Proxy
 import qualified Data.Set                              as S
 import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
---import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
 import qualified Network.Kafka.Protocol                as KP
