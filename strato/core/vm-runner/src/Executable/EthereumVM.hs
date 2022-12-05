@@ -245,10 +245,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-            case mExecResults of
-              Just (ExecResults  _ _ _ _ _ _ _ _ erException _ _ _) -> return erException
-              _ = (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
-
+        if any (isJust . erException) mExecResults
+          then return Nothing
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
