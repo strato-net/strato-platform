@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 
+
 module Options where
 
 import           HFlags
@@ -16,4 +17,6 @@ defineFlag "keyStoreCacheTimeout" (60::Integer) "The number of seconds nonces ar
 
 defineFlag "pw" ("" :: String) "Password for vault-wrapper"
 defineFlag "key" ("" :: String) "the old blockstanbulPrivateKey to migrate"
+defineFlag "pwOld" ("" :: String) "Password for old vault-wrapper" -- Used for mercata migration
+defineFlag "indexToStartAt" (1 :: Int) "The index in the postgres table to convert old decrypted to new decryption" 
 

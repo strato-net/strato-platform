@@ -310,7 +310,7 @@ class CreateContract extends Component {
                 >
                   <option />
                   {
-                    Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                    this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
                       return (
                         <option key={id + i} value={id}>{id}</option>
                       )
@@ -336,6 +336,8 @@ class CreateContract extends Component {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.fetchChainIds();
           this.props.contractOpenModal();
+          this.props.initialize(this.props.initialValues);
+          this.props.getLabelIds(this.props.initialValues.chainLabel)
         }}
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
@@ -530,6 +532,7 @@ export const CREATE_CONTRACT_FORM = 'create-contract'
 
 
 export function mapStateToProps(state) {
+  const selectedChainData = state.chains.chainIds.find((data) => data.id ===  state.chains.selectedChain)
   return {
     isOpen: state.createContract.isOpen,
     abi: state.createContract.abi,
@@ -544,7 +547,9 @@ export function mapStateToProps(state) {
     codeType: state.codeEditor.codeType,
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
-      address: state.user.oauthUser ? state.user.oauthUser.address : ''
+      address: state.user.oauthUser ? state.user.oauthUser.address : '',
+      chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
+      chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds
