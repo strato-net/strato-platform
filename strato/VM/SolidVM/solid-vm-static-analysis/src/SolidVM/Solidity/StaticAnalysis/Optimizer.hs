@@ -25,14 +25,12 @@ data R = R
   , contract :: Maybe Contract
   }
 
--- 
 
-type SSS = StateT (M.Map SolidString (Expression))   (Reader R) 
---type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
+type SSS = StateT (M.Map SolidString (Expression))   (Reader R) -- Is there a better data structure for this job?
 
 
 detector ::  CodeCollection -> CodeCollection
-detector cc =  (over (contracts . mapped) (contractHelper cc)
+detector cc = (over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
           $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
 
