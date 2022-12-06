@@ -539,7 +539,8 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
       chainId
-
+  $logDebugLS "postUsersContractSolidVM'/tx" tx
+  
   txHash <- postTransaction tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
   getResultAndRespond [txHash] resolve
