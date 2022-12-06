@@ -44,6 +44,7 @@ library:
       - raw-strings-qq
       - solid-vm-model
       - ethereum-rlp
+      - x509-certs
 
 
 executables:
