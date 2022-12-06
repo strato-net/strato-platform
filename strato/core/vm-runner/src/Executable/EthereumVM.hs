@@ -35,7 +35,6 @@ import           Data.Proxy
 import qualified Data.Set                              as S
 import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
-import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
 import qualified Network.Kafka.Protocol                as KP
@@ -342,7 +341,8 @@ runChainConstructors cId cInfo = do
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
-
+  curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash )
+  curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
   actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
       NonContract{} -> pure Nothing
@@ -366,7 +366,7 @@ runChainConstructors cId cInfo = do
             0 --block number
             100000000000
             0
-            (posixSecondsToUTCTime 0)
+            (bSumTimestamp curBlockSummary)
             ""
             0
             (Keccak256.unsafeCreateKeccak256FromWord256 0))

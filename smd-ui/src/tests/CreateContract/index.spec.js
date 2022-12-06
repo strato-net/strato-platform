@@ -548,6 +548,7 @@ describe('CreateContract: index', () => {
         },
       },
       chains: {
+        chainIds: [],
         listChain: chain,
         listLabelIds: chain["airline cartel 9"]
       },
