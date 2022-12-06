@@ -23,6 +23,7 @@ dependencies:
 - blockapps-vault-proxy-api
 - bytestring
 - common-log
+- lens
 - postgresql-simple
 - text
 - http-conduit

@@ -18,14 +18,14 @@ spec:
         app: strato-platform
     spec:
       containers:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:blue
         name: smd
         env:
         - name: NODE_NAME
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:blue
         name: apex
         env:
         - name: NODE_HOST
@@ -51,7 +51,7 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: redis-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:blue
         name: strato
         ports:
           - containerPort: 30303
@@ -111,7 +111,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:blue
         name: postgrest
         env:
         - name: blocHost
@@ -140,7 +140,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:blue
         name: nginx
         ports:
           - containerPort: 80
@@ -213,7 +213,7 @@ spec:
         volumeMounts:
           - mountPath: /kafka
             name: kafka-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:blue
         name: prometheus
         env:
         - name: NODE_HOST
@@ -221,7 +221,7 @@ spec:
         volumeMounts:
           - mountPath: /prometheus
             name: prometheus-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:boba1
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:blue
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout

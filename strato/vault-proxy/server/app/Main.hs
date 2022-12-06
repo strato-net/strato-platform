@@ -13,9 +13,8 @@ import           Control.Monad
 import           Data.ByteString                        as B hiding (putStrLn)
 -- import           Data.ByteString.Internal
 import           Data.Cache
--- import           Data.IORef
--- import           Data.Pool
--- import qualified Data.Text                              as T
+-- import           Control.Lens
+import           Data.Text                              as T hiding (unlines)   
 import           Data.Text.Encoding                     as TE
 -- import           Debug.Trace
 import           HFlags
@@ -120,7 +119,10 @@ app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
   --Get the JWT token
   jwt <- vaulty vc
-  let goodJwt = accessToken jwt
+  foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
+  let fport = baseUrlPort foreignVault
+      furl = baseUrlHost foreignVault
+      goodJwt = accessToken jwt
       headers = W.requestHeaders rev
       -- authHeadr = R.header (TE.encodeUtf8 "X-USER-UNIQUE-NAME") (TE.encodeUtf8 $ (T.pack "Bearer " <> goodJwt))
       -- auth = (hAuthorization,) . (authHeadr <>) <$> goodJwt
@@ -131,7 +133,7 @@ app vc rev = do
         Nothing    -> rev
         Just auth' -> rev { W.requestHeaders = auth':headers }
     --Assuming the port is 8094 for the shared vault
-  pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ vaultUrl vc) 8094
+  pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
