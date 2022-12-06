@@ -2,6 +2,8 @@ version: "3"
 volumes:
   vaultpgdata:
     driver: local
+  idpconfig:
+      driver: local
 services:
   vault-wrapper:
     depends_on:
@@ -46,7 +48,7 @@ services:
     environment:
     - INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL}
     - INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER}
-    - INITIAL_OAUTH_JWT_USERNAME_PROPERTY=${INITIAL_OAUTH_JWT_USERNAME_PROPERTY}
+    - INITIAL_OAUTH_JWT_USERNAME_CLAIM=${INITIAL_OAUTH_JWT_USERNAME_CLAIM}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
@@ -57,6 +59,7 @@ services:
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
+    - idpconfig:/config
     restart: unless-stopped
     logging:
       driver: "json-file"
