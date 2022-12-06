@@ -19,39 +19,22 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
 import           SolidVM.Solidity.Parse.UnParser
 
-import Debug.Trace
 
 data R = R
   { codeCollection :: CodeCollection
   , contract :: Maybe Contract
   }
 
---TODO 
--- Change SSS to a map? Of something that I can modify and look up state variables
--- Also add state variables.
 -- 
 
-type SSS = StateT (M.Map SolidString (Expression))   (Reader R) --- hmm SO change this to?
+type SSS = StateT (M.Map SolidString (Expression))   (Reader R) 
 --type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
---we want a map var name var expression
---Love it I think that works.
---This may get tricky, but I am ready for this
---
-
--- SO first get this compiling by replacing what you have
--- Then get it functionally working
--- I can replace map in 30min or less my goal is before 1:30
--- Then get work till 3
--- x`
 
 detector ::  CodeCollection -> CodeCollection
-detector cc = trace ("\n\nBefore optmization"++ (show cc) ++"\n\n after optmizer"  ++(show $ (over (contracts . mapped) (contractHelper cc)
+detector cc =  (over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc))) 
-          ( (over (contracts . mapped) (contractHelper cc)
-          $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)) 
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
 
 
 contractHelper :: CodeCollection
@@ -165,38 +148,24 @@ optimizeStatements (s@(EmitStatement {}) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(RevertStatement {}) : _) = pure [s]
 optimizeStatements (s@(UncheckedStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(AssemblyStatement _ _) : ss) = (s:) <$> optimizeStatements ss
-
---optimizeStatements (s@(SimpleStatement a _) : ss) = ( ( (optimizeExpression a)) :) <$> optimizeStatements ss
---optimizeStatements (s@(SimpleStatement a (ExpressionStatement expr)) : ss) = (SimpleStatement a (ExpressionStatement (optimizeExpression expr)) :) <$> optimizeStatements ss
 optimizeStatements (s@(SimpleStatement _  _) : ss) = do
-  let ssz = trace ("GGGSIMPLE STATEMENT INSIDE\n" ++ (show s) ++ ("\n\n")) s   
-  ssss <- evalStateT (simpleStatementFHelper'  ssz) M.empty
-  (ssss :) <$> optimizeStatements ss
-
+  simpleStatementOptimized <- evalStateT (simpleStatementFHelper'  s) M.empty
+  (simpleStatementOptimized :) <$> optimizeStatements ss
 optimizeStatements (s@(Return (Just _) _) : ss) = do 
   ssss <- evalStateT (simpleStatementFHelper'  s) M.empty
   (ssss :) <$> optimizeStatements ss
-
 optimizeStatements (s@(Return _ _) : _) = pure [s]
 
--------This commented out section is a return statement that doesn't work
--- optimizeStatements (s@(Return (Just (expr)) b) : ss) = do 
---   --optimizeExpression expr
---   x <- optimizeExpression expr
---   (Return (Just (x) b) :) <$> optimizeStatements ss
--- optimizeStatements (s@(Return _ _) : _) = pure [s]
--------- ------------------------------------------------------
 
 
--- optimizeStatements (s@(SimpleStatement _  _) : ss) = ((evalStateT (simpleStatementFHelper'  s) ["xBS examplex"] ) :) <$> optimizeStatements ss
 
-
--- Need to handle other case of simple statementF -> VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
+-- Note two cases for simple statement:  
+-- 1. VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) 
+-- 2. ExpressionStatement (ExpressionF a) 
 simpleStatementFHelper' ::  Statement -> SSS (Statement)
 simpleStatementFHelper' (SimpleStatement (ExpressionStatement xpr) b ) = do 
-  let xprr = trace ("simpleStatementFHelper' " ++ (show xpr)) xpr
-  x <- optimizeExpression xprr
-  _ <- case x of -- Double check this logic
+  x <- optimizeExpression xpr
+  _ <- case x of -- Double check this logic -- This needs to be fixed Not 100% sure what this should be?
     (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
   pure $   (SimpleStatement (ExpressionStatement x) b )
 
@@ -211,47 +180,12 @@ simpleStatementFHelper' (SimpleStatement (VariableDefinition [(VarDefEntry typ l
   --   (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
   pure $   (SimpleStatement (VariableDefinition [(VarDefEntry resVdef loc nam a)]  mExpr) b ) 
 
-
-
 simpleStatementFHelper' (Return (Just expr ) b)  = do
   x <- optimizeExpression expr
   pure $ Return (Just x ) b 
 simpleStatementFHelper' a = pure $ a
 
 
---Okay so we need to put vars in the stack
---Then we need to check if they are being called
--- Typechecker needs to be doing this
--- So I should double check what that is doing
---- I want to hear the feedback from functional programming group
-
-
--------
--- simpleStatementFHelper ::  (SimpleStatementF a) -> SSS (SimpleStatement)
--- --simpleStatementFHelper (SimpleStatement a b ) = pure $ (SimpleStatement a b ) 
--- simpleStatementFHelper ExpressionStatement b =  pure $ (ExpressionStatement b) b
--- --simpleStatementFHelper (VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) =  pure $ (SimpleStatement a b ) 
--- simpleStatementFHelper a = pure $ a 
--------
-
--- --   x <- optimizeExpression xpr
--- --   pure $   ExpressionStatement x
--- -- simpleStatementHelper a = pure $ a
--- --   --pushLocalVariables vdefs
--- --   let ts' = foldr varDefsToType' (topType' x) vdefs
--- --   ts' ~> maybe (pure $ topType' x) tcExpr mExpr
--- -- simpleStatementHelper _ (ExpressionStatement expr) =
--- --   tcExpr expr
-
- 
--- simpleStatementHelper :: SimpleStatement -> SSS SimpleStatement
--- simpleStatementHelper (ExpressionStatement xpr) = do 
---   x <- optimizeExpression xpr
---   pure $   ExpressionStatement x
--- simpleStatementHelper a = pure $ a
--- As of right now this is just a helper for UserDefined types.
--- TODO alter fore all Types
--- Also maybe a specialized UserDefined version of this
 getVariableByName :: SolidString -> SSS  (Maybe Expression)--VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type 
 getVariableByName name = do
   mc <- asks contract
@@ -274,7 +208,6 @@ getVariableByName name = do
         Nothing -> pure $  Nothing
         _ -> pure $ mVar
 
---Offf I just realized we don't have an equal
 optimizeExpression :: Expression -> SSS Expression
 optimizeExpression (Binary x "=" a b) = do
   a' <- optimizeExpression a
@@ -317,14 +250,11 @@ optimizeExpression (Binary x "%" a b) = do
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args) = do
   mc <- asks contract
-  let vvvvv = case mc of Just ccc -> M.member nam (_userDefined  ccc); Nothing -> False; 
-  let mcc = trace ("inside  optimizeExpression\n Varaibale name" ++( show nam) ++ "mc \n" ++ (show vvvvv) ++ "\n" ++ (show args) )  (mc)
-  case mcc  of
+  case mc  of
     Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args -- Wait is this getting hit?
     Just c -> case args of
         OrderedArgs [x] | M.member nam (_userDefined  c) -> do
-          let xx = trace ("Garrett we should optmizie expression" ++ (show x)) x 
-          optimizeExpression xx
+          optimizeExpression x
         _ -> pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args) = do
