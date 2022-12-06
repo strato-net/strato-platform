@@ -249,10 +249,9 @@ optimizeExpression (Binary x "%" a b) = do
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args) = do
   mc <- asks contract
   case mc  of
-    Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args -- Wait is this getting hit?
+    Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args
     Just c -> case args of
-        OrderedArgs [x] | M.member nam (_userDefined  c) -> do
-          optimizeExpression x
+        OrderedArgs [x] | M.member nam (_userDefined  c) -> optimizeExpression x
         _ -> pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args) = do

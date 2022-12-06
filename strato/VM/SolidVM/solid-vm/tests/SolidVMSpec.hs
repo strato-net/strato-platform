@@ -6872,7 +6872,7 @@ contract qq {
 }   |]) `shouldThrow` anyTooMuchGasError
 
 
-  fit "2can create user defined type" . runTest $ do
+  it "can decalre user defined type within a function" . runTest $ do
     runBS [r|
 type MagicInt is int;
 contract DD {        
@@ -6907,7 +6907,7 @@ contract qq {
     getFields ["plusRated"] `shouldReturn`  [ BInteger 3]
 
 
-  it "1can create user defined type" . runTest $ do
+  it "can create user defined type" . runTest $ do
     runBS [r|
 type MagicInt is int;
 contract DD {        
