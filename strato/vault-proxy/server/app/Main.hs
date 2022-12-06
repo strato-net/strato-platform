@@ -9,6 +9,7 @@
 module Main where
 
 import           Control.Monad
+import           Control.Monad.IO.Class
 -- import           Database.PostgreSQL.Simple
 import           Data.ByteString                        as B hiding (putStrLn)
 -- import           Data.ByteString.Internal
@@ -16,7 +17,7 @@ import           Data.Cache
 -- import           Control.Lens
 import           Data.Text                              as T hiding (unlines)   
 import           Data.Text.Encoding                     as TE
--- import           Debug.Trace
+import           Debug.Trace
 import           HFlags
 import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
@@ -98,6 +99,8 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
+  --get the awesome token, awesome token alters the token, so a result is not needed
+  _ <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -110,10 +113,23 @@ main = do
       tokenCache = tokenCash,
       additionalOauth = noErrorOauth
   }
+  -- waiSettings <- defaultWaiProxySettings
+  traceM "vaultToken %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+  vv <- vaulty vaultConnection
+  let temp = accessToken vv
+  traceM $ show temp
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
       vport = vaultProxyPort vaultConnection
   print $ "Running the vault proxy on port " ++ show vport
   run vport (app' $ httpManager vaultConnection)
+  traceM $ "Vault-Proxy is closed, please do something about it."
+
+-- changeProxyDest :: VaultConnection -> W.Request -> IO WaiProxyResponse
+-- changeProxyDest vc _ = do 
+--   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
+--   let fport = baseUrlPort foreignVault
+--       furl = (TE.encodeUtf8 $ T.pack (baseUrlHost foreignVault)) 
+--   pure . WPRProxyDest $ ProxyDest furl fport
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
