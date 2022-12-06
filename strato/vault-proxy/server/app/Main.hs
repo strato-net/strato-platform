@@ -19,7 +19,7 @@ import           Data.Text                              as T hiding (unlines)
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
--- import           GHC.Conc
+import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 -- import           Network.HTTP.Req                       as R
@@ -93,7 +93,7 @@ main = do
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
-  tokenCash <- newCache Nothing
+  tokenCash <- atomically $ newCacheSTM Nothing
   ourl <- parseBaseUrl "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration" 
   rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
   noErrorOauth <- case rawOauthInfo of

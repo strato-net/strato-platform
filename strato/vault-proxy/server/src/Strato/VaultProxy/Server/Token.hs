@@ -9,13 +9,13 @@
 
 module Strato.VaultProxy.Server.Token where
 
--- import           Control.Concurrent.STM
+import           Control.Concurrent.STM
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 -- import           Control.Monad.Trans.Reader
 import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
--- import           Data.Cache.Internal      as C
+import           Data.Cache.Internal      as C
 import           Data.Maybe
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
@@ -53,7 +53,11 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
 getAwesomeToken :: (MonadIO m, MonadThrow m) => VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
 getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
     --Get the current STM time and the check if the item in memory needs to be cleared, clear it if needed
-    cache <- liftIO $ C.lookup squirrel clientId
+    cache <- liftIO . atomically $ do 
+        now <- C.nowSTM
+        cash <- lookupSTM True clientId squirrel now
+        pure cash
+
     --If the cache is up to date, then just return the VaultToken
     vaultToken <- case cache of 
         Just c -> pure c
@@ -65,7 +69,7 @@ getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
             --Calculate the time that the token will expire
             exTime <- makeExpry virToken reserveTime
             --Insert the new token into the STM cache
-            liftIO $ insert' squirrel (Just exTime) clientId virToken
+            liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
             pure virToken
     pure vaultToken
 
