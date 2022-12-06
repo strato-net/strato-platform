@@ -6872,26 +6872,60 @@ contract qq {
 }   |]) `shouldThrow` anyTooMuchGasError
 
 
-  it "user Defined Type" . runTest $ do
+  fit "2can create user defined type" . runTest $ do
     runBS [r|
 type MagicInt is int;
-contract DD {        function f() public returns (int) {
-                return MagicInt.unwrap(MagicInt.wrap(3));
-        } }
+contract DD {        
+  function f() public returns (int) { return MagicInt.unwrap(MagicInt.wrap(3));}
+  function fff() public returns (int) {
+    MagicInt insideInt;
+    insideInt = MagicInt.wrap(3);
+    int semiRegularInt = MagicInt.unwrap(insideInt);
+    int regularInt = MagicInt.unwrap( MagicInt.wrap(3)); 
+    return regularInt;
+    
+    } 
+                
+            }
 contract qq {
           MagicInt myInt;
           int regularInt;
           int plusRated;
-          DD testVar =  new DD();
+          DD testContract =  new DD();
+          int functionTest;
 
-          
           constructor() {
               myInt = MagicInt.wrap(3); //creates defined type using wrap function
               //regularIntType = myInt; Will throw an error since myInt is of type MagicInt
               regularInt = MagicInt.unwrap(myInt); // turn userDefined type back into underlying type
-              plusRated = testVar.f();
+              plusRated = testContract.f();
+              functionTest = testContract.fff();
           }
 }
 
 |]
     getFields ["plusRated"] `shouldReturn`  [ BInteger 3]
+
+
+  it "1can create user defined type" . runTest $ do
+    runBS [r|
+type MagicInt is int;
+contract DD {        
+  function f() public returns (int) { return MagicInt.unwrap(MagicInt.wrap(3));}
+}
+contract qq {
+          MagicInt myInt;
+          int regularInt;
+          int plusRated;
+          DD testContract =  new DD();
+
+          constructor() {
+              myInt = MagicInt.wrap(5); //creates defined type using wrap function
+              //regularIntType = myInt; Will throw an error since myInt is of type MagicInt
+              regularInt = MagicInt.unwrap(myInt); // turn userDefined type back into underlying type
+              plusRated = testContract.f();
+          }
+}
+
+|]
+    getFields ["plusRated", "regularInt"] `shouldReturn`  [ BInteger 3, BInteger 5]

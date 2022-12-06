@@ -196,9 +196,22 @@ simpleStatementFHelper' ::  Statement -> SSS (Statement)
 simpleStatementFHelper' (SimpleStatement (ExpressionStatement xpr) b ) = do 
   let xprr = trace ("simpleStatementFHelper' " ++ (show xpr)) xpr
   x <- optimizeExpression xprr
-  _ <- case x of
+  _ <- case x of -- Double check this logic
     (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
   pure $   (SimpleStatement (ExpressionStatement x) b )
+
+simpleStatementFHelper' (SimpleStatement (VariableDefinition [(VarDefEntry typ loc nam a)]  maybeExpression) b ) = do
+  mExpr  <- case maybeExpression of
+    Nothing -> pure $ maybeExpression
+    Just xpr -> do 
+      x <- optimizeExpression xpr
+      pure $ Just $ x
+  let resVdef = case  typ of Just (SVMType.UserDefined _ actual ) -> Just actual; _ -> typ; --- Unwarp Userdefined types to original type
+  -- _ <- case x of --- WTF IS THIS? Oh it puts it in the stack
+  --   (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
+  pure $   (SimpleStatement (VariableDefinition [(VarDefEntry resVdef loc nam a)]  mExpr) b ) 
+
+
 
 simpleStatementFHelper' (Return (Just expr ) b)  = do
   x <- optimizeExpression expr
