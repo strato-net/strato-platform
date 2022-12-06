@@ -6838,6 +6838,40 @@ contract A {
 
 }|]) `shouldThrow` anyTypeError
 
+  xit "cant infinite loop" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+
+contract qq {
+  uint x = 3;
+  constructor() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
+
+  xit "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
+    runBS [r|
+
+
+contract A {
+  uint x = 3;
+  function f() public returns () {
+    while (true) {
+      x = x + 1;
+    }
+  }
+}
+
+contract qq {
+  constructor() public returns () {
+    A a = new A();
+    a.f();
+    return;
+  }
+}   |]) `shouldThrow` anyTooMuchGasError
+
+
   it "can get code from other contracts using type function" . runTest $ do
     runBS [r|
 pragma solidvm 3.4;
@@ -6887,36 +6921,3 @@ contract qq {
 
 |]
     getFields ["plusRated"] `shouldReturn`  [ BInteger 3]
-
-  xit "cant infinite loop" $ (runTestWithTimeout 20000000 $
-    runBS [r|
-
-contract qq {
-  uint x = 3;
-  constructor() public returns () {
-    while (true) {
-      x = x + 1;
-    }
-  }
-}   |]) `shouldThrow` anyTooMuchGasError
-
-  xit "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
-    runBS [r|
-
-
-contract A {
-  uint x = 3;
-  function f() public returns () {
-    while (true) {
-      x = x + 1;
-    }
-  }
-}
-
-contract qq {
-  constructor() public returns () {
-    A a = new A();
-    a.f();
-    return;
-  }
-}   |]) `shouldThrow` anyTooMuchGasError
