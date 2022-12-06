@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 module Blockchain.Sequencer.Kafka (
     assertTopicCreation,
     unseqEventsTopicName,
@@ -13,7 +14,6 @@ module Blockchain.Sequencer.Kafka (
     writeUnseqEvents,
     writeSeqVmEvents,
     writeSeqP2pEvents,
-    UnseqSink,
     emitKafkaTransactions,
     emitKafkaBlock,
     emitKafkaChainDetails,
@@ -21,7 +21,7 @@ module Blockchain.Sequencer.Kafka (
 ) where
 
 import           Conduit
-import           Control.Monad.Change.Modify (Accessible(..), Proxy(..))
+import           Control.Monad.Change.Modify (Outputs(..))
 import           Data.Binary                (Binary, decode, encode)
 
 import qualified Blockchain.Blockstanbul as PBFT
@@ -112,32 +112,25 @@ readFromTopic' topic offset = do
   --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}
 
-type UnseqSink k = [IngestEvent] -> k ()
-
-emitKafkaTransactions :: (MonadIO m, Accessible (UnseqSink m) m)
+emitKafkaTransactions :: (MonadIO m, m `Outputs` [IngestEvent])
                       => Origin.TXOrigin
                       -> [Transaction]
                       -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
-    sink <- access Proxy
-    sink ingestTxs
+    output ingestTxs
 
-emitKafkaBlock :: (Monad m, Accessible (UnseqSink m) m)
+emitKafkaBlock :: (m `Outputs` [IngestEvent])
                => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    sink <- access Proxy
-    sink [ingestBlock]
+    output [ingestBlock]
 
-emitKafkaChainDetails :: (MonadIO m, Accessible (UnseqSink m) m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
+emitKafkaChainDetails :: (m `Outputs` [IngestEvent]) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
 emitKafkaChainDetails origin chainId details = do
     let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
-    sink <- access Proxy
-    sink [ingestGenesis]
+    output [ingestGenesis]
 
-emitBlockstanbulMsg :: (MonadIO m, Accessible (UnseqSink m) m) => PBFT.WireMessage -> m ()
-emitBlockstanbulMsg wm = do
-  sink <- access Proxy
-  sink [IEBlockstanbul wm]
+emitBlockstanbulMsg :: (m `Outputs` [IngestEvent]) => PBFT.WireMessage -> m ()
+emitBlockstanbulMsg wm = output [IEBlockstanbul wm]

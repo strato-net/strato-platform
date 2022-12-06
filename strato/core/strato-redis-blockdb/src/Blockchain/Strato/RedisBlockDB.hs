@@ -21,6 +21,7 @@ module Blockchain.Strato.RedisBlockDB
     , revokeCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getTrueOrgNameChains, getFalseOrgNameChains, addOrgNameChain, removeOrgNameChain
+    , getOrgUnitsForOrg, getMembersInOrgUnit, getChainMembersFromSet, getCertFromParsedSet, modifyParsedSetFromCert, removeCertFromParsedSet
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getPrivateTransactions, addPrivateTransactions, getUncles
@@ -37,7 +38,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
-    , getSyncStatus, putSyncStatus
+    , getSyncStatus, putSyncStatus, getSyncStatusNow
     ) where
 
 import           BlockApps.X509.Certificate
@@ -52,7 +53,7 @@ import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.ChainMember
+import qualified Blockchain.Strato.Model.ChainMember   as CM
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
@@ -113,6 +114,8 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTrueOrgNameChains -> "pnct:"
             PrivateFalseOrgNameChains -> "pncf:"
             X509Certificates     -> "x509:"
+            ParsedSetWhitePage    -> "potu:"
+            ParsedSetToX509      -> "psx509:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -131,6 +134,8 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pnct" -> PrivateTrueOrgNameChains
   "pncf" -> PrivateFalseOrgNameChains
   "x509" -> X509Certificates
+  "potu:" -> ParsedSetWhitePage
+  "psx509:" -> ParsedSetToX509
   wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
@@ -166,19 +171,19 @@ putChainInfo cId cInfo = do
 --         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
-                -> Redis ChainMemberRSet
+                -> Redis CM.ChainMemberRSet
 getChainMembers cId = getInNamespace PrivateChainMembers cId >>= \case
-    Left _             -> return $ ChainMemberRSet $ rSetEmpty
-    Right Nothing      -> return $ ChainMemberRSet $ rSetEmpty
+    Left _             -> return $ CM.ChainMemberRSet $ rSetEmpty
+    Right Nothing      -> return $ CM.ChainMemberRSet $ rSetEmpty
     Right (Just rmems) -> let RedisChainMemberRSet mems = fromValue rmems
                            in return mems
 
 
 putChainMembers :: Word256
-                -> ChainMembers
+                -> CM.ChainMembers
                 -> Redis (Either Reply Status)
 putChainMembers cId mems = do
-    let rmems = RedisChainMemberRSet $ chainMembersToChainMemberRset mems
+    let rmems = RedisChainMemberRSet $ CM.chainMembersToChainMemberRset mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
         TxSuccess _ ->  addOrgNameChain mems cId
@@ -186,12 +191,12 @@ putChainMembers cId mems = do
         TxError e  -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
 addChainMember :: Word256
-               -> ChainMembers
+               -> CM.ChainMembers
                -> Redis (Either Reply Status)
 addChainMember cId newMem = do
-    ChainMemberRSet mems <- getChainMembers cId
-    let ChainMemberRSet newMemRset = chainMembersToChainMemberRset newMem
-        mems' = ChainMemberRSet $ mems `rSetUnion` newMemRset
+    CM.ChainMemberRSet mems <- getChainMembers cId
+    let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset newMem
+        mems' = CM.ChainMemberRSet $ mems `rSetUnion` newMemRset
         rmems = RedisChainMemberRSet mems'
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
@@ -228,9 +233,16 @@ registerCertificate contractAddress userAddr x509CertInfoState = do
         rightContract = contractAddress == Account 0x509 Nothing
 
     case parent of
-        -- Check that the event is emitted from the correct contract and its parent is valid
-        Just p  | parentIsValid && rightContract ->
-            fmap txToEither . multiExec $ updateParent p >> insertNewX509
+        -- The CertificateRegistry is initialized, this event it emitted from the right contract,
+        -- and the parent certificate is valid
+        Just p  | rightContract && parentIsValid -> do
+            res1 <- modifyParsedSetFromCert x509CertInfoState
+            res2 <- addParsedSet x509CertInfoState
+            res3 <- fmap txToEither . multiExec $ updateParent p >> insertNewX509
+            case (res1, res2, res3) of
+                (Right _, Right _, Right _) -> pure $ Right Ok
+                (Left e1, Left e2, Left e3) -> pure $ Left . SingleLine $ S8.pack (show e1) <> S8.pack (show e2) <> S8.pack (show e3)
+                (_, _, _) -> pure $ Left . SingleLine $ "registerCertificate failed."
 
         -- We can not register this certificate
         _ -> pure . Left . SingleLine $ "registerCertificate - invalid contractAddress, contract is not CertificateRegistry"
@@ -255,6 +267,7 @@ revokeCertificate contractAddress userAddress = do
                     case res of
                         TxSuccess _ -> do
                                 res2 <- mapM (revokeCertificate contractAddress) (children certInfoState)
+                                _ <- removeCertFromParsedSet certInfoState
                                 pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
                         TxAborted -> pure . Left $ SingleLine (S8.pack "revokeCertificate - Aborted revoking cert")
                         TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertificate - Error revoking cert" <> e)
@@ -300,25 +313,25 @@ addChainTxsInBlock bHash cId shas = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
-getTrueOrgNameChains :: ChainMembers
+getTrueOrgNameChains :: CM.ChainMembers
                  -> Redis (S.Set Word256)
 getTrueOrgNameChains org = getInNamespace PrivateTrueOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-getFalseOrgNameChains :: ChainMembers
+getFalseOrgNameChains :: CM.ChainMembers
                  -> Redis (S.Set Word256)
 getFalseOrgNameChains org = getInNamespace PrivateFalseOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-addOrgNameChain :: ChainMembers
+addOrgNameChain :: CM.ChainMembers
                 -> Word256
                 -> Redis (Either Reply Status)
 addOrgNameChain cm cId = do
-    chainsTrue <- getTrueOrgNameChains $ getTrueChainMemberParsedSets cm
+    chainsTrue <- getTrueOrgNameChains $ CM.getTrueChainMemberParsedSets cm
     let chains' = RedisOrgNameChains $ S.insert cId chainsTrue 
     res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chains')
     case res of
@@ -326,17 +339,107 @@ addOrgNameChain cm cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
         TxError e  -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
 
-removeOrgNameChain :: ChainMembers
+removeOrgNameChain :: CM.ChainMembers
                    -> Word256
                    -> Redis (Either Reply Status)
 removeOrgNameChain cm cId = do
-    chainsFalse<- getFalseOrgNameChains $ getFalseChainMemberParsedSets cm
+    chainsFalse<- getFalseOrgNameChains $ CM.getFalseChainMemberParsedSets cm
     let chains' = RedisOrgNameChains $ S.insert cId chainsFalse
     res <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
+
+getOrgUnitsForOrg :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
+getOrgUnitsForOrg (CM.Org o _) = getInNamespace ParsedSetWhitePage (CM.Org o True) <&> \case
+    Right (Just runits) -> let RedisOrgUnits units = fromValue runits
+                           in units
+    _ -> []
+getOrgUnitsForOrg _ = pure $ []
+
+getMembersInOrgUnit :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
+getMembersInOrgUnit (CM.OrgUnit o u _) = getInNamespace ParsedSetWhitePage (CM.OrgUnit o u True) <&> \case
+    Right (Just rmems) -> let RedisOrgUnitMembers mems = fromValue rmems
+                          in mems
+    _ -> []
+getMembersInOrgUnit _ = pure $ []
+
+getChainMembersFromSet :: CM.ChainMemberParsedSet -> Redis (Maybe [CM.ChainMemberParsedSet])
+getChainMembersFromSet cm = 
+    case cm of
+        CM.CommonName _ _ _ _ -> do
+            pure $ Just [cm]
+        CM.OrgUnit _ _ _ -> do
+            mems <- getMembersInOrgUnit cm
+            pure $ Just mems
+        CM.Org _ _ -> do
+            units <- getOrgUnitsForOrg cm
+            mems <- traverse getMembersInOrgUnit units
+            pure $ Just $ concat mems
+        CM.Everyone _ ->
+            pure $ Nothing
+
+getCertFromParsedSet :: CM.ChainMemberParsedSet -> Redis (Maybe X509CertInfoState)
+getCertFromParsedSet (CM.CommonName o u c _) = getInNamespace ParsedSetToX509 (CM.CommonName o u c True) >>= \case
+    Right (Just state) -> let certInfoState = fromValue state
+                          in pure $ Just certInfoState
+    _ -> pure $ Nothing
+getCertFromParsedSet _ = pure $ Nothing
+
+addParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
+addParsedSet (X509CertInfoState _ _ _ _ o u c) = do
+    let setOrg = CM.Org (T.pack o) True
+        setOrgUnit = CM.OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
+        setCommonName = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+    currentUnits <- getInNamespace ParsedSetWhitePage setOrg >>= \case
+        Right (Just runits) -> let units = fromValue runits
+                          in pure $ units
+        _ -> pure $ []
+    newUnits <- case setOrgUnit `elem` currentUnits of
+        True -> pure $ currentUnits
+        False -> pure $ currentUnits ++ [setOrgUnit]
+    orgAdd <- multiExec $ set (inNamespace ParsedSetWhitePage setOrg) (toValue newUnits) 
+    orgRes <- case orgAdd of
+                TxSuccess _ -> pure $ Right Ok
+                TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addParsedSet - Aborted")
+                TxError e   -> pure . Left $ SingleLine (S8.pack $ "addParsedSet - Error" ++ e)
+    currentMems <- getInNamespace ParsedSetWhitePage setOrgUnit >>= \case
+        Right (Just rmems) -> let mems = fromValue rmems
+                          in pure $ mems
+        _ -> pure $ []
+    newMems <- case setCommonName `elem` currentMems of
+        True -> pure $ currentMems
+        False -> pure $ currentMems ++ [setCommonName]
+    unitAdd <- multiExec $ set (inNamespace ParsedSetWhitePage setOrgUnit) (toValue newMems) 
+    unitRes <- case unitAdd of
+                TxSuccess _ -> pure $ Right Ok
+                TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addParsedSet - Aborted")
+                TxError e   -> pure . Left $ SingleLine (S8.pack $ "addParsedSet - Error" ++ e)
+    case (orgRes, unitRes) of
+        (Right _, Right _) -> pure $ Right Ok
+        (Left e1, Left e2) -> pure $ Left . SingleLine $ S8.pack (show e1) <> S8.pack (show e2)
+        (_, _) -> pure $ Left . SingleLine $ "This probably shouldn't happen."
+    
+
+modifyParsedSetFromCert :: X509CertInfoState -> Redis (Either Reply Status)
+modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
+    let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+    res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) (toValue certInfo)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "modifyParsedSetFromCert - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "modifyParsedSetFromCert - Error" ++ e)
+
+removeCertFromParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
+removeCertFromParsedSet (X509CertInfoState addr cert _ children o u c) = do
+    let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+    res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) $ toValue (X509CertInfoState addr cert False children o u c)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "revokeCertFromParsedSet - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "revokeCertFromParsedSet - Error" ++ e)
+
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -591,6 +694,11 @@ putBlocks :: Traversable t
           -> Redis (t (Either Reply Status))
 putBlocks = mapM putBlock
 
+
+--partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
+-- partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
+
+
 insertBlock :: Keccak256
             -> OutputBlock
             -> Redis (Either Reply Status)
@@ -601,7 +709,7 @@ insertBlock sha b = do
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
-                    (isJust . txAnchorChain)
+                    (isJust . (txChainId <=< otPrivatePayload))
                     (obReceiptTransactions b)
         swapPayload otx = case otPrivatePayload otx of
                                 Nothing -> Nothing
@@ -611,8 +719,8 @@ insertBlock sha b = do
         inNS'   = flip inNamespace sha
     unless (null fullPrivateTxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) fullPrivateTxs
-      forM_ (partitionWith txAnchorChain fullPrivateTxs) $ \(cId, ptxs') ->
+        map (txHash &&& ((fromJust . (txChainId <=< otPrivatePayload)) &&& id)) fullPrivateTxs 
+      forM_ (partitionWith (txChainId <=< otPrivatePayload)  fullPrivateTxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do
@@ -851,6 +959,22 @@ checkAndUpdateSyncStatus = do
         (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
         (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
         _ -> pure ()
+
+getSyncStatusNow :: Redis (Maybe Bool)
+getSyncStatusNow = do
+    status         <- getSyncStatus
+    if case status of Just True -> True; _ -> False; 
+        then pure  $ Just True
+        else do
+            nodeBestBlock  <- getBestBlockInfo
+            worldBestBlock <- getWorldBestBlockInfo
+            let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+                worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+            pure $ Just $  case (status, nodeTotalDiff, worldTotalDiff) of
+                (Just False, Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Just ntd, Just wtd) -> ntd >= wtd
+                (Nothing,    Nothing,  Just _  ) -> False
+                _ ->  True
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"

@@ -1,9 +1,12 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.Strato.Discovery.UDP (
   dataToPacket,
   sendPacket,
+  processDataStream',
   getServerPubKey,
   ndPacketToRLP,
   NodeDiscoveryPacket(..),
@@ -19,16 +22,15 @@ module Blockchain.Strato.Discovery.UDP (
   ) where
 
 import           Network.Socket
-import qualified Network.Socket.ByteString             as NB
 
 import           Control.Error                         (note)
-import           Control.Exception
+import           Control.Exception                     hiding (try)
+import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.IO.Class
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
 import           Data.List.Split
 import           Data.Maybe
@@ -37,10 +39,8 @@ import           Data.Time.Clock.POSIX
 import qualified Network.URI                           as URI
 import           Numeric
 import           System.Endian
-import           System.Timeout
 
 import           BlockApps.Logging
-import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
 import           Blockchain.Strato.Model.ExtendedWord
@@ -51,6 +51,7 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as CL
 import           Text.Format
+import           UnliftIO
 
 data NodeDiscoveryPacket =
   Ping Integer Endpoint Endpoint Integer |
@@ -113,10 +114,10 @@ instance RLPSerializable IAddr where
     where word128 = rlpDecode o::Word128
   rlpDecode x = error $ "bad type for rlpDecode for IAddr: " ++ show x
 
-data Endpoint = Endpoint IAddr Word16 Word16 deriving (Show, Read, Eq)
+data Endpoint = Endpoint IAddr UDPPort TCPPort deriving (Show, Read, Eq)
 
 instance Format Endpoint where
-  format (Endpoint address udpPort tcpPort) = format address ++ ":" ++ show udpPort ++ "/" ++ show tcpPort
+  format (Endpoint address (UDPPort udpPort) (TCPPort tcpPort)) = format address ++ ":" ++ show udpPort ++ "/" ++ show tcpPort
 
 data Neighbor = Neighbor Endpoint NodeID deriving (Show, Read, Eq)
 
@@ -124,26 +125,24 @@ instance Format Neighbor where
   format (Neighbor endpoint nodeID) = format endpoint ++ ", " ++ format nodeID
 
 instance RLPSerializable Endpoint where
-    rlpEncode (Endpoint address udpPort tcpPort) = RLPArray [rlpEncode address, rlpEncode udpPort, rlpEncode tcpPort]
+    rlpEncode (Endpoint address (UDPPort udpPort) (TCPPort tcpPort)) = RLPArray [rlpEncode address, rlpEncode $ toInteger udpPort, rlpEncode $ toInteger tcpPort]
 --    rlpDecode (RLPArray [address, udpPort, tcpPort]) = Endpoint (stringToIAddr $ rlpDecode address) (rlpDecode udpPort) (rlpDecode tcpPort)
-    rlpDecode (RLPArray [address, udpPort, tcpPort]) = Endpoint (rlpDecode address) (rlpDecode udpPort) (rlpDecode tcpPort)
+    rlpDecode (RLPArray [address, udpPort, tcpPort]) = Endpoint (rlpDecode address) (UDPPort . fromInteger $ rlpDecode udpPort) (TCPPort . fromInteger $ rlpDecode tcpPort)
     rlpDecode x = error $ "unsupported rlp in rlpDecode for Endpoint: " ++ show x
 
 instance RLPSerializable Neighbor where
-  rlpEncode (Neighbor (Endpoint address udpPort tcpPort) nodeID) =
-    RLPArray [rlpEncode address, rlpEncode udpPort, rlpEncode tcpPort, rlpEncode nodeID]
+  rlpEncode (Neighbor (Endpoint address (UDPPort udpPort) (TCPPort tcpPort)) nodeID) =
+    RLPArray [rlpEncode address, rlpEncode $ toInteger udpPort, rlpEncode $ toInteger tcpPort, rlpEncode nodeID]
   rlpDecode (RLPArray [address, udpPort, tcpPort, nodeID]) =
-    Neighbor (Endpoint (rlpDecode address) (rlpDecode udpPort) (rlpDecode tcpPort)) (rlpDecode nodeID)
+    Neighbor (Endpoint (rlpDecode address) (UDPPort . fromInteger $ rlpDecode udpPort) (TCPPort . fromInteger $ rlpDecode tcpPort)) (rlpDecode nodeID)
   rlpDecode x = error $ "unsupported rlp in rlpDecode for Neighbor: " ++ show x
 
 peerToNeighbor :: PPeer -> Either DiscoverException Neighbor
-peerToNeighbor p' = do
-  -- TODO(tim): Reenable port selection
-  let p = p'{pPeerUdpPort=30303, pPeerTcpPort=30303}
+peerToNeighbor p = do
   pubKey <- note NoPublicKeyException (pPeerPubkey p)
   let endpoint = Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
-                          (fromIntegral $ pPeerUdpPort p)
-                          (fromIntegral $ pPeerTcpPort p)
+                          (UDPPort . fromIntegral $ pPeerUdpPort p)
+                          (TCPPort . fromIntegral $ pPeerTcpPort p)
   return $ Neighbor endpoint $ pointToNodeID pubKey
 
 getHostAddress :: SockAddr -> Either DiscoverException IAddr
@@ -151,7 +150,8 @@ getHostAddress (SockAddrInet _ x) = Right $ IPV4Addr x
 getHostAddress x                  = Left $ IPFormatException $ "Unsupported case in sockAddrToHostAddr: " ++ show x
 
 ndPacketToRLP :: NodeDiscoveryPacket -> (Word8, RLPObject)
-ndPacketToRLP (Ping ver (Endpoint ipFrom udpPortFrom tcpPortFrom) (Endpoint ipTo udpPortTo tcpPortTo) expiration) =
+ndPacketToRLP (Ping ver (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom))
+                        (Endpoint ipTo (UDPPort udpPortTo) (TCPPort tcpPortTo)) expiration) =
   (1, RLPArray [rlpEncode ver,
                 RLPArray [
                 rlpEncode ipFrom,
@@ -162,11 +162,12 @@ ndPacketToRLP (Ping ver (Endpoint ipFrom udpPortFrom tcpPortFrom) (Endpoint ipTo
                 rlpEncode $ toInteger udpPortTo,
                 rlpEncode $ toInteger tcpPortTo],
                 rlpEncode expiration])
-ndPacketToRLP (Pong (Endpoint ipFrom udpPortFrom tcpPortFrom) tok expiration) = (2, RLPArray [RLPArray [ rlpEncode ipFrom,
-                                                                                                         rlpEncode $ toInteger udpPortFrom,
-                                                                                                         rlpEncode $ toInteger tcpPortFrom],
-                                                                                                         rlpEncode tok,
-                                                                                                         rlpEncode expiration])
+ndPacketToRLP (Pong (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom)) tok expiration) =
+  (2, RLPArray [RLPArray [ rlpEncode ipFrom,
+                           rlpEncode $ toInteger udpPortFrom,
+                           rlpEncode $ toInteger tcpPortFrom],
+                           rlpEncode tok,
+                           rlpEncode expiration])
 ndPacketToRLP (FindNeighbors target expiration) = (3, RLPArray [rlpEncode target, rlpEncode expiration])
 ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rlpEncode neighbors, rlpEncode expiration])
 
@@ -193,12 +194,11 @@ dataToPacket msg = do
         typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
         typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
 
-sendPacket :: (HasVault m, MonadIO m, MonadLogger m)
-           => Socket
-           -> SockAddr
+sendPacket :: (HasVault m, MonadLogger m, A.Replaceable SockAddr B.ByteString m)
+           => SockAddr
            -> NodeDiscoveryPacket
            -> m ()
-sendPacket sock addr packet = do
+sendPacket addr packet = do
   $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
   let (theType', theRLP) = ndPacketToRLP packet
       theData = rlpSerialize theRLP
@@ -208,8 +208,7 @@ sendPacket sock addr packet = do
   let sigBS = exportSignature sig
       theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
-  _ <- liftIO $ NB.sendTo sock ( theHash <> sigBS <> B.singleton theType' <> theData) addr
-  return ()
+  A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
 
 processDataStream'::B.ByteString-> PublicKey
 processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
@@ -232,8 +231,6 @@ processDataStream' bs =
         then error "bad UDP data sent from peer, the hash isn't correct"
         else fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
-newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
-
 nodeIDToPoint::NodeID->Point
 nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
 nodeIDToPoint (NodeID nodeID) = Point x y
@@ -245,36 +242,25 @@ pointToNodeID::Point->NodeID
 pointToNodeID PointO      = error "called pointToNodeID with PointO, we can't handle that yet"
 pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
-instance RLPSerializable NodeID where
-  rlpEncode (NodeID x) = RLPString x
-  rlpDecode (RLPString x) = NodeID x
-  rlpDecode x             = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
-
-instance Format NodeID where
-  format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
-
 
 
 data UDPException = UDPTimeout deriving (Show)
 
 instance Exception UDPException where
 
-getSocket :: HostName -> PortNumber -> IO Socket
-getSocket domain _ = do
-  -- TODO(tim): Reenable port selection
-  let port = 30303 :: Int
-  (serveraddr:_) <- getAddrInfo Nothing (Just domain) (Just $ show port)
-  s <- socket (addrFamily serveraddr) Datagram defaultProtocol
-  _ <- connect s (addrAddress serveraddr)
-  return s
-
-getServerPubKey :: (HasVault m, MonadIO m) => String -> PortNumber -> m (Either SomeException Point)
-getServerPubKey domain _ = do
-    -- TODO(tim): Reenable port selection
+getServerPubKey :: ( HasVault m
+                   , MonadUnliftIO m
+                   , A.Selectable (IPAsText, UDPPort, B.ByteString) Point m
+                   )
+                => PPeer -> m (Either SomeException Point)
+getServerPubKey peer = do
     timestamp <- liftIO $ fmap round getPOSIXTime
-    let (theType, theRLP) =
+    let domain = IPAsText $ pPeerIp peer
+        udpPort = UDPPort $ pPeerUdpPort peer
+        tcpPort = TCPPort $ pPeerTcpPort peer
+        (theType, theRLP) =
             ndPacketToRLP $
-            Ping 4 (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (timestamp + 50)
+            Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . T.unpack $ pPeerIp peer) udpPort tcpPort) (timestamp + 50)
         theData = rlpSerialize theRLP
         theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
     
@@ -283,19 +269,8 @@ getServerPubKey domain _ = do
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
         theMsg = theHash <> sigBS <> B.singleton theType <> theData
 
-    liftIO $ withSocketsDo $ bracket (getSocket domain port) close (talk theMsg)
-  where
-    port = 30303
-    talk :: B.ByteString -> Socket -> IO (Either SomeException Point)
-    talk msg socket' = do
-      _ <- NB.send socket' msg 
-
-      --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
-      --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe PublicKey))
-
-      case pubKey of
-        Right Nothing  -> return $ Left $ SomeException UDPTimeout
-        Left x         -> return $ Left x
-        Right (Just x) -> return $ Right $ secPubKeyToPoint x
-
+    pubKey <- try $ A.select (A.Proxy @Point) (domain, udpPort, theMsg)
+    case pubKey of
+      Right Nothing  -> return $ Left $ SomeException UDPTimeout
+      Left x         -> return $ Left x
+      Right (Just x) -> return $ Right x

@@ -12,10 +12,10 @@ import           Control.DeepSeq
 import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
-import           Data.Map                as M
+-- import           Data.Map                as M
 
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
+-- import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 
 import           Blockchain.VM.SolidException
@@ -26,7 +26,7 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.Stream.Action      (Action)
 import           Blockchain.VMOptions
 
-import           BlockApps.X509.Certificate
+-- import           BlockApps.X509.Certificate
 
 data ExecResults =
   ExecResults {
@@ -41,11 +41,12 @@ data ExecResults =
     erAction             :: Maybe Action,
     erException          :: Maybe (Either SolidException VMException),
     erKind               :: CodeKind,
-    erNewX509Certs       :: M.Map Address X509Certificate,
+    -- erNewX509Certs       :: M.Map Address X509Certificate,
     erPragmas            :: [(String, String)]
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
+
 
 
 calculateReturned :: Transaction -> ExecResults -> Integer
@@ -77,7 +78,8 @@ errorResults ck remainingGas e =
     , erAction = Nothing
     , erException = Just e
     , erKind = ck
-    , erNewX509Certs = M.empty
+    -- , erNewX509Certs = M.empty
     , erPragmas=[]
     }
+
 

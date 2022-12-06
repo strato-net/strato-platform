@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators  #-}
 module Blockchain.SolidVM.Simple
   ( SolidVM.SolidVMBase
   , SolidVMTxArgs(..)
@@ -133,7 +134,7 @@ createErr = err "create"
 callErr :: String -> a
 callErr = err "call"
 
-create :: SolidVM.SolidVMBase m
+create :: (SolidVM.SolidVMBase m)
        => SolidVMCreateArgs
        -> m ExecResults
 create s = SolidVM.create
@@ -153,7 +154,7 @@ create s = SolidVM.create
   (s ^. createArgs . argsChainId)
   (s ^. createArgs . argsMetadata)
 
-call :: SolidVM.SolidVMBase m
+call :: (SolidVM.SolidVMBase m)
      => SolidVMCallArgs
      -> m ExecResults
 call s = SolidVM.call

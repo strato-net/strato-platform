@@ -46,6 +46,8 @@ data BlockDBNamespace = Headers
                       | PrivateTrueOrgNameChains
                       | PrivateFalseOrgNameChains
                       | X509Certificates
+                      | ParsedSetWhitePage
+                      | ParsedSetToX509
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -120,6 +122,14 @@ instance RedisDBValuable RedisChainMemberRSet where
     toValue (RedisChainMemberRSet c) = toStrict $ encode c
     fromValue = RedisChainMemberRSet . decode . fromStrict
 
+instance RedisDBValuable RedisOrgUnits where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisOrgUnitMembers where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
 instance RedisDBValuable RedisChainTxsInBlocks where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
@@ -160,9 +170,9 @@ newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
+newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
 --newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
-
-
 
     -- instance RLPSerializable RedisChainMemberRSet where
     --   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
@@ -179,6 +189,14 @@ instance RLPSerializable RedisOrgIdChains where
 instance RLPSerializable RedisOrgNameChains where
   rlpEncode (RedisOrgNameChains s) = rlpEncode $ S.toList s
   rlpDecode = RedisOrgNameChains . S.fromList . rlpDecode
+
+instance RLPSerializable RedisOrgUnits where
+  rlpEncode (RedisOrgUnits s) = rlpEncode $ s
+  rlpDecode = RedisOrgUnits . rlpDecode
+
+instance RLPSerializable RedisOrgUnitMembers where
+  rlpEncode (RedisOrgUnitMembers s) = rlpEncode $ s
+  rlpDecode = RedisOrgUnitMembers . rlpDecode
 
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
@@ -210,5 +228,7 @@ displayForNamespace ns input = case ns of
     PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     --Validators           -> format (fromValue input :: [Address])
     X509Certificates     -> format (fromValue input :: Address)
+    ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
+    ParsedSetToX509 ->  format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
