@@ -33,11 +33,11 @@ endif
 
 $(info )
 
-all: build_all docker-compose
+all: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
+.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -69,6 +69,10 @@ get_solcs:
 			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
 		" ;\
 	fi
+
+eks:
+	@echo Now generating eks-deployment.yaml file
+	cd devops/eks && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-deployment.tpl.yaml > eks-deployment.yaml
 
 build_buildbase:
 	@echo building buildbase...

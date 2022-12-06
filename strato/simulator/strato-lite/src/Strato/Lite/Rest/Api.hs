@@ -3,25 +3,32 @@
 {-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
 {-# LANGUAGE TypeOperators     #-} -- DEBUGGING
 {-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Strato.Lite.Rest.Api
   ( ThreadResultMap
+  , AddNodeParams(..)
+  , PostTxParams(..)
   , StratoLiteRestAPI
   , stratoLiteRestAPI
   ) where
 
+import           Data.Aeson
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
+import           GHC.Generics
 import           Servant
-import           Blockchain.Data.Json
+import           Blockchain.Data.AlternateTransaction
 
 type ThreadResultMap = M.Map T.Text (Maybe (Either String ()))
 
 type StratoLiteRestAPI = GetNodes
                     :<|> GetConnections
+                    :<|> GetChainInfo
+                    :<|> GetPeers
                     :<|> PostAddNode
                     :<|> PostRemoveNode
                     :<|> PostAddConnection
@@ -30,10 +37,13 @@ type StratoLiteRestAPI = GetNodes
                     :<|> PostTx
 
 type GetNodes = "nodes" :> Get '[JSON] ThreadResultMap
+type GetPeers = "nodes" :> Capture "nodeLabel" T.Text :> "peers" :> Get '[JSON] [T.Text]
 type GetConnections = "connections" :> Get '[JSON] ThreadResultMap
+type GetChainInfo = "chainInfo" :> Capture "nodeLabel" T.Text
+                                :> Get '[JSON] ThreadResultMap
 type PostAddNode = "node" :> Capture "nodeLabel" T.Text 
                           :> "add"
-                          :> ReqBody '[JSON] T.Text
+                          :> ReqBody '[JSON] AddNodeParams
                           :> Post '[JSON] Bool
 type PostRemoveNode = "node" :> Capture "nodeLabel" T.Text
                              :> "remove"
@@ -47,7 +57,18 @@ type PostRemoveConnection = "connection" :> Capture "server" T.Text
                                          :> "remove"
                                          :> Post '[JSON] Bool
 type PostTimeout = "timeout" :> ReqBody '[JSON] Int :> Post '[JSON] ()
-type PostTx = "tx" :> ReqBody '[JSON] Transaction' :> Post '[JSON] ()
+
+data AddNodeParams = AddNodeParams
+  { _ip :: T.Text
+  , _bootNodes :: [T.Text]
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+data PostTxParams = PostTxParams
+  { _tx :: UnsignedTransaction
+  , _metadata :: M.Map T.Text T.Text
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type PostTx = "node" :> Capture "nodeLabel" T.Text :> "tx" :> ReqBody '[JSON] PostTxParams :> Post '[JSON] ()
 -- type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 -- type PutResume = "resume" :> Put '[JSON] DebuggerStatus
 -- type GetBreakpoints = "breakpoints" :> Get '[JSON] [Breakpoint]

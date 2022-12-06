@@ -11,6 +11,7 @@ ghc-options: -Wall -O2 -threaded
 
 dependencies:
   - base
+  - x509-certs
 
 library:
   source-dirs: src/
