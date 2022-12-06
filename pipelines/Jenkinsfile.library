@@ -215,7 +215,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        // sh "sed -i 's/static/default/g' docker-compose.yml"
+        sh "sed -i 's/static/default/g' docker-compose.yml"
         if(appName == 'beanstalk') {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
@@ -344,7 +344,7 @@ def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsP
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        // sh "sed -i 's/static/default/g' docker-compose.yml"
+        sh "sed -i 's/static/default/g' docker-compose.yml"
         writeFile file: "run-app.sh", text: """
 #!/bin/bash
 set -e
@@ -892,7 +892,7 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
     echo "Waiting for network nodes to be in-sync and healthy..."
     int counter = 0
     int restartEveryHour = 0
-    for (int i = 0; i < 6000; i++) {
+    for (int i = 0; i < 12000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         // Restart strato container once sync is done or every 30 mins (USED FOR MEMORY LEAK ISSUE)
         // if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
@@ -956,7 +956,7 @@ def waitForCirrus() {
 //       -H \"Authorization: Bearer ${accessToken}\"  \
 //       -H 'Accept: application/json;charset=utf-8' \
 //       -H 'Content-Type: application/json' \
-//       --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+//       --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
 //     ).trim()
 //   }
 // }
@@ -969,7 +969,7 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
-    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
+    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
     | jq '.[].txResult.contractsCreated'"
   ).trim()
   return CONTRACT_ADDRESS

@@ -1,4 +1,3 @@
-pragma solidvm 3.0;
 contract qq {
     function f() public pure {}
     constructor() public {

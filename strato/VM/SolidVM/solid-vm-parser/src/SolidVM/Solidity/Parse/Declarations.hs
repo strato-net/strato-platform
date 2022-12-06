@@ -108,16 +108,14 @@ solidityContract = do
       )
   where
     parseOverloads :: String -> SolidVM.Func -> SolidVM.Func -> SolidVM.Func
-    parseOverloads pragmaVersion' new old = do
-      if (pragmaVersion' /= "3.4") 
-        then duplicateDefinition "Function overloading is not supported below pragma solidvm 3.4" $ SolidVM._funcContext new
-        else do let oldParamTypes = fmap snd $ SolidVM._funcArgs old
-                    newParamTypes = fmap snd $ SolidVM._funcArgs new
-                    overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
-                if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
-                  then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
-                  else
-                    old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
+    parseOverloads _ new old = do
+      let oldParamTypes = fmap snd $ SolidVM._funcArgs old
+          newParamTypes = fmap snd $ SolidVM._funcArgs new
+          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
+       in if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
+            else
+              old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
 
 --  where -- constants = byMutability True (repeat 0)
@@ -144,8 +142,6 @@ solidityContract = do
 -- | Parses a free function
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
-  pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "Free functions/File level functions are not supported below pragma solidvm 3.4" 
   (fname, (FuncDeclaration a)) <- functionDeclaration True
   when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
   return $ FLFunc fname $ SolidVM.Func 
@@ -214,8 +210,6 @@ structDeclaration = do
 
 solidityFLStruct :: SolidityParser SourceUnit
 solidityFLStruct = do
-  pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "File level structs are not supported below pragma solidvm 3.4" 
   ~(a, (structName, structFields)) <- withPosition $ do
     reserved "struct"
     structName <- identifier
@@ -236,8 +230,6 @@ solidityFLStruct = do
 
 solidityFLEnum :: SolidityParser SourceUnit
 solidityFLEnum = do
-  pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "File level enums are not supported below pragma solidvm 3.4" 
   ~(a, (enumName, enumFields)) <- withPosition $ do
     reserved "enum"
     enumName <- identifier
@@ -256,7 +248,6 @@ solidityFLEnum = do
 solidityFLError :: SolidityParser SourceUnit
 solidityFLError = do
   pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "File level custom errors are not supported below pragma solidvm 3.4" 
   ~(a, (errorName, errorArgs)) <- withPosition $ do
     reserved "error"
     errorName <- identifier
@@ -335,7 +326,6 @@ public keywords =
 solidityFLConstant :: SolidityParser SourceUnit
 solidityFLConstant = do
   pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "File level constants are not supported below pragma solidvm 3.4" 
   start <- getSourcePosition
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
@@ -383,7 +373,6 @@ simpleVariableDeclaration = do
   let ctx = SourceAnnotation start end ()
   let isImmutable  = KImmutable  `elem` keywords
   let isConstant   = KConstant  `elem` keywords
-  when (isImmutable && pragmaVersion' /= "3.4") $ fail "Immutable variables are not supported below pragma solidvm 3.4"
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
@@ -391,7 +380,6 @@ simpleVariableDeclaration = do
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do
   pragmaVersion' <- getPragmaVersion
-  when (pragmaVersion' /= "3.4") $ fail "Custom errors are not supported below pragma solidvm 3.4" 
   start <- getSourcePosition
   reserved "error"
   errorName <- identifier
@@ -490,30 +478,26 @@ eventDeclaration = do
 -- that use modifiers.
 modifierDeclaration :: SolidityParser (String, Declaration)
 modifierDeclaration = do
-  pragmaVersion' <- getPragmaVersion
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  if (pragmaVersion' /= "3.3" && pragmaVersion' /= "3.4")
-    then unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
-    else do
-      args <- option [] tupleDeclaration
-      contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
-      end <- getSourcePosition
-      let ctx = SourceAnnotation start end ()
-          nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
-      return
-        (
-          name,
-          ModifierDeclaration Xabi.Modifier{
-            Xabi._modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
-              Map.fromList $
-                zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
-          , Xabi._modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-          , Xabi._modifierContents = contents -- :: Maybe [Statement]
-          , Xabi._modifierContext = ctx
-          }
-        )
+  args <- option [] tupleDeclaration
+  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+  end <- getSourcePosition
+  let ctx = SourceAnnotation start end ()
+      nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
+  return
+    (
+      name,
+      ModifierDeclaration Xabi.Modifier{
+        Xabi._modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
+          Map.fromList $
+            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
+      , Xabi._modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+      , Xabi._modifierContents = contents -- :: Maybe [Statement]
+      , Xabi._modifierContext = ctx
+      }
+    )
 
 {- Not really declarations -}
 
@@ -582,10 +566,8 @@ functionModifiers = do
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     constructorCallModifiersOrOtherModifiers = do 
-      pVersion <- getPragmaVersion
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
-      when ((pVersion == "3.0" || pVersion == "") && isNothing exps) $ fail "modifiers are not supported below pragma solidvm 3.0"
       return (name, fromMaybe [] exps) 
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
@@ -671,25 +653,6 @@ inCommentSingle
 --To make a new reserved word with a specific pragma version please add to the following function list, 
   -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
 isReservedWord :: String -> String -> Bool
-isReservedWord version reservedWord = do
+isReservedWord version _ = do
   case version of
-    "3.2" -> do 
-      case reservedWord of
-        "account" -> True
-        _ -> False
-    "3.3" -> do
-      case reservedWord of
-        "block_number" -> True
-        "block_timestamp" -> True
-        "block_hash" -> True
-        "record_id" -> True
-        "transaction_hash" -> True
-        "transaction_sender" -> True
-        "salt" -> True
-        _ -> isReservedWord "3.2" reservedWord
-    "3.4" -> do
-      case reservedWord of
-        "error" -> True
-        "throw" -> True
-        _ -> isReservedWord "3.3" reservedWord
     _ -> False

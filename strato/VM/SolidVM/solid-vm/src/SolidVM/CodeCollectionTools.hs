@@ -27,8 +27,8 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-xabiToContract :: SolidString -> [SolidString] -> String -> M.Map String String -> Xabi -> SolidEither Contract
-xabiToContract contractName' parents' vmVersion' userDefinedTypes xabi = do
+xabiToContract :: SolidString -> [SolidString] -> M.Map String String -> Xabi -> SolidEither Contract
+xabiToContract contractName' parents' userDefinedTypes xabi = do
   validateXabi xabi
   constr <- case M.toList $ Xabi._xabiConstr xabi of
     [] -> Right Nothing
@@ -49,7 +49,6 @@ xabiToContract contractName' parents' vmVersion' userDefinedTypes xabi = do
   _functions = Xabi._xabiFuncs xabi,
   _modifiers = Xabi._xabiModifiers xabi,
   _constructor = constr,
-  _vmVersion = vmVersion',
   _contractContext = Xabi._xabiContext xabi
   }
 

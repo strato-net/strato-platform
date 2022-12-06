@@ -303,20 +303,17 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToHistories :: (MonadIO m, MonadLogger m) =>
-                  IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> OLD.Contract
+rowToHistories :: (MonadIO m) =>
+                  IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
                -> m [ProcessedContract]
-rowToHistories gref abiid row actions cont oldState = do
-  hist <- isHistoric gref $ historyTableName (actionOrganization row) (actionApplication row) (aiName abiid)
-  if not hist
-    then pure []
-    else flip evalStateT oldState . forM actions $ \hRow -> do
-      modify $ case actionStorage hRow of
-                  Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
-                  Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-      newMap <- gets Map.fromList
-      return $ processedContract abiid newMap hRow
+rowToHistories _ abiId actions cont oldState = do
+  flip evalStateT oldState . forM actions $ \hRow -> do
+    modify $ case actionStorage hRow of
+                Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
+                Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
+    newMap <- gets Map.fromList
+    return $ processedContract abiId newMap hRow
 
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
@@ -417,7 +414,7 @@ getEVMInserts g row actions acct = do
       -- adjustGlobals g row details
       oldState <- readPreviousEVMState g acct cont
       indexContract <- rowToInsert g abiid row cont oldState
-      hs <- rowToHistories g abiid row actions cont oldState
+      hs <- rowToHistories g abiid actions cont oldState
       pure . Right $ BatchedInserts indexContract hs
 
 getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
@@ -456,24 +453,21 @@ processTheMessages env sqlEnv conn g messages = do
 
                 let htn = historyTableName o a n
                     historyTableNames = map (historyTableName o a) hl
-                    historyEnabled = htn `elem` historyTableNames
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
                 historyStatus <- historyStatusCreated g htn
                 when (not historyStatus) $ do
-                  -- history status is not defined, so set it to whether or not this is found in the history list
-                  setHistoryTable g htn historyEnabled
+                  -- creates a history table for all contracts in the CodeCollection
+                  setHistoryTable g htn True
 
-                hasHistoryTable <- isHistoric g htn
-
-                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
+                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
                 let nameParts = (o, a, n)
 
                 deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
-                when hasHistoryTable $
-                  outputData conn $ createExpandHistoryTable g c nameParts
+-- mark
+                outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn . createEventTables g $ contractToEventTables nameParts c
 
@@ -515,7 +509,7 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          hs <- rowToHistories g abiid row actions cont oldState
+          hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs
 
@@ -547,3 +541,4 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+  

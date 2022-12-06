@@ -95,6 +95,7 @@ Object {
   "contracts": Object {},
   "error": "ERROR",
   "filter": "",
+  "isLoading": false,
 }
 `;
 
@@ -136,6 +137,7 @@ Object {
   },
   "error": null,
   "filter": "",
+  "isLoading": false,
 }
 `;
 
@@ -173,6 +175,7 @@ Object {
   },
   "error": null,
   "filter": "",
+  "isLoading": false,
 }
 `;
 
@@ -214,6 +217,7 @@ Object {
   },
   "error": null,
   "filter": "Just to test filter",
+  "isLoading": true,
 }
 `;
 
@@ -393,5 +397,6 @@ Object {
   "contracts": Object {},
   "error": null,
   "filter": "",
+  "isLoading": false,
 }
 `;

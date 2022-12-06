@@ -31,11 +31,9 @@ const label = 'My chain label';
 const src = 'contract Governance { uint constant TEN = 10; }';
 const args = {};
 const members = [{
-    address: "00000000000000000000000000000000deadbeef"
-  , enode: "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
+    orgName: "BlockApps"
   }, {
-    address: "0000000000000000000000000000000012345678"
-  , enode: "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+    orgName: "Microsoft"
   }];
 const balances = [
            { address: "00000000000000000000000000000000deadbeef"
@@ -70,9 +68,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const mems = [{address: alice.address, enode: members[0].enode}
-                 ,{address: bob.address, enode: members[1].enode}
-		 ];
+    const mems = members;
     for(var i = 0; i < 100; i++) {
     const chainId = await rest.createChain(ouser1, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     console.log('###CHAINID###',chainId);
@@ -96,9 +92,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const mems = [{address: alice.address, enode: members[0].enode}
-                 ,{address: bob.address, enode: members[1].enode}
-		 ];
+    const mems = members;
     const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
@@ -152,9 +146,7 @@ describe("Create Chain", function() {
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
-    const mems = [{address: alice.address, enode: members[0].enode}
-                  ,{address: bob.address, enode: members[1].enode}
-		             ];
+    const mems = members;
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -178,9 +170,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                   ,{ address: bob.address, balance: 0}
                  ];
-    const mems = [{address: alice.address, enode: members[0].enode}
-                  ,{address: bob.address, enode: members[1].enode}
-		             ];
+    const mems = members;
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -209,9 +199,7 @@ describe("Create Chain", function() {
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
 
-    const mems = [{address: alice.address, enode: members[0].enode}
-                  ,{address: bob.address, enode: members[1].enode}
-		             ];
+    const mems = members;
     const bals = [{ address: alice.address, balance: 0}
                  ,{ address: bob.address, balance: 0}
                  ];
@@ -251,9 +239,7 @@ describe("Create Chain", function() {
     assert.notEqual(main.address, 0, "should be a nonzero address");
 
     // create chain with codePtr
-    const mems = [{address: alice.address, enode: members[0].enode}
-                  ,{address: bob.address, enode: members[1].enode}
-		             ];
+    const mems = members;
     const bals = [{ address: alice.address, balance: 1000000}
                  ,{ address: bob.address, balance: 10000000}
                  ];

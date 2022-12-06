@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
+import           Blockchain.Options ()
+import           Blockchain.VMOptions ()
+import           Executable.EVMFlags ()
 import           HFlags
 import           Strato.Lite
 import           Strato.Lite.Options
@@ -13,8 +16,4 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Strato Lite"
   let nodesRes = eitherDecode . BL.fromStrict $ BC.pack flags_nodes
-      connectionsRes = eitherDecode . BL.fromStrict $ BC.pack flags_connections
-  case (nodesRes, connectionsRes) of
-    (Right n, Right c) -> runStratoLite n c
-    (Left e, _) -> error e
-    (_, Left e) -> error e
+  either error runStratoLite nodesRes

@@ -16,6 +16,10 @@ BlockData
     mixHash Keccak256
     deriving Eq Read Show Generic Data
 
+ValidatorRef
+    address Address
+    deriving Eq Read Show
+
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
@@ -180,10 +184,9 @@ ChainSignatureRef
     v Word8
     deriving Eq Generic Show
 
-ChainMemberRef
+ChainMemberParsedRef
     chainInfoId ChainInfoRefId
-    name String
-    address Address
+    chainMember ChainMemberParsedSet
     deriving Eq Generic Show
 
 AccountInfoRef

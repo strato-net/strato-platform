@@ -27,6 +27,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.ChainMember
 import           Text.Format
 
 data BlockDBNamespace = Headers
@@ -40,11 +41,14 @@ data BlockDBNamespace = Headers
                       | PrivateChainMembers
                       | PrivateTransactions
                       | PrivateTxsInBlocks
-                      | PrivateIPChains
-                      | PrivateOrgIdChains
                       | PrivateOrgNameChains
+                      -- | Validators
+                      | PrivateTrueOrgNameChains
+                      | PrivateFalseOrgNameChains
                       | X509Certificates
                       | X509Initialized
+                      | ParsedSetWhitePage
+                      | ParsedSetToX509
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -66,11 +70,15 @@ instance RedisDBValuable Account where
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode
 
-instance RedisDBKeyable (String, Maybe String) where
-    toKey (n, u) = SB16.encode . S8.pack $ (n ++ maybeSnd)
+instance RedisDBKeyable (String, Maybe String, Maybe String) where
+    toKey (n, u, c) = SB16.encode . S8.pack $ (n ++ maybeSnd ++ maybeThrd)
         where maybeSnd = case u of
+                Nothing -> "/"
+                Just a  -> "/" ++ a
+              maybeThrd = case c of
                 Nothing -> ""
                 Just a  -> "/" ++ a
+
 instance RedisDBValuable S8.ByteString where
     toValue   = SB16.encode
     fromValue x = case SB16.decode x of
@@ -79,6 +87,15 @@ instance RedisDBValuable S8.ByteString where
 
 instance RedisDBKeyable Keccak256 where
     toKey = S8.pack . keccak256ToHex
+
+-- instance RedisDBValuable ChainMemberParsedSet where
+--     toValue = toStrict . encode
+--     fromValue = decode . fromStrict
+instance RedisDBKeyable ChainMemberParsedSet where
+    toKey = toStrict . encode
+
+instance RedisDBKeyable ChainMembers where
+    toKey = toStrict . encode
 
 instance RedisDBValuable Keccak256 where
     toValue   = S8.pack . keccak256ToHex
@@ -102,7 +119,15 @@ instance RedisDBValuable RedisChainInfo where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
-instance RedisDBValuable RedisChainMembers where
+instance RedisDBValuable RedisChainMemberRSet where
+    toValue (RedisChainMemberRSet c) = toStrict $ encode c
+    fromValue = RedisChainMemberRSet . decode . fromStrict
+
+instance RedisDBValuable RedisOrgUnits where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisOrgUnitMembers where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
@@ -112,14 +137,6 @@ instance RedisDBValuable RedisChainTxsInBlocks where
 
 instance RedisDBKeyable IPAddress where
     toKey = S8.pack . showIP
-
-instance RedisDBValuable RedisIPChains where
-    toValue   = rlpSerialize . rlpEncode
-    fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisOrgIdChains where
-    toValue   = rlpSerialize . rlpEncode
-    fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBValuable RedisOrgNameChains where
     toValue   = rlpSerialize . rlpEncode
@@ -149,11 +166,18 @@ newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Rea
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving newtype (Eq, Read, Show, RedisDBValuable)
 newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Show, RLPSerializable)
-newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainMemberRSet = RedisChainMemberRSet ChainMemberRSet deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
+newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
+--newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
+
+    -- instance RLPSerializable RedisChainMemberRSet where
+    --   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
+    --   rlpDecode = RedisChainMemberRSet . rlpDecode
 
 instance RLPSerializable RedisIPChains where
   rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
@@ -166,6 +190,14 @@ instance RLPSerializable RedisOrgIdChains where
 instance RLPSerializable RedisOrgNameChains where
   rlpEncode (RedisOrgNameChains s) = rlpEncode $ S.toList s
   rlpDecode = RedisOrgNameChains . S.fromList . rlpDecode
+
+instance RLPSerializable RedisOrgUnits where
+  rlpEncode (RedisOrgUnits s) = rlpEncode $ s
+  rlpDecode = RedisOrgUnits . rlpDecode
+
+instance RLPSerializable RedisOrgUnitMembers where
+  rlpEncode (RedisOrgUnitMembers s) = rlpEncode $ s
+  rlpDecode = RedisOrgUnitMembers . rlpDecode
 
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
@@ -189,13 +221,16 @@ displayForNamespace ns input = case ns of
     Transactions -> let RedisTxs txs = fromValue input in intercalate "\n" [format tx | RedisTx tx <- txs]
     Uncles -> let RedisUncles us = fromValue input in show us
     PrivateChainInfo -> let RedisChainInfo info = fromValue input in show info
-    PrivateChainMembers -> let RedisChainMembers mems = fromValue input in show mems
+    PrivateChainMembers -> let RedisChainMemberRSet mems = fromValue input in show mems
     PrivateTransactions -> let (anchor, RedisTx tx) = fromValue input in formatChainId (Just anchor) ++ format tx
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
-    PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
-    PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
     PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-    X509Certificates -> format (fromValue input :: Address)
-    X509Initialized -> format input
+    PrivateTrueOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
+    PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
+    --Validators           -> format (fromValue input :: [Address])
+    X509Certificates     -> format (fromValue input :: Address)
+    X509Initialized      -> format input
+    ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
+    ParsedSetToX509 ->  format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)

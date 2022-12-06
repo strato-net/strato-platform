@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 module Main where
 
+import Blockchain.Options()
 import Blockchain.VMOptions()
 import Executable.EVMFlags()
 import HFlags
@@ -15,5 +16,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "P2P unit tests"
+  _ <- $initHFlagsDependentDefaults "P2P unit tests" (const $ const $ const $ [("requireCerts", "False")])
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec

@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds         #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
     , indexAPI
@@ -22,11 +23,13 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           BlockApps.Logging
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class      (blockHash)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -47,21 +50,33 @@ indexAPI :: ( MonadLogger m
             , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
             , (Keccak256 `A.Alters` API OutputBlock) m
+            , (([Address],[Address]) `A.Alters` API ValidatorRef) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
-  let txs = [tx | IndexTransaction _ tx <- idxEvents]
-      chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
-      blocks = [b | RanBlock b <- idxEvents]
+  let (txs, chainInfos, blocks, validatorAddresses) = filterHelper idxEvents ([],[],[],[])
       insertCount = length blocks
 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
   A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
 
+  when (length validatorAddresses > 0) $ do forM_ (validatorAddresses) $ (\x -> A.insert (A.Proxy @(API ValidatorRef)) x ( (API (ValidatorRef (Address 0))))) 
+
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $ do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
     A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
+  
+  where
+    filterHelper :: [IndexEvent] -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])]) -> ([OutputTx], [(Word256, ChainInfo)], [OutputBlock], [([Address], [Address])])
+    filterHelper (indxEv:xs) (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs) = 
+      case indxEv of  
+        IndexTransaction _ tx  -> filterHelper xs  (tx : indexTransactions,  newChainInfos, ranBlocksLs, validatorLs)
+        NewChainInfo cId cInfo -> filterHelper xs  (indexTransactions,  (cId, cInfo) : newChainInfos, ranBlocksLs, validatorLs)
+        RanBlock b             -> filterHelper xs  (indexTransactions,  newChainInfos, b : ranBlocksLs, validatorLs)
+        ValidatorsG x          -> filterHelper xs  (indexTransactions,  newChainInfos, ranBlocksLs, x:validatorLs)
+        _ -> filterHelper xs (indexTransactions,  newChainInfos, ranBlocksLs, validatorLs)
+    filterHelper [] a = a
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")

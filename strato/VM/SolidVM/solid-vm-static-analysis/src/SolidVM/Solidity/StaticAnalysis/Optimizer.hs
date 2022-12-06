@@ -19,6 +19,8 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
 import           SolidVM.Solidity.Parse.UnParser
 
+import Debug.Trace
+
 data R = R
   { codeCollection :: CodeCollection
   , contract :: Maybe Contract
@@ -41,13 +43,16 @@ type SSS = StateT (M.Map SolidString (Expression))   (Reader R) --- hmm SO chang
 -- Then get it functionally working
 -- I can replace map in 30min or less my goal is before 1:30
 -- Then get work till 3
--- Then maybe take break to workout
 -- x`
 
 detector ::  CodeCollection -> CodeCollection
-detector cc = (over (contracts . mapped) (contractHelper cc)
+detector cc = trace ("\n\nBefore optmization"++ (show cc) ++"\n\n after optmizer"  ++(show $ (over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc))) 
+          ( (over (contracts . mapped) (contractHelper cc)
+          $ over (flFuncs . mapped) (functionHelper cc  Nothing)
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)) 
+
 
 contractHelper :: CodeCollection
                -> Contract
@@ -154,18 +159,34 @@ optimizeStatements ((DoWhileStatement body cond x) : ss) = do
     _ -> (DoWhileStatement body' cond' x:) <$> optimizeStatements ss
 optimizeStatements (s@(Continue _) : _) = pure [s]
 optimizeStatements (s@(Break _) : _) = pure [s]
-optimizeStatements (s@(Return _ _) : _) = pure [s]
 optimizeStatements (s@(Throw _ _) : _) = pure [s]
 optimizeStatements (s@(ModifierExecutor _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(EmitStatement {}) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(RevertStatement {}) : _) = pure [s]
 optimizeStatements (s@(UncheckedStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(AssemblyStatement _ _) : ss) = (s:) <$> optimizeStatements ss
+
 --optimizeStatements (s@(SimpleStatement a _) : ss) = ( ( (optimizeExpression a)) :) <$> optimizeStatements ss
 --optimizeStatements (s@(SimpleStatement a (ExpressionStatement expr)) : ss) = (SimpleStatement a (ExpressionStatement (optimizeExpression expr)) :) <$> optimizeStatements ss
-optimizeStatements (s@(SimpleStatement _  _) : ss) = do   
+optimizeStatements (s@(SimpleStatement _  _) : ss) = do
+  let ssz = trace ("GGGSIMPLE STATEMENT INSIDE\n" ++ (show s) ++ ("\n\n")) s   
+  ssss <- evalStateT (simpleStatementFHelper'  ssz) M.empty
+  (ssss :) <$> optimizeStatements ss
+
+optimizeStatements (s@(Return (Just _) _) : ss) = do 
   ssss <- evalStateT (simpleStatementFHelper'  s) M.empty
   (ssss :) <$> optimizeStatements ss
+
+optimizeStatements (s@(Return _ _) : _) = pure [s]
+
+-------This commented out section is a return statement that doesn't work
+-- optimizeStatements (s@(Return (Just (expr)) b) : ss) = do 
+--   --optimizeExpression expr
+--   x <- optimizeExpression expr
+--   (Return (Just (x) b) :) <$> optimizeStatements ss
+-- optimizeStatements (s@(Return _ _) : _) = pure [s]
+-------- ------------------------------------------------------
+
 
 -- optimizeStatements (s@(SimpleStatement _  _) : ss) = ((evalStateT (simpleStatementFHelper'  s) ["xBS examplex"] ) :) <$> optimizeStatements ss
 
@@ -173,10 +194,15 @@ optimizeStatements (s@(SimpleStatement _  _) : ss) = do
 -- Need to handle other case of simple statementF -> VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
 simpleStatementFHelper' ::  Statement -> SSS (Statement)
 simpleStatementFHelper' (SimpleStatement (ExpressionStatement xpr) b ) = do 
-  x <- optimizeExpression xpr
+  let xprr = trace ("simpleStatementFHelper' " ++ (show xpr)) xpr
+  x <- optimizeExpression xprr
   _ <- case x of
     (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
   pure $   (SimpleStatement (ExpressionStatement x) b )
+
+simpleStatementFHelper' (Return (Just expr ) b)  = do
+  x <- optimizeExpression expr
+  pure $ Return (Just x ) b 
 simpleStatementFHelper' a = pure $ a
 
 
@@ -237,6 +263,13 @@ getVariableByName name = do
 
 --Offf I just realized we don't have an equal
 optimizeExpression :: Expression -> SSS Expression
+optimizeExpression (Binary x "=" a b) = do
+  a' <- optimizeExpression a
+  b' <- optimizeExpression b
+  case (a', b') of
+    (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
+    (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
+    _ -> pure $ Binary x "=" a' b'
 optimizeExpression (Binary x "+" a b) = do
   a' <- optimizeExpression a
   b' <- optimizeExpression b
@@ -271,10 +304,14 @@ optimizeExpression (Binary x "%" a b) = do
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args) = do
   mc <- asks contract
-  case mc  of
-    Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args
+  let vvvvv = case mc of Just ccc -> M.member nam (_userDefined  ccc); Nothing -> False; 
+  let mcc = trace ("inside  optimizeExpression\n Varaibale name" ++( show nam) ++ "mc \n" ++ (show vvvvv) ++ "\n" ++ (show args) )  (mc)
+  case mcc  of
+    Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args -- Wait is this getting hit?
     Just c -> case args of
-        OrderedArgs [x] | M.member nam (_userDefined  c) -> optimizeExpression x
+        OrderedArgs [x] | M.member nam (_userDefined  c) -> do
+          let xx = trace ("Garrett we should optmizie expression" ++ (show x)) x 
+          optimizeExpression xx
         _ -> pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
 
 optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args) = do

@@ -40,6 +40,7 @@ module Blockchain.VM.SolidException
   , generalMetaProgrammingError
   , oldForeignPragmaError
   , userDefinedError
+  , missingCertificate
   ) where
 
 import Control.DeepSeq
@@ -86,6 +87,7 @@ data SolidException = TypeError String String
                     | GeneralMetaProgrammingError String String
                     | OldForeignPragmaError String String
                     | UserDefinedError String String
+                    | MissingCertificate String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -119,7 +121,7 @@ showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s"
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
-showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
+showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %s, but the current gasInfo was: %s" a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
@@ -129,6 +131,7 @@ showSolidException (TooManyCooks a b) = printf "Too many arguments were given, e
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
 showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
 showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
+showSolidException (MissingCertificate a b) = printf "Sender does not have a registered certificate: %s %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -243,3 +246,6 @@ oldForeignPragmaError = toThrower OldForeignPragmaError
 
 userDefinedError :: (Show v) => String -> v -> a
 userDefinedError = toThrower UserDefinedError
+
+missingCertificate :: (Show v) => String -> v -> a
+missingCertificate = toThrower MissingCertificate 

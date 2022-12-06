@@ -1,26 +1,31 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
 module Strato.Lite.Rest.Server where
 
+import qualified Control.Concurrent.STM.MonadIO    as CCS
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (traverse_)
+import           Data.Foldable                     (for_, traverse_)
 import           Data.Traversable                  (for)
 import qualified Data.Map.Strict                   as M
+import           Data.Maybe                        (fromMaybe)
 import qualified Data.Text                         as T
-import           Blockchain.Data.Json
 import qualified Blockchain.Data.TXOrigin          as Origin
 import           Blockchain.Sequencer.Event
 import           Strato.Lite.Rest.Api
 import           Strato.Lite.Monad
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.MicroTime
 import           Servant
 import           UnliftIO                          hiding (Handler)
@@ -40,8 +45,25 @@ getConnections mgr = liftIO . atomically $ do
     mExp <- pollSTM a
     pure $ fmap (first show) mExp
 
-postAddNode :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddNode mgr label ip = liftIO $ runReaderT (addNode label ip) mgr
+getChainInfo :: NetworkManager -> T.Text -> Handler ThreadResultMap
+getChainInfo mgr nodeLabel = liftIO . atomically $ do
+  ths <- readTVar $ mgr ^. network
+  let theNode = fromMaybe (error "Node not found.") $ M.lookup nodeLabel $ ths ^. nodes
+  ctxt <- (CCS.readTVarSTM . _p2pTestContext) theNode
+  let chainInfo = (Just . Left) $ show $ ctxt ^. chainInfoMap
+      res = M.singleton nodeLabel chainInfo
+  pure $ res
+
+getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
+getPeers mgr label = do
+  mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
+  mCtx <- liftIO $ traverse (readTVarIO . _p2pTestContext) mPeer
+  let peers = maybe [] (map T.pack . M.keys . _stringPPeerMap) mCtx
+  pure peers
+
+postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
+postAddNode mgr label (AddNodeParams ip bootNodes) =
+  liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
@@ -58,18 +80,21 @@ postTimeout mgr rn = do
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
   liftIO $ traverse_ (postEvent ev) peers
 
-postTx :: NetworkManager -> Transaction' -> Handler ()
-postTx mgr (Transaction' tx) = do
-  ts <- liftIO $ getCurrentMicrotime
-  let ev = UnseqEvent . IETx ts $ IngestTx Origin.API tx
-  peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
-  
-  liftIO $ traverse_ (postEvent ev) peers
+postTx :: NetworkManager -> T.Text -> PostTxParams -> Handler ()
+postTx mgr nodeLabel (PostTxParams tx md) = do
+  mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
+  liftIO . for_ mPeer $ \peer -> do
+    ts <- liftIO $ getCurrentMicrotime
+    let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
+        ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
+    postEvent ev peer  
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
        getNodes mgr
   :<|> getConnections mgr
+  :<|> getChainInfo mgr
+  :<|> getPeers mgr
   :<|> postAddNode mgr
   :<|> postRemoveNode mgr
   :<|> postAddConnection mgr
