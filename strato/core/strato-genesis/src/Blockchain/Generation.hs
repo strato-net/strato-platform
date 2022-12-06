@@ -194,15 +194,14 @@ insertCertRegistryContract gi =
       rlpWrap         = rlpSerialize . rlpEncode
       encodedRegistry = encodeUtf8 certificateRegistryContract
       encodedCert     = encodeUtf8 certificateContract
-      elfdod'         = (fromJust . stringAddress) "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859"
-      elfdod          = rlpWrap $ BAccount (NamedAccount elfdod' MainChain)
+      rootAddress'    = (fromJust . stringAddress) "74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0"
+      rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
       addrToCertIdx   = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ "1337") MainChain) 
       certSubject     = fromJust $ getCertSubject rootCert
       registryAcct    = SolidVMContractWithStorage 0x509 509 
         (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) 
         [
-            (".owner", elfdod),
-            (".initialized", rlpWrap (BBool True)),
+            (".owner", rootAddress),
             (".addressToCertMap<a:74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0>", addrToCertIdx)
         ]
       certAcct = SolidVMContractWithStorage 0x1337 1337
@@ -351,40 +350,15 @@ contract CertificateRegistry {
     mapping(address => Certificate) addressToCertMap;
     address public owner;
 
-    bool initialized;
-
     event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
-    event CertificateRegistryInitialized();
 
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
         owner = msg.sender;
-
-        initialized = false;
-    }
-
-    function initializeCertificateRegistry(string[] _rootCerts) returns (int) {
-        require(!initialized, "The CertificateRegistry has already been initialized!");        
-        
-        for (uint i=0; i < _rootCerts.length; i += 1) {
-            // Create the Certificate record
-            Certificate c = new Certificate(_rootCerts[i]);
-            // Register the root certificates and emit event
-            addressToCertMap[c.userAddress()] = c;
-            
-            emit CertificateRegistered(_rootCerts[i]);
-        }
-        
-        initialized = true;
-        emit CertificateRegistryInitialized();
-        
-        return 200;
     }
     
     function registerCertificate(string newCertificateString) returns (int) {
-        require(initialized, "You must first initialize with initializeCertificateRegistry!");
-        
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
         Certificate parentContract = addressToCertMap[account(parentUserAddress)];
@@ -398,10 +372,7 @@ contract CertificateRegistry {
             }
 
             addressToCertMap[c.userAddress()] = c;
-            
-            
             emit CertificateRegistered(newCertificateString);
-    
             return 200; // 200 = HTTP Status OK
         }
         return 400;

@@ -1041,7 +1041,6 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                       RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
                                       RegisterCertificate (Right (_, addr, certState)) -> x509certMap %= M.insert addr certState
                                       CertificateRevoked _ -> pure () --(Right addr) -> pure ()
-                                      CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                       TerminateChain _ -> pure ()
                                       PutLogDB _ -> pure ()
                                       PutEventDB _ -> pure ()

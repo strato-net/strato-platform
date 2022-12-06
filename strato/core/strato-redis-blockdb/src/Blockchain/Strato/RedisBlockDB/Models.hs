@@ -46,7 +46,6 @@ data BlockDBNamespace = Headers
                       | PrivateTrueOrgNameChains
                       | PrivateFalseOrgNameChains
                       | X509Certificates
-                      | X509Initialized
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -211,6 +210,5 @@ displayForNamespace ns input = case ns of
     PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     --Validators           -> format (fromValue input :: [Address])
     X509Certificates     -> format (fromValue input :: Address)
-    X509Initialized      -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)

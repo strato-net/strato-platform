@@ -974,7 +974,6 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                     --     orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
                                     RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
-                                    CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
                                     PutLogDB _ -> pure ()
                                     PutEventDB _ -> pure ()
