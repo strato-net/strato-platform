@@ -1487,8 +1487,8 @@ contract A {
         ]
       let src = [r|
 pragma solidvm 3.2;
-constructor() {}
 contract A {
+  constructor() {}
   event MemberAdded(address addr, string enode);
   uint x = 0;
   function addMember(address _addr, string _enode) {
