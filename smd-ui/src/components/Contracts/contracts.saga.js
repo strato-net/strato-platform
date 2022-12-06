@@ -14,7 +14,7 @@ import { handleErrors } from '../../lib/handleErrors';
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset) {
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainId=${chainid}` : ''}`
+  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}`
 
   return fetch(
     url,
