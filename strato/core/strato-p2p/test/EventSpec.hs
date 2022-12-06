@@ -1405,6 +1405,7 @@ contract Certificate {
       let privChainSrc = [r|
 pragma solidvm 3.2;
 contract A {
+  constructor(){}
   event OrgAdded(string orgName);
   function addMember(string _orgName) {
     emit OrgAdded(_orgName);
@@ -1835,7 +1836,6 @@ contract RegisterCert {
               -- Post a mock dApp to a private chain
               src = [r|
                     pragma solidvm 3.2;
-                    constructor(){}
                     contract A {
                       event OrgUnitAdded(string name, string unit);
 
