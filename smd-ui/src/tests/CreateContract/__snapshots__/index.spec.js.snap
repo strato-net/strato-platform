@@ -220,6 +220,8 @@ Object {
   "createDisabled": false,
   "initialValues": Object {
     "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "chainId": "",
+    "chainLabel": "",
     "username": "tanuj41",
   },
   "isOpen": true,
