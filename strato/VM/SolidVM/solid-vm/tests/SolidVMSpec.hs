@@ -6872,31 +6872,7 @@ contract qq {
 }   |]) `shouldThrow` anyTooMuchGasError
 
 
-  it "can get code from other contracts using type function" . runTest $ do
-    runBS [r|
-pragma solidvm 3.4;
-contract qq {
-  string  bb = type(qq).creationCode;
-  string  dd = type(C).name;
-  string  ccc = type(B).creationCode;
-}
-
-contract B {
-  string  cc;
-  string myName;
-  constructor () {
-    cc = type(qq).creationCode;
-    //myName = type(A).name; 
-  }
-}
-
-|]
-    getFields ["bb", "cc"] `shouldReturn` 
-      [ BString "contract qq {\n  string bb = type(qq).creationCode;\n  string cc = type(B).creationCode;\n  string dd = type(C).name;\n  // no constructor found\n}"
-      , BString "contract B {\n  string  cc;\n  constructor () public {\n    string cc = type(qq).creationCode;\n    }\n}"
-      ]
-  
-  fit "user Defined Type" . runTest $ do
+  it "user Defined Type" . runTest $ do
     runBS [r|
 type MagicInt is int;
 contract DD {        function f() public returns (int) {
@@ -6915,8 +6891,6 @@ contract qq {
               regularInt = MagicInt.unwrap(myInt); // turn userDefined type back into underlying type
               plusRated = testVar.f();
           }
-
-
 }
 
 |]
