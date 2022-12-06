@@ -235,12 +235,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
           fromDiff :: Diff a 'Eventual -> a
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
-      $logInfoS "initgen" $ T.pack $ "##################### fullAddrStates" ++ show fullAddrStates
-      $logInfoS "initgen" $ T.pack $ "##################### filteredAddrStates" ++ show filteredAddrStates
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-
-      -- $logInfoS "initgen" $ T.pack $ unlines $ (show . (storage . snd) <$>  (Map.toList fullAccountDiffs))
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
 
       let statediff ad = StateDiff {

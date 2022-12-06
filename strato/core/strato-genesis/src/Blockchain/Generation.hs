@@ -203,7 +203,7 @@ insertCertRegistryContract gi =
         [
             (".owner", elfdod),
             (".initialized", rlpWrap (BBool True)),
-            (".addressToCertMap<a:e1fd0d4a52b75a694de8b55528ad48e2e2cf7859>", addrToCertIdx)
+            (".addressToCertMap<a:74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0>", addrToCertIdx)
         ]
       certAcct = SolidVMContractWithStorage 0x1337 1337
         (SolidVMCode "Certificate" (KECCAK256.hash encodedCert))

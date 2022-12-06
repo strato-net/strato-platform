@@ -121,6 +121,7 @@ data instance Diff a 'Incremental =
 -- See the 'Detailed' instance for what that means.
 newtype instance Diff a 'Eventual = Value a
 
+-- | Not a type, but a data kind
 data Detail = Incremental | Eventual
 
 -- | A class for condensing information in a diff
