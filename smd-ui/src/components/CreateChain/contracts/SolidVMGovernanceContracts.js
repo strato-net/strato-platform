@@ -62,7 +62,7 @@ contract AdminOnly {
   } 
 }`
 
-const MajorityRules = `pragma solidvm 3.2; 
+const MajorityRules = `
  
 contract MajorityRules { 
   event CommonNameAdded(string orgName, string orgUnit, string commonName);

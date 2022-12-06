@@ -18,14 +18,14 @@ spec:
         app: strato-platform
     spec:
       containers:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:7.9.0-46441c30f
+      - image: <REPO_URL>smd:<VERSION>
         name: smd
         env:
         - name: NODE_NAME
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:7.9.0-46441c30f
+      - image: <REPO_URL>apex:<VERSION>
         name: apex
         env:
         - name: NODE_HOST
@@ -51,7 +51,7 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: redis-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:7.9.0-46441c30f
+      - image: <REPO_URL>strato:<VERSION>
         name: strato
         ports:
           - containerPort: 30303
@@ -111,7 +111,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:7.9.0-46441c30f
+      - image: <REPO_URL>postgrest:<VERSION>
         name: postgrest
         env:
         - name: blocHost
@@ -140,7 +140,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:7.9.0-46441c30f
+      - image: <REPO_URL>nginx:<VERSION>
         name: nginx
         ports:
           - containerPort: 80
@@ -213,7 +213,7 @@ spec:
         volumeMounts:
           - mountPath: /kafka
             name: kafka-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:7.9.0-46441c30f
+      - image: <REPO_URL>prometheus:<VERSION>
         name: prometheus
         env:
         - name: NODE_HOST
@@ -221,7 +221,7 @@ spec:
         volumeMounts:
           - mountPath: /prometheus
             name: prometheus-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:7.9.0-46441c30f
+      - image: <REPO_URL>vault-wrapper:<VERSION>
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout

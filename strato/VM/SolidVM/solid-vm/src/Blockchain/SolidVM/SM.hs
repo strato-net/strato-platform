@@ -66,9 +66,10 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
-import           Data.Traversable (for)
+import           Data.Traversable                   (for)
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
+
 
 --import           Data.IORef
 import           Data.Map (Map)
@@ -90,13 +91,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Stream.Action           (Action)
 import qualified Blockchain.Stream.Action           as Action
 import qualified Blockchain.SolidVM.Environment     as Env
@@ -105,7 +105,7 @@ import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 import           Blockchain.SolidVM.GasInfo
-
+import           BlockApps.X509.Certificate
 
 import qualified SolidVM.Model.CodeCollection as CC
 import           Blockchain.Data.BlockSummary 
@@ -168,14 +168,12 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
-                 , HasX509CertDB m
                  , HasSelectX509CertDB m
                  , HasSelectX509FieldDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
-                 , HasMemCertDB m
                  , Mod.Accessible Env.Environment m
                  , Mod.Modifiable GasInfo m
                  , Mod.Modifiable MemDBs m
@@ -200,12 +198,6 @@ instance Monad m => HasMemRawStorageDB (SM m) where
   putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
-
-instance Monad m => HasMemCertDB (SM m) where
-  getCertTxDBMap      = gets $ _certTxMap . _ssMemDBs
-  putCertTxDBMap    m = modify $ ssMemDBs . certTxMap .~ m
-  getCertBlockDBMap   = gets $ _certBlockMap . _ssMemDBs
-  putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
@@ -265,22 +257,7 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
-  get = lift . Mod.get
-  put p = lift . Mod.put p
-
-instance ( (Address `A.Alters` X509Certificate) m
-         , Mod.Modifiable CertRoot m
-         , (MP.StateRoot `A.Alters` MP.NodeData) m
-         ) => (Address `A.Alters` X509Certificate) (SM m) where
-  lookup _ k = do
-    mBH <- gets $ view $ ssMemDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
-  insert _ = putCert
-  delete _ = deleteCert
-
 instance ( (Address `A.Selectable` X509Certificate) m
-         , Mod.Modifiable CertRoot m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (MonadLogger m)
          ,(A.Alters (Maybe Word256) MP.StateRoot m)
@@ -293,7 +270,6 @@ instance ( (Address `A.Selectable` X509Certificate) m
         maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
 
 instance ( ((Address,T.Text) `A.Selectable` X509CertificateField) m
-         , Mod.Modifiable CertRoot m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (MonadLogger m)
          ,(A.Alters (Maybe Word256) MP.StateRoot m)
@@ -449,7 +425,6 @@ getVariableOfName name = do
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
-                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
                               }
@@ -473,7 +448,7 @@ getVariableOfName name = do
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
-                                                  , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
+                                                  , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

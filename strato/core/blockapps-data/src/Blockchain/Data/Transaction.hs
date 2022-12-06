@@ -98,7 +98,6 @@ instance TransactionLike Transaction where
     txMetadata    = \case
                        PrivateHashTX{} -> Nothing
                        t -> transactionMetadata t
-    txAnchorChain = const Nothing -- raw transactions don't have an AnchorChain
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation

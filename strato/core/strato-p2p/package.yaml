@@ -10,6 +10,7 @@ dependencies:
   - common-log
   - extra
   - vm-tools
+  - x509-certs
 
 ghc-options: -Wall -threaded
 
@@ -62,6 +63,7 @@ library:
     - json-rpc-server
     - json-rpc-client
     - lens
+    - lifted-async
     - lifted-base
     - milena
     - milena-tools
@@ -109,8 +111,10 @@ tests:
       - bytestring
       - conduit
       - containers
+      - crypto-pubkey-types
       - data-default
       - debugger
+      - ethereum-encryption
       - ethereum-discovery
       - ethereum-rlp
       - hflags
@@ -122,6 +126,7 @@ tests:
       - merkle-patricia-db
       - monad-alter
       - mtl
+      - network
       - nibblestring
       - ordered-containers
       - Ranged-sets
@@ -135,6 +140,7 @@ tests:
       - strato-p2p
       - strato-sequencer
       - text
+      - time
       - unliftio
       - vm-runner
       - vm-tools
