@@ -7,4 +7,5 @@ export NODE_HOST=localhost:8080
 export OAUTH_JWT_USERNAME_PROPERTY=email
 
 reload.sh
-docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"ht3"' localhost:8000/strato/v2.3/password || true
+# TODO remove hardcoded values
+docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"ht3"' strato:8013/strato/v2.3/password || true

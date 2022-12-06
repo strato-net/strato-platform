@@ -9,4 +9,4 @@ export OAUTH_ENABLED=true
 export OAUTH_TEMPORARY_MIXED_AUTH=true
 
 reload.sh
-docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"mixed"' localhost:8000/strato/v2.3/password || true
+docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"mixed"' strato:8013/strato/v2.3/password || true

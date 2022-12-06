@@ -427,7 +427,7 @@ setEnv debugWSPort ${debugWSPort:-8052}
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 setEnv VAULT_PROXY_PORT 8013
 setEnv VAULT_PROXY_URL http://strato
-setEnv VAULT_URL http://vault-wrapper:8000/strato/v2.3
+setEnv VAULT_URL http://multinode202.ci.blockapps.net:8093/
 
 if [[ -z ${VAULT_URL} ]] ; then
   echo -e "Error: VAULT_URL is required"

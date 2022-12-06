@@ -14,7 +14,7 @@ defineFlag "password" ("api" :: String) "Postgres password"
 defineFlag "database" ("cirrus" :: String) "Postgres database"
 defineFlag "stratourl" ("http://starto:3000/eth/v1.2"::String)
     "URL of the Strato server Bloc will connect to"
-defineFlag "vaultwrapperurl" ("http://vault-wrapper:8000/strato/v2.3"::String)
+defineFlag "vaultwrapperurl" ("http://localhost:8013/strato/v2.3"::String) --Might need to be http://strato:8013 instead
     "URL of the Vault Wrapper server Bloc will connect to"
 defineFlag "kafkahost" ("kafka" :: String) "Kafka host"
 defineFlag "kafkaport" (9092 :: Int) "Kafka port"

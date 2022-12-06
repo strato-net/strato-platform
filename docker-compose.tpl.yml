@@ -51,7 +51,7 @@ services:
     - STATS_SUBMIT_ENABLED=${STATS_SUBMIT_ENABLED}
     - STATS_SUBMIT_CONTRACT_TYPES_ENABLED=${STATS_SUBMIT_CONTRACT_TYPES_ENABLED}
     - stratoHost=strato:3000
-    - vaultWrapperHost=vault-wrapper:8000
+    - vaultWrapperHost=strato:8013
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     restart: unless-stopped
@@ -162,7 +162,7 @@ services:
     - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
-    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
+    - vaultWrapperHost=${vaultWrapperHost:-localhost:8013}
     - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
