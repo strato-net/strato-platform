@@ -1486,6 +1486,7 @@ contract A {
         ]
       let src = [r|
 pragma solidvm 3.2;
+constructor() {}
 contract A {
   event MemberAdded(address addr, string enode);
   uint x = 0;
@@ -1834,6 +1835,7 @@ contract RegisterCert {
               -- Post a mock dApp to a private chain
               src = [r|
                     pragma solidvm 3.2;
+                    constructor(){}
                     contract A {
                       event OrgUnitAdded(string name, string unit);
 
