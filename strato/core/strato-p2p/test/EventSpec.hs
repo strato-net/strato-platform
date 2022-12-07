@@ -1903,7 +1903,6 @@ contract CertRegistry {
 
 pragma solidvm 3.2;
 contract A {
-constructor() {}
   event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;
 
