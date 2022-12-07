@@ -66,8 +66,8 @@ function newnode {
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
   runBackgroundProcess blockapps-vault-proxy-server \
       --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="${VAULT_URL}" \
-      --VAULT_PROXY_PORT="${VAULT_PROXY_PORT}"  \
+      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
+      --VAULT_PROXY_PORT=8013  \
       --minLogLevel="${minLogLevel}"
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -425,14 +425,6 @@ setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
-setEnv VAULT_PROXY_PORT 8013
-setEnv VAULT_PROXY_URL http://strato
-setEnv VAULT_URL http://strato:8013
-
-if [[ -z ${VAULT_URL} ]] ; then
-  echo -e "Error: VAULT_URL is required"
-  exit 1
-fi
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
