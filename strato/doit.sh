@@ -44,15 +44,27 @@ fi
 
 
 function newnode {
-
+  # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
       touch .initialized
+      # Start vault-proxy first
+      runBackgroundProcess blockapps-vault-proxy-server \
+        --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+        --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
+        --VAULT_PROXY_PORT=8013  \
+        --minLogLevel="${minLogLevel}" &>> logs/vault-proxy
       sleep 10
     else
       touch .initNotFinished
       mkdir logs
+      # start vault proxy before absolutely anything else
+      runBackgroundProcess blockapps-vault-proxy-server \
+        --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+        --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
+        --VAULT_PROXY_PORT=8013  \
+        --minLogLevel="${minLogLevel}" &>> logs/vault-proxy
       cleanupDB
       doInit
       touch .initialized
@@ -65,13 +77,7 @@ function newnode {
   echo "Starting Strato processes. All output is logged to $PWD/logs."
   runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
-  echo "Starting vault-proxy"
-  ##Logging statement are in strato_strato_1 in file logs/vault-proxy
-  runBackgroundProcess blockapps-vault-proxy-server \
-      --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-      --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
-      --VAULT_PROXY_PORT=8013  \
-      --minLogLevel="${minLogLevel}"
+
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -343,7 +349,7 @@ function doInit {
   mkdir config
 
   echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
-
+  echo "999999999999999999999999999999999999999999999999999999"
 }
 
 # Find all logs greater than 10M, then copy and truncate
