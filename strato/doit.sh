@@ -44,6 +44,10 @@ fi
 
 
 function newnode {
+  if [[ -n "${VAULT_PROXY_PORT}" ]]; then
+    vppFlag="--VAULT_PROXY_PORT=${VAULT_PROXY_PORT}"
+  fi
+
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
@@ -51,20 +55,18 @@ function newnode {
       touch .initialized
       # Start vault-proxy first
       runBackgroundProcess blockapps-vault-proxy-server \
-        --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-        --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
-        --VAULT_PROXY_PORT=8013  \
-        --minLogLevel="${minLogLevel}" &>> logs/vault-proxy
+        --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+        --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
+        ${vppFlag}  &>> logs/vault-proxy
       sleep 10
     else
       touch .initNotFinished
       mkdir logs
-      # start vault proxy before absolutely anything else
+      # start vault proxy before ABSOLUTELY anything else
       runBackgroundProcess blockapps-vault-proxy-server \
-        --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
-        --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
-        --VAULT_PROXY_PORT=8013  \
-        --minLogLevel="${minLogLevel}" &>> logs/vault-proxy
+        --OAUTH_DISCOVERY_URL="${OAUTH_DISCOVERY_URL}" --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}" \
+        --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}" --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL="${VAULT_URL}" \
+        --VAULT_PROXY_PORT=${VAULT_PROXY_PORT}  &>> logs/vault-proxy
       cleanupDB
       doInit
       touch .initialized
@@ -431,6 +433,7 @@ setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
+
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
