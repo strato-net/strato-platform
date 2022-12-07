@@ -90,6 +90,8 @@ main = do
     , "                                                                                                  :::        "
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
+  $logInfoS 
+  $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
@@ -100,7 +102,10 @@ main = do
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
   --get the awesome token, awesome token alters the token, so a result is not needed
-  _ <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
+  full <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
+  case accessToken full of
+      Nothing -> $logInfoS "Vault-Proxy was not able to get the token at startup"
+      Just _ -> $logInfoS "Vault-Proxy was able to get the token at startup, token is hidden for security reasons"
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -113,16 +118,11 @@ main = do
       tokenCache = tokenCash,
       additionalOauth = noErrorOauth
   }
-  -- waiSettings <- defaultWaiProxySettings
-  traceM "vaultToken %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-  vv <- vaulty vaultConnection
-  let temp = accessToken vv
-  traceM $ show temp
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
       vport = vaultProxyPort vaultConnection
-  print $ "Running the vault proxy on port " ++ show vport
+  $logInfoS "Vault-Proxy is starting up inside of the strato container on port: " ++ vport
   run vport (app' $ httpManager vaultConnection)
-  traceM $ "Vault-Proxy is closed, please do something about it."
+  $logInfoS "Vault-Proxy is shutting down"
 
 -- changeProxyDest :: VaultConnection -> W.Request -> IO WaiProxyResponse
 -- changeProxyDest vc _ = do 
@@ -133,17 +133,12 @@ main = do
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
-  --Get the JWT token
   jwt <- vaulty vc
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
       goodJwt = accessToken jwt
       headers = W.requestHeaders rev
-      -- authHeadr = R.header (TE.encodeUtf8 "X-USER-UNIQUE-NAME") (TE.encodeUtf8 $ (T.pack "Bearer " <> goodJwt))
-      -- auth = (hAuthorization,) . (authHeadr <>) <$> goodJwt
-      -- oldHead = W.requestHeaders req 
-      -- modReq = req { W.requestHeaders = authHeadr <> oldHead  }
       auth = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 goodJwt))
       modReq = case auth of
         Nothing    -> rev
