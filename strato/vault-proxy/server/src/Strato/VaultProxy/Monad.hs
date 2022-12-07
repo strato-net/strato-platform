@@ -14,20 +14,13 @@ module Strato.VaultProxy.Monad where
 
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
--- import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
--- import           Data.Aeson
--- import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy            as LB
--- import           Data.Cache
--- import           Data.Scientific                 as Scientific
 import           Data.String
 import           Data.Text                       as T hiding (map, unlines)
 import qualified Data.Text                       as Text
 import           Data.Text.Encoding
 import           GHC.Stack
--- import           Network.HTTP.Client
 import           Servant
--- import           Strato.VaultProxy.Crypto
 
 import           UnliftIO                        hiding (Handler(..))
 
@@ -58,12 +51,6 @@ vaultProxyError :: HasCallStack => VaultProxyError -> VaultProxyM y
 vaultProxyError err = do
     logErrorCS callStack . Text.pack $ show err ++ "\n" ++ prettyCallStack' ?callStack
     throwIO err
-
--- data VaultProxyEnv = VaultProxyEnv
---   { httpManager         :: Manager
---   , superSecretKey      :: IORef (Maybe SecretBox.Key)
---   , keyStoreCache       :: Cache Text KeyStore
---   }
 
 data VaultProxyError
   = DBError Text

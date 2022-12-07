@@ -12,21 +12,18 @@ module Strato.VaultProxy.Server.Token where
 import           Control.Concurrent.STM
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
--- import           Control.Monad.Trans.Reader
 import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
 import           Data.Cache.Internal      as C
 import           Data.Maybe
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
+import           Debug.Trace
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
--- import           Strato.VaultProxy.API
--- import           Strato.VaultProxy.Monad
 import           Strato.VaultProxy.RawOauth
 import           System.Clock
 import           Text.URI                as URI
--- import           Web.JWT                 as JWT
 
 import           Strato.VaultProxy.DataTypes
 
@@ -63,6 +60,7 @@ getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
         Just c -> pure c
         --If the token was old destroy the old token and get a new one
         Nothing -> do 
+            traceM "Trying to get a new token"
             -- Get the virgin token from the provider
             let vToken = getVirginToken clientId clientSecret additionalOauth
             virToken <- vToken
