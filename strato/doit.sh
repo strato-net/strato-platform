@@ -62,6 +62,9 @@ function newnode {
     sleep 10
   fi
 
+  echo "Starting Strato processes. All output is logged to $PWD/logs."
+  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
+
   echo "Starting vault-proxy"
   ##Logging statement are in strato_strato_1 in file logs/vault-proxy
   runBackgroundProcess blockapps-vault-proxy-server \
@@ -69,9 +72,6 @@ function newnode {
       --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --OAUTH_RESERVE_SECONDS="$OAUTH_RESERVE_SECONDS" --VAULT_URL="http://strato:8013" \
       --VAULT_PROXY_PORT=8013  \
       --minLogLevel="${minLogLevel}"
-
-  echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   if $mineBlocks
   then echo "Starting strato-adit"
