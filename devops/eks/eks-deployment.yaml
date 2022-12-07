@@ -18,14 +18,14 @@ spec:
         app: strato-platform
     spec:
       containers:
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:-4906c5ba2
         name: smd
         env:
         - name: NODE_NAME
           value: "localhost"
         - name: NODE_HOST
           value: "localhost"
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:-4906c5ba2
         name: apex
         env:
         - name: NODE_HOST
@@ -51,7 +51,7 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: redis-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:-4906c5ba2
         name: strato
         ports:
           - containerPort: 30303
@@ -111,7 +111,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:-4906c5ba2
         name: postgrest
         env:
         - name: blocHost
@@ -140,7 +140,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:-4906c5ba2
         name: nginx
         ports:
           - containerPort: 80
@@ -213,7 +213,7 @@ spec:
         volumeMounts:
           - mountPath: /kafka
             name: kafka-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:-4906c5ba2
         name: prometheus
         env:
         - name: NODE_HOST
@@ -221,7 +221,7 @@ spec:
         volumeMounts:
           - mountPath: /prometheus
             name: prometheus-data
-      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:perfect
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:-4906c5ba2
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout

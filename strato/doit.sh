@@ -44,29 +44,24 @@ fi
 
 
 function newnode {
-  if [[ -n "${VAULT_PROXY_PORT}" ]]; then
-    vppFlag="--VAULT_PROXY_PORT=${VAULT_PROXY_PORT}"
-  fi
+  
+  mkdir -p logs
+
+  runBackgroundProcess blockapps-vault-proxy-server \
+    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
+    --VAULT_PROXY_PORT=8013  &>> logs/vault-proxy
+
+  sleep 5
 
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
       touch .initialized
-      # Start vault-proxy first
-      runBackgroundProcess blockapps-vault-proxy-server \
-        --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-        --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
-        ${vppFlag}  &>> logs/vault-proxy
       sleep 10
     else
       touch .initNotFinished
-      mkdir logs
-      # start vault proxy before ABSOLUTELY anything else
-      runBackgroundProcess blockapps-vault-proxy-server \
-        --OAUTH_DISCOVERY_URL="${OAUTH_DISCOVERY_URL}" --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}" \
-        --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}" --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL="${VAULT_URL}" \
-        --VAULT_PROXY_PORT=${VAULT_PROXY_PORT}  &>> logs/vault-proxy
       cleanupDB
       doInit
       touch .initialized

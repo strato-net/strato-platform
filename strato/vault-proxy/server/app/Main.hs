@@ -63,7 +63,7 @@ main = do
   mgr <- HCLI.newManager HCON.tlsManagerSettings
   tokenCash <- atomically $ newCacheSTM Nothing
   traceM "Trying to parse the oauth url"
-  ourl <- parseBaseUrl $ show flags_OAUTH_DISCOVERY_URL 
+  ourl <- parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL 
   rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
