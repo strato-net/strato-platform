@@ -134,7 +134,7 @@ else
   end
 end
 
--- set request headers to forward to APIs
+
 ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")

@@ -17,6 +17,7 @@ async function createKey(accessToken, userParams = null) {
     try {
 
       userParams = userParams == null ? {} : userParams;
+
       const userAccount = await ax.post(process.env.vaultProxyUrl, userParams, '/strato/v2.3/key', {
         "x-user-access-token": accessToken,
       });
@@ -46,6 +47,7 @@ async function getKey(accessToken, userQuery = null) {
 
   try {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
+
     const userAccount = await ax.get(process.env.vaultProxyUrl, `/strato/v2.3/key${query}`, {
       "x-user-access-token": accessToken,
     });

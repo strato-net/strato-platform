@@ -426,7 +426,7 @@ instance HasVault SequencerM where
 
 waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
 waitOnVault action = do
-  $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
+  $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
   res <- action
   case res of
     Left err -> do
