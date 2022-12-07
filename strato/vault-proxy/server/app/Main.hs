@@ -10,11 +10,8 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
--- import           Database.PostgreSQL.Simple
 import           Data.ByteString                        as B hiding (putStrLn)
--- import           Data.ByteString.Internal
 import           Data.Cache
--- import           Control.Lens
 import           Data.Text                              as T hiding (unlines)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
@@ -22,51 +19,19 @@ import           HFlags
 import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
--- import           Network.HTTP.Req                       as R
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header             (hAuthorization)
 import           Network.Wai.Handler.Warp              (run)
 import           Network.Wai                           as W
--- import           Network.Wai.Middleware.Cors
--- import           Network.Wai.Middleware.Prometheus
--- import           Network.Wai.Middleware.RequestLogger
--- import           Network.Wai.Middleware.Servant.Options
--- import           Servant
--- import           System.Clock
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
 
 import           BlockApps.Init
--- import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
 import           Servant.Client
--- import qualified Servant.Subscriber.Request               as SR
--- import           Servant.Client.Core 
-
--- import qualified Strato.VaultProxy.API                    as VaultProxy
--- import qualified Strato.VaultProxy.Monad                  as VaultProxy
--- import qualified Strato.VaultProxy.Server                 as VaultProxy
 import           Strato.VaultProxy.DataTypes              as VaultProxy
 import           Strato.VaultProxy.RawOauth               as RO
 import           Strato.VaultProxy.Server.Token
-
--- import System.Environment (getArgs)
--- import System.IO (Handle, hSetBuffering, BufferMode(NoBuffering))
-
--- import Network (listenOn, accept, PortID(..), Socket)
--- import Network.Socket hiding (recv, accept)
--- import Network.Socket.ByteString (recv, sendAll)
-
--- import Control.Concurrent (forkIO)
-
--- import Data.Monoid
--- import Data.Maybe
--- import Data.Attoparsec.ByteString (maybeResult, parseWith, parse)
--- import qualified Data.ByteString as BS
-
--- import Types
--- import Parser
--- import PrettyPrinter
 
 import           Options
 
@@ -90,7 +55,6 @@ main = do
     , "                                                                                                  :::        "
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
-  $logInfoS 
   $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
