@@ -10,12 +10,12 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+-- import           Control.Monad.Logger
 import           Data.ByteString                        as B hiding (putStrLn)
 import           Data.Cache
 import           Data.Text                              as T hiding (unlines)   
 import           Data.Text.Encoding                     as TE
-import           Debug.Trace
+-- import           Debug.Trace
 import           HFlags
 import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
@@ -56,9 +56,10 @@ main = do
     , "                                                                                                  :::        "
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
-  $logInfoS "Vault-Proxy is Starting"
+  -- $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
+
   mgr <- HCLI.newManager HCON.tlsManagerSettings
   tokenCash <- atomically $ newCacheSTM Nothing
   ourl <- parseBaseUrl "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration" 
@@ -66,11 +67,11 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
-  --get the awesome token, awesome token alters the token, so a result is not needed
-  full <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
-  case accessToken full of
-      Nothing -> $logInfoS "Vault-Proxy was not able to get the token at startup"
-      Just _ -> $logInfoS "Vault-Proxy was able to get the token at startup, token is hidden for security reasons"
+  --get the awesome token, awesome token alters the token cash, so a result is not needed
+  _ <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
+  -- case accessToken full of
+  --     Nothing -> $logInfoS "Vault-Proxy was not able to get the token at startup"
+  --     Just _ -> $logInfoS "Vault-Proxy was able to get the token at startup, token is hidden for security reasons"
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -85,16 +86,10 @@ main = do
   }
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
       vport = vaultProxyPort vaultConnection
-  $logInfoS "Vault-Proxy is starting up inside of the strato container on port: " ++ vport
+  --  $logInfoS "Vault-Proxy is starting up inside of the strato container on port: " ++ vport
+  
   run vport (app' $ httpManager vaultConnection)
-  $logInfoS "Vault-Proxy is shutting down"
-
--- changeProxyDest :: VaultConnection -> W.Request -> IO WaiProxyResponse
--- changeProxyDest vc _ = do 
---   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
---   let fport = baseUrlPort foreignVault
---       furl = (TE.encodeUtf8 $ T.pack (baseUrlHost foreignVault)) 
---   pure . WPRProxyDest $ ProxyDest furl fport
+  --  $logInfoS "Vault-Proxy is shutting down"
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
