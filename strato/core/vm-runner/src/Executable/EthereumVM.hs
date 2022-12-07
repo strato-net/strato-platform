@@ -243,11 +243,13 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
-        (sr, mExecResults) <-
+        (sr, mExecResults) <-           
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-        Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
+        if any (isJust . erException) mExecResults
+          then return Nothing
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do

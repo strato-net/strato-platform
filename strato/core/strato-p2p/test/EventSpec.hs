@@ -1780,6 +1780,7 @@ contract Certificate {
 
       let privChainSrc = [r|
 contract A {
+  constructor(){}
   event OrgAdded(string orgName);
   function addMember(string _orgName) {
     emit OrgAdded(_orgName);
@@ -1899,6 +1900,8 @@ contract CertRegistry {
             })
 
       let src = [r|
+
+pragma solidvm 3.2;
 contract A {
   event CommonNameAdded(string name, string unit, string commonName);
   uint x = 0;

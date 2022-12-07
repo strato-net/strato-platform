@@ -444,7 +444,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
       erNewContractAccount = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
-      erException = Nothing,
+      erException = Nothing,      -- tells me if theres an exception
       erKind = SolidVM,
       erPragmas=[]
       }
