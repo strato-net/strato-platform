@@ -21,7 +21,10 @@ kubectl apply -f zookeeper-pvc.yaml
 kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
-kubectl apply -f deployment.yaml 
+kubectl apply -f deployment.yaml
+
+# Create nginx Service
+kubectl apply -f nginx-service.yaml
 
 # Known Issues
 * We are using old strato api by setting USE_OLD_STRATO_API as true. New strato api is using [hardcoded](https://github.com/blockapps/strato-platform/blob/develop/strato/api/strato-api/app/StratoAPIInit.hs#L26) postgres service. [STRATO-2805](https://blockapps.atlassian.net/browse/STRATO-2805) has been created for the fix.
