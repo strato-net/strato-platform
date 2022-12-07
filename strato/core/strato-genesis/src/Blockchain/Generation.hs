@@ -47,7 +47,7 @@ import           Blockchain.Data.ChainInfo
 
 import           SolidVM.Model.Storable         hiding (size)
 import           BlockApps.X509.Certificate
-import           BlockApps.X509.Keys             (pubToBytes)
+import           BlockApps.X509.Keys             (pubToBytes, rootPubKey)
 
 data Type = Number Integer
           | Stryng Text
@@ -194,7 +194,7 @@ insertCertRegistryContract gi =
       rlpWrap         = rlpSerialize . rlpEncode
       encodedRegistry = encodeUtf8 certificateRegistryContract
       encodedCert     = encodeUtf8 certificateContract
-      rootAddress'    = (fromJust . stringAddress) "74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0"
+      rootAddress'    = fromPublicKey rootPubKey
       rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
       addrToCertIdx   = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ "1337") MainChain) 
       certSubject     = fromJust $ getCertSubject rootCert
@@ -202,7 +202,7 @@ insertCertRegistryContract gi =
         (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) 
         [
             (".owner", rootAddress),
-            (".addressToCertMap<a:74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0>", addrToCertIdx)
+            (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx)
         ]
       certAcct = SolidVMContractWithStorage 0x1337 1337
         (SolidVMCode "Certificate" (KECCAK256.hash encodedCert))
