@@ -18,6 +18,8 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
 
 COPY nginx.tpl.conf openid.tpl.lua /tmp/
 
+COPY cfg-loader.lua /usr/local/openresty/nginx/lua/
+
 COPY docker-run.sh /
 
 COPY licenses /licenses
