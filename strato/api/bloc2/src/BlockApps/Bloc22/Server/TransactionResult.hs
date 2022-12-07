@@ -337,7 +337,27 @@ functionResult i txHash txResult mmd toAccount = do
       txResp = fromShort $ transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
     -- workaround for enums
-      mFormattedResponse = convertResultResToVals txResp mappedResultTypes
+      {- -- check if evm or svm is called 
+      --(Map.fromList <$> rawTransactionMetadata)
+      ~(name, src, vm) <- case mmd of
+    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+    Just md -> case Map.lookup "name" md of
+      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
+        "EVM" -> case Map.lookup "src" md of
+          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+          Just src -> pure (name, src, "EVM")
+
+      -}
+
+      transcationMetadata=Map.fromList <$> rawTransactionMetadata
+      case Map.lookup "name" transcationMetadata of
+        Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+        Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
+          "EVM" -> mFormattedResponse = convertResultResToVals txResp mappedResultTypes
+          "SVM" -> mFormattedResponse = convertSvmResultResToVals txResp 
+      Nothing -> lift . throwIO . UserError $ "Could not get the VM type!"
+      
   case transactionResultMessage txResult of
     "Success!" -> do
       let r = Text.decodeUtf8 $ Base16.encode txResp
@@ -351,10 +371,15 @@ convertEnumTypeToInt = \case
   TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
-
+-- this function works for EVM only
 convertResultResToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
+
+-- this function works for SolidVM only
+convertSvmResultResToVals :: Maybe [Value] ->  Maybe [SolidityValue]
+convertSvmResultResToVals resp  =
+  map valueToSolidityValue <$> resp 
 
 
 

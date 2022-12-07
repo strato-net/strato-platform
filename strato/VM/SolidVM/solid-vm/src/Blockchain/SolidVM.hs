@@ -37,7 +37,6 @@ import           Control.Monad.Trans.Maybe
 import           Data.Bits
 import           Data.Typeable
 import           Data.Bool                            (bool)
-import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
@@ -55,7 +54,6 @@ import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
 import qualified Data.Text                            as T
-import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -437,7 +435,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
-      erReturnVal = BSS.toShort <$> returnVal,
+      erReturnVal = BSS.toShort .  BC.pack <$> returnVal,
       erTrace = [],
       erLogs = [],
       erEvents = toList finalEvs,
@@ -2428,7 +2426,7 @@ callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
   sIntHash <- case Numeric.readHex s of
     [(y, "")] -> return y
     _ -> invalidArguments "parseHex: error parsing s: " s
-  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
+  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString (BC.pack  bytestringHash)) rIntHash sIntHash v
   let theZero ::  Integer
       theZero = 0
   case theSignerAddress of
@@ -2876,23 +2874,15 @@ logVals val1 val2 = onTraced . liftIO $ printf
   \            %%%% val2 = %s\n" (show val1) (show val2)
 
 --TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
-encodeForReturn :: MonadSM m => Value -> m ByteString
-
-encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
-encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
-encodeForReturn ((SAccount a _)) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
-encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
-encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-
--- if it's just a single string, harcode offset as 32 and append strLen + str
-encodeForReturn (SString s) = do
-  let offset = word256ToBytes $ fromIntegral (32 :: Int)
-      encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
-      retStr = offset `B.append` (encodedLength `B.append` stringBytes)
-  return retStr
-  where stringBytes = TE.encodeUtf8 $ T.pack s
-
-
+-- change the return type from ByteSTring to String
+encodeForReturn :: MonadSM m => Value -> m String
+encodeForReturn (SInteger i) = return . show $  i
+encodeForReturn (SEnumVal _ _ v) = return . show $ v
+encodeForReturn ((SAccount a _)) = return .  show $ a ^. namedAccountAddress
+encodeForReturn (SContract _ a) = return .  show $ a ^. namedAccountAddress
+encodeForReturn (SBool b) = return .  show . fromEnum $ b
+encodeForReturn (SString s) = return s
+{- The following comments are just for previous encodeForReturn function to return ByteString type. 
 -- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
 --   1) starting at the first value to encode, check if it is fixed length type (32), or
 --      dynamic (right now, this group is only strings since we don't return arrays). 
@@ -2914,42 +2904,10 @@ encodeForReturn (SString s) = do
 --                                            (offsetStr1)            (offsetStr2)
 -- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
-
--- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn (SArray _ items) = do
-  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-  bs <- encodeVector items
-  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
-
-encodeForReturn (STuple items) = encodeVector items
-
+-}
+encodeForReturn (SArray _ items) = return  $  "[" ++ ( intercalate "," ( map show (V.toList items) ) ) ++ "]"  --[,]
+encodeForReturn (STuple items) = return   $  "(" ++ ( intercalate "," (map show (V.toList items) ) ) ++ ")" --(,)
 encodeForReturn x = todo "Cannot encode this return type: " x
-
-encodeVector :: MonadSM m => V.Vector Variable -> m ByteString
-encodeVector v = do
-  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList v)
-  return $ headers `B.append` strings
-  where
-    headerLen = (V.length v) * 32
-    buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
-    buildEncoding (headers, strings) val = case val of
-      SString s -> do
-        let offset = word256ToBytes $ fromIntegral (headerLen + (B.length strings))
-            encStr = TE.encodeUtf8 $ T.pack s
-            encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
-            strBS =  encStrLen `B.append` encStr
-        return (headers `B.append` offset, strings `B.append` strBS)
-      tup@(STuple _) -> todo "encoding nested tuples as return values" tup
-      val' -> do
-        bs <- encodeForReturn val'
-        return (headers `B.append` bs, strings)
-
-
-
-
-
-
-
 
 
 {- BEN WILL REFACTOR THIS SOMEDAY -}
