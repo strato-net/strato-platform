@@ -10,6 +10,7 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Data.ByteString                        as B hiding (putStrLn)
 import           Data.Cache
 import           Data.Text                              as T hiding (unlines)   
