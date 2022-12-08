@@ -4,7 +4,7 @@ metadata:
   name: nginx-service
 spec:
   selector:
-    app: strato-platform
+    app: strato
   type: LoadBalancer
   ports:
    -  protocol: TCP
