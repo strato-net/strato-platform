@@ -52,7 +52,11 @@ function newnode {
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013  &>> logs/vault-proxy
 
-  sleep 5
+  echo 'Waiting for vault-proxy to be available...'
+until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
+  sleep 0.1
+done
+echo 'vault-proxy is available'
 
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
