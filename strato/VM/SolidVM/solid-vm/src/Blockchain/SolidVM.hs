@@ -750,8 +750,26 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let functionsIncludingConstructor =
         case contract^.CC.constructor of
-          Nothing -> contract^.CC.functions
+          Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions                  --contract^. M.empty $ CC.functions 
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
+        where
+          emptyFunction = CC.Func [] [] Nothing Nothing Nothing M.empty [] dummyAnnotation False [] 
+          dummyAnnotation :: SourceAnnotation ()
+          dummyAnnotation =
+            SourceAnnotation
+            {
+              _sourceAnnotationStart=SourcePosition {
+                _sourcePositionName="",
+                _sourcePositionLine=0,
+                _sourcePositionColumn=0
+                },
+              _sourceAnnotationEnd=SourcePosition {
+                _sourcePositionName="",
+                  _sourcePositionLine=0,
+                  _sourcePositionColumn=0
+                },
+              _sourceAnnotationAnnotation = ()
+            }
 
   (f, args) <-
         case M.lookup functionName functionsIncludingConstructor of
