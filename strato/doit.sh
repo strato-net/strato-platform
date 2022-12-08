@@ -432,6 +432,10 @@ setEnv debugWSPort ${debugWSPort:-8052}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 
+if [[ -z ${VAULT_URL} ]] ; then
+  echo -e "Error: VAULT_URL is required"
+  exit 1
+fi
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
