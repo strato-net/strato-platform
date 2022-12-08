@@ -36,7 +36,7 @@ import qualified Strato.Strato23.Client     as VC
 instance HasVault IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
+    url <- parseBaseUrl "http://localhost:8013/strato/v2.3"
     eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
@@ -113,7 +113,7 @@ main :: IO ()
 main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
+  vaultUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
   optSender <- do 
     eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of

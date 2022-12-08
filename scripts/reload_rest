@@ -8,4 +8,4 @@ export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-dev
 export OAUTH_ENABLED=true
 
 reload.sh
-docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"rest"' localhost:8000/strato/v2.3/password || true
+docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"rest"' localhost:8013/strato/v2.3/password || true

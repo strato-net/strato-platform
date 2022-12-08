@@ -38,7 +38,7 @@ stack test -j1 \
       x509-certs \
       evm-solidity \
       bloc2api \
-      blockapps-vault-wrapper-server \
+      blockapps-vault-proxy-server \
       slipstream \
       blockapps-privacy \
       seqevents \
@@ -48,8 +48,7 @@ stack test -j1 \
       cross-monitoring \
       format \
       labeled-error \
-      source-tools \
-      strato-lite
+      source-tools
 
 stack bench vm-runner
 
