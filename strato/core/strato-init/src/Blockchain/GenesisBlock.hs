@@ -216,22 +216,23 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  (SolidVMCode "CertificateRegistry" ch)
+                                  (codeHash d)
                                   ""
                                   ""
-                                  SolidVM
+                                  (case codeHash d of
+                                    EVMCode _ -> EVM
+                                    SolidVMCode _ _ -> SolidVM
+                                    CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block")
                                   (case storage d of
                                     SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                                     EVMDiff m -> A.EVMDiff $ Map.map fromDiff m)
                                   [A.Create]
-            , A._metadata = getMetadata ch
+            , A._metadata = getMetadata (case codeHash d of
+                  EVMCode ch' -> ch'
+                  SolidVMCode _ ch' -> ch'
+                  CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block")
             , A._events = S.empty
             }
-            where ch =
-                    case codeHash d of
-                      EVMCode ch' -> ch'
-                      SolidVMCode _ ch' -> ch'
-                      CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
           fromDiff :: Diff a 'Eventual -> a
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
