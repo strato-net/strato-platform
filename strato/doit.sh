@@ -346,7 +346,6 @@ function doInit {
   mkdir config
 
   echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
-  echo "999999999999999999999999999999999999999999999999999999"
 }
 
 # Find all logs greater than 10M, then copy and truncate

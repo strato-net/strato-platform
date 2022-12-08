@@ -48,7 +48,8 @@ stack test -j1 \
       cross-monitoring \
       format \
       labeled-error \
-      source-tools
+      source-tools \
+      strato-lite
 
 stack bench vm-runner
 
