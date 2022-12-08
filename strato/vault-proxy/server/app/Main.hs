@@ -87,7 +87,7 @@ main = do
   --Create the proxy server
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
       vport = vaultProxyPort vaultConnection
-  traceM $ "Starting the proxy server on port: " ++ vport  
+  traceM $ "Starting the proxy server on port: " ++ show vport  
   run vport (app' $ httpManager vaultConnection)
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
