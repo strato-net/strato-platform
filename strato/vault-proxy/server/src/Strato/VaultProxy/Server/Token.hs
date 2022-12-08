@@ -61,13 +61,6 @@ getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
         --If the token was old destroy the old token and get a new one
         Nothing -> do 
             traceM "Trying to get a new token"
-            traceM "clientId: "
-            traceM $ T.unpack clientId
-            traceM "clientSecret: "
-            traceM $ T.unpack clientSecret
-            traceM "additionalOauth: "
-            traceM $ show additionalOauth
-
             -- Get the virgin token from the provider
             let vToken = getVirginToken clientId clientSecret additionalOauth
             traceM "Got a new token"
@@ -94,6 +87,7 @@ makeExpry token reserveTime = do
         expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger reserveTime) * 1000000000)
     pure expry
 
+--Get the vault token more easily
 vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
 vaulty vaultConn = getAwesomeToken tc cid csec rs ao
     where

@@ -13,4 +13,4 @@ defineFlag "OAUTH_RESERVE_SECONDS" (13 :: Int) "How long the system should reser
 defineFlag "VAULT_URL" (T.pack "" :: Text) "The place where I go to visit THE VAULT 🔒."
 defineFlag "VAULT_PASSWORD" (T.pack "" :: Text) "This is the password that is used to log into the shared vault."
 defineFlag "VAULT_PROXY_PORT" (8013 :: Int) "This is the port that the vault proxy will listen on."
-defineFlag "VAULT_PROXY_URL" (T.pack "http://strato" :: Text) "This is the url that the vault proxy will listen on."
+defineFlag "VAULT_PROXY_URL" (T.pack "http://localhost" :: Text) "This is the url that the vault proxy will listen on."

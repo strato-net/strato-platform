@@ -10,7 +10,6 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
--- import           Control.Monad.Logger
 import           Data.ByteString                        as B hiding (putStrLn)
 import           Data.Cache
 import           Data.Text                              as T hiding (unlines)   
@@ -58,19 +57,21 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   -- $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
-  
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
+  --Initialize the token cache
   tokenCash <- atomically $ newCacheSTM Nothing
   traceM "Trying to parse the oauth url"
+  --Parse the shared vault url
   ourl <- parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL 
+  --Connect to the oauth provider
   rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
   --get the awesome token, awesome token alters the token cash, so a result is not needed
   _ <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
-
+  --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
       httpManager = mgr,
@@ -83,26 +84,30 @@ main = do
       tokenCache = tokenCash,
       additionalOauth = noErrorOauth
   }
+  --Create the proxy server
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
       vport = vaultProxyPort vaultConnection
-  --  $logInfoS "Vault-Proxy is starting up inside of the strato container on port: " ++ vport
-  
+  traceM $ "Starting the proxy server on port: " ++ vport  
   run vport (app' $ httpManager vaultConnection)
-  --  $logInfoS "Vault-Proxy is shutting down"
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
+  --get the JWT information
   jwt <- vaulty vc
+  --get the foreign vault information
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
       goodJwt = accessToken jwt
+      --get the old headers
       headers = W.requestHeaders rev
+      --Add the new authorization header
       auth = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 goodJwt))
+      --Add the authorization header to the request
       modReq = case auth of
         Nothing    -> rev
         Just auth' -> rev { W.requestHeaders = auth':headers }
-    --Assuming the port is 8094 for the shared vault
+  --Modifiy the request setting the pointing direction to shared vault
   pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 bearerBS :: ByteString
