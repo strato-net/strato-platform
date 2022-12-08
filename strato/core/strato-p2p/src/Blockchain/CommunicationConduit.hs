@@ -190,9 +190,7 @@ handleMsgClientConduit myId peer = do
         Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-                $logInfoS "serverHandshakeClient1/David{}" .T.pack $ show networkID'
-                $logInfoS "serverHandshakeClient1/David2{}" .T.pack $ show computeNetworkID  
+                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch 
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -206,8 +204,6 @@ handleMsgClientConduit myId peer = do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-                $logInfoS "serverHandshakeClient2/David{}" .T.pack $ show networkID'
-                $logInfoS "serverHandshakeClient2/David2{}" .T.pack $ show computeNetworkID 
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -260,8 +256,6 @@ handleMsgServerConduit myPubkey peer = do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              $logInfoS "serverHandshake/David{}" .T.pack $ show networkID'
-              $logInfoS "serverHandshake/David2{}" .T.pack $ show computeNetworkID
               -- we set to 0 cause we dont necessarily know the number yet
               when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {
