@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: strato-platform
+  name: strato
 spec:
   replicas: 1
   strategy:
