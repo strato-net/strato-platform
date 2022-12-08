@@ -14,6 +14,7 @@ import CreateChain from '../CreateChain';
 import Chain from '../Chain';
 import './chains.css';
 import HexText from '../HexText';
+import { Button } from '@blueprintjs/core';
 
 const tourSteps = [
   {
@@ -29,7 +30,9 @@ class Chains extends Component {
   constructor() {
     super()
     this.state = {
-      selected: null
+      selected: null,
+      limit: 10,
+      offset: 0,
     }
   }
 
@@ -54,6 +57,22 @@ class Chains extends Component {
       })
     }
   }
+
+  onNextClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = offset + limit;
+    this.setState({ offset: newOffset }, () => {
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    });
+  };
+
+  onPrevClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = Math.max(0, offset - limit);
+    this.setState({ offset: newOffset }, () => {
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    });
+  };
 
   render() {
     const labelIds = this.props.labelIds;
@@ -96,6 +115,8 @@ class Chains extends Component {
           </div>
         );
       }.bind(this));
+
+    const isPaginationDisplay = rows.length ? true : Boolean(this.state.offset);
 
     return (
       <div className="container-fluid pt-dark">
@@ -150,6 +171,29 @@ class Chains extends Component {
               </div>
             </div>
           </div>
+          {isPaginationDisplay && <div className="pt-dark">
+            <div className="row">
+              <div className="col-sm-2 smd-pad-16 text-left">
+                <Button
+                  onClick={this.onPrevClick}
+                  className="pt-icon-arrow-left"
+                  text="Previous"
+                  disabled={!(this.state.offset > 0)}
+                />
+              </div>
+              <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
+                {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(rows.length, this.state.limit)}`}
+              </div>
+              <div className="col-sm-2 smd-pad-16 text-right">
+                <Button
+                  onClick={this.onNextClick}
+                  className="pt-icon-arrow-right"
+                  text="Next"
+                  disabled={rows.length < this.state.limit}
+                />
+              </div>
+            </div>
+          </div>}
         </div>
       </div>
     );
