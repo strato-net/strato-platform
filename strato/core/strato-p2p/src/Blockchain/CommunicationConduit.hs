@@ -189,7 +189,7 @@ handleMsgClientConduit myId peer = do
         -- TODO remove distinction between new status messages and old ones once entire protocol is complete
         Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-                -- when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+                when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
                 $logInfoS "serverHandshakeClient1/David{}" .T.pack $ show networkID'
                 $logInfoS "serverHandshakeClient1/David2{}" .T.pack $ show computeNetworkID  
@@ -204,7 +204,7 @@ handleMsgClientConduit myId peer = do
                 lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-                -- when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+                when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
                 $logInfoS "serverHandshakeClient2/David{}" .T.pack $ show networkID'
                 $logInfoS "serverHandshakeClient2/David2{}" .T.pack $ show computeNetworkID 
