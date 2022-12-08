@@ -263,7 +263,7 @@ handleMsgServerConduit myPubkey peer = do
               $logInfoS "serverHandshake/David{}" .T.pack $ show networkID'
               $logInfoS "serverHandshake/David2{}" .T.pack $ show computeNetworkID
               -- we set to 0 cause we dont necessarily know the number yet
-              when (networkID' == computeNetworkID && genHash /= peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,
