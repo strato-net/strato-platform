@@ -91,7 +91,7 @@ runPeer peer sSource = do
     case attempt of
       Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
       Just err -> do
-        $logErrorS "runPeer" . T.pack $ "Peer did not run successfullyClient: " ++ show err
+        $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
         throwIO err
 
 runEthClientConduit :: MonadP2P m
