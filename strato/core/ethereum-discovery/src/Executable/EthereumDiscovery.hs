@@ -19,3 +19,4 @@ ethereumDiscovery runner = do
   $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
   $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
   runner runEthUDPServer
+

@@ -466,13 +466,9 @@ lookupX509AddrFromCBHash ::(
                       )
       => Address -> m (Maybe Address)
 lookupX509AddrFromCBHash k = do
-  -- do
-  --   mBH <- Mod.get (Mod.Proxy @CurrentBlockHash)
-  --   mbh= 0
-    -- fmap join . for mBH $ \(CurrentBlockHash _) -> do 
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
-    maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+    maybe Nothing (stringAddress . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB

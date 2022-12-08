@@ -37,7 +37,7 @@ all: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper vault-nginx get_solcs build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...

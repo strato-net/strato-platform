@@ -43,6 +43,7 @@ def deployStrato(nodeData) {
         networkID="${nodeData.NETWORK_ID}" \\
         BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
         validators="${nodeData.VALIDATORS}" \\
+        requireCerts=false \\
         ./strato --blockstanbul"""
       } else {
         runCommand = """#!/bin/bash
@@ -58,6 +59,7 @@ def deployStrato(nodeData) {
         NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
         HTTPS_PORT="${nodeData.PORT}" \\
         network="blockappsnet" \\
+        requireCerts=false \\
         ./strato --blockstanbul"""
       }
       writeFile file:"run.sh", text: """${runCommand}"""
@@ -145,6 +147,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
         HTTPS_PORT="${nodeData.PORT}" \\
         BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
+        requireCerts=false \\
         gasOn=false \\"""
       if (rootNodeAddress == null) {
         runCommand = """${runCommand}
@@ -247,6 +250,7 @@ export AWS_ACCESS_KEY_ID='${AWS_BEANSTALK_INTERNAL_TEST_USER_KEY}'
 export AWS_SECRET_ACCESS_KEY='${AWS_BEANSTALK_INTERNAL_TEST_USER_PASSWORD}'
 export AWS_REGION='us-east-1'
 export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-internal-sqs'
+export requireCerts=false
 
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL
@@ -279,6 +283,7 @@ export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/aut
 export INT_SERVER_OAUTH_CLIENT_ID='dev'
 export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
 export INT_SERVER_OAUTH_SCOPE='openid email'
+export requireCerts=false
 
 docker-compose up -d --build
           """
@@ -371,6 +376,7 @@ export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://login.microsoftonline.com/
 export INT_SERVER_OAUTH_CLIENT_ID='${AZUREAD_INTSERVER_CLIENT_ID}'
 export INT_SERVER_OAUTH_CLIENT_SECRET='${AZUREAD_INTSERVER_CLIENT_SECRET}'
 export INT_SERVER_OAUTH_SCOPE='openid email ${AZUREAD_INTSERVER_CLIENT_ID}/.default'
+export requireCerts=false
 
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL
@@ -956,7 +962,7 @@ def waitForCirrus() {
 //       -H \"Authorization: Bearer ${accessToken}\"  \
 //       -H 'Accept: application/json;charset=utf-8' \
 //       -H 'Content-Type: application/json' \
-//       --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+//       --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
 //     ).trim()
 //   }
 // }
@@ -969,7 +975,7 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
-    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
+    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
     | jq '.[].txResult.contractsCreated'"
   ).trim()
   return CONTRACT_ADDRESS
