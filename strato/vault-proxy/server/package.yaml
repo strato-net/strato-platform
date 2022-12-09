@@ -1,0 +1,116 @@
+name:                blockapps-vault-proxy-server
+version:             0.1.0.0
+github:              "githubuser/vault-proxy"
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/server#readme>
+
+dependencies:
+- base
+- blockapps-vault-proxy-api
+- bytestring
+- common-log
+- lens
+- postgresql-simple
+- text
+- http-conduit
+- monad-logger
+- servant-client
+- servant-client-core
+- servant-subscriber
+- http-reverse-proxy
+- http-types
+- req
+
+ghc-options: -Wall -Werror -threaded
+
+library:
+  source-dirs: src
+  dependencies:
+    - aeson
+    - base64
+    - bytestring
+    - cache
+    - clock
+    - containers
+    - cryptonite
+    - exceptions
+    - http-client
+    - jwt
+    - lens
+    - modern-uri
+    - monad-alter
+    - monad-control
+    - mtl
+    - opaleye
+    - product-profunctors
+    - profunctors
+    - req
+    - saltine
+    - servant
+    - servant-auth
+    - servant-auth-server
+    - servant-client
+    - scientific
+    - servant-swagger
+    - strato-model
+    - stm
+    - swagger2
+    - transformers
+    - unliftio
+    - resource-pool
+    - secp256k1-haskell == 0.2.0
+    - servant-server
+    - text
+    - yesod-core
+
+
+executables:
+  blockapps-vault-proxy-server:
+    source-dirs: app
+    main: Main.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-proxy-server
+      - blockapps-init
+      - cache
+      - clock
+      - hflags
+      - http-client
+      - resource-pool
+      - servant-options
+      - servant-server
+      - wai
+      - wai-cors
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
+    ghc-options: -threaded
+      
+tests:
+  vault-proxy-spec:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-data
+      - blockapps-vault-proxy-server
+      - bytestring
+      - clockwork
+      - cryptonite
+      - hspec
+      - labeled-error
+      - secp256k1-haskell
+      - strato-model
