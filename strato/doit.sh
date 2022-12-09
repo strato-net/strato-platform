@@ -45,11 +45,24 @@ fi
 
 function newnode {
   
+  # if alternative log in methods are provided then use them
   mkdir -p logs
+  
+  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID} ]] ; then
+    VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+  else 
+    VPACI=${OAUTH_VAULT_PROXY_CLIENT_ID}
+  fi
+
+  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET} ]] ; then
+    VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
+  else 
+    VPACS=${OAUTH_CLIENT_SECRET}
+  fi
 
   runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
+    --OAUTH_DISCOVERY_URL=${VPACI} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+    --OAUTH_CLIENT_SECRET=${VPACS} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013  &>> logs/vault-proxy
 
   echo 'Waiting for vault-proxy to be available...'
