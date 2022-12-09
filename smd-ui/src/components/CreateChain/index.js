@@ -98,7 +98,7 @@ class CreateChain extends Component {
         });
       }
 
-      this.props.createChain(values.chainName, members, balances, values.governanceContract, args, values.vm);
+      this.props.createChain(values.chainName, members, balances, values.governanceContract, args, values.vm, this.props.limit, this.props.offset);
       this.setState({
         members: [],
       });
@@ -521,7 +521,6 @@ class CreateChain extends Component {
                   </table>
                 </div>
               </div>
-              
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
