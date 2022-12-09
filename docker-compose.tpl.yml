@@ -285,7 +285,7 @@ services:
     image: zookeeper:3.4.14
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/opt/zookeeper-3.4.14/data
+      - zookeeperdata:/zookeeper-3.4.14
     logging:
       driver: "json-file"
       options:
