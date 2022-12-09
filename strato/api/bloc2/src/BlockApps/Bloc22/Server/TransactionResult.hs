@@ -363,6 +363,7 @@ convertEnumTypeToInt = \case
   TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
+
 -- works for EVM only
 convertResultResToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertResultResToVals byteResp responseTypes =
@@ -377,7 +378,6 @@ convertSvmResultResToVals resp =
         Right y -> let values = traverse expressionToValue y
                     in fmap valueToSolidityValue <$> values
 
-
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n 
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
@@ -386,8 +386,6 @@ expressionToValue _ = Nothing
 -- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
 --expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
 --expressionToValue (ObjectLiteral _ n) = Just $ SMV.SStruct _ n --SStruct _ theMap
-
-
 
 constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
                                Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m (ByteString, Text)
