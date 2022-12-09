@@ -34,6 +34,7 @@ import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
+import qualified Data.ByteString.Char8             as BC
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
@@ -50,6 +51,11 @@ import           Data.Traversable
 import           Text.Format
 import           Text.Read                         (readMaybe)
 import           UnliftIO
+import           Text.Parsec                          (runParser)
+import           SolidVM.Solidity.Parse.Statement
+
+import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
+
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -62,7 +68,7 @@ import           BlockApps.Solidity.Contract()
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Type
-import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Value 
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
@@ -78,6 +84,7 @@ import           BlockApps.Bloc22.API.TypeWrappers
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
+import           SolidVM.Model.CodeCollection.Statement
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -337,27 +344,12 @@ functionResult i txHash txResult mmd toAccount = do
       txResp = fromShort $ transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
     -- workaround for enums
-      {- -- check if evm or svm is called 
-      --(Map.fromList <$> rawTransactionMetadata)
-      ~(name, src, vm) <- case mmd of
-    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-    Just md -> case Map.lookup "name" md of
-      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
-        "EVM" -> case Map.lookup "src" md of
-          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-          Just src -> pure (name, src, "EVM")
+      theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+  mFormattedResponse <- case theVM of
+        "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
+        "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
+        _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
-      -}
-
-      transcationMetadata=Map.fromList <$> rawTransactionMetadata
-      case Map.lookup "name" transcationMetadata of
-        Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-        Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
-          "EVM" -> mFormattedResponse = convertResultResToVals txResp mappedResultTypes
-          "SVM" -> mFormattedResponse = convertSvmResultResToVals txResp 
-      Nothing -> lift . throwIO . UserError $ "Could not get the VM type!"
-      
   case transactionResultMessage txResult of
     "Success!" -> do
       let r = Text.decodeUtf8 $ Base16.encode txResp
@@ -371,19 +363,31 @@ convertEnumTypeToInt = \case
   TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
--- this function works for EVM only
+-- works for EVM only
 convertResultResToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
--- this function works for SolidVM only
-convertSvmResultResToVals :: Maybe [Value] ->  Maybe [SolidityValue]
-convertSvmResultResToVals resp  =
-  map valueToSolidityValue <$> resp 
+-- works for SolidVM only
+convertSvmResultResToVals :: String -> Maybe [SolidityValue]
+convertSvmResultResToVals resp =
+  let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
+   in case args of 
+        Left _ -> Nothing
+        Right y -> let values = traverse expressionToValue y
+                    in fmap valueToSolidityValue <$> values
 
 
+expressionToValue :: Expression -> Maybe Value
+expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n 
+expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
+expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue _ = Nothing
+-- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
+--expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
+--expressionToValue (ObjectLiteral _ n) = Just $ SMV.SStruct _ n --SStruct _ theMap
 
----------------------------------
+
 
 constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
                                Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m (ByteString, Text)
