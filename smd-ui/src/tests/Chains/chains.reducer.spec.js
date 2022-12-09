@@ -36,7 +36,8 @@ describe('Chains: reducer', () => {
         listChain: {},
         listLabelIds: {},
         chainIds: [],
-        selectedChain: null
+        selectedChain: null,
+        isLoading: true
       };
 
       expect(reducer(initialState, action)).toMatchSnapshot();
@@ -54,7 +55,8 @@ describe('Chains: reducer', () => {
         listChain: {},
         listLabelIds: {},
         chainIds: [],
-        selectedChain: null
+        selectedChain: null,
+        isLoading: false
       };
 
       expect(reducer(initialState, action)).toMatchSnapshot();
@@ -71,7 +73,8 @@ describe('Chains: reducer', () => {
         listChain: {},
         listLabelIds: {},
         chainIds: [],
-        selectedChain: null
+        selectedChain: null,
+        isLoading: false
       };
 
       const action = fetchChainsFailure('error');
