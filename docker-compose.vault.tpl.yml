@@ -26,7 +26,7 @@ services:
         max-file: "3"
   postgres:
     environment:
-      - POSTGRES_PASSWORD=${postgres_password:-api}
+      - postgres_password=${postgres_password:-api}
     image: postgres:9.6
     volumes:
       - vaultpgdata:/var/lib/postgresql/data
