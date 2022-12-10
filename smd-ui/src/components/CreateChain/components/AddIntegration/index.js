@@ -6,6 +6,7 @@ import { Button, Dialog, Intent } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm } from 'redux-form';
 import { openAddIntegrationModal, closeAddIntegrationModal } from '../../createChain.actions';
+import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 import { validate } from './validate';
 
 class AddIntegration extends Component {
@@ -65,21 +66,92 @@ class AddIntegration extends Component {
     }
   }
 
+  renderChainFields() {
+    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+
+    if (chainLabel.length) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain
+              </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input chain-field"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => this.props.getLabelIds(e.target.value)
+                  }
+                >
+                  <option />
+                  {
+                    chainLabel.map((label, i) => {
+                      return (
+                        <option key={label + i} value={label}>{label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain IDs
+              </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select smd-max-width">
+                <Field
+                  className="pt-input smd-max-width"
+                  component="select"
+                  name="chainId"
+                  onChange={
+                    (e) => this.handleChainIdChange(e)
+                  }
+                >
+                  <option />
+                  {
+                    this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                      return (
+                        <option key={id + i} value={id}>{id}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  }
+
   render() {
     return (
       <div >
         <Button onClick={() => {
           mixpanelWrapper.track("add_integration_open_click");
+          this.props.fetchChainIds();
           this.props.openAddIntegrationModal();
+          this.props.initialize(this.props.initialValues);
+          this.props.getLabelIds(this.props.initialValues.chainLabel)
         }} className="pt-intent-primary pt-icon-add"
           style={{ marginTop: '8px' }}
-          text="Add App Integration" />
+          text="Add DApp Integration" />
 
         <Dialog
           iconName="add"
           isOpen={this.props.isOpen}
           onClose={this.closeModal}
-          title="Add App Integration"
+          title="Add DApp Integration"
           className="pt-dark"
         >
           <form>
@@ -109,29 +181,7 @@ class AddIntegration extends Component {
                   </div>
                 </div>
               }
-
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    App Chain ID:
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="form-width">
-                    <Field
-                      name="chainId"
-                      component="input"
-                      type="text"
-                      placeholder="App Chain ID"
-                      value={this.state.chainId}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleChainIdChange(e)}
-                      required
-                    />
-                    <br /><span className="error-text">{this.errorMessageFor('chainId')}</span>
-                  </div>
-                </div>
-              </div>
+              {this.renderChainFields()}
             </div>
 
             <div className="pt-dialog-footer">
@@ -144,7 +194,7 @@ class AddIntegration extends Component {
                 <Button
                   intent={Intent.PRIMARY}
                   onClick={this.submit}
-                  text="Add App Integration"
+                  text="Add DApp Integration"
                 />
               </div>
             </div>
@@ -156,19 +206,25 @@ class AddIntegration extends Component {
 }
 
 export function mapStateToProps(state) {
+  const selectedChainData = state.chains.chainIds.find((data) => data.id ===  state.chains.selectedChain)
   return {
     isOpen: state.createChain.isAddIntegrationModalOpen,
     initialValues: {
       name: "",
-      chainId: "",
-    }
+      chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
+      chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
+    },
+    chainLabel: state.chains.listChain,
+    chainLabelIds: state.chains.listLabelIds
   };
 }
 
 const formed = reduxForm({ form: 'add-integration' })(AddIntegration);
 const connected = connect(mapStateToProps, {
   openAddIntegrationModal,
-  closeAddIntegrationModal
+  closeAddIntegrationModal,
+  fetchChainIds,
+  getLabelIds
 })(formed);
 
 export default withRouter(connected);

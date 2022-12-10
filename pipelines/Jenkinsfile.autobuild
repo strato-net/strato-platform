@@ -182,7 +182,7 @@ pipeline {
                 rm -rf strato-api-tests
                 git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout STRATO-2919_required-chain-signatures # Replace with custom branch here if made changes to API and strato-api-tests repo code
+                # git checkout feature-branch # Replace with custom branch here if made changes to API and strato-api-tests repo code
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \

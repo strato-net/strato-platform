@@ -152,9 +152,9 @@ class CreateChain extends Component {
   removeIntegration(integration) {
     const integrations = this.state.integrations.slice(0);
     const index = integrations.indexOf(integration);
-    integrations.splice(index, 1);
+    const newIntegrations = integrations.slice(index, 1);
     this.setState({
-      integrations: integrations
+      integrations: newIntegrations
     });
   }
 
@@ -224,7 +224,7 @@ class CreateChain extends Component {
     else {
       return (
         <div className="pt-dialog-header no-integration">
-          <span className="pt-dialog-header-title">No App Integrations</span>
+          <span className="pt-dialog-header-title">No DApp Integrations</span>
         </div>
       );
     }

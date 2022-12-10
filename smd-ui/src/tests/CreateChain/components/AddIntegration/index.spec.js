@@ -3,7 +3,7 @@ import AddIntegration, { mapStateToProps } from '../../../../components/CreateCh
 import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
 import * as checkMode from '../../../../lib/checkMode';
-import { indexAccountsMock } from '../../../Accounts/accountsMock';
+import { chain } from '../../../Chains/chainsMock';
 
 describe('AddIntegration: index', () => {
 
@@ -22,7 +22,13 @@ describe('AddIntegration: index', () => {
     test('with empty values', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: chain,
+        chainLabelIds: chain["airline cartel 9"],
+        fetchChainIds: jest.fn(),
         store: store
       };
 
@@ -36,7 +42,12 @@ describe('AddIntegration: index', () => {
     test('with values', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
         store: store
       };
 
@@ -50,7 +61,14 @@ describe('AddIntegration: index', () => {
     test('form fields', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         handler: jest.fn(),
         reset: jest.fn(),
         closeAddIntegrationModal: jest.fn(),
@@ -86,7 +104,12 @@ describe('AddIntegration: index', () => {
     test('errorMessageFor', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
         handler: jest.fn(),
         reset: jest.fn(),
         closeAddIntegrationModal: jest.fn(),
@@ -113,7 +136,12 @@ describe('AddIntegration: index', () => {
     test('with empty values', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
         store: store
       };
 
@@ -127,7 +155,12 @@ describe('AddIntegration: index', () => {
     test('with values', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
         store: store
       };
 
@@ -144,7 +177,14 @@ describe('AddIntegration: index', () => {
         const props = {
           isOpen: true,
           initialValues: {
+            name: "",
+            chainLabel: "",
+            chainId: ""
           },
+          chainLabel: "",
+          chainLabelIds: [],
+          fetchChainIds: jest.fn(),
+          getLabelIds: jest.fn(),
           handler: jest.fn(),
           reset: jest.fn(),
           closeAddIntegrationModal: jest.fn(),
@@ -169,7 +209,14 @@ describe('AddIntegration: index', () => {
       test('without values', () => {
         const props = {
           initialValues: {
+            name: "",
+            chainLabel: "",
+            chainId: ""
           },
+          chainLabel: "",
+          chainLabelIds: [],
+          fetchChainIds: jest.fn(),
+          getLabelIds: jest.fn(),
           handler: jest.fn(),
           reset: jest.fn(),
           closeAddIntegrationModal: jest.fn(),
@@ -196,7 +243,14 @@ describe('AddIntegration: index', () => {
     test('open modal', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         handler: jest.fn(),
         reset: jest.fn(),
         openAddIntegrationModal: jest.fn(),
@@ -216,10 +270,13 @@ describe('AddIntegration: index', () => {
     test('close modal', () => {
       const props = {
         initialValues: {
+          name: "",
+          chainLabel: "",
+          chainId: ""
         },
+        chainLabel: "",
+        chainLabelIds: [],
         handler: jest.fn(),
-        reset: jest.fn(),
-        openAddIntegrationModal: jest.fn(),
         closeAddIntegrationModal: jest.fn(),
         store: store
       };
@@ -240,6 +297,11 @@ describe('AddIntegration: index', () => {
       createChain: {
         isAddIntegrationModalOpen: true
       },
+      chains: {
+        chainIds: [],
+        listChain: chain,
+        listLabelIds: chain["airline cartel 9"]
+      }
     }
 
     expect(mapStateToProps(state)).toMatchSnapshot();

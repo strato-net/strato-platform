@@ -204,7 +204,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
             </label>
             <div className=\\"pt-dialog-header no-integration\\">
               <span className=\\"pt-dialog-header-title\\">
-                No App Integrations
+                No DApp Integrations
               </span>
             </div>
             <span className=\\"error-text\\" />
@@ -355,7 +355,7 @@ exports[`CreateChain: index render component with values 1`] = `
             </label>
             <div className=\\"pt-dialog-header no-integration\\">
               <span className=\\"pt-dialog-header-title\\">
-                No App Integrations
+                No DApp Integrations
               </span>
             </div>
             <span className=\\"error-text\\" />
