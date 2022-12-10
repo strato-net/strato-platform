@@ -55,7 +55,7 @@ export const closeAddIntegrationModal = function () {
   }
 }
 
-export const createChain = function (label, members, balances, integrations, src, args, vm) {
+export const createChain = function (label, members, balances, integrations, src, args, vm, limit, offset) {
   return {
     type: CREATE_CHAIN_REQUEST,
     label,
@@ -67,6 +67,8 @@ export const createChain = function (label, members, balances, integrations, src
     vm,
     spinning: true,
     isOpen: true,
+    limit,
+    offset
   }
 }
 

@@ -35,7 +35,6 @@ import           Data.Proxy
 import qualified Data.Set                              as S
 import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
-import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
 import qualified Network.Kafka.Protocol                as KP
@@ -243,11 +242,13 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChains
-        (sr, mExecResults) <-
+        (sr, mExecResults) <-           
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-        Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
+        if any (isJust . erException) mExecResults
+          then return Nothing
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
@@ -341,7 +342,8 @@ runChainConstructors cId cInfo = do
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
-
+  curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash )
+  curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
   actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
       NonContract{} -> pure Nothing
@@ -365,7 +367,7 @@ runChainConstructors cId cInfo = do
             0 --block number
             100000000000
             0
-            (posixSecondsToUTCTime 0)
+            (bSumTimestamp curBlockSummary)
             ""
             0
             (Keccak256.unsafeCreateKeccak256FromWord256 0))

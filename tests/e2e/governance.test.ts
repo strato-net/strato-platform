@@ -24,6 +24,7 @@ let options:Options={config}
 
 const label = 'My chain label';
 const src = `contract Governance {
+  constructor() {}
   enum Rule { NOTHING, AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES }
   event OrgAdded(string orgName);
   event OrgRemoved(string orgName);

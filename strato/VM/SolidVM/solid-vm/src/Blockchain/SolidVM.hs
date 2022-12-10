@@ -444,7 +444,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
       erNewContractAccount = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
-      erException = Nothing,
+      erException = Nothing,      -- tells me if theres an exception
       erKind = SolidVM,
       erPragmas=[]
       }
@@ -750,8 +750,26 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let functionsIncludingConstructor =
         case contract^.CC.constructor of
-          Nothing -> contract^.CC.functions
+          Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions                  --contract^. M.empty $ CC.functions 
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
+        where
+          emptyFunction = CC.Func [] [] Nothing Nothing Nothing M.empty [] dummyAnnotation False [] 
+          dummyAnnotation :: SourceAnnotation ()
+          dummyAnnotation =
+            SourceAnnotation
+            {
+              _sourceAnnotationStart=SourcePosition {
+                _sourcePositionName="",
+                _sourcePositionLine=0,
+                _sourcePositionColumn=0
+                },
+              _sourceAnnotationEnd=SourcePosition {
+                _sourcePositionName="",
+                  _sourcePositionLine=0,
+                  _sourcePositionColumn=0
+                },
+              _sourceAnnotationAnnotation = ()
+            }
 
   (f, args) <-
         case M.lookup functionName functionsIncludingConstructor of
@@ -1485,15 +1503,10 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "tx", "username") -> do
         env' <- getEnv
         maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-        -- $logInfoS "CERT IN QUESTION USERNAME" . T.pack $ (show (Env.origin env' ^. accountAddress))
-        -- $logInfoS "CERT IN QUESTION USERNAME" . T.pack $ (show env') 
-        -- $logInfoS "CERT IN QUESTION USERNAME returns: " . T.pack $ (show (Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert)) 
         return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do
         env' <- getEnv
         maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
-        -- $logInfoS "CERT IN QUESTION ORG" . T.pack $ (show maybeCert) 
-        -- $logInfoS "CERT IN QUESTION ORG returns: " . T.pack $ (show (Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert))
         return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do
         env' <- getEnv
