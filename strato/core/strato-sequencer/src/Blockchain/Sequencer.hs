@@ -280,7 +280,6 @@ blockstanbulSend = mapM_ $ \ie -> do
 
 blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
-                     , (Keccak256 `A.Alters` ChainHashEntry) m
                      , (Keccak256 `A.Alters` DependentBlockEntry) m
                      )
                   => InEvent
@@ -298,17 +297,31 @@ blockstanbulSend' msg = do
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
   rch <- Mod.access (Mod.Proxy @(TQueue VoteResult))
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
-  let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks) 
+
+  -- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
+  -- blockToIngestBlock  :: TO.TXOrigin -> BDB.Block -> IngestBlock
+
+  -- TXOrigin
+  -- getSequencedBlock ::  BDB.Block -> IngestBlock -> Maybe SequencedBlock
+
+  --  traverse (a -> f b) -> t a -> f (t b)
+
+  let getSequencedBlock = ingestBlockToSequencedBlock 
                         . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
-  rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
+  let rBlocks = catMaybes (map getSequencedBlock blocks)
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
   let (vms, p2pevs, ckpts) = vmEvenP2pCheckptFilterHelper resp
   
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
            ++ vms
+
+
+  -- let getSequencedBlock = ingestBlockToSequencedBlock 
+  --                       . blockToIngestBlock TO.Blockstanbul
+
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -344,6 +357,13 @@ privateWitnessableHash tHash cHash =
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
 
+
+
+
+-- wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
+
+
+
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
                            , (Keccak256 `A.Alters` ChainHashEntry) m
@@ -352,7 +372,7 @@ transformPrivateHashTXs :: ( MonadLogger m
                         => [(Timestamp, IngestTx)]
                         -> ConduitT a SeqEvent m ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  motx <- wrapTransaction lookupChainIdFromChainHash t
+  motx <- wrapTransaction t
   for_ motx $ \otx -> do
     let privateWitnessHash = privateWitnessableHash th' ch'
     pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
@@ -372,7 +392,7 @@ transformFullTransactions :: ( MonadLogger m
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
-    wrapTransaction lookupChainIdFromChainHash itx >>= \case
+    wrapTransaction itx >>= \case
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx
@@ -508,7 +528,6 @@ expandBlock sb = do
 runConsensus :: ( MonadLogger m
                 , MonadMonitor m
                 , MonadBlockstanbul m
-                , (Keccak256 `A.Alters` ChainHashEntry) m
                 , (Keccak256 `A.Alters` DependentBlockEntry) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
@@ -561,13 +580,17 @@ transformBlocks :: ( MonadLogger m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
-transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromChainHash ib >>= \case
-  Nothing -> do
-    $logWarnS "transformEvents/emitBlocks" . T.pack
-      $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-    P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-  Just sb -> do
-    runBlockWithConsensus sb
+-- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
+-- forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
+transformBlocks ibs = do
+  forM_ ibs $ \ib ->
+    case (ingestBlockToSequencedBlock ib) of
+      Nothing -> do
+        $logWarnS "transformEvents/emitBlocks" . T.pack
+          $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+        P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+      Just sb -> do
+        runBlockWithConsensus sb
 
 transformGenesis :: ( MonadLogger m
                     , MonadMonitor m

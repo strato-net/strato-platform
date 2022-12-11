@@ -43,7 +43,7 @@ import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault(..))
-import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatus)
+import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatusNow)
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Strato.Strato23.Client   hiding (verifyPassword)
@@ -133,4 +133,4 @@ getPubKey mAccessToken =
     Just _  -> blocVaultWrapper $ getKey  "nodekey" Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
-checkIsSynced = (runStratoRedisIO getSyncStatus) >>= \case Nothing -> pure False; Just c ->pure  c; 
+checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

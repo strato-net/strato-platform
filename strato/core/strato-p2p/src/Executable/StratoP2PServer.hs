@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -17,60 +18,40 @@ import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
+import           Control.Lens                          ((^.))
 import           Control.Monad
-import qualified Control.Monad.Change.Alter            as A
-import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
-import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
-import           Network.Socket
-import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
 import           BlockApps.Logging
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
-import           Blockchain.P2PUtil
-import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                           as C
 
-runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-             => IORef (S.OSet Keccak256)
-             -> Int
+runEthServer :: (RunsServer n m, MonadP2P n)
+             => Int
+             -> PeerRunner n m ()
              -> m ()
-runEthServer wireMessagesRef listenPort = do
-  let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  runGeneralTCPServer settings $ \app ->
-      runContextM cfg $ do    -- Note- the monad has to run here, inside the server connection, because ResourceT should be cleaned up per connection
-        let sSource = seqEventNotificationSource $ contextKafkaState initContext
-        uSink <- asks configUnseqSink
-        ethServerHandler (appSource app) (appSink app) sSource uSink (appSockAddr app)
+runEthServer listenPort runner = runServer (TCPPort listenPort) runner $ \c a ->
+  ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
-ethServerHandler :: ( MonadP2P m
-                    , MonadReader Config m
-                    , A.Selectable String PPeer m
-                    , ((T.Text, Int) `A.Alters` ActivityState) m
-                    )
+ethServerHandler :: MonadP2P m
                  => ConduitM () B.ByteString m ()
                  -> ConduitM B.ByteString Void m ()
                  -> ConduitM () P2pEvent m ()
-                 -> ([IngestEvent] -> m ())
-                 -> SockAddr
+                 -> IPAsText
                  -> m ()
-ethServerHandler peerSource peerSink seqSource unseqSink sockAddr = do
-  let theSockAddr = sockAddrToIP sockAddr
-      peerStr = show theSockAddr
-  ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
+ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
+  let peerStr = T.unpack i
+  ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
-  getPeerByIP theSockAddr >>= \case
+  getPeerByIP ipAsText >>= \case
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
@@ -78,10 +59,8 @@ ethServerHandler peerSource peerSink seqSource unseqSink sockAddr = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
-          (attempt :: Maybe SomeException) <- withActivePeer p $ do
-            initState <- newIORef initContext
-            local (\c -> c{configContext = initState}) $
-              runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr
+          (attempt :: Maybe SomeException) <- withActivePeer p $
+            runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
             Just err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -91,27 +70,27 @@ runEthServerConduit :: MonadP2P m
                     -> ConduitM () B.ByteString m ()
                     -> ConduitM B.ByteString Void m ()
                     -> ConduitM () P2pEvent m ()
-                    -> ([IngestEvent] -> m ())
                     -> String
                     -> m (Maybe SomeException)
-runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr = do
+runEthServerConduit p pSource pSink seqSrc peerStr = do
   myPubKey' <- getPub
   
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
-  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptAccept otherPubKey `fuseUpstream` peerSink
+  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
   
-  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink
+  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+  !eventSink <- mkEthP2PEventConduit peerStr outCtx
   fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                   .| handleMsgServerConduit myPubkey p
                   .| eventSink
-                  .| peerSink
+                  .| pSink
 
-stratoP2PServer :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PServer wireMessagesRef = do
+stratoP2PServer :: (MonadP2P n, RunsServer n (LoggingT IO))
+                => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
+stratoP2PServer runner = do
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void $ runEthServer wireMessagesRef flags_listen
+  runEthServer flags_listen runner

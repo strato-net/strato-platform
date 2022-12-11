@@ -1098,7 +1098,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         , erAction             = Just $ _action vmState
         , erException          = Just (Right e)
         , erKind               = EVM
-        , erNewX509Certs       = M.empty
+        -- , erNewX509Certs       = M.empty
         , erPragmas            = []
         }
     Right _ -> do
@@ -1480,7 +1480,7 @@ vmStateToExecResults vmState = do
       , erAction             = Just $ _action vmState
       , erException          = Nothing
       , erKind               = EVM
-      , erNewX509Certs       = M.empty
+      -- , erNewX509Certs       = M.empty
       , erPragmas            =[]
       }
 

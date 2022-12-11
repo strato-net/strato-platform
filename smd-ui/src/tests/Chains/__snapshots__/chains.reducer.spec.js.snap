@@ -305,6 +305,7 @@ Object {
   "error": "error",
   "filter": "",
   "initialLabel": null,
+  "isLoading": false,
   "labelIds": Object {},
   "listChain": Object {},
   "listLabelIds": Object {},
@@ -319,6 +320,7 @@ Object {
   "error": null,
   "filter": null,
   "initialLabel": null,
+  "isLoading": true,
   "labelIds": Object {},
   "listChain": Object {},
   "listLabelIds": Object {},
@@ -344,6 +346,7 @@ Object {
   "error": null,
   "filter": "",
   "initialLabel": "airline cartel 1",
+  "isLoading": false,
   "labelIds": Object {
     "airline cartel 1": Object {
       "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73": Object {},
@@ -786,6 +789,7 @@ Object {
   "error": null,
   "filter": "",
   "initialLabel": null,
+  "isLoading": false,
   "labelIds": Object {},
   "listChain": Object {},
   "listLabelIds": Object {},

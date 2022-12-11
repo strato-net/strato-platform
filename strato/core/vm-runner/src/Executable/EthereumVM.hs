@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DerivingStrategies  #-}
 
 module Executable.EthereumVM (
   ethereumVM,
@@ -34,7 +35,6 @@ import           Data.Proxy
 import qualified Data.Set                              as S
 import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
-import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
 import qualified Network.Kafka.Protocol                as KP
@@ -54,7 +54,6 @@ import           Blockchain.Data.DataDefs              (blockDataExtraData, bloc
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
-import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB, flushMemCertDB)
 import           Blockchain.EthConf
 import           Blockchain.Event
 import           Blockchain.JsonRpcCommand
@@ -97,18 +96,20 @@ import           Blockchain.Timing
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
+-- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
+--   deriving (Eq, Ord, Show)
+
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR cpCR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR, cpCR)
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
-    Mod.put Proxy $ CertRoot cpCR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -133,8 +134,8 @@ ethereumVM d = void . execContextM d $ do
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
-        setCheckpoint newOffset withCertroot
+        -- withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
+        setCheckpoint newOffset withChainroot
 
 microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -184,6 +185,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
       Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
+    $logInfoS "evm/loop/newBlock" "about to evaluate shouldOutputBlocks"
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
@@ -243,11 +245,13 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
-        (sr, mExecResults) <-
+        (sr, mExecResults) <-           
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-        Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
+        if any (isJust . erException) mExecResults
+          then return Nothing
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
@@ -342,7 +346,8 @@ runChainConstructors cId cInfo = do
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
-
+  curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash )
+  curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
   actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
       NonContract{} -> pure Nothing
@@ -366,7 +371,7 @@ runChainConstructors cId cInfo = do
             0 --block number
             100000000000
             0
-            (posixSecondsToUTCTime 0)
+            (bSumTimestamp curBlockSummary)
             ""
             0
             (Keccak256.unsafeCreateKeccak256FromWord256 0))
@@ -393,7 +398,6 @@ runChainConstructors cId cInfo = do
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
-  flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr,actions) 
@@ -401,18 +405,15 @@ runChainConstructors cId cInfo = do
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
                                        , Mod.Modifiable GenesisRoot m
-                                       , Mod.Modifiable CertRoot m
                                        , (MP.StateRoot `A.Alters` MP.NodeData) m
                                        )
                                     => OutputBlock
                                     -> m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint sha _ _ sr _) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint sha _ _ sr ) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
   (BlockHashRoot bhr) <- bootstrapChainDB sha [(Nothing, sr)]
-  (CertRoot cr) <- bootstrapCertDB sha
   return evmc{ ctxChainDBStateRoot = bhr
-             , ctxCertDBStateRoot = cr
              }
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
@@ -425,7 +426,7 @@ outputBlockToEvmCheckpoint block =
       uncL   = length (obBlockUncles block)
       cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
       sr     = blockDataStateRoot header
-   in EVMCheckpoint sha header cbbi sr MP.emptyTriePtr
+   in EVMCheckpoint sha header cbbi sr 
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =

@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -12,12 +14,15 @@
 
 module BlockApps.X509.Certificate (
   X509Certificate(..),
+  X509CertificateField(..),
   X509CertInfoState(..),
   CertificateChain(..),
   SignedCertificate,
   Issuer(..),
   Subject(..),
   x509CertToCertInfoState,
+  HasSelectX509CertDB,
+  HasSelectX509FieldDB,
   rootCert,
   certToBytes,
   bsToCert,
@@ -58,6 +63,7 @@ import qualified Control.Lens                       as Lens
 import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
+import qualified Control.Monad.Change.Alter         as A        
 import           Crypto.Random.Entropy
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms             as CH
@@ -81,6 +87,7 @@ import           Data.Swagger                       hiding (Format, get, put, fo
 import           Data.Swagger.Internal.Schema
 
 import qualified Data.Set                           as S
+import           Data.String
 import           Data.Functor
 -- import qualified Data.Functor.Identity              as DFI
 import           Data.Either
@@ -108,6 +115,16 @@ import           Servant.Docs
 
 
 newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
+
+newtype X509CertificateField = X509CertificateField String deriving (Show, Eq, Binary, Generic, Read, NFData)
+
+type HasSelectX509CertDB m = (Address `A.Selectable` X509Certificate) m
+
+type HasSelectX509FieldDB m = ((Address, T.Text) `A.Selectable` X509CertificateField) m
+
+instance IsString X509CertificateField where
+  fromString "" = X509CertificateField ""
+  fromString s  = X509CertificateField s
 
 instance Ord X509Certificate where
     compare a b = compare (certToBytes a) (certToBytes b)

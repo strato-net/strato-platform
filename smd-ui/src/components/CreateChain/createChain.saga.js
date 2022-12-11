@@ -62,7 +62,7 @@ export function* createChain(action) {
     if (response.status === 200) {
       yield put(createChainSuccess(response));
       yield call(delay, 2000);
-      yield put(fetchChains());
+      yield put(fetchChains(action.limit, action.offset));
       yield put(fetchChainIds())
     } else {
       yield put(createChainFailure(response));
