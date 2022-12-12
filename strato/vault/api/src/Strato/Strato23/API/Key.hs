@@ -19,11 +19,11 @@ type GetKey = "key"
             :> Get '[JSON] AddressAndKey
 
 type PostKey = "key"
-            :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+            :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
             :> Post '[JSON] AddressAndKey
 
 type GetSharedKey = "sharedkey"
-                 :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+                 :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
                  :> ReqBody '[JSON] PublicKey
                  :> Get '[JSON] SharedKey
 

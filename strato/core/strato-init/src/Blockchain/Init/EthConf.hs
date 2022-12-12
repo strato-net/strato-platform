@@ -120,7 +120,7 @@ waitOnVault clientEnv request = do
       400 -> -- 400 is thrown when the key does not exist
         if flags_generateKey then do 
           putStrLn "nodekey does not exist -  I'm going to create one"
-          waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+          waitOnVault clientEnv $ runClientM (postKey $ Just $ T.pack "nodekey") clientEnv
         else do
           putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
           threadDelay 5000000 -- 5 seconds

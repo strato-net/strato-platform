@@ -22,13 +22,13 @@ getPing = client (Proxy @ GetPing)
 getKey :: Text -> Maybe Text -> ClientM AddressAndKey
 getKey = client (Proxy @ GetKey)
 
-postKey :: Text -> ClientM AddressAndKey
+postKey :: Maybe Text -> ClientM AddressAndKey
 postKey = client (Proxy @ PostKey)
 
-getSharedKey :: Text -> PublicKey -> ClientM SharedKey
+getSharedKey :: Maybe Text -> PublicKey -> ClientM SharedKey
 getSharedKey = client (Proxy @ GetSharedKey)
 
-getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
+getUsers :: Maybe Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
 getUsers = client (Proxy @ GetUsers)
 
 postSignature :: Text -> MsgHash -> ClientM Signature
