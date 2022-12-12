@@ -78,13 +78,14 @@ end
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
-local USER_ID = ''
+local USER_ID
+local ISSUER
 
 if ngx.req.get_headers()["Authorization"] then
   
   local auth_header = ngx.req.get_headers()["Authorization"]
   local identity_providers = config["identity_providers_keyed"]
-  local ISSUER = get_access_token_issuer_unverified(auth_header)
+  ISSUER = get_access_token_issuer_unverified(auth_header)
   local PROVIDER_DATA = identity_providers[ISSUER]
 
   if not PROVIDER_DATA then
