@@ -6,7 +6,6 @@ module Strato.Strato23.Client
   , getKeys'
   , postKey
   , getSharedKey'
-  , getUsers
   , getUsers'
   , postSignature'
   , postPassword
@@ -34,11 +33,8 @@ postKey = client (Proxy @ PostKey)
 getSharedKey' :: Text -> Maybe Text -> PublicKey -> ClientM SharedKey
 getSharedKey' = client (Proxy @ GetSharedKey)
 
-getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
-getUsers = client (Proxy @ GetUsers)
-
 getUsers' :: Text ->  Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User] -- External Vault
-getUsers' = client (Proxy @ GetUsers')
+getUsers' = client (Proxy @ GetUsers)
 
 postSignature' :: Text -> Maybe Text ->  MsgHash -> ClientM Signature
 postSignature' = client (Proxy @ PostSignature)

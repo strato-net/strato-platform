@@ -27,7 +27,6 @@ vaultWrapper = getPing
           :<|> getKeys'
           :<|> postKey
           :<|> getSharedKey'
-          :<|> getUsers
           :<|> getUsers'
           :<|> postSignature'
           :<|> postPassword
