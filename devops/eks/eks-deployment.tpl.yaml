@@ -183,7 +183,7 @@ spec:
       - image: zookeeper:3.4.14
         name: zookeeper
         volumeMounts:
-          - mountPath: /zookeeper-3.4.14
+          - mountPath: /data
             name: zookeeper-data
       - image: wurstmeister/kafka:1.1.0
         name: kafka
