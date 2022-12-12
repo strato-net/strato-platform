@@ -12,14 +12,9 @@ import           Strato.Strato23.API.Types
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
+
 type PostSignature = "signature"
-                   :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                   :> ReqBody '[JSON] MsgHash
-                   :> Post '[JSON] Signature
-
-
-type PostSignature' = "signature"
                     :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                    :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+                    :> Header' '[Optional, Strict] "X-IDENTITY-PROVIDER-ID"    Text
                     :> ReqBody '[JSON] MsgHash
                     :> Post '[JSON] Signature

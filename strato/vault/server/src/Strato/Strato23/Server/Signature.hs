@@ -39,23 +39,26 @@ postSignature userName (MsgHash msgBS) = do
       | otherwise -> vaultWrapperError $ AnError "Message was not 32 bytes long"
 
 
-postSignature' :: Text -> Text -> MsgHash -> VaultM Signature
-postSignature' userName oauthProvider (MsgHash msgBS) = do
-  cache <- asks keyStoreCache
-  cachedPk <- liftIO $ Cache.lookup cache (append userName oauthProvider)
-  (_,nonce,pKey,_) <- case cachedPk of
-    Just (KeyStore a b c d) -> pure (a,b,c,d)
-    Nothing -> do
-      mpk <- vaultTransaction
-           . vaultQueryMaybe
-           $ getUserKeyQuery' userName oauthProvider
-      (a,b,c,d) <- case mpk of
-        Just pk -> return pk
-        Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
-      liftIO . Cache.insert cache (append userName  oauthProvider) $ KeyStore a b c d
-      pure (a,b,c,d)
-  withSecretKey $ \key -> case decryptSecKey key nonce pKey of
-    Nothing -> vaultWrapperError IncorrectPasswordError
-    Just prvKey 
-      | B.length msgBS == 32 -> return $ signMsg prvKey msgBS 
-      | otherwise -> vaultWrapperError $ AnError "Message was not 32 bytes long"
+postSignature' :: Text -> Maybe Text -> MsgHash -> VaultM Signature
+postSignature' userName mOauthProvider (MsgHash msgBS) = do
+  case mOauthProvider of 
+    Nothing -> postSignature userName (MsgHash msgBS)
+    Just oauthProvider -> do
+        cache <- asks keyStoreCache
+        cachedPk <- liftIO $ Cache.lookup cache (append userName oauthProvider)
+        (_,nonce,pKey,_) <- case cachedPk of
+          Just (KeyStore a b c d) -> pure (a,b,c,d)
+          Nothing -> do
+            mpk <- vaultTransaction
+                . vaultQueryMaybe
+                $ getUserKeyQuery' userName oauthProvider
+            (a,b,c,d) <- case mpk of
+              Just pk -> return pk
+              Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
+            liftIO . Cache.insert cache (append userName  oauthProvider) $ KeyStore a b c d
+            pure (a,b,c,d)
+        withSecretKey $ \key -> case decryptSecKey key nonce pKey of
+          Nothing -> vaultWrapperError IncorrectPasswordError
+          Just prvKey 
+            | B.length msgBS == 32 -> return $ signMsg prvKey msgBS 
+            | otherwise -> vaultWrapperError $ AnError "Message was not 32 bytes long"

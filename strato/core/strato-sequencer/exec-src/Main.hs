@@ -84,7 +84,7 @@ main = do
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress

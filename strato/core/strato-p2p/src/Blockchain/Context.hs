@@ -461,17 +461,17 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
   sign bs = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+    waitOnVault $ liftIO $ runClientM (VC.postSignature' (T.pack "nodekey") Nothing (VC.MsgHash bs)) vc
   
   getPub = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing Nothing) vc
   
   getShared pub = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey' "nodekey" Nothing pub) vc
 
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p

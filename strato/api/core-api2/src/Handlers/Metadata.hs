@@ -115,7 +115,7 @@ getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) 
 getPubKeyAndAddress mAccessToken =
   case mAccessToken of
     Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" 
-    Just _  -> try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  "nodekey" Nothing
+    Just _  -> try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  "nodekey" Nothing Nothing
 
 unaddressAndUnkey :: AddressAndKey -> (PublicKey, Address)
 unaddressAndUnkey addressAndKey = (Strato.Strato23.API.Types.unPubKey addressAndKey ,Strato.Strato23.API.Types.unAddress addressAndKey) 

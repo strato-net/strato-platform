@@ -13,25 +13,10 @@ import           Strato.Strato23.API.Types
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
+
 type GetKey = "key"
-            :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-            :> QueryParam "username" Text
-            :> Get '[JSON] AddressAndKey
-
-type PostKey = "key"
-            :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-            :> Post '[JSON] AddressAndKey
-
-type GetSharedKey = "sharedkey"
-                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                 :> ReqBody '[JSON] PublicKey
-                 :> Get '[JSON] SharedKey
-
-
---------------------------------------------------------------------------------
-type GetKey' = "key"
             :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME"  Text
-            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+            :> Header' '[Optional, Strict] "X-IDENTITY-PROVIDER-ID"    Text
             :> QueryParam "username" Text
             :> Get '[JSON] AddressAndKey
 
@@ -41,13 +26,13 @@ type GetKeys' = "key"
             :> QueryParam "username" Text
             :> Get '[JSON] [AddressAndKey]
 
-type PostKey' = "key"
+type PostKey = "key"
             :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+            :> Header' '[Optional, Strict] "X-IDENTITY-PROVIDER-ID"    Text
             :> Post '[JSON] AddressAndKey
 
-type GetSharedKey' = "sharedkey"
+type GetSharedKey = "sharedkey"
                  :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                 :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
+                 :> Header' '[Optional, Strict] "X-IDENTITY-PROVIDER-ID"    Text
                  :> ReqBody '[JSON] PublicKey
                  :> Get '[JSON] SharedKey
