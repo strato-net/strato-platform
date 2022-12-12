@@ -49,6 +49,8 @@ import qualified Data.Text                                   as T
 import           GHC.Generics
 import           Text.Format
 
+import           Debug.Trace
+
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.
 data StateDiff =
@@ -246,6 +248,7 @@ accountUpdate :: ( MonadLogger m
               => Maybe Word256 -> [N.Nibble] -> Val -> Val -> m (Account, AccountDiff 'Incremental)
 accountUpdate chainId k vOld vNew = do
   address <- lookupAddress k
+  $logInfoS "accountUpdate" . T.pack $ "Updating account state from " ++ show vOld ++ " to " ++ show vNew 
   let oldAddrState = retrieveMPDBValue vOld
       newAddrState = retrieveMPDBValue vNew
   accountDiff <- incrementalAccountState oldAddrState newAddrState
@@ -344,7 +347,7 @@ incrementalStorage kind oldRoot newRoot = do
       return (key, Update{oldValue, newValue})
 
 retrieveMPDBValue :: RLPSerializable a => Val -> a
-retrieveMPDBValue = rlpDecode . rlpDeserialize . rlpDecode
+retrieveMPDBValue =  rlpDecode . traceShowId . rlpDeserialize . rlpDecode
 
 decodeStorageKV :: ( MonadLogger m
                    , HasHashDB m
