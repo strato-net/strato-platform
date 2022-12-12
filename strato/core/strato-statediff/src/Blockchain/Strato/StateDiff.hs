@@ -236,6 +236,7 @@ accountEnd :: ( MonadLogger m
 accountEnd chainId k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
+  $logInfoS "accountEnd" . T.pack $ "End account state: " ++ show addrState
   accountDiff <- eventualAccountState addrState
   return (Account address chainId, accountDiff)
 
@@ -248,9 +249,10 @@ accountUpdate :: ( MonadLogger m
               => Maybe Word256 -> [N.Nibble] -> Val -> Val -> m (Account, AccountDiff 'Incremental)
 accountUpdate chainId k vOld vNew = do
   address <- lookupAddress k
-  $logInfoS "accountUpdate" . T.pack $ "Updating account state from " ++ show vOld ++ " to " ++ show vNew 
   let oldAddrState = retrieveMPDBValue vOld
       newAddrState = retrieveMPDBValue vNew
+  $logInfoS "accountUpdate" . T.pack $ "Old account state: " ++ show oldAddrState
+  $logInfoS "accountUpdate" . T.pack $ "New account state: " ++ show newAddrState 
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (Account address chainId, accountDiff)
 
@@ -344,6 +346,8 @@ incrementalStorage kind oldRoot newRoot = do
       let
         oldValue = decodeMPDBValue vOld
         newValue = decodeMPDBValue vNew
+      $logInfoS "incrementalStorage" . T.pack $ "OLD decoded MPDB Value: " ++ show oldValue
+      $logInfoS "incrementalStorage" . T.pack $ "NEW decoded MPDB Value: " ++ show newValue
       return (key, Update{oldValue, newValue})
 
 retrieveMPDBValue :: RLPSerializable a => Val -> a
@@ -354,11 +358,13 @@ decodeStorageKV :: ( MonadLogger m
                    , HasCodeDB m
                    , StorableKey a
                    , StorableValue b
+                   , Show b
                    )
                 => Key -> Val -> m (a, b)
 decodeStorageKV k v = do
   key <- lookupStorageKey k
   let val = decodeMPDBValue v
+  $logInfoS "decodeStorageKV" . T.pack $ "decoded storage key/value: " ++ show val
   return (key, val)
 
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
