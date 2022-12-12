@@ -172,16 +172,17 @@ EventDB
 ChainInfoRef
     chainId Word256
     chainLabel String
-    parentChain Word256 Maybe
     creationBlock Keccak256
     chainNonce Word256
-    deriving Eq Generic Show
-
-ChainSignatureRef
-    chainInfoId ChainInfoRefId
     r Integer
     s Integer
     v Word8
+    deriving Eq Generic Show
+
+ParentChainRef
+    chainInfoId ChainInfoRefId
+    refName     String
+    refChainId  Word256
     deriving Eq Generic Show
 
 ChainMemberParsedRef

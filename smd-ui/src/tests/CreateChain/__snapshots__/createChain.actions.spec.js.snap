@@ -94,32 +94,33 @@ Object {
 
 exports[`CreateChain: action create chain request 1`] = `
 Object {
-  "args": Object {
-    "addRule": "MajorityRules",
-    "removeRule": "MajorityRules",
-  },
+  "args": false,
   "balances": Array [
     Object {
       "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
       "balance": 500000000000000,
     },
   ],
+  "integrations": "contract SimpleStorage {
+        uint public storedData;
+      }",
   "isOpen": true,
   "label": "airline cartel 9",
-  "limit": 10,
+  "limit": 0,
   "members": Array [
     Object {
       "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
       "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7…4cac9f77166ad92a0@172.16.0.5:30303?discport=30303",
     },
   ],
-  "offset": 0,
+  "offset": undefined,
   "spinning": true,
-  "src": "contract SimpleStorage {
-        uint public storedData;
-      }",
+  "src": Object {
+    "addRule": "MajorityRules",
+    "removeRule": "MajorityRules",
+  },
   "type": "CREATE_CHAIN_REQUEST",
-  "vm": false,
+  "vm": 10,
 }
 `;
 

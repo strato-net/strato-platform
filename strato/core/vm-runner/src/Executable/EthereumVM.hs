@@ -228,10 +228,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       return Nothing
     Nothing -> do
       let cBlock = creationBlock $ chainInfo cInfo
-          pChain = parentChain $ chainInfo cInfo
-      bHash' <- getChainCreationBlock cBlock pChain
-      bHash <- if bHash' /= Keccak256.zeroHash
-                 then pure bHash'
+          pChains = parentChains $ chainInfo cInfo
+      bHash <- if cBlock /= Keccak256.zeroHash
+                 then pure cBlock
                  else do
                    mBB <- getChainGenesisInfo Nothing
                    case mBB of
@@ -242,14 +241,14 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
-        void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
+        void $ putChainGenesisInfo (Just cId) cBlock sr' pChains
         (sr, mExecResults) <-           
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
         if any (isJust . erException) mExecResults
           then return Nothing
-          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do

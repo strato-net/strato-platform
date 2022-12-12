@@ -242,19 +242,18 @@ contract A {
 }
 |]
           contractName = "A"
-          chainInfo' = ChainInfo
+          chainInfo' = signChain (privKeys !! 0) $
             UnsignedChainInfo { chainLabel     = "My test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = chainMember1
-                              , parentChain    = Nothing
+                              , parentChains   = M.empty
                               , creationBlock  = zeroHash
                               , chainNonce     = 123456789
                               , chainMetadata  = M.singleton "VM" "SolidVM"
                               }
-            Nothing
           chainId = keccak256ToWord256 $ rlpHash chainInfo'
       ts <- liftIO getCurrentMicrotime
       let args = "(" <> "\"Blockapps\", \"engineering\")"
@@ -364,7 +363,7 @@ contract A {
           chainMember1 = CM.ChainMembers $ Set.fromList  [(CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "David Nallapu") True)
                                                          ,(CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "Garrett") True)]
           chainMember2 = CM.ChainMembers $ Set.singleton (CM.CommonName (T.pack "Blockapps") (T.pack "engineering") (T.pack "David Nallapu") True)
-          mkChainInfo bHash = ChainInfo
+          mkChainInfo bHash = signChain (privKeys !! 0) $
             UnsignedChainInfo { chainLabel     = "My parent test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
@@ -372,25 +371,23 @@ contract A {
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = chainMember1
-                              , parentChain    = Nothing
+                              , parentChains   = M.empty
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
                               , chainMetadata  = M.singleton "VM" "SolidVM"
                               }
-            Nothing
-          mkChainInfo2 bHash pChain = ChainInfo
+          mkChainInfo2 bHash pChain = signChain (privKeys !! 0) $
             UnsignedChainInfo { chainLabel     = "My child test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = chainMember2
-                              , parentChain    = Just pChain
+                              , parentChains   = M.singleton "parent" pChain
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
                               , chainMetadata  = M.singleton "VM" "SolidVM"
                               }
-            Nothing
           mkChainId = keccak256ToWord256 . rlpHash
       ts <- liftIO getCurrentMicrotime
       let incXArgs = "()"
@@ -643,7 +640,7 @@ contract RegisterCert {
             chainMember1 = (CM.ChainMembers $ Set.singleton $ CM.CommonName (T.pack "BlockApps") (T.pack "engineering") (T.pack "Dustin") True)
             args = "(" <> "\"Blockapps\")"
             txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
-            tChainInfo = ChainInfo
+            tChainInfo = signChain (privKeys !! 0) $
               UnsignedChainInfo { chainLabel     = "My organization's private chain"
                                 , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                   , NonContract (validators' !! 0) 1000000000000000000000
@@ -651,12 +648,11 @@ contract RegisterCert {
                                                   ]
                                 , codeInfo       = [CodeInfo "" src $ Just contractName]
                                 , members        = chainMember1
-                                , parentChain    = Nothing
+                                , parentChains   = M.empty
                                 , creationBlock  = zeroHash
                                 , chainNonce     = 123456789
                                 , chainMetadata  = M.singleton "VM" "SolidVM"
                                 }
-              Nothing
             setupTx cId = U.UnsignedTransaction
               { U.unsignedTransactionNonce      = Nonce 0
               , U.unsignedTransactionGasPrice   = Wei 1
