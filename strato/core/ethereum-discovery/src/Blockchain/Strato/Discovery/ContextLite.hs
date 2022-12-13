@@ -151,7 +151,7 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m)
   sign msg = do
     vc <- asks vaultClient
     $logInfoS "HasVault" "asking vault-proxy for a message signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash msg)) vc
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (Just $ T.pack "nodekey") (VC.MsgHash msg)) vc
 
   getPub = do
     vc <- asks vaultClient
