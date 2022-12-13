@@ -313,7 +313,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       case () of
         () | sender auth /= pr ->
               $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+                "Rejecting proposal: proposer " ++ format (sender auth) ++ " is not " ++ format pr
            | v /= v' -> do
               $logInfoS "blockstanbul/roundchange" . T.pack $
                  "view mismatch (us, sender): " ++ format (v, v')

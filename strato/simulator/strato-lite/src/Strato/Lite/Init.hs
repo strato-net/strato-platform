@@ -13,14 +13,15 @@ module Strato.Lite.Init
   ) where
 
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.ChainMember
 import           Data.Text                (Text)
 import           Strato.Lite.Options
 import           Strato.Lite.Rest
 import           Strato.Lite.Monad
 import           Network.Wai.Handler.Warp
 
-runStratoLite :: [(Text, Text)] -> IO ()
+runStratoLite :: [(Text, ChainMemberParsedSet, Text)] -> IO ()
 runStratoLite nodes' = do
-  let nodes'' = (\(a,b) -> (a, (IPAsText b, TCPPort 30303, UDPPort 30303))) <$> nodes'
+  let nodes'' = (\(a,b,c) -> (a, (b, IPAsText c, TCPPort 30303, UDPPort 30303))) <$> nodes'
   mgr <- runNetwork nodes'' id
   run flags_port $ stratoLiteRestApp mgr

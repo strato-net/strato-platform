@@ -54,6 +54,7 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , x509certInfoState
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -122,7 +123,7 @@ import qualified Strato.Strato23.Client                    as VC
 
 
 
-data Modification a = Modification a | Deletion
+data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB

@@ -10,7 +10,7 @@ import           Test.Hspec
 
 spec :: Spec
 spec = pure ()
-{-
+{- TODO: fix
 import Test.Hspec (Spec, describe, it, parallel)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck

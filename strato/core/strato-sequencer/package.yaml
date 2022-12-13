@@ -141,11 +141,13 @@ tests:
       - stm-chans
       - strato-model
       - strato-sequencer
+      - text
       - time
       - unliftio
       - wai-extra
       - wai-middleware-prometheus
       - warp
+      - x509-certs
 
 benchmarks:
   send-to-blockstanbul:

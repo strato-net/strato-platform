@@ -272,7 +272,7 @@ processBlockSummaries :: ( MonadIO m
                          , MonadLogger m
                          , HasBlockSummaryDB m
                          , Mod.Modifiable ContextState m
-                         , (Address `A.Alters` X509Certificate) m
+                         , A.Selectable Address X509Certificate m
                          )
                       => [OutputBlock]
                       -> m ()

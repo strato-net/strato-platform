@@ -3,29 +3,26 @@
 
 module AuthenticationSpec where
 
-import           Test.Hspec
-
-spec :: Spec
-spec = pure ()
-{-
-
-
-
-import           Control.Lens
+import           Control.Lens               hiding (children)
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.Reader
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as C8
 import           Data.Maybe
+import           Data.Map.Strict            (Map)
+import qualified Data.Map.Strict            as M
 import qualified Data.Set                   as S
 import           Data.Time.Clock.POSIX
-import           Test.Hspec
+import           Test.Hspec                 hiding (shouldBe, shouldSatisfy)
+import           Test.Hspec.Expectations.Lifted
 import           Test.QuickCheck
 
+import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -38,7 +35,7 @@ testBlock =
   let bData = BlockData {
       blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
       blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
-      blockDataCoinbase = Address 0x0,
+      blockDataCoinbase = emptyChainMember,
       blockDataStateRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "0000000000000000000000000000000000000000000000000000000000000000",
       blockDataTransactionsRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
       blockDataReceiptsRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -54,27 +51,26 @@ testBlock =
       }
    in Block bData [] []
 
-testValidators :: [Address]
-testValidators = [Address 0x101, Address 0xaaa]
+testValidators :: ChainMembers
+testValidators = ChainMembers $ S.fromList [CommonName "BlockApps" "Engineering" "Admin" True, CommonName "Microsoft" "Sales" "Steve Ballmer" True]
 
 private :: PrivateKey
 private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
 valX509Info :: X509CertInfoState
 valX509Info = X509CertInfoState
-  { userAddress = fromPrivateKey private
-  , certificate = error "test reading certificate"
-  , isValid = True
-  , children = []
-  , orgName = "BlockApps"
-  , orgUnit = Just "Engineering"
-  , commonName = "Admin"
-  }
+  (fromPrivateKey private)
+  (error "test reading certificate")
+  True
+  []
+  "BlockApps"
+  "Engineering"
+  "Admin"
 
 runTest :: ReaderT (Map Address X509CertInfoState) IO a -> IO a
 runTest f =
   let r = M.singleton (fromPrivateKey private) valX509Info
-   in runReaderT r f
+   in runReaderT f r
 
 instance HasVault IO where
   sign bs = return $ signMsg private bs 
@@ -84,7 +80,7 @@ instance HasVault IO where
 spec :: Spec
 spec = do
   describe "Commitment seals" $ do
-    it "verifies the signatures" $ do
+    it "verifies the signatures" $ runTest $ do
       let digest = unsafeCreateKeccak256FromWord256 0x1234
           want = Just . fromPrivateKey $ private
       sig <- commitmentSeal digest
@@ -92,7 +88,7 @@ spec = do
       got `shouldBe` want
 
   describe "Proposal seals" $ do
-    it "verifies the signatures, without including the seals" $ do
+    it "verifies the signatures, without including the seals" $ runTest $ do
       let istExtra = IstanbulExtra testValidators Nothing []
           initialExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
       sig <- proposerSeal (set extraLens initialExtra testBlock)
@@ -114,7 +110,7 @@ spec = do
         bs `shouldSatisfy` (<= 32) . B.length
         cookRawExtra (uncookRawExtra iex) `shouldBe` iex
 
-    it "by default only populates vanity" $ do
+    it "by default only populates vanity" $ runTest $ do
       cookRawExtra "h" `shouldBe` ExtraData "h" Nothing
       cookRawExtra "abc" `shouldBe` ExtraData "abc" Nothing
       let maxBs = B.replicate 32 0xff
@@ -135,30 +131,30 @@ spec = do
 
   describe "Historic Block" $ do
     it "Rejects a non-PBFT block" $ runTest $ do
-      got <- replayHistoricBlock S.empty 20 testBlock
+      got <- replayHistoricBlock (ChainMembers S.empty) 20 testBlock
       got `shouldBe` Left "no istanbul metadata"
 
     it "Rejects a block with the wrong block number" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk = addValidators vals testBlock
-      got <- replayHistoricBlock S.empty 300 blk
+      got <- replayHistoricBlock (ChainMembers S.empty) 300 blk
       got `shouldBe` Left "unexpected block number: have 40, wanted 301"
 
     it "Rejects a block with the wrong validator list" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
-          wrongVal = S.fromList $ [CommonName "Microsoft" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+          wrongVal = ChainMembers . S.fromList $ [CommonName "Microsoft" "Engineering" "Admin" True]
           blk = addValidators vals testBlock
-      got <- replayHistoricBlock (wrongVal) 39 blk
+      got <- replayHistoricBlock wrongVal 39 blk
       got `shouldBe` Left "mismatched validators"
 
     it "Rejects a block without a proposer's signature" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk = addValidators vals testBlock
       got <- replayHistoricBlock vals 39 blk
       got `shouldBe` Left "invalid proposer seal"
 
     it "Rejects a block with a bad proposer's signature" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk' = addValidators vals testBlock
       seal <- proposerSeal blk'
       let blk = addProposerSeal seal blk'
@@ -166,7 +162,7 @@ spec = do
       got `shouldBe` Left "proposer 00b54e93ee2eba3086a55f4249873e291d1ab06c not a validator"
 
     it "Rejects a block without commit seals" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk' = addValidators vals testBlock
       seal <- proposerSeal blk'
       let blk = addProposerSeal seal blk'
@@ -176,7 +172,7 @@ spec = do
     it "Rejects a block with an unknown seal" $ runTest $ do
       let mFakeKey = importPrivateKey (LabeledError.b16Decode "blockstanbul/AuthenticationSpec.hs" $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
           fakeKey = fromMaybe (error "could not import fake key") mFakeKey
-          vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+          vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk'' = addValidators vals testBlock
       pSeal <- proposerSeal blk'' 
       let blk' = addProposerSeal pSeal blk''
@@ -186,12 +182,11 @@ spec = do
       got `shouldBe` Left "unknown signers: 9a4a1b2b0e0d2b5d378ecc392d337a6557602559" 
 
     it "Accepts a block with 1 validator" $ runTest $ do
-      let vals = S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
+      let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
           blk'' = addValidators vals testBlock
       pSeal <- proposerSeal blk''
       let blk' = addProposerSeal pSeal blk''
       cSeal <- commitmentSeal (blockHash blk')
       let blk = addCommitmentSeals [cSeal] blk'
       got <- replayHistoricBlock vals 39 blk
-      got `shouldBe` Right (40, S.elemAt 0 vals)
--}
+      got `shouldBe` Right (40, S.elemAt 0 $ unChainMembers vals)

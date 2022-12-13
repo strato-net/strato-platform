@@ -20,7 +20,6 @@ import           Data.Maybe
 import qualified Data.Set                         as S
 import qualified Data.Text                        as T
 import           Prelude                          hiding (round, sequence)
-import           Text.Printf
 import           Text.Format
 
 
@@ -91,8 +90,8 @@ debugShowCtx = do
       infoLog loc lns f = join . uses lns $ $logInfoS loc . T.pack . f
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
-  infoLog "showctx/proposer" proposer (printf "%x")
-  infoLog "showctx/validators" validators (show . map (printf "%x" :: ChainMemberParsedSet -> String) . S.toList . unChainMembers)
+  infoLog "showctx/proposer" proposer ((++"\n") . format)
+  infoLog "showctx/validators" validators (show . map ((++"\n") . format) . S.toList . unChainMembers)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)

@@ -105,7 +105,6 @@ import           Text.Read                         (readMaybe)
 import           BlockApps.X509.Certificate
 import           BlockApps.Init()
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
@@ -699,14 +698,14 @@ peekPendingVote = do
 -- mark the vote as committed and remove it from the queue.
 clearPendingVote :: ( MonadLogger m
                     , Mod.Modifiable ContextState m
-                    , (Address `A.Alters` X509Certificate) m
+                    , A.Selectable Address X509Certificate m
                     )
                  => Block -> m ()
 clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
   let bd = blockBlockData b
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
       senderAddr = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
-  sender <- lift $ maybe emptyChainMember (getChainMemberFromX509 . x509CertToCertInfoState) <$> A.lookup (A.Proxy @X509Certificate) senderAddr
+  sender <- lift $ maybe emptyChainMember (getChainMemberFromX509 . x509CertToCertInfoState) <$> A.select (A.Proxy @X509Certificate) senderAddr
   ctxCoinbaseQ <- use coinbaseQueue
   let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
         Just i -> Q.deleteAt i ctxCoinbaseQ

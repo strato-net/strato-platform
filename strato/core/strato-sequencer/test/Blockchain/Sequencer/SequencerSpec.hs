@@ -16,6 +16,7 @@ import qualified Data.Map                            as M
 import qualified Data.Set                            as S
 import           Data.Maybe                          (isJust)
 import           Data.ByteString.Base16              as B16
+import qualified Data.Text                           as T
 import           Numeric                             (showHex)
 
 import           Conduit
@@ -32,6 +33,7 @@ import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate          hiding (isValid)
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
@@ -63,7 +65,6 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
-import qualified Data.Set                            as S
 import qualified LabeledError
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
@@ -146,15 +147,19 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , maxEventsPerIter = 10
                                , vaultClient = Nothing
                                }
-        myAddr = CommonName "BlockApps" "Engineering" "Admin" True
-        vals = [myAddr]
-        auSenders = [myAddr]
-        ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) myAddr
+        myAddr = fromPrivateKey myPriv
+        myCM = CommonName "BlockApps" "Engineering" "Admin" True
+        vals = [myCM]
+        auSenders = [myCM]
+        ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) myCM
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
+        cmpsToXcis a (CommonName o u n True) = X509CertInfoState a rootCert True [] (T.unpack o) (Just $ T.unpack u) (T.unpack n)
+        cmpsToXcis _ _ = error "cmpsToXcis"
         boot = do
           bootstrapGenesisBlock hsh difficulty
+          A.insert (A.Proxy @X509CertInfoState) myAddr $ cmpsToXcis myAddr myCM
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
     fromLeft (error "webserver completed") <$>
       race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))

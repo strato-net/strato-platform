@@ -26,7 +26,7 @@ import           Data.Aeson                     hiding (Success)
 
 import qualified Data.Text                      as T
 import           Data.Aeson.Casing.Internal     (camelCase, dropFPrefix)
-import           Data.Maybe                     (fromJust)
+import           Data.Maybe                     (fromJust, fromMaybe)
 import           Data.Swagger                   hiding (url)
        
 import           Control.Monad.Composable.SQL

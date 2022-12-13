@@ -63,7 +63,6 @@ import qualified Control.Lens                       as Lens
 import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Control.Monad.Change.Alter         as A        
 import           Crypto.Random.Entropy
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms             as CH
@@ -89,7 +88,6 @@ import           Data.Swagger.Internal.Schema
 import qualified Data.Set                           as S
 import           Data.String
 import           Data.Functor
--- import qualified Data.Functor.Identity              as DFI
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
