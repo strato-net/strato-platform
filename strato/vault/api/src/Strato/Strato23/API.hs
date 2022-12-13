@@ -3,6 +3,7 @@
 
 module Strato.Strato23.API
   ( VaultWrapperAPI
+  , VaultCoreAPI
   , module Strato.Strato23.API.Key
   , module Strato.Strato23.API.Password
   , module Strato.Strato23.API.Ping
@@ -21,16 +22,14 @@ import           Strato.Strato23.API.Users
 
 
 type VaultWrapperAPI = GetPing
-                  :<|> GetKey
                   :<|> GetKey'
                   :<|> GetKeys'
-                  :<|> PostKey
                   :<|> PostKey'
-                  :<|> GetSharedKey
                   :<|> GetSharedKey'
-                  :<|> GetUsers
                   :<|> GetUsers'
-                  :<|> PostSignature
                   :<|> PostSignature'
                   :<|> PostPassword
                   :<|> VerifyPassword
+
+
+type VaultCoreAPI =  GetKey :<|> PostKey  :<|> GetSharedKey :<|> GetUsers :<|> PostSignature

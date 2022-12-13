@@ -37,7 +37,7 @@ instance HasVault IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
     url <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
-    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
+    eSig <- runClientM (VC.postSignature (Just $ T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
