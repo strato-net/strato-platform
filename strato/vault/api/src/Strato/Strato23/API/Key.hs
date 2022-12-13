@@ -14,16 +14,16 @@ import           Strato.Strato23.API.Types
 -- Routes and Types
 --------------------------------------------------------------------------------
 type GetKey = "key"
-            :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+            :> Header' '[Optional, Strict] "Authorization" Text
             :> QueryParam "username" Text
             :> Get '[JSON] AddressAndKey
 
 type PostKey = "key"
-            :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
+            :> Header' '[Optional, Strict] "Authorization" Text
             :> Post '[JSON] AddressAndKey
 
 type GetSharedKey = "sharedkey"
-                 :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
+                 :> Header' '[Optional, Strict] "Authorization" Text
                  :> ReqBody '[JSON] PublicKey
                  :> Get '[JSON] SharedKey
 

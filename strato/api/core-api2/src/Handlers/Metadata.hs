@@ -108,7 +108,7 @@ blocVaultWrapper client' = do
   either (blocError . VaultWrapperError) return resultEither
 
 getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) =>  m (Either VaultWrapperError (PublicKey, Address))
-getPubKeyAndAddress  = try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  "nodekey" Nothing
+getPubKeyAndAddress  = try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  (Just "nodekey") Nothing
 
 unaddressAndUnkey :: AddressAndKey -> (PublicKey, Address)
 unaddressAndUnkey addressAndKey = (Strato.Strato23.API.Types.unPubKey addressAndKey ,Strato.Strato23.API.Types.unAddress addressAndKey) 

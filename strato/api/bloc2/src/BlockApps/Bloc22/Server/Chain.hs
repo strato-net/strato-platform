@@ -194,7 +194,7 @@ postChainInfo :: ( MonadIO m
                  )
               => Maybe Text -> ChainInput -> m ChainId
 postChainInfo mJwtToken chainInput = case mJwtToken of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find Authorization in the header"
   Just jwtToken -> withLastBlockHash $ \bHash -> do
     evmCompatibleOn <- fmap evmCompatible getBlocEnv
     if evmCompatibleOn
@@ -217,7 +217,7 @@ postChainInfos :: ( MonadIO m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]
 postChainInfos mJwtToken chainInputs = case mJwtToken of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find Authorization in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     chainIds <- postChains chainInfos

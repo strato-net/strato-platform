@@ -222,7 +222,7 @@ instance ToSchema ChainIdChainOutput where
 -- POST /chain
 
 type PostChainInfo = "chain"
-  :> Servant.API.Header "X-USER-UNIQUE-NAME" Text
+  :> Servant.API.Header "Authorization" Text
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
 
@@ -234,7 +234,7 @@ type GetSingleChainInfo = "chain"
 -- POST /chains
 
 type PostChainInfos = "chains"
-  :> Servant.API.Header "X-USER-UNIQUE-NAME" Text
+  :> Servant.API.Header "Authorization" Text
   :> ReqBody '[JSON] [ChainInput]
   :> Post '[JSON] [ChainId]
 

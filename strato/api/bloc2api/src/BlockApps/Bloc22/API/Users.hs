@@ -217,7 +217,7 @@ instance ToParam (QueryFlag "resolve") where
 --------------------------------------------------------------------------------
 
 type PostUsersFill = "users"
-  :> Capture "user" JwtToken
+  :> Capture "user" JwtToken --Question this does not seem right?
   :> Capture "address" Address
   :> "fill"
   :> QueryFlag "resolve"
