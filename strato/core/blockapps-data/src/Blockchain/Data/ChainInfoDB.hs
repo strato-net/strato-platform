@@ -13,7 +13,7 @@ module Blockchain.Data.ChainInfoDB where
 
 -- import           Control.Monad                      (when)
 import           Control.Arrow                      ((***))
-import           Data.Foldable                      (traverse_)
+-- import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 import qualified Data.Text                          as T

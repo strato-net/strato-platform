@@ -54,6 +54,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.Nonce
+import qualified Blockchain.Strato.Model.ChainMember as CM
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
 
