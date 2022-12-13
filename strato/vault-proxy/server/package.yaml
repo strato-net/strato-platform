@@ -23,6 +23,7 @@ dependencies:
 - postgresql-simple
 - text
 - http-conduit
+- HTTP
 - monad-logger
 - servant-client
 - servant-client-core
