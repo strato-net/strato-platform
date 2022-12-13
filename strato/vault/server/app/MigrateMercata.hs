@@ -26,7 +26,7 @@ import           Options
 
 getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
 getUsersQuery conn = runSelect conn $ proc () -> do
-  (userId, _,  salt, nonce, encKey, _, _) <- selectTable usersTable -< ()
+  (userId, _, _,  salt, nonce, encKey, _) <- selectTable usersTable -< ()
   returnA -< (userId, salt, nonce, encKey)
 
 
