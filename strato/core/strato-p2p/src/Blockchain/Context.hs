@@ -466,7 +466,7 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
   getPub = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (Just $ T.pack "nodekey") Nothing) vc
   
   getShared pub = do
     vc <- asks configVaultClient 

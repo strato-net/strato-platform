@@ -105,7 +105,7 @@ getNodeKey = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
-  ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
+  ak <- waitOnVault clientEnv $ runClientM (getKey (Just $ T.pack "nodekey") Nothing) clientEnv
   return (VC.unPubKey ak, VC.unAddress ak)
 
 waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
