@@ -46,16 +46,20 @@ fi
 function newnode {
   
   mkdir -p logs
+  
+  [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
   runBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
+    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013  &>> logs/vault-proxy
 
-  echo 'Waiting for vault-proxy to be available...'
+  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
+  set +x
   until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
     sleep 0.1
   done
+  set -x
   echo 'vault-proxy is available'
 
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
@@ -371,6 +375,8 @@ function runBackgroundProcess {
   disown %
 }
 
+# If variable with name <arg 1> does not have non-empty value, set it to <arg 2>
+# setEnv (var_name, default_value)
 function setEnv {
   [[ -n ${!1} ]] || eval $1=$2
   echo "$1 = ${!1}"
