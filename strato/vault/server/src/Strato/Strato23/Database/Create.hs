@@ -17,12 +17,12 @@ usersTable :: Query
 usersTable = [sql|
 CREATE TABLE IF NOT EXISTS users(
   id serial              PRIMARY KEY,
-  x_user_unique_name varchar(512) NOT NULL,
+  x_user_unique_name     varchar(512) NOT NULL,
+  x_identity_provider_id varchar(512) NOT NULL,
   salt bytea             NOT NULL,
   nonce bytea            NOT NULL,
   enc_sec_prv_key bytea  NOT NULL,
   address bytea          NOT NULL,
-  x_identity_provider_id      varchar(512) NOT NULL,
   UNIQUE (x_user_unique_name, x_identity_provider_id)
 );
 CREATE INDEX IF NOT EXISTS indexed_address ON users (address);

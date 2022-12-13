@@ -33,7 +33,7 @@ import Strato.Strato23.Server.Password
 -- If concerned about old usage, you git log to find the orignal status if this needs to be resurrection 
 getUserOldKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserOldKeyQuery username = proc () -> do
-  (_, name, salt, nonce, encSecKey, address, _) <- selectTable TS.usersTable -< ()
+  (_, name,  _, salt, nonce, encSecKey, address) <- selectTable TS.usersTable -< ()
   restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecKey, address)
 
