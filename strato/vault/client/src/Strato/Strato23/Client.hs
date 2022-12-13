@@ -31,7 +31,7 @@ getSharedKey = client (Proxy @ GetSharedKey)
 getUsers :: Maybe Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
 getUsers = client (Proxy @ GetUsers)
 
-postSignature :: Text -> MsgHash -> ClientM Signature
+postSignature :: Maybe Text -> MsgHash -> ClientM Signature
 postSignature = client (Proxy @ PostSignature)
 
 postPassword :: Text -> ClientM ()

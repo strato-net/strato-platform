@@ -461,7 +461,7 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
   sign bs = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (Just $ T.pack "nodekey") (VC.MsgHash bs)) vc
   
   getPub = do
     vc <- asks configVaultClient 
