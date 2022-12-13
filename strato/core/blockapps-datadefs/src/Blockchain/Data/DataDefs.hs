@@ -95,9 +95,9 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbaseOrg);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbaseOrgUnit);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbaseCommonName);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseOrg\");"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseOrgUnit\");"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseCommonName\");"
 
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
 
