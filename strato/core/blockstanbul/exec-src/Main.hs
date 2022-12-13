@@ -7,6 +7,7 @@
 
 module Main where
 
+import qualified Data.Aeson                 as Ae
 import           Control.Exception
 import           Control.Monad
 import qualified Data.ByteString.Char8      as C8
@@ -24,7 +25,7 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.HTTPAdmin
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 
@@ -48,7 +49,8 @@ instance HasVault IO where
 data Options = Options
   { optRemove    :: Bool
   , optHTTPS     :: Bool
-  , optRecipient :: Address
+  , optRecipient :: ChainMemberParsedSet
+  , optSender    :: ChainMemberParsedSet
   , optNodes     :: [String]
   , optNonce     :: Int
   } deriving Show
@@ -57,7 +59,8 @@ defaultOptions :: Options
 defaultOptions  = Options
   { optRemove    = False
   , optHTTPS     = False
-  , optRecipient = throw $ userError "Give me a recipient address."
+  , optRecipient = throw $ userError "Give me a recipient."
+  , optSender    = throw $ userError "Give me a sender."
   , optNodes     = throw $ userError "Give me the node(s) to whom I'll send the vote."
   , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
   }
@@ -76,11 +79,20 @@ options =
   , Option ['r'] ["recipient"]
       (ReqArg
        (\ rp opts -> do
-           let strAddr = stringAddress rp
+           let strAddr = Ae.eitherDecodeStrict (C8.pack rp) :: Either String ChainMemberParsedSet
            case strAddr of
-             Just eRecipient -> return opts { optRecipient = eRecipient }
-             Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
-       ) "Address")
+             Right recipient -> return opts { optRecipient = recipient }
+             Left msg -> ioError . userError . printf "invalid recipient: %s" $ show msg
+       ) "ChainMemberParsedSet")
+    "REQUIRED; The beneficiary address."
+  , Option ['s'] ["sender"]
+      (ReqArg
+       (\ s opts -> do
+           let strAddr = Ae.eitherDecodeStrict (C8.pack s) :: Either String ChainMemberParsedSet
+           case strAddr of
+             Right sender -> return opts { optSender = sender }
+             Left msg -> ioError . userError . printf "invalid sender: %s" $ show msg
+       ) "ChainMemberParsedSet")
     "REQUIRED; The beneficiary address."
   , Option ['d'] ["nodes"]
       (ReqArg
@@ -112,15 +124,8 @@ parseArgs = do
 main :: IO ()
 main = do
   Options{..} <- parseArgs
-  mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-  optSender <- do 
-    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
-    case eAdAndKey of
-      Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
-      Right adAndKey -> return $ VC.unAddress adAndKey
   
-  putStrLn $ "Sender (admin node) address: " ++ show optSender
+  putStrLn $ "Sender (admin node): " ++ show optSender
   putStrLn $ "Starting nonce: " ++ show optNonce
   printf $ "\nSending the vote to the following nodes: " ++ show optNodes
  

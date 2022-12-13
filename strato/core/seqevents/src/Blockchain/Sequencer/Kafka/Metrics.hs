@@ -38,5 +38,8 @@ seqVMReads :: Vector Text Counter
 seqVMReads = buildCounter "seq_vm_reads" "Events read from seq_vm_events by kind"
 
 recordEvents :: (Data a, MonadIO m) => Vector Text Counter -> [a] -> m ()
-recordEvents vec events = liftIO $ forM_ events $ \ev -> do
-  withLabel vec (pack . show $ toConstr ev) incCounter
+recordEvents vec = recordEvents' vec . fmap (show . toConstr)
+
+recordEvents' :: MonadIO m => Vector Text Counter -> [String] -> m ()
+recordEvents' vec events = liftIO $ forM_ events $ \constr -> do
+  withLabel vec (pack constr) incCounter

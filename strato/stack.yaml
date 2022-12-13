@@ -59,8 +59,6 @@ packages:
 
 - simulator/strato-lite
 
-- test-suite
-
 - tools/blockapps-tools
 - tools/x509-tools
 

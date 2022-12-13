@@ -48,7 +48,7 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
 import           Text.Format
@@ -161,7 +161,7 @@ runTheGregor cfg = race_ (runGregorM cfg unseqReader)
 
 -- When a checkpoint already exists, the arguments are ignored. They might
 -- be stale if the validator pool has expanded.
-initializeCheckpoint :: [Address] -> [Address] -> GregorM Checkpoint
+initializeCheckpoint :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GregorM Checkpoint
 initializeCheckpoint vals admins = do
   meta <- snd <$> getNextOffsetAndMetadata
   let overrideVals c = c{checkpointValidators=vals, checkpointAdmins=admins}

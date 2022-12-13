@@ -46,7 +46,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
@@ -58,7 +58,7 @@ defaultBlockData :: BlockData
 defaultBlockData = BlockData
     emptyHash
     emptyHash
-    (Address 0)
+    emptyChainMember
     MP.emptyTriePtr
     MP.emptyTriePtr
     MP.emptyTriePtr

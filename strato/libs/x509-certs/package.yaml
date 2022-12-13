@@ -30,9 +30,11 @@ library:
   - cryptonite
   - deepseq
   - ethereum-rlp
+  - ethereum-encryption
   - hourglass
   - lens
   - memory
+  - monad-alter
   - pem
   - text
   - format
@@ -44,6 +46,7 @@ library:
   - x509
   - x509-validation
   - deepseq
+  - QuickCheck
 
 tests:
   x509-test:

@@ -28,6 +28,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
@@ -241,7 +242,11 @@ blockDataRefToBlock bdr txs = Block{
      BlockData{
        blockDataParentHash = blockDataRefParentHash bdr,
        blockDataUnclesHash = blockDataRefUnclesHash bdr,
-       blockDataCoinbase = blockDataRefCoinbase bdr,
+       blockDataCoinbase = CommonName
+         (blockDataRefCoinbaseOrg bdr)
+         (blockDataRefCoinbaseOrgUnit bdr)
+         (blockDataRefCoinbaseCommonName bdr)
+         True,
        blockDataStateRoot = blockDataRefStateRoot bdr,
        blockDataTransactionsRoot = blockDataRefTransactionsRoot bdr,
        blockDataReceiptsRoot = blockDataRefReceiptsRoot bdr,
@@ -314,13 +319,30 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-      toJSON (BlockDataRef' (BlockDataRef ph uh a sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
-        object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= a, "stateRoot" .= sr,
-        "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
-        "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
-        "mixHash" .= mh, "hash" .= h, "uncles" .= map bdToBdPrime uncles, "powVerified" .= pow, "isConfirmed" .= isConf, "totalDifficulty" .= td]
-
-
+  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
+    object [
+        "parentHash" .= ph
+      , "unclesHash" .= uh
+      , "coinbaseOrg" .= co
+      , "coinbaseOrgUnit" .= cu
+      ,"coinbaseCommonName" .= cc
+      , "stateRoot" .= sr
+      , "transactionsRoot" .= tr
+      , "receiptsRoot" .= rr
+      , "difficulty" .= d
+      , "number" .= num
+      , "gasLimit" .= gl
+      , "gasUsed" .= gu
+      , "timestamp" .= ts
+      , "extraData" .= ed
+      , "nonce" .= non
+      , "mixHash" .= mh
+      , "hash" .= h
+      , "uncles" .= map bdToBdPrime uncles
+      , "powVerified" .= pow
+      , "isConfirmed" .= isConf
+      , "totalDifficulty" .= td
+      ]
 
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'

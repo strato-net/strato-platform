@@ -59,7 +59,7 @@ assertTopicCreation = do
 readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents off = do
   events <- readUnseqEventsFromTopic unseqEventsTopicName off
-  recordEvents unseqReads events
+  recordEvents' unseqReads $ show <$> events
   return events
 
 readUnseqEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
@@ -88,7 +88,7 @@ readSeqP2pEventsFromTopic = readFromTopic'
 
 writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
 writeUnseqEvents events = do
-  recordEvents unseqWrites events
+  recordEvents' unseqWrites $ show <$> events
   KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 

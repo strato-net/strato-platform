@@ -1,16 +1,23 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Extra (whenM)
+import qualified Control.Monad.Change.Alter        as A
 import Control.Monad.Trans.Except
-import Control.Monad.State.Class
+import Control.Monad.State.Strict hiding (sequence)
 import Crypto.Random.Entropy (getEntropy)
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -23,6 +30,7 @@ import Text.Printf
 
 import Blockapps.Crossmon
 import BlockApps.Logging
+import BlockApps.X509.Certificate
 
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
@@ -36,6 +44,7 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.ChainMember
 import Text.Format
 
 
@@ -54,7 +63,7 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (addr `S.member`)
+    ret <- uses validators (S.member addr . unChainMembers)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
@@ -62,24 +71,31 @@ authorize = \case
   _ -> return ()
 
 
-isAuthorized :: (StateMachineM m) => InEvent -> m AuthResult
+isAuthorized :: (StateMachineM m, A.Selectable Address X509CertInfoState m) => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  let authenticated = authenticate iev
-      raiseInProd reason = when doAuthn $ do
-        $logWarnS "blockstanbul/auth" . T.pack $ reason
-        throwE reason
-  unless authenticated $ do
+  authenticated <- lift $ authenticate iev    --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
+  let raiseInProd reason = when doAuthn $ do
+        $logWarnS "blockstanbul/auth" . T.pack $ reason 
+        throwE reason                  --debug statement?
+  unless authenticated $ do               
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
-  case iev of
+  case iev of                         -- cases of valid and non valid input (for approval of messages and tx's?)
     NewBeneficiary (MsgAuth addr sig) (benf, dir, nonc) -> do
       -- Check nonce for replay attack
-      slist <- use authSenders
+      -- let convertedAddr = getAddressFromCM addr <- this doesn't work
+      slist <- use authSenders    -- authSenders::generateNonceMap senderlist
       let ifAuthMember = M.member addr slist
           nonceAuth = Just nonc > M.lookup addr slist
-          signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sig
-
+          benAddress = verifyBenfInfo (benf,dir,nonc) sig
+      res <- case benAddress of 
+        Nothing -> return Nothing
+        Just a -> lift $ A.select (A.Proxy @X509CertInfoState) a
+      let signAuth = (getAddressFromCM addr =<< res) == benAddress
+     --conflict benf being cmps verifybenfinfo takes in address and signature (rewritting needed)
+     --should i eliminate this function and just use authenticate (authentication.hs to verify benf info)
+     -- only used twice
       unless ifAuthMember $
         raiseInProd $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
                    ++ " is not a authorized sender" ++ show slist
@@ -91,23 +107,33 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
                    ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sig))
     -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
     -- but with incorrect extraData.
-    IMsg _ (Preprepare _ pp) -> do
-      vals <- use validators
-      let payloadVals = S.fromList (getValidatorList pp)
-          validatorsMatch = vals == payloadVals
-          signatory = verifyProposerSeal pp =<< getProposerSeal pp
-          signerExists = signatory `S.member` S.map Just vals
-      unless signerExists $
-        raiseInProd $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
-                   ++ " is not a known validator"
-      unless validatorsMatch $
-        raiseInProd $ "Rejecting Preprepare; payload validators "
-                   ++ show (S.map format payloadVals) ++ " are not expected validators "
-                  ++ show (S.map format vals)
-    IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-      let ret = Just addr == verifyCommitmentSeal di seal
-      unless ret . raiseInProd $ "Rejecting Commit; bad seal"
+    IMsg _ (Preprepare _ pp) -> do     
+      vals <- use validators            -- this is _validators from bloctanbul context?
+      let valSet = unChainMembers vals
+      let payloadVals = getValidatorList pp  -- getvalslsit::Block -> [Address] to word256 x 2
+          validatorsMatch = vals == payloadVals          -- if validators match perform getvalslist
+          mSignatory = verifyProposerSeal pp =<< getProposerSeal pp  -- same convention getProposerSeal :: Block -> Maybe Signature
+      case mSignatory of
+        Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
+        Just signatory -> do
+          mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          let signerExists = maybe False (`S.member` valSet) mChainMember
+          unless signerExists $
+            raiseInProd $ "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
+                      ++ " is not a known validator"
+          unless validatorsMatch $
+            raiseInProd $ "Rejecting Preprepare; payload validators "
+                      ++ show (S.map format $ unChainMembers payloadVals) ++ " are not expected validators "
+                      ++ show (S.map format valSet)
+    IMsg (MsgAuth addr _) (Commit _ di seal) -> case verifyCommitmentSeal di seal of
+      Nothing -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
+      Just signatory -> do
+          mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          let ret = Just addr == mChainMember
+          unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
+
+-- I need to change most of the authentication.hs file becase it either uses block -> address or address -> signature
 
 assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
@@ -142,11 +168,11 @@ roundChange = do
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
   --update validators list
-  val <- uses validators S.toList
+  val <- uses validators $ S.toList . unChainMembers
   vot <- use voted
-  let (newVals, toDrop, toAdd) = (updateValidator val vot)
+  let (newVals, toDrop, toAdd) = updateValidator val vot
   when (val /= newVals) $ do
-    validators .= S.fromList newVals
+    validators .= ChainMembers (S.fromList newVals)
     yieldR $ ListOfValidators toDrop toAdd
   $logInfoS "blockstanbul/voting" . T.pack $
                  "nextRound: voted map" ++ show vot
@@ -159,7 +185,7 @@ nextRound nt = do
       view . round .= r
       yieldR $ ResetTimer r
   use view >>= recordView
-  vals <- use validators
+  vals <- unChainMembers <$> use validators
   thisR <- use $ view . round
   epocheck <- use $ view . sequence
   when (epocheck `mod` 10000 == 0) $ do
@@ -194,12 +220,21 @@ nextRound nt = do
 
   yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
                                               (use voted)
-                                              (uses validators S.toList)
+                                              (uses validators (S.toList . unChainMembers))
                                               (uses authSenders M.keys)
 
-eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
+instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
+  select p = lift . A.select p
+
+eventLoop :: ( MonadIO m
+             , MonadLogger m
+             , HasVault m
+             , A.Selectable Address X509CertInfoState m
+             )
+          => BlockstanbulContext
+          -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
-  debugShowCtx
+  lift debugShowCtx
   authz <- lift $ isAuthorized ev
   recordAuthResult authz
   v <- use view
@@ -229,8 +264,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
-      let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
-          blockNo = blockDataNumber . blockBlockData $ blk
+      eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
+      let blockNo = blockDataNumber . blockBlockData $ blk
       recordMaxBlockNumber "pbft_previousblock" blockNo
       case eNextSeqNo of
         Left err -> do
@@ -278,7 +313,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       case () of
         () | sender auth /= pr ->
               $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+                "Rejecting proposal: proposer " ++ format (sender auth) ++ " is not " ++ format pr
            | v /= v' -> do
               $logInfoS "blockstanbul/roundchange" . T.pack $
                  "view mismatch (us, sender): " ++ format (v, v')
@@ -399,7 +434,12 @@ loopback :: EOutEvent -> Maybe InEvent
 loopback (Right (OMsg a m)) = Just $ IMsg a m
 loopback _ = Nothing
 
-sendMessages' :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [EOutEvent]
+sendMessages' :: ( MonadIO m
+                 , MonadLogger m
+                 , HasBlockstanbulContext m
+                 , HasVault m
+                 , A.Selectable Address X509CertInfoState m
+                 ) => [InEvent] -> m [EOutEvent]
 sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
@@ -421,10 +461,10 @@ sendMessages' wms = do
       putBlockstanbulContext ctx'
       return evs
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout 
@@ -439,13 +479,13 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
 
-editVoted :: (MonadIO m, MonadLogger m, MonadState BlockstanbulContext m) => Block -> Address -> m ()
+editVoted :: (MonadIO m, MonadLogger m, MonadState BlockstanbulContext m) => Block -> ChainMemberParsedSet -> m ()
 editVoted pp pr = do
   case extractBeneficiary pp of
     Nothing -> return()
     Just (bnef,vot) -> do
       -- insert the vote into map
-      val <- uses voted $M.lookup bnef
+      val <- uses voted $ M.lookup bnef
       $logInfoS "blockstanbul/voting" . T.pack $
         "extractBeneficiary" ++ show val
       let unwrapVal = fromMaybe M.empty val

@@ -28,6 +28,7 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified GHC.Generics                              as GHCG
 
 import qualified Blockchain.Strato.Model.Address           as A
+import           BlockApps.X509.Certificate
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256         (Keccak256)
@@ -62,17 +63,18 @@ instance Format SeqLoopEvent where
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
-                --  | IENewChainMember Word256 A.Address Enode
+                 | IENewCertRegistered  A.Address X509CertInfoState
                  | IENewChainOrgName Word256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
-                 deriving (Eq, Show, GHCG.Generic, Data)
+                 deriving (Eq, Show, GHCG.Generic)
+
 
 data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
-                    --  | IETNewChainMember
+                     | IETNewCertRegistered
                      | IETNewChainOrgName
                      | IETBlockstanbul
                      | IETForcedConfigChange
@@ -84,7 +86,7 @@ iEventType = \case
   IETx{}                 -> IETTransaction
   IEBlock{}              -> IETBlock
   IEGenesis{}            -> IETGenesis
-  -- IENewChainMember{}     -> IETNewChainMember
+  IENewCertRegistered{}     -> IETNewCertRegistered
   IENewChainOrgName{}    -> IETNewChainOrgName
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
@@ -94,7 +96,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  -- format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
+  format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
@@ -137,12 +139,11 @@ data P2pEvent =
   | P2pGenesis OutputGenesis
   | P2pGetChain [Word256]
   | P2pGetTx [Keccak256]
-  -- | P2pNewChainMember Word256 A.Address Enode
   | P2pNewOrgName Word256 ChainMemberParsedSet
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
-  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
-  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
+  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
+  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: ChainMemberParsedSet}
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format P2pEvent where
@@ -151,7 +152,6 @@ instance Format P2pEvent where
   format (P2pGenesis o)            = show o
   format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  -- format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
@@ -162,9 +162,9 @@ data VmEvent =
   | VmGenesis OutputGenesis
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
-  | VmVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+  | VmVoteToMake { voteRecipient :: ChainMemberParsedSet, voteVotingDir :: Bool, voteSender :: ChainMemberParsedSet }
   | VmPrivateTx OutputTx
-  | VmValidatorList [A.Address] [A.Address]
+  | VmValidatorList [ChainMemberParsedSet] [ChainMemberParsedSet]
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where

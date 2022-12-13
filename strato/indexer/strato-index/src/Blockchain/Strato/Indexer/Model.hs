@@ -7,7 +7,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs                (LogDB, EventDB, TransactionResult)
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord    (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Binary
@@ -21,7 +21,7 @@ data IndexEvent = RanBlock OutputBlock
                 | IndexTransaction Timestamp OutputTx
                 | EventDBEntry EventDB
                 | IndexPrivateTx OutputTx
-                | ValidatorsG ([Address], [Address])
+                | ValidatorsG ([ChainMemberParsedSet], [ChainMemberParsedSet])
                 deriving (Eq, Show)
 
 instance Binary LogDB

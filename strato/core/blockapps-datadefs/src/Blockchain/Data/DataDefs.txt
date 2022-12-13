@@ -1,7 +1,7 @@
 BlockData
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Address
+    coinbase ChainMemberParsedSet
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -17,13 +17,17 @@ BlockData
     deriving Eq Read Show Generic Data
 
 ValidatorRef
-    address Address
+    org Text
+    orgUnit Text
+    commonName Text
     deriving Eq Read Show
 
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Address
+    coinbaseOrg Text
+    coinbaseOrgUnit Text
+    coinbaseCommonName Text
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot

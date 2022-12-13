@@ -54,6 +54,7 @@ import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -262,7 +263,7 @@ runArgsWithSenderBeef acc args bs = do
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
-                            , blockDataCoinbase = Address 0x0
+                            , blockDataCoinbase = emptyChainMember
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
                             , blockDataReceiptsRoot = ""
@@ -298,7 +299,7 @@ runArgsWithSender acc args bs = do
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
-                            , blockDataCoinbase = Address 0x0
+                            , blockDataCoinbase = emptyChainMember
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
                             , blockDataReceiptsRoot = ""
@@ -333,7 +334,7 @@ runArgsWithOrigin orig acc args bs = do
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
-                            , blockDataCoinbase = Address 0x0
+                            , blockDataCoinbase = emptyChainMember
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
                             , blockDataReceiptsRoot = ""
@@ -433,7 +434,7 @@ runCall funcName callArgs bs = do
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
-                            , blockDataCoinbase = Address 0x0
+                            , blockDataCoinbase = emptyChainMember
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
                             , blockDataReceiptsRoot = ""
@@ -478,7 +479,7 @@ call2 funcName callArgs contractAddress = do
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
-                            , blockDataCoinbase = Address 0x0
+                            , blockDataCoinbase = emptyChainMember
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
                             , blockDataReceiptsRoot = ""

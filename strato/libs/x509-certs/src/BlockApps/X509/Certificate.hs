@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase            #-}
 
 
 module BlockApps.X509.Certificate (
@@ -18,6 +20,7 @@ module BlockApps.X509.Certificate (
   SignedCertificate,
   Issuer(..),
   Subject(..),
+  x509CertToCertInfoState,
   HasSelectX509CertDB,
   HasSelectX509FieldDB,
   rootCert,
@@ -42,11 +45,15 @@ module BlockApps.X509.Certificate (
   x509ToSigneds,
   signedsToX509,
   dateTimeToString,
-  getValidity
+  getValidity,
+  getAddressFromCM,
+  getX509FromAddress,
+  getChainMemberFromX509
  ) where
 
 
-
+import qualified Control.Monad.Change.Alter         as A
+import           Blockchain.Strato.Model.ChainMember hiding (orgName, orgUnit, commonName)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
@@ -56,7 +63,6 @@ import qualified Control.Lens                       as Lens
 import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Control.Monad.Change.Alter         as A        
 import           Crypto.Random.Entropy
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms             as CH
@@ -92,9 +98,11 @@ import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
+import           Test.QuickCheck
 
 import           Servant.Docs
 
+-- import           Blockchain.Data.PubKey
 -- import           Data.ASN1.Encoding
 -- import           Data.ASN1.BinaryEncoding
 -- import           Data.ASN1.Types
@@ -142,11 +150,60 @@ data X509CertInfoState = X509CertInfoState
 instance Format X509CertInfoState where
   format = show
 
+instance Arbitrary X509Certificate where
+  arbitrary = pure . X509Certificate $ CertificateChain []
+
+instance Arbitrary X509CertInfoState where
+  arbitrary = X509CertInfoState
+          <$> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+          <*> arbitrary
+
 signedsToX509 :: [SignedCertificate] -> X509Certificate
 signedsToX509 = X509Certificate . CertificateChain
 
 x509ToSigneds :: X509Certificate -> [SignedCertificate]
 x509ToSigneds (X509Certificate (CertificateChain cs)) = cs
+
+x509CertToCertInfoState :: X509Certificate -> X509CertInfoState
+x509CertToCertInfoState cert =
+  let sub = getCertSubject cert
+      ua = maybe (Address 0) (fromPublicKey . subPub) sub
+      o = maybe "" subOrg sub
+      ou = maybe Nothing subUnit sub
+      cn = maybe "" subCommonName sub
+   in X509CertInfoState
+        { userAddress = ua
+        , certificate = cert
+        , isValid = True
+        , children = []
+        , orgName = o
+        , orgUnit = ou
+        , commonName = cn
+        }
+
+getAddressFromCM :: ChainMemberParsedSet -> X509CertInfoState ->  Maybe Address 
+getAddressFromCM (Everyone _) (X509CertInfoState ua _ _ _ _ _ _) = Just ua 
+getAddressFromCM (Org on _) (X509CertInfoState ua _ _ _ onx _ _) = 
+  if on == T.pack onx then Just ua else Nothing
+getAddressFromCM (OrgUnit on ou _) (X509CertInfoState ua _ _ _ onx oux _) =
+  if on == T.pack onx  && ou == T.pack (fromMaybe " " oux) then Just ua else Nothing
+getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cnmx) =
+  if on == T.pack onx  && ou == T.pack (fromMaybe " " oux) && cmn == T.pack cnmx then Just ua else Nothing
+
+
+getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
+getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName  (T.pack $ on) (T.pack(fromMaybe " " ou)) (T.pack $ cname) True)
+
+getX509FromAddress :: A.Selectable Address X509CertInfoState m
+          => Address 
+          -> m (Maybe (X509CertInfoState))
+getX509FromAddress addr = (A.select (A.Proxy @X509CertInfoState)addr)
+
 
 data Issuer = Issuer
   {

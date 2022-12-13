@@ -28,7 +28,6 @@ import qualified Data.Set                           as S
 import           Data.Word
 
 import           BlockApps.Logging
-import           Blockchain.Constants
 import           Blockapps.Crossmon
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -43,12 +42,12 @@ import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -110,16 +109,16 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFCodeCollectionNotFound{} -> recoverable f
         Just f@TFInvalidPragma{} -> recoverable f
 
-rewardCoinbases :: MonadBagger m => Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-rewardCoinbases us uncles ourNumber = do
-    _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
-    forM_ uncles $ \uncle -> do
-        _ <- addToBalance (Account us Nothing) (rewardBase flags_testnet `quot` 32)
-        _ <- addToBalance (Account (DD.blockDataCoinbase uncle) Nothing) ((rewardBase flags_testnet * (8+DD.blockDataNumber uncle - ourNumber )) `quot` 8)
-        return ()
-    flushMemStorageDB
-    flushMemAddressStateDB
-    A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+-- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
+-- rewardCoinbases us uncles ourNumber = do
+--     _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
+--     forM_ uncles $ \uncle -> do
+--         _ <- addToBalance (Account us Nothing) (rewardBase flags_testnet `quot` 32)
+--         _ <- addToBalance (Account (DD.blockDataCoinbase uncle) Nothing) ((rewardBase flags_testnet * (8+DD.blockDataNumber uncle - ourNumber )) `quot` 8)
+--         return ()
+--     flushMemStorageDB
+--     flushMemAddressStateDB
+--     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
 -- todo batch insert results
 txsDroppedCallback :: MonadBagger m => [TxRejection] -> [Keccak256] -> m () -- called when a Tx is dropped from/rejected by the pool
@@ -544,7 +543,7 @@ buildFromMiningCache = do
     let nextDiff     = 1 --nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
-    rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
+    rewardedBlockData <- buildRewardedBlockHeader nextBlockData
     when isPBFT $
       cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
     return OutputBlock { obOrigin = TO.Quarry
@@ -561,7 +560,7 @@ buildNextBlockHeader :: DD.BlockData
                      -> [OutputTx]
                      -> UTCTime
                      -> Bool
-                     -> Address
+                     -> ChainMemberParsedSet
                      -> Word64
                      -> DD.BlockData
 buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
@@ -587,12 +586,12 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataNonce            = nonce
                         }
 
-buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
-buildRewardedBlockHeader bd uncles = do
+buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> m DD.BlockData
+buildRewardedBlockHeader bd = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
   oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
-  rewardedStateRoot <- rewardCoinbases (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  let rewardedStateRoot = oldSR
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) oldSR
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   return bd{DD.blockDataStateRoot = rewardedStateRoot}
