@@ -11,6 +11,9 @@
 
 module Blockchain.Data.ChainInfoDB where
 
+-- import           Control.Monad                      (when)
+import           Control.Arrow                      ((***))
+import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 import qualified Data.Text                          as T
@@ -26,7 +29,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 
 getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
@@ -95,7 +98,7 @@ getChainInfo (ChainId chainId) = do
                                         accountInfoRefBalance
                                         (fromJust accountInfoRefCodeHash)
                                 | otherwise
-                                    = ContractWithStorage
+                                    = SolidVMContractWithStorage
                                         accountInfoRefAddress
                                         accountInfoRefBalance
                                         (fromJust accountInfoRefCodeHash)
@@ -151,7 +154,8 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} ChainSignature{.
           case aInfo of
             NonContract a i -> AccountInfoRef chid a i Nothing Nothing
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
-            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
+            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just $ map (word256ToBytes *** word256ToBytes) tup)
+            SolidVMContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
         parseCInfo ch (CodeInfo bc cc cn)  =
           CodeInfoRef ch bc (T.unpack cc) (fmap T.unpack cn)
         parseMember chi cmps  =

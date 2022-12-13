@@ -261,6 +261,7 @@ getChainInfo chainIds lim off = do
                                     NonContract a b -> (a, b)
                                     ContractNoStorage a b _ -> (a, b)
                                     ContractWithStorage a b _ _ -> (a, b)
+                                    SolidVMContractWithStorage a b _ _ -> (a, b)
         let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
             mems = members chinfo
         NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput

@@ -120,11 +120,6 @@ doRevokeCertificate contractAddress userAddress = do
         ]
   void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate contractAddress userAddress
 
-doCertificateRegistryInitialized :: Account -> IContextM ()
-doCertificateRegistryInitialized contractAddress = do
-  logF [ "Initializing Certificate Registry"]
-  void . RBDB.withRedisBlockDB $ RBDB.initializeCertificateRegistry contractAddress
-
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
@@ -144,7 +139,6 @@ data TxrResult =
                | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
                | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
                | CertificateRevoked (Either String (Account, Address))
-               | CertificateRegistryInitialized (Either String Account)
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -205,7 +199,6 @@ indexEventToTxrResults = \case
         in case userAddress' of
             Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
             Just ua -> Just . CertificateRevoked . Right $ (eventDBContractAddress ev, ua)
-      (Nothing, "CertificateRegistryInitialized", []) -> Just . CertificateRegistryInitialized . Right $ (eventDBContractAddress ev)
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -230,9 +223,6 @@ txrResultHandler = \case
   CertificateRevoked e -> case e of
     Right (contractAddress, userAddress) -> doRevokeCertificate contractAddress userAddress
     Left err -> $logErrorS "txrIndexer" $ T.pack err
-  CertificateRegistryInitialized e -> case e of
-    Right contractAddress -> doCertificateRegistryInitialized contractAddress
-    Left err  -> $logErrorS "txrIndexer whaaat?" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId
     Left err -> $logErrorS "txrIndexer" $ T.pack err

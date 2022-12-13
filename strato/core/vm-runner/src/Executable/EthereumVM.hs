@@ -349,6 +349,7 @@ runChainConstructors cId cInfo = do
       NonContract{} -> pure Nothing
       ContractNoStorage a _ ch -> resolveSrc a ch
       ContractWithStorage a _ ch _ -> resolveSrc a ch
+      SolidVMContractWithStorage a _ ch _ -> resolveSrc a ch
     for addrSrc $ \(addr,ms) -> SolidVM.call
          False --isRunningTests
          True --isHomestead

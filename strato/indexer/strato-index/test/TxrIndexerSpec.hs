@@ -58,10 +58,6 @@ spec = do
                 event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRevoked" [show userAddr]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, CertificateRevoked . Right $ ((Account 0xdeadbeef Nothing), userAddr)]
-        it "Index EventDB for CertificateRegistryInitialized" $
-            let event =  EventDB(Account 0xdeadbeef Nothing) Nothing "CertificateRegistryInitialized" []
-            in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, CertificateRegistryInitialized . Right $ Account 0xdeadbeef Nothing]
         it "Index EventDBEntry for non-special event" $
             let chainId = fromInteger 0x480244
                 event = EventDB (Account 0xdeadbeef Nothing) (Just chainId) "NotSpecial" ["48193"]

@@ -136,9 +136,9 @@ bytesToValue b = \case
   TypeArrayFixed len ty ->
     let valArray = splitBytes b ty
     in ValueArrayFixed len <$> sequence valArray
+  TypeContract{} -> SimpleValue <$> bytesToSimpleValue b TypeAddress
   TypeMapping{}  -> Nothing -- TODO: Fixme
   TypeFunction{} -> Nothing -- TODO: Fixme
-  TypeContract{} -> undefined -- TODO: the one thing thats not Fixme
   TypeEnum{}     -> Nothing -- TODO: Fixme
   TypeStruct{}   -> Nothing  -- TODO: Fixme
   where
@@ -171,7 +171,8 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
         TypeFunction{}      -> Nothing
         TypeStruct{}        -> Nothing
         TypeEnum{}          -> undefined -- TODO: Need to implement
-        TypeContract{}      -> undefined -- TODO: Need to implement
+        -- defaulting to wildcard to return contract address
+        -- TypeContract{}      -> undefined 
         TypeArrayDynamic ty -> case getTypeByteLength ty of
           Nothing   -> Nothing
           Just size -> do

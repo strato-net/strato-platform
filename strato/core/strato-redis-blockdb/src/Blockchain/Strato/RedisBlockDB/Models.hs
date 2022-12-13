@@ -46,7 +46,6 @@ data BlockDBNamespace = Headers
                       | PrivateTrueOrgNameChains
                       | PrivateFalseOrgNameChains
                       | X509Certificates
-                      | X509Initialized
                       | ParsedSetWhitePage
                       | ParsedSetToX509
     deriving (Eq, Read, Show)
@@ -229,7 +228,6 @@ displayForNamespace ns input = case ns of
     PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     --Validators           -> format (fromValue input :: [Address])
     X509Certificates     -> format (fromValue input :: Address)
-    X509Initialized      -> format input
     ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
     ParsedSetToX509 ->  format input
   where

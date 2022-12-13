@@ -41,7 +41,10 @@ library:
       - merkle-patricia-db
       - strato-model
       - text
-
+      - raw-strings-qq
+      - solid-vm-model
+      - ethereum-rlp
+      - x509-certs
 
 
 executables:
