@@ -79,7 +79,7 @@ def deployStrato(nodeData) {
     // Save node's public key into file (for future reference)
     def nodePubKey = sh(
         returnStdout: true,
-        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key -H \\\"X-USER-UNIQUE-NAME: nodekey\\\" | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
     ).trim()
     writeFile file: "nodePublicKey", text: "${nodePubKey}"
 
@@ -176,7 +176,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     // Save node's public key into file (for future reference)
     def nodePubKey = sh(
         returnStdout: true,
-        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key -H \\\"X-USER-UNIQUE-NAME: nodekey\\\" | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
     ).trim()
     writeFile file: "publicKey", text: "${nodePubKey}"
     
@@ -213,7 +213,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
       script {
         def publicKey = sh(
             returnStdout: true,
-            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key -H \\\"X-USER-UNIQUE-NAME: nodekey\\\" | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
         ).trim()
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
@@ -344,7 +344,7 @@ def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsP
       script {
         def publicKey = sh(
             returnStdout: true,
-            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key -H \\\"X-USER-UNIQUE-NAME: nodekey\\\" | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
         ).trim()
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
