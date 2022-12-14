@@ -119,13 +119,9 @@ checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
   traceM "Inspecting the headers given to the vault-proxy"
   xuat <- checkXuat rev vc
-  authy <- checkAuth rev vc
   traceM "Fixing the headers"
   h <- if
-    | (authy /= Nothing && xuat /= Nothing) -> do
-      traceM "Authorization was present, but X-USER-ACCESS-TOKEN was not, returning the original headers"
-      pure authy
-    | (xuat /= Nothing && authy == Nothing) -> do 
+    | (xuat /= Nothing) -> do 
       traceM "X-USER-ACCESS-TOKEN was present, but Authorization was not, adding the Authorization header"
       pure xuat
     | otherwise -> do
@@ -164,25 +160,25 @@ checkXuat rev vc = do
       traceM "X-USER-ACCESS-TOKEN was not present"
       pure Nothing
 
-checkAuth :: Request -> VaultConnection -> IO (Maybe Header)
-checkAuth rev vc = do
-  traceM "Inspecting the headers given to the vault-proxy"
-  case (lookup "Authorization" $ W.requestHeaders rev) of
-    Just auth -> do
-      traceM "Authorization header was already present"
-      newA <- case auth of
-        "" -> do
-          traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
-          goodJwt <- vaulty vc
-          pure (TE.encodeUtf8 (accessToken goodJwt))
-        _ -> do
-          traceM "X-USER-ACCESS-TOKEN was not empty, using it"
-          pure auth
-      let newAuth = (TH.hAuthorization,) . (bearerBS <>) <$> Just newA
-      pure newAuth
-    Nothing -> do
-      traceM "Authorization header was not present"
-      pure Nothing
+-- checkAuth :: Request -> VaultConnection -> IO (Maybe Header)
+-- checkAuth rev vc = do
+--   traceM "Inspecting the headers given to the vault-proxy"
+--   case (lookup "Authorization" $ W.requestHeaders rev) of
+--     Just auth -> do
+--       traceM "Authorization header was already present"
+--       newA <- case auth of
+--         "" -> do
+--           traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
+--           goodJwt <- vaulty vc
+--           pure (TE.encodeUtf8 (accessToken goodJwt))
+--         _ -> do
+--           traceM "X-USER-ACCESS-TOKEN was not empty, using it"
+--           pure auth
+--       let newAuth = (TH.hAuthorization,) . (bearerBS <>) <$> Just newA
+--       pure newAuth
+--     Nothing -> do
+--       traceM "Authorization header was not present"
+--       pure Nothing
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
