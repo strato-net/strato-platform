@@ -185,8 +185,9 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: zookeeper-data
-          - mountPath: /datalog
-            name: zookeeper-data-log
+        env:
+        - name: ZOO_DATA_LOG_DIR:
+          value: "/data"
       - image: wurstmeister/kafka:1.1.0
         name: kafka
         env:
@@ -257,9 +258,6 @@ spec:
         - name: zookeeper-data
           persistentVolumeClaim:
             claimName: zookeeper-pvc
-        - name: zookeeper-data-log
-          persistentVolumeClaim:
-            claimName: zookeeper-data-log-pvc
         - name: strato-data
           persistentVolumeClaim:
             claimName: strato-pvc

@@ -12,14 +12,12 @@ kubectl delete pvc prometheus-pvc
 kubectl delete pvc redis-pvc
 kubectl delete pvc strato-pvc
 kubectl delete pvc zookeeper-pvc
-kubectl delete pvc zookeeper-data-log-pvc
 kubectl delete pvc postgres-pvc
 kubectl delete pv kafka-pv
 kubectl delete pv prometheus-pv
 kubectl delete pv redis-pv
 kubectl delete pv strato-pv
 kubectl delete pv zookeeper-pv
-kubectl delete pv zookeeper-data-log-pv
 kubectl delete pv postgres-pv
 
 **Note that** *strato* above is the name of the deployment.
@@ -32,7 +30,6 @@ kubectl apply -f kafka-pv.yaml
 kubectl apply -f prometheus-pv.yaml
 kubectl apply -f redis-pv.yaml
 kubectl apply -f strato-pv.yaml
-kubectl apply -f zookeeper-data-log-pv.yaml
 kubectl apply -f zookeeper-pv.yaml
 kubectl apply -f postgres-pv.yaml
 
@@ -42,7 +39,6 @@ kubectl apply -f prometheus-pvc.yaml
 kubectl apply -f redis-pvc.yaml
 kubectl apply -f strato-pvc.yaml
 kubectl apply -f zookeeper-pvc.yaml
-kubectl apply -f zookeeper-data-log-pvc.yaml
 kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
