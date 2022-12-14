@@ -95,9 +95,9 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseOrg\");"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseOrgUnit\");"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (\"coinbaseCommonName\");"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org_unit);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_common_name);"
 
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
 
@@ -143,25 +143,23 @@ instance Pretty BS.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
 instance RLPSerializable BlockData where
-  rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17]) =
+  rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15]) =
     BlockData {
       blockDataParentHash = rlpDecode v1,
       blockDataUnclesHash = rlpDecode v2,
-      blockDataCoinbaseOrg = rlpDecode v3,
-      blockDataCoinbaseOrgUnit = rlpDecode v4,
-      blockDataCoinbaseOrgCommonName = rlpDecode v5,
-      blockDataStateRoot = rlpDecode v6,
-      blockDataTransactionsRoot = rlpDecode v7,
-      blockDataReceiptsRoot = rlpDecode v8,
-      blockDataLogBloom = rlpDecode v9,
-      blockDataDifficulty = rlpDecode v10,
-      blockDataNumber = rlpDecode v11,
-      blockDataGasLimit = rlpDecode v12,
-      blockDataGasUsed = rlpDecode v13,
-      blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v14,
-      blockDataExtraData = rlpDecode v15,
-      blockDataMixHash = rlpDecode v16,
-      blockDataNonce = bytesToWord64 $ BS.unpack $ rlpDecode v17
+      blockDataCoinbase = rlpDecode v3,
+      blockDataStateRoot = rlpDecode v4,
+      blockDataTransactionsRoot = rlpDecode v5,
+      blockDataReceiptsRoot = rlpDecode v6,
+      blockDataLogBloom = rlpDecode v7,
+      blockDataDifficulty = rlpDecode v8,
+      blockDataNumber = rlpDecode v9,
+      blockDataGasLimit = rlpDecode v10,
+      blockDataGasUsed = rlpDecode v11,
+      blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v12,
+      blockDataExtraData = rlpDecode v13,
+      blockDataMixHash = rlpDecode v14,
+      blockDataNonce = bytesToWord64 $ BS.unpack $ rlpDecode v15
       }
   rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ show (pretty arr))
   rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
@@ -171,9 +169,7 @@ instance RLPSerializable BlockData where
     RLPArray [
       rlpEncode $ blockDataParentHash bd,
       rlpEncode $ blockDataUnclesHash bd,
-      rlpEncode $ blockDataCoinbaseOrg bd,
-      rlpEncode $ blockDataCoinbaseOrgUnit bd,
-      rlpEncode $ blockDataCoinbaseCommonName bd,
+      rlpEncode $ blockDataCoinbase bd,
       rlpEncode $ blockDataStateRoot bd,
       rlpEncode $ blockDataTransactionsRoot bd,
       rlpEncode $ blockDataReceiptsRoot bd,
@@ -194,9 +190,7 @@ instance Format BlockData where
     "parentHash: " ++ format (blockDataParentHash b) ++ "\n" ++
     "unclesHash: " ++ format (blockDataUnclesHash b) ++
     (if blockDataUnclesHash b == hash (BS.pack [0xc0]) then " (the empty array)\n" else "\n") ++
-    "coinbaseOrg: " ++ (format $ blockDataCoinbaseOrg b) ++ "\n" ++
-    "coinbaseOrgUnit: " ++ (format $ blockDataCoinbaseOrgUnit b) ++ "\n" ++
-    "coinbaseCommonName: " ++ (format $ blockDataCoinbaseCommonName b) ++ "\n" ++
+    "coinbase: " ++ (format $ blockDataCoinbase b) ++ "\n" ++
     "stateRoot: " ++ format (blockDataStateRoot b) ++ "\n" ++
     "transactionsRoot: " ++ format (blockDataTransactionsRoot b) ++ "\n" ++
     "receiptsRoot: " ++ format (blockDataReceiptsRoot b) ++ "\n" ++
@@ -211,7 +205,7 @@ instance BlockHeaderLike BlockData where
     blockHeaderBlockNumber      = blockDataNumber
     blockHeaderParentHash       = blockDataParentHash
     blockHeaderOmmersHash       = blockDataUnclesHash
-    blockHeaderBeneficiary      = blockDataCoinbase
+    blockHeaderBeneficiary      = blockDataCoinbase -- blockHeaderBeneficiaryOrg      = blockDataCoinbaseOrg?
     blockHeaderStateRoot        = unboxStateRoot . blockDataStateRoot
     blockHeaderTransactionsRoot = unboxStateRoot . blockDataTransactionsRoot
     blockHeaderReceiptsRoot     = unboxStateRoot . blockDataReceiptsRoot
