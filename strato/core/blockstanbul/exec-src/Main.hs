@@ -115,7 +115,7 @@ main = do
   mgr <- newManager defaultManagerSettings
   vaultUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
   optSender <- do 
-    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
+    eAdAndKey <- runClientM (VC.getKey Nothing Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
       Right adAndKey -> return $ VC.unAddress adAndKey
