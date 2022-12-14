@@ -96,89 +96,69 @@ main = do
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
-  traceM "Here is the original request incoming to the vault-proxy:"
-  traceM $ show rev ---Can remove in production
-  --get the JWT information
-  traceM "Getting the JWT information"
-  jwt <- vaulty vc
-  traceM "Vault-Proxy first time JWT token: "
-  traceM $ show jwt
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the original request incoming to the vault-proxy:" 
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show rev ---Can remove in production
+
   --get the foreign vault information
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
   --Check and review the headers that were added
-  traceM "Checking if the request contains the X-USER-ACCESS-TOKEN header"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the request contains the X-USER-ACCESS-TOKEN header"
   modReq <- checkHeaders rev vc
-  traceM "Changing the request to the foreign vault."
-  traceM "Here is the modified request: "
-  traceM $ show modReq
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Changing the request to the foreign vault."
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the modified request: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show modReq
   pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
-  traceM "Inspecting the headers given to the vault-proxy"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the headers given to the vault-proxy"
   xuat <- checkXuat rev vc
-  traceM "Fixing the headers"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Fixing the headers"
   h <- if
     | (xuat /= Nothing) -> do 
-      traceM "X-USER-ACCESS-TOKEN was present, but Authorization was not, adding the Authorization header"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was present"
       pure xuat
     | otherwise -> do
-      traceM "Neither Authorization or X-USER-ACCESS-TOKEN were present, adding the Authorization header"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN were present, adding the Authorization header"
       goodJwt <- vaulty vc
       let uth = (TH.hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 (accessToken goodJwt)))
       pure uth
-  traceM "Filtering out the old headers, targetting the X-USER-ACCESS-TOKEN and Authorization headers"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Filtering out the old headers, targetting the X-USER-ACCESS-TOKEN and Authorization headers"
   let headers = W.requestHeaders rev
       filteredHeaders = filter (\(a,_) -> a /= "X-USER-ACCESS-TOKEN" && a /= "Authorization") headers
-  traceM "Adding the new headers to the request"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Adding the new headers to the request"
   let modReq = case h of
         Nothing    -> rev
         Just auth' -> rev { W.requestHeaders = auth':filteredHeaders }
-  traceM "Here are the raw headers: "
-  traceM $ show (W.requestHeaders modReq)
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here are the raw headers: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show (W.requestHeaders modReq)
   pure modReq
 
 checkXuat :: Request -> VaultConnection -> IO (Maybe Header)
 checkXuat rev vc = do
-  traceM "Inspecting the headers given to the vault-proxy"
-  case (lookup "referer" $ W.requestHeaders rev) of
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the headers given to the vault-proxy"
+  case (lookup "X-USER-ACCESS-TOKEN" $ W.requestHeaders rev) of
     Just b -> do
-      traceM "X-USER-ACCESS-TOKEN was present, converting it into an authorization header"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was present, converting it into an authorization header"
       newB <- case b of
         "" -> do
-          traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was empty, getting a new one"
           goodJwt <- vaulty vc
           pure (TE.encodeUtf8 (accessToken goodJwt))
         _ -> do
-          traceM "X-USER-ACCESS-TOKEN was not empty, using it"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not empty, using it"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show b
           pure b
       let newXuat = (TH.hAuthorization,) . (bearerBS <>) <$> Just newB
       pure newXuat
     Nothing -> do
-      traceM "X-USER-ACCESS-TOKEN was not present"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present"
       pure Nothing
 
--- checkAuth :: Request -> VaultConnection -> IO (Maybe Header)
--- checkAuth rev vc = do
---   traceM "Inspecting the headers given to the vault-proxy"
---   case (lookup "Authorization" $ W.requestHeaders rev) of
---     Just auth -> do
---       traceM "Authorization header was already present"
---       newA <- case auth of
---         "" -> do
---           traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
---           goodJwt <- vaulty vc
---           pure (TE.encodeUtf8 (accessToken goodJwt))
---         _ -> do
---           traceM "X-USER-ACCESS-TOKEN was not empty, using it"
---           pure auth
---       let newAuth = (TH.hAuthorization,) . (bearerBS <>) <$> Just newA
---       pure newAuth
---     Nothing -> do
---       traceM "Authorization header was not present"
---       pure Nothing
+vaultProxyDebug :: Applicative f => Bool -> String -> f()
+vaultProxyDebug debug msg  = when debug $ traceM msg
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
