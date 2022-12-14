@@ -107,15 +107,12 @@ app vc rev = do
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
-      -- goodJwt = accessToken jwt
-      --get the old headers
-      -- headers = W.requestHeaders rev
   --Check and review the headers that were added
-  traceM "Here is the route the vault-proxy is going to:"
-  traceM $ show furl
   traceM "Checking if the request contains the X-USER-ACCESS-TOKEN header"
   modReq <- checkHeaders rev vc
   traceM "Changing the request to the foreign vault."
+  traceM "Here is the modified request: "
+  traceM $ show modReq
   pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 checkHeaders :: W.Request -> VaultConnection -> IO Request
