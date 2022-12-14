@@ -119,6 +119,7 @@ services:
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
