@@ -53,25 +53,20 @@ getAwesomeToken squirrel clientId clientSecret reserveTime additionalOauth = do
     cache <- liftIO . atomically $ do 
         now <- C.nowSTM
         cash <- lookupSTM True clientId squirrel now
-        pure cash
+        case cash of 
+            Just c -> pure c
+            --If the token was old destroy the old token and get a new one
+            Nothing -> do 
+                traceM "Got a new token"
+                virToken <- getVirginToken clientId clientSecret additionalOauth
+                --Calculate the time that the token will expire
+                exTime <- makeExpry virToken reserveTime
+                --Insert the new token into the STM cache
+                liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
+                traceM "Successfully inserted the new token into the cache"
+                pure virToken
 
-    --If the cache is up to date, then just return the VaultToken
-    vaultToken <- case cache of 
-        Just c -> pure c
-        --If the token was old destroy the old token and get a new one
-        Nothing -> do 
-            traceM "Trying to get a new token"
-            -- Get the virgin token from the provider
-            let vToken = getVirginToken clientId clientSecret additionalOauth
-            traceM "Got a new token"
-            virToken <- vToken
-            --Calculate the time that the token will expire
-            exTime <- makeExpry virToken reserveTime
-            --Insert the new token into the STM cache
-            liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
-            traceM "Successfully inserted the new token into the cache"
-            pure virToken
-    pure vaultToken
+    pure cache
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
 makeExpry :: MonadIO m => VaultToken -> Int -> m TimeSpec 
