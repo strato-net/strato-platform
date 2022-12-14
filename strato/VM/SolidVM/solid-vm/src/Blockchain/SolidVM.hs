@@ -2905,10 +2905,16 @@ encodeForReturn (SString s) = return $ show s
 -- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 -}
-encodeForReturn (SArray _ items) = return  $  "[" ++ ( intercalate "," ( map show (V.toList items) ) ) ++ "]"  --[,]
-encodeForReturn (STuple items) = return   $  "(" ++ ( intercalate "," (map show (V.toList items) ) ) ++ ")" --(,)
+encodeForReturn (SArray _ items) = do
+  encodedItems <- mapM (encodeForReturn <=< getVar) $ V.toList items
+  return $ "[" ++ ( intercalate "," encodedItems ) ++ "]"  --[,]
+encodeForReturn (STuple items)   = do
+  encodedItems <- mapM (encodeForReturn <=< getVar) $ V.toList items
+  return $ "(" ++ ( intercalate "," encodedItems ) ++ ")" 
+
 encodeForReturn x = todo "Cannot encode this return type: " x
 
+--formatAddressWithoutColor : padded the address with 40 bytes
 
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
