@@ -349,7 +349,7 @@ functionResult i txHash txResult mmd toAccount = do
         "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
         "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
         _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
-  $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse
+  $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
       let r = Text.decodeUtf8 $ Base16.encode txResp
