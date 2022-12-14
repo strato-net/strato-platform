@@ -10,6 +10,7 @@ module Strato.VaultProxy.RawOauth where
 import           Data.Cache               as C
 import           Data.Proxy
 import qualified Data.Text               as T
+-- import           GHC.Conc
 import           Servant.API             as SA
 import           Servant.Client
 
