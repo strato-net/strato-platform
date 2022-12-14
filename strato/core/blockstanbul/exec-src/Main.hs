@@ -113,7 +113,7 @@ main :: IO ()
 main = do
   Options{..} <- parseArgs
   mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://vault-proxy:8000/strato/v2.3"
+  vaultUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
   optSender <- do 
     eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of

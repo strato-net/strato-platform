@@ -159,7 +159,7 @@ enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocS
 enterBloc2 blocEnv sqlEnv f =
   runBlocSQLMUsingEnv sqlEnv
   $ flip runReaderT blocEnv
-  $ runCoreAPIM "http://strato:3000/eth/v1.2"
+  $ runCoreAPIM "http://localhost:3000/eth/v1.2"
   $ f
 
 matters :: AggregateAction -> Bool
