@@ -6,7 +6,6 @@ import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
-import qualified Data.Text                          as T
 import           Network.HTTP.Client                (newManager, defaultManagerSettings)
 import           Network.HTTP.Types.Status
 import           Servant.Client

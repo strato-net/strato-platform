@@ -11,7 +11,6 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
