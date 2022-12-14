@@ -6787,6 +6787,13 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
 
+  fit "can return chainId in a simple manner" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = this.chainId ;
+}
+|] 
+    getFields ["x"] `shouldReturn` [BDefault]
 
   it "View functions enforced in 3.4" $ (runTest $
     runBS [r|

@@ -1480,7 +1480,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             return $ Constant $ SEnumVal enumName name num
 
 
-        
+      (SBuiltinVariable "this", "chainId") -> (Constant . (SString) . show . view accountChainId <$> getCurrentAccount)
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do
         contract' <- getCurrentContract
