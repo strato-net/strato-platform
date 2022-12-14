@@ -52,7 +52,7 @@ function newnode {
   runBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG} &>> logs/vault-proxy
+    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
 
   echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
   set +x
@@ -435,7 +435,6 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
-setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 

@@ -157,8 +157,8 @@ checkXuat rev vc = do
       vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present"
       pure Nothing
 
-vaultProxyDebug :: Applicative f => Bool -> String -> f()
-vaultProxyDebug debug msg  = when debug $ traceM msg
+vaultProxyDebug :: Applicative f => Int -> String -> f()
+vaultProxyDebug debug msg  = when (debug == 1) $ traceM msg
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
