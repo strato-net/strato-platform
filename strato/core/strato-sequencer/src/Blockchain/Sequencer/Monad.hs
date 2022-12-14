@@ -419,7 +419,7 @@ instance HasVault SequencerM where
     mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
-      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (Just $ T.pack "nodekey") (VC.MsgHash mesg)) vc
+      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash mesg)) vc
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
