@@ -11,7 +11,6 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -84,7 +83,7 @@ main = do
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress

@@ -6,7 +6,6 @@ import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
-import qualified Data.Text                          as T
 import           Network.HTTP.Client                (newManager, defaultManagerSettings)
 import           Network.HTTP.Types.Status
 import           Servant.Client
@@ -105,7 +104,7 @@ getNodeKey = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
-  ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
+  ak <- waitOnVault clientEnv $ runClientM (getKey Nothing Nothing) clientEnv
   return (VC.unPubKey ak, VC.unAddress ak)
 
 waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
@@ -120,7 +119,7 @@ waitOnVault clientEnv request = do
       400 -> -- 400 is thrown when the key does not exist
         if flags_generateKey then do 
           putStrLn "nodekey does not exist -  I'm going to create one"
-          waitOnVault clientEnv $ runClientM (postKey $ Just $ T.pack "nodekey") clientEnv
+          waitOnVault clientEnv $ runClientM (postKey Nothing) clientEnv
         else do
           putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
           threadDelay 5000000 -- 5 seconds

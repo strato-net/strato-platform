@@ -14,7 +14,7 @@ import           Strato.Strato23.API.Types
 -- Routes and Types
 --------------------------------------------------------------------------------
 type GetKey = "key"
-            :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+            :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
             :> QueryParam "username" Text
             :> Get '[JSON] AddressAndKey
 
