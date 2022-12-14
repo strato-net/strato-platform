@@ -14,8 +14,6 @@ volumes:
     driver: local
   zookeeperdata:
     driver: local
-  zookeeperdatalog:
-    driver: local
 services:
   smd:
     depends_on:
@@ -288,7 +286,8 @@ services:
     restart: unless-stopped
     volumes:
       - zookeeperdata:/data
-      - zookeeperdatalog:/datalog
+    environment:
+      ZOO_DATA_LOG_DIR: /data
     logging:
       driver: "json-file"
       options:
