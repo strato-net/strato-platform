@@ -13,7 +13,7 @@ import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
-import qualified Data.Text                  as T
+--import qualified Data.Text                  as T
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Network.HTTP.Simple
 import           Network.HTTP.Types.Status
