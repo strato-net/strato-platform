@@ -2417,21 +2417,21 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
-  let intHash = intBuiltin [SString h]
-  bytestringHash <- encodeForReturn intHash
-  rIntHash <-case Numeric.readHex r of
-    [(x, "")] -> return x
-    _ -> invalidArguments "parseHex: error parsing r: " r
-  sIntHash <- case Numeric.readHex s of
-    [(y, "")] -> return y
-    _ -> invalidArguments "parseHex: error parsing s: " s
-  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString (BC.pack  bytestringHash)) rIntHash sIntHash v
-  let theZero ::  Integer
-      theZero = 0
-  case theSignerAddress of
-    Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
-    Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
+callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = case B16.decode (BC.pack h) of
+  Left err -> invalidArguments err ("" :: String)
+  Right bytestringHash -> do
+    rIntHash <-case Numeric.readHex r of
+      [(x, "")] -> return x
+      _ -> invalidArguments "parseHex: error parsing r: " r
+    sIntHash <- case Numeric.readHex s of
+      [(y, "")] -> return y
+      _ -> invalidArguments "parseHex: error parsing s: " s
+    let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
+    let theZero ::  Integer
+        theZero = 0
+    case theSignerAddress of
+      Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
+      Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
 callBuiltin ("sha256") args Nothing = do
   let allStrings [] = True
       allStrings ((SString _):xs) = True && (allStrings xs)
