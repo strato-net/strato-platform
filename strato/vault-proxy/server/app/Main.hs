@@ -11,10 +11,10 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.ByteString                        as B hiding (putStrLn, map)
+import           Data.ByteString                        as B hiding (putStrLn, map, filter)
 import qualified Data.Cache                             as Cache
-import qualified Data.CaseInsensitive                   as CI
-import           Data.Text                              as T hiding (unlines, map)   
+-- import qualified Data.CaseInsensitive                   as CI
+import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
@@ -22,9 +22,9 @@ import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
-import qualified Network.HTTP.Types.Header              as TH
-import qualified Network.HTTP.Types                     as TH    
-import           Network.HTTP.Headers                  as H   
+import           Network.HTTP.Types.Header              as TH
+-- import           Network.HTTP.Types                     as TH1    
+-- import           Network.HTTP.Headers                  as H   
 import           Network.Wai.Handler.Warp              (run)
 import           Network.Wai                           as W
 import           System.IO                              (BufferMode (..),
@@ -107,9 +107,9 @@ app vc rev = do
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
-      goodJwt = accessToken jwt
+      -- goodJwt = accessToken jwt
       --get the old headers
-      headers = W.requestHeaders rev
+      -- headers = W.requestHeaders rev
   --Check and review the headers that were added
   traceM "Here is the route the vault-proxy is going to:"
   traceM $ show furl
@@ -121,43 +121,71 @@ app vc rev = do
 checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
   traceM "Inspecting the headers given to the vault-proxy"
-  let og = W.requestHeaders rev
-      xuat = "X-USER-ACCESS-TOKEN" `lookup` og
-      authy = lookupHeader HdrAuthorization og
+  xuat <- checkXuat rev vc
+  authy <- checkAuth rev vc
   traceM "Fixing the headers"
   h <- if
     | (authy /= Nothing && xuat /= Nothing) -> do
-      traceM "Authorization was present, so to was X-USER-ACCESS-TOKEN, returning the original headers"
-      pure og
+      traceM "Authorization was present, but X-USER-ACCESS-TOKEN was not, returning the original headers"
+      pure authy
     | (xuat /= Nothing && authy == Nothing) -> do 
-      traceM "X-USER-ACCESS-TOKEN was present, but Authorization was not."
-      h <- case xuat of
-        Nothing -> do
-          traceM "X-USER-ACCESS-TOKEN was present, but empty, adding the Authorization header"
-          goodJwt <- vaulty vc
-          pure $ insertHeader HdrAuthorization (T.unpack (T.pack "Bearer " <> accessToken goodJwt)) og
-        Just xuat' -> do
-          traceM "X-USER-ACCESS-TOKEN was not empty, adding the Authorization header"
-          pure $ insertHeader HdrAuthorization (T.unpack (T.pack "Bearer " <> (T.pack xuat'))) og
-      pure h
+      traceM "X-USER-ACCESS-TOKEN was present, but Authorization was not, adding the Authorization header"
+      pure xuat
     | otherwise -> do
       traceM "Neither Authorization or X-USER-ACCESS-TOKEN were present, adding the Authorization header"
       goodJwt <- vaulty vc
-      let h = insertHeader HdrAuthorization (T.unpack (T.pack "Bearer " <> accessToken goodJwt)) og
-      pure h
-
-  let modReq = setHeaders rev h
-
-  -- let headers = W.requestHeaders rev
-  --     modReq = case h of
-  --       Nothing    -> rev
-  --       Just auth' -> rev { W.requestHeaders = auth':headers }
+      let uth = (TH.hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 (accessToken goodJwt)))
+      pure uth
+  traceM "Filtering out the old headers, targetting the X-USER-ACCESS-TOKEN and Authorization headers"
+  let headers = W.requestHeaders rev
+      filteredHeaders = filter (\(a,_) -> a /= "X-USER-ACCESS-TOKEN" && a /= "Authorization") headers
+  traceM "Adding the new headers to the request"
+  let modReq = case h of
+        Nothing    -> rev
+        Just auth' -> rev { W.requestHeaders = auth':filteredHeaders }
   traceM "Here are the raw headers: "
-  traceM $ show $ getHeaders modReq
-  traceM "Here is the raw request: "
-  traceM $ show modReq
-  
+  traceM $ show (W.requestHeaders modReq)
   pure modReq
+
+checkXuat :: Request -> VaultConnection -> IO (Maybe Header)
+checkXuat rev vc = do
+  traceM "Inspecting the headers given to the vault-proxy"
+  case (lookup "referer" $ W.requestHeaders rev) of
+    Just b -> do
+      traceM "X-USER-ACCESS-TOKEN was present, converting it into an authorization header"
+      newB <- case b of
+        "" -> do
+          traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
+          goodJwt <- vaulty vc
+          pure (TE.encodeUtf8 (accessToken goodJwt))
+        _ -> do
+          traceM "X-USER-ACCESS-TOKEN was not empty, using it"
+          pure b
+      let newXuat = (TH.hAuthorization,) . (bearerBS <>) <$> Just newB
+      pure newXuat
+    Nothing -> do
+      traceM "X-USER-ACCESS-TOKEN was not present"
+      pure Nothing
+
+checkAuth :: Request -> VaultConnection -> IO (Maybe Header)
+checkAuth rev vc = do
+  traceM "Inspecting the headers given to the vault-proxy"
+  case (lookup "Authorization" $ W.requestHeaders rev) of
+    Just auth -> do
+      traceM "Authorization header was already present"
+      newA <- case auth of
+        "" -> do
+          traceM "X-USER-ACCESS-TOKEN was empty, getting a new one"
+          goodJwt <- vaulty vc
+          pure (TE.encodeUtf8 (accessToken goodJwt))
+        _ -> do
+          traceM "X-USER-ACCESS-TOKEN was not empty, using it"
+          pure auth
+      let newAuth = (TH.hAuthorization,) . (bearerBS <>) <$> Just newA
+      pure newAuth
+    Nothing -> do
+      traceM "Authorization header was not present"
+      pure Nothing
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
