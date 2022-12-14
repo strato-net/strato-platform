@@ -18,7 +18,6 @@ dependencies:
 - base
 - blockapps-vault-proxy-api
 - bytestring
-- case-insensitive
 - common-log
 - lens
 - postgresql-simple
