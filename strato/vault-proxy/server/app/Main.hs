@@ -11,9 +11,10 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.ByteString                        as B hiding (putStrLn, map)
+import           Data.ByteString                        as B hiding (putStrLn, map, filter)
 import qualified Data.Cache                             as Cache
-import           Data.Text                              as T hiding (unlines, map)   
+-- import qualified Data.CaseInsensitive                   as CI
+import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
@@ -21,8 +22,9 @@ import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
-import           Network.HTTP.Types.Header             (hAuthorization, RequestHeaders)
-import           Network.HTTP.Headers                  as H   
+import           Network.HTTP.Types.Header              as TH
+-- import           Network.HTTP.Types                     as TH1    
+-- import           Network.HTTP.Headers                  as H   
 import           Network.Wai.Handler.Warp              (run)
 import           Network.Wai                           as W
 import           System.IO                              (BufferMode (..),
@@ -94,96 +96,69 @@ main = do
 
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
-  --get the JWT information
-  traceM "Getting the JWT information"
-  jwt <- vaulty vc
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the original request incoming to the vault-proxy:" 
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show rev ---Can remove in production
+
   --get the foreign vault information
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
-      goodJwt = accessToken jwt
-      --get the old headers
-      headers = W.requestHeaders rev
   --Check and review the headers that were added
-  traceM "Checking if the request contains the X-USER-ACCESS-TOKEN header"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the request contains the X-USER-ACCESS-TOKEN header"
   modReq <- checkHeaders rev vc
-  traceM "Changing the request to the foreign vault."
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Changing the request to the foreign vault."
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the modified request: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show modReq
   pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
-  traceM "Inspecting the headers given to the vault-proxy"
-  xuat <- checkXuat rev
-  authy <- checkAuth rev vc
-  traceM "Fixing the headers"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the headers given to the vault-proxy"
+  xuat <- checkXuat rev vc
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Fixing the headers"
   h <- if
-    | (authy /= Nothing && xuat /= Nothing) -> do
-      traceM "Authorization was present, but X-USER-ACCESS-TOKEN was not, returning the original headers"
-      pure authy
-    | (xuat /= Nothing && authy == Nothing) -> do 
-      traceM "X-USER-ACCESS-TOKEN was present, but Authorization was not, adding the Authorization header"
+    | (xuat /= Nothing) -> do 
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was present"
       pure xuat
     | otherwise -> do
-      traceM "Neither Authorization or X-USER-ACCESS-TOKEN were present, adding the Authorization header"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present, adding the Authorization header"
       goodJwt <- vaulty vc
-      let uth = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 (accessToken goodJwt)))
-      goodAuth <- case uth of 
-        Nothing -> error "There was no good authorization"
-        Just val -> return val
-      goodAuth
-  traceM "changing the headers."
-  headers <- W.requestHeaders rev
+      let uth = (TH.hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 (accessToken goodJwt)))
+      pure uth
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Filtering out the old headers, will remove old X-USER-ACCESS-TOKEN and Authorization headers"
+  let headers = W.requestHeaders rev
+      filteredHeaders = filter (\(a,_) -> a /= "X-USER-ACCESS-TOKEN" && a /= "Authorization") headers
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Adding the new headers to the request"
   let modReq = case h of
         Nothing    -> rev
-        Just auth' -> rev { W.requestHeaders = auth':headers }
-  traceM "Here are the raw headers: "
-  traceM $ show (W.requestHeaders rev)
+        Just auth' -> rev { W.requestHeaders = auth':filteredHeaders }
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here are the raw headers: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show (W.requestHeaders modReq)
   pure modReq
 
-checkXuat :: Request -> IO (Maybe Header)
-checkXuat rev = do
-  traceM "Inspecting the headers given to the vault-proxy"
-  case (lookup "referer" $ W.requestHeaders rev) of
-    Just (a,b) -> do
-      traceM "X-USER-ACCESS-TOKEN was present, converting it into an authorization header"
-      let newXuat = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 b))
+checkXuat :: Request -> VaultConnection -> IO (Maybe Header)
+checkXuat rev vc = do
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if X-USER-ACCESS-TOKEN is in the list of headers in the request."
+  case (lookup "X-USER-ACCESS-TOKEN" $ W.requestHeaders rev) of
+    Just b -> do
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN is present"
+      newB <- case b of
+        "" -> do
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN is empty, will get a new token"
+          goodJwt <- vaulty vc
+          pure (TE.encodeUtf8 (accessToken goodJwt))
+        _ -> do
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not empty, using it instead of using the cache"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show b
+          pure b
+      let newXuat = (TH.hAuthorization,) . (bearerBS <>) <$> Just newB
       pure newXuat
     Nothing -> do
-      traceM "X-USER-ACCESS-TOKEN was not present"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present"
       pure Nothing
 
-checkAuth :: Request -> VaultConnection -> IO (Maybe Header)
-checkAuth hd vc = do
-  traceM "Inspecting the headers given to the vault-proxy"
-  case (map (lookup "Authorization") hd) of
-    Just (_,auth) -> do
-      traceM "Authorization header was already present"
-      newAuth <- checkValidAuth auth vc
-      pure auth
-    Nothing -> do
-      traceM "Authorization header was not present"
-      pure Nothing
-
-checkValidAuth :: Header -> VaultConnection -> IO Header
-checkValidAuth auth vc = do
-  traceM "Inspecting the Authorization header given to the vault-proxy"
-  (headName,postfix) <- auth
-  case (postfix == Nothing) of
-    True -> do
-      traceM "Authorization had something in it, so I am going to assume it is valid"
-      pure auth
-    False -> do
-      traceM "Nothing was present in the Authorization, so I am replacing the header with a new one"
-      goodJwt <- vaulty vc
-      let h = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 $ accessToken goodJwt))
-      hh <- case h of
-        Nothing -> do
-          traceM "There was an error with the adding the new Authorization header, just returning the old one"
-          pure auth
-        Just h' -> h'
-      pure hh
--- authHeader :: B.ByteString -> Header
--- authHeader jwt = (hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 jwt))
+vaultProxyDebug :: Applicative f => Int -> String -> f()
+vaultProxyDebug debug msg  = when (debug == 1) $ traceM msg
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "

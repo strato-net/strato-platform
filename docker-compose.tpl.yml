@@ -147,6 +147,7 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - VAULT_URL=${VAULT_URL}
+    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
