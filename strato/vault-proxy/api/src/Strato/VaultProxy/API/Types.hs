@@ -27,7 +27,6 @@ import qualified Data.Text                    as T
 import           Data.Swagger
 -- import           Data.Swagger.Internal.Schema (named)
 
--- import           GHC.Conc
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Address

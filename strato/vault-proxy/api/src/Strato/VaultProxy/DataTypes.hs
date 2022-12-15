@@ -1,48 +1,37 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
-    RawOauth(..),
-    accessToken,
-    expiresIn,
-    refreshExpiresIn,
-    refreshToken,
-    tokenType,
-    notBeforePolicy,
-    sessionState,
-    scone
-  ) where
+    RawOauth(..)
+    -- accessToken,
+    -- expiresIn,
+    -- refreshExpiresIn,
+    -- refreshToken,
+    -- tokenType,
+    -- notBeforePolicy,
+    -- sessionState,
+    -- sconce
+) where
 
-import           Control.Lens
-import           GHC.Generics
+-- import           Control.Lens
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
--- import           GHC.Conc
 import           Network.HTTP.Client
 
 --This is the received information from the OpenId Connect response
--- data Stupid = Stupid {
---     _stupid :: T.Text
--- } deriving (Eq, Show, Generic)
--- makeLenses ''Stupid
-
 data VaultToken = VaultToken {
-    _accessToken :: T.Text,
-    _expiresIn :: Integer,
-    _refreshExpiresIn :: Integer,
-    _refreshToken :: T.Text,
-    _tokenType :: T.Text,
-    _notBeforePolicy :: Integer,
-    _sessionState :: T.Text,
-    _scone :: T.Text
-  } deriving (Eq, Show, Generic)
-makeLenses ''VaultToken
+    accessToken :: T.Text,
+    expiresIn :: Integer,
+    refreshExpiresIn :: Integer,
+    refreshToken :: T.Text,
+    tokenType :: T.Text,
+    notBeforePolicy :: Integer,
+    sessionState :: T.Text,
+    scone :: T.Text
+} deriving (Eq, Show)
+-- makeLenses ''VaultToken
 
 instance FromJSON VaultToken where
   parseJSON (Object o) = do

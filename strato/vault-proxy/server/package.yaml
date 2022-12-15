@@ -24,7 +24,6 @@ dependencies:
 - text
 - http-conduit
 - HTTP
-- lens
 - monad-logger
 - servant-client
 - servant-client-core
@@ -48,6 +47,7 @@ library:
     - exceptions
     - http-client
     - jwt
+    - lens
     - modern-uri
     - monad-alter
     - monad-control

@@ -16,7 +16,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base
-  - lens
 
 ghc-options: -Wall -Werror -threaded
 
@@ -31,6 +30,7 @@ library:
   - cryptonite
   - http-client
   - labeled-error
+  - lens
   - saltine
   - scientific
   - servant
