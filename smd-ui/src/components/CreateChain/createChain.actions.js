@@ -12,6 +12,7 @@ export const COMPILE_CHAIN_CONTRACT_REQUEST = "COMPILE_CHAIN_CONTRACT_REQUEST";
 export const COMPILE_CHAIN_CONTRACT_SUCCESS = "COMPILE_CHAIN_CONTRACT_SUCCESS";
 export const COMPILE_CHAIN_CONTRACT_FAILURE = "COMPILE_CHAIN_CONTRACT_FAILURE";
 export const RESET_CONTRACT = "RESET_CONTRACT";
+export const CONTRACT_NAME_CHANGE = "CONTRACT_NAME_CHANGE";
 
 export const openCreateChainOverlay = function () {
   return {
@@ -123,5 +124,12 @@ export const compileChainContractFailure = function (error) {
 export const resetContract = function () {
   return {
     type: RESET_CONTRACT
+  }
+}
+
+export const contractNameChange = function(contractName) {
+  return {
+    type: CONTRACT_NAME_CHANGE,
+    contractName
   }
 }

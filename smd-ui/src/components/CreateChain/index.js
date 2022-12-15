@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract, resetContract } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract, resetContract, contractNameChange } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -167,12 +167,12 @@ class CreateChain extends Component {
             <div className="col-sm-1"></div>
             <div className="col-sm-9">
               <span>{member.orgName
-                       ? member.orgUnit
-                         ? member.commonName
-                           ? `${member.access ? 'Include' : 'Exclude'} ${member.commonName} from ${member.orgUnit} at ${member.orgName}`
-                           : `${member.access ? 'Include' : 'Exclude'} everyone from ${member.orgUnit} at ${member.orgName}`
-                         : `${member.access ? 'Include' : 'Exclude'} everyone at ${member.orgName}`
-                       : `${member.access ? 'Include' : 'Exclude'} everyone`
+                ? member.orgUnit
+                  ? member.commonName
+                    ? `${member.access ? 'Include' : 'Exclude'} ${member.commonName} from ${member.orgUnit} at ${member.orgName}`
+                    : `${member.access ? 'Include' : 'Exclude'} everyone from ${member.orgUnit} at ${member.orgName}`
+                  : `${member.access ? 'Include' : 'Exclude'} everyone at ${member.orgName}`
+                : `${member.access ? 'Include' : 'Exclude'} everyone`
               }</span>
             </div>
             <div className="col-sm-2">
@@ -306,7 +306,7 @@ class CreateChain extends Component {
   compilation() {
     const src = this.props.abi && this.props.abi.src;
     const contractname = this.props.contractName;
-    
+
     if (src) {
       let contract = src[contractname];
       let count = 0;
@@ -369,7 +369,14 @@ class CreateChain extends Component {
     }
   }
 
+  handleContractNameChange = (e) => {
+    this.props.contractNameChange(e.target.value);
+  }
+
   render() {
+    const contracts = this.props.abi ? Object.keys(this.props.abi.src) : [];
+    console.log(contracts);
+
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
@@ -405,7 +412,7 @@ class CreateChain extends Component {
                     className="pt-input form-width"
                     tabIndex="1"
                     required
-                    />
+                  />
                   <span className="error-text">{this.errorMessageFor('chainName')}</span>
                 </div>
               </div>
@@ -434,7 +441,7 @@ class CreateChain extends Component {
                         this.findGovernanceContractSrc('AutoApprove');
                       }
                     }
-                    /> AutoApprove
+                  /> AutoApprove
                 </div>
               </div>
               <div className="row">
@@ -457,7 +464,7 @@ class CreateChain extends Component {
                         this.findGovernanceContractSrc('TwoIn');
                       }
                     }
-                    /> TwoIn
+                  /> TwoIn
                 </div>
               </div>
               <div className="row">
@@ -480,7 +487,7 @@ class CreateChain extends Component {
                         this.findGovernanceContractSrc('MajorityRules');
                       }
                     }
-                    /> MajorityRules
+                  /> MajorityRules
                 </div>
               </div>
               <div className="row">
@@ -503,7 +510,7 @@ class CreateChain extends Component {
                         this.findGovernanceContractSrc('AdminOnly');
                       }
                     }
-                    /> AdminOnly
+                  /> AdminOnly
                 </div>
               </div>
               <div className="row">
@@ -526,7 +533,7 @@ class CreateChain extends Component {
                         this.handleContractFile(this.state.droppedFileName);
                       }
                     }
-                    /> Upload file
+                  /> Upload file
                 </div>
               </div>
               <div className="row">
@@ -534,11 +541,11 @@ class CreateChain extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   {this.state.form.contractSelected === 'Governance' &&
                     <Field
-                    id="input-b"
-                    name="contract"
-                    component={this.renderDropzoneInput}
-                    dir="auto"
-                    title="Contract Source"
+                      id="input-b"
+                      name="contract"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Contract Source"
                     />
                   }
                 </div>
@@ -556,15 +563,40 @@ class CreateChain extends Component {
                       component="select"
                       name="vm"
                       onChange={(e) => {
-                        this.setState({vm: e.target.value === "SolidVM"})
+                        this.setState({ vm: e.target.value === "SolidVM" })
                       }}
-                      >
+                    >
                       <option key={0} value="SolidVM">SolidVM</option>
                       <option key={1} value="EVM">EVM</option>
                     </Field>
-                    </div>
+                  </div>
                 </div>
               </div>
+              {contracts.length > 0 && <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Contracts
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-select"
+                      component="select"
+                      name="contractName"
+                      onChange={this.handleContractNameChange}
+                    >
+                      {
+                        contracts.map((value, index) => {
+                          return (
+                            <option key={value} value={value}>{value}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
+                </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -592,7 +624,7 @@ class CreateChain extends Component {
                   </label>
                   {this.showMembers(this.state.members)}
                   <span className="error-text">{this.errorMessageFor('members')}</span>
-                  <AddMember handler={this.updateMembers} publicKey={this.props.publicKey}/>
+                  <AddMember handler={this.updateMembers} publicKey={this.props.publicKey} />
                 </div>
               </div>
               
@@ -641,7 +673,7 @@ export function mapStateToProps(state) {
     createErrorMessage: state.createChain.error,
     abi: state.createChain.abi,
     contractName: state.createChain.contractName,
-    publicKey : state.user.publicKey
+    publicKey: state.user.publicKey,
   };
 }
 
@@ -655,7 +687,8 @@ const connected = connect(
     resetError,
     compileChainContract,
     resetContract,
-    fetchUserPubkey
+    fetchUserPubkey,
+    contractNameChange
   }
 )(formed);
 
