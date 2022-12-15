@@ -46,7 +46,9 @@ pipeline {
               INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \
               INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \
               INITIAL_OAUTH_JWT_USERNAME_PROPERTY='sub' \
-              docker-compose -p vault -f docker-compose.vault.yml up -d                             # TODO: The password is being set as part of strato deployment, not Vault. Fix. Or remove the password from Vault ¯\\_(ツ)_/¯
+              docker-compose -p vault -f docker-compose.vault.yml up -d
+            sleep 3
+            PASSWORD=123 ./strato --set-vault-password
             
             export NODE_HOST=$(</host)
             export genesis=smokeTest
@@ -80,7 +82,6 @@ pipeline {
             echo "Restarting docker containers to simulate computer restart..."
             docker-compose -p strato --log-level ERROR stop
             docker-compose -p strato --log-level ERROR start
-            PASSWORD=${PASSWORD} ./strato --set-password
             check_availability
           '''
       }
