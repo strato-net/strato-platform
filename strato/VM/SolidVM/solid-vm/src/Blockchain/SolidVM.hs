@@ -94,7 +94,7 @@ import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
 import           BlockApps.X509.Certificate
 import           BlockApps.X509.Keys
--- import           BlockApps.Logging
+import           BlockApps.Logging
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -231,6 +231,8 @@ solidVMBreakpoint ann = do
 requireOriginCert :: MonadSM m => Account -> m ()
 requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
   originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress)
+  $logInfoS "LOGGING: acct ^. accountAddress " . T.pack $ (show $  acct ^. accountAddress)
+  $logInfoS "LOGGING: fromPublicKey rootPubKey " . T.pack $ (show  (fromPublicKey rootPubKey))
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
 create :: SolidVMBase m
