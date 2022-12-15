@@ -54,7 +54,7 @@ data ChainInput  = ChainInput
   , chaininputBalances :: NamedMap "address" "balance" Address Integer
   , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: ChainMembers
-  , chaininputParentChain :: Maybe Word256
+  , chaininputParentChains :: Map Text Word256
   , chaininputMetadata :: Maybe (Map Text Text)
   , chaininputAsync    :: Maybe Bool
   } deriving (Eq, Show, Generic)
@@ -82,7 +82,11 @@ instance FromJSON ChainInput where
       <*> (o .: "balances")
       <*> (o .: "args")
       <*> (o .: "members")
-      <*> (o .:? "parentChain")
+      <*> (do
+            pc <- o .:? "parentChain"
+            mPcs <- o .:? "parentChains"
+            pure $ fromMaybe Map.empty mPcs <> maybe Map.empty (Map.singleton "parent") pc
+          )
       <*> (o .:? "metadata")
       <*> (o .:? "async")
   parseJSON o = fail $ "parseJSON ChainInput: Expected Object, got " ++ show o
@@ -142,7 +146,7 @@ exChainInput = ChainInput
        , ("removeRule", ArgString "AUTO_APPROVE")
        ]
     , chaininputMembers = ChainMembers (S.fromList [exampleChainMember1, exampleChainMember2, exampleChainMember3, exampleChainMember4, exampleChainMember5, exampleChainMember6])
-    , chaininputParentChain = Nothing
+    , chaininputParentChains = Map.empty
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
     , chaininputAsync = Nothing
     }

@@ -36,7 +36,7 @@ import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
-import           Blockchain.Data.ChainInfo          (ParentChainId, isAncestorChainOf)
+import           Blockchain.Data.ChainInfo          (ParentChainIds, isAncestorChainOf)
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Strato.Model.Account
@@ -103,7 +103,7 @@ instance RLPSerializable AddressState where
     resolveCodePtr fails when there is a circular reference of code pointers on the same chain
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
-resolveCodePtr' :: ( Selectable (Maybe Word256) ParentChainId m
+resolveCodePtr' :: ( Selectable Word256 ParentChainIds m
                   , (Account `Alters` AddressState) m
                   )
                => Set.Set CodePtr -> Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
@@ -121,7 +121,7 @@ resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
         else pure Nothing
 resolveCodePtr' _ cid cp = resolveCodePtr cid cp
    
-resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
+resolveCodePtr :: ( Selectable Word256 ParentChainIds m
                   , (Account `Alters` AddressState) m
                   )
                => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
@@ -149,7 +149,7 @@ unsafeResolveCodePtrSelect (CodeAtAccount acct name) = select Proxy acct >>= \ca
     _ -> pure Nothing
 unsafeResolveCodePtrSelect codePtr = pure $ Just codePtr
 
-resolveCodePtrParent :: ( Selectable (Maybe Word256) ParentChainId m
+resolveCodePtrParent :: ( Selectable Word256 ParentChainIds m
                         , (Account `Alters` AddressState) m
                         )
                         => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
@@ -169,7 +169,7 @@ unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
     _ -> pure Nothing
 unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
 
-codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
+codePtrToSHA :: ( Selectable Word256 ParentChainIds m
                 , (Account `Alters` AddressState) m
                 )
              => Maybe Word256 -> CodePtr -> m (Maybe Keccak256)
@@ -183,7 +183,7 @@ resolvedCodePtrToSHA (EVMCode hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
-codePtrToCodeKind :: ( Selectable (Maybe Word256) ParentChainId m
+codePtrToCodeKind :: ( Selectable Word256 ParentChainIds m
                      , (Account `Alters` AddressState) m
                      )
                   => Maybe Word256 -> CodePtr -> m CodeKind
@@ -197,7 +197,7 @@ unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
 
 
-getAppAccount :: ( Selectable (Maybe Word256) ParentChainId m
+getAppAccount :: ( Selectable Word256 ParentChainIds m
                  , (Account `Alters` AddressState) m
                  )
               => Maybe Word256 -> Account -> m (Maybe Account)

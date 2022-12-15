@@ -13,9 +13,11 @@ export const RESET_INITIAL_LABLE = 'RESET_INITIAL_LABLE';
 export const GET_LABEL_IDS = 'GET_LABEL_IDS';
 export const SELECT_CHAIN = 'SELECT_CHAIN';
 
-export const fetchChains = function () {
+export const fetchChains = function (limit, offset) {
   return {
-    type: FETCH_CHAINS_REQUEST
+    type: FETCH_CHAINS_REQUEST,
+    limit,
+    offset
   }
 };
 

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: strato-platform
+  name: strato
 spec:
   replicas: 1
   strategy:
@@ -180,11 +180,14 @@ spec:
           value: "8050"
         - name: VAULT_WRAPPER_HOST
           value: "localhost:8000"
-      - image: wurstmeister/zookeeper:3.4.6
+      - image: zookeeper:3.4.14
         name: zookeeper
         volumeMounts:
-          - mountPath: /opt/zookeeper-3.4.6/data
+          - mountPath: /data
             name: zookeeper-data
+        env:
+        - name: ZOO_DATA_LOG_DIR:
+          value: "/data"
       - image: wurstmeister/kafka:1.1.0
         name: kafka
         env:
