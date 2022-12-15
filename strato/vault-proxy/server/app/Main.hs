@@ -121,11 +121,11 @@ checkHeaders rev vc = do
       vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was present"
       pure xuat
     | otherwise -> do
-      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present, adding the Authorization header"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN were present, adding the Authorization header"
       goodJwt <- vaulty vc
       let uth = (TH.hAuthorization,) . (bearerBS <>) <$> (Just (TE.encodeUtf8 (accessToken goodJwt)))
       pure uth
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Filtering out the old headers, will remove old X-USER-ACCESS-TOKEN and Authorization headers"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Filtering out the old headers, targetting the X-USER-ACCESS-TOKEN and Authorization headers"
   let headers = W.requestHeaders rev
       filteredHeaders = filter (\(a,_) -> a /= "X-USER-ACCESS-TOKEN" && a /= "Authorization") headers
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Adding the new headers to the request"
@@ -138,17 +138,17 @@ checkHeaders rev vc = do
 
 checkXuat :: Request -> VaultConnection -> IO (Maybe Header)
 checkXuat rev vc = do
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if X-USER-ACCESS-TOKEN is in the list of headers in the request."
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the headers given to the vault-proxy"
   case (lookup "X-USER-ACCESS-TOKEN" $ W.requestHeaders rev) of
     Just b -> do
-      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN is present"
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was present, converting it into an authorization header"
       newB <- case b of
         "" -> do
-          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN is empty, will get a new token"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was empty, getting a new one"
           goodJwt <- vaulty vc
           pure (TE.encodeUtf8 (accessToken goodJwt))
         _ -> do
-          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not empty, using it instead of using the cache"
+          vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not empty, using it"
           vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show b
           pure b
       let newXuat = (TH.hAuthorization,) . (bearerBS <>) <$> Just newB
