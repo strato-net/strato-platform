@@ -19,7 +19,6 @@ dependencies:
 - blockapps-vault-proxy-api
 - bytestring
 - common-log
-- concurrency
 - lens
 - postgresql-simple
 - text
