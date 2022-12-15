@@ -18,6 +18,7 @@ import blockDataReducer from './components/BlockData/block-data.reducer'
 import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
+import deployDappReducer from './components/DeployDapp/deployDapp.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
@@ -40,6 +41,7 @@ import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
+import watchDeployDapp from './components/DeployDapp/deployDapp.saga';
 import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
@@ -84,6 +86,7 @@ const rootReducer = combineReducers({
   contracts: contractsReducer,
   contractQuery: contractQueryReducer,
   createContract: createContractReducer,
+  deployDapp: deployDappReducer,
   methodCall: methodCallReducer,
   node: nodeCardReducer,
   transactions: transactionsReducer,
@@ -111,6 +114,7 @@ const rootSaga = function* startForeman() {
     fork(watchFetchAccounts),
     fork(watchCompileSourceFromEditor),
     fork(watchCreateContract),
+    fork(watchDeployDapp),
     fork(watchFetchContracts),
     fork(watchCompileContract),
     fork(watchFetchState),

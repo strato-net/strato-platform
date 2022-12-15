@@ -42,6 +42,7 @@ import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Data.Bool                     (bool)
 import           Data.Foldable                 (foldrM, for_)
+import qualified Data.Map.Strict               as M
 import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Sequence                 as Q
@@ -59,7 +60,7 @@ type HasPrivacyRegistries m = ( (Keccak256 `Alters` OutputBlock) m
                               , (Keccak256 `Alters` OutputTx) m
                               , (Keccak256 `Alters` ChainHashEntry) m
                               , (Word256 `Alters` ChainIdEntry) m
-                              , Selectable (Maybe Word256) ParentChainId m
+                              , Selectable Word256 ParentChainIds m
                               )
 
 type HasFullPrivacy m = ( HasPrivacyRegistries m
@@ -300,24 +301,35 @@ runBlocks chainId = go Nothing
                     blocksToRun %= S.delete b0
                   (b:) <$> go (Just b0)
 
-hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m
-                     => Maybe Word256 -> m Bool
-hasAllAncestorChains = go
-  where
-    go Nothing = pure True
-    go (Just chainId) = do
-      mmParent <- join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
-      maybe (pure False) go mmParent
+hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m => Maybe Word256 -> m Bool
+hasAllAncestorChains Nothing = pure True
+hasAllAncestorChains (Just cid) = fst <$> go S.empty cid
+  where go seen descendent =
+          if descendent `S.member` seen
+            then pure (True, seen)
+            else lookup (Proxy @ChainIdEntry) descendent >>= \case
+              Nothing -> pure (False, seen)
+              Just cie -> case cie ^. chainIdInfo of
+                Nothing -> pure (False, seen)
+                Just cInfo ->
+                  let parents = M.elems . parentChains $ chainInfo cInfo
+                      newSeen = seen <> S.singleton descendent
+                   in foldrM (maybeDo go) (True, newSeen) parents
+        maybeDo _ _ (False, seen') = pure (False, seen')
+        maybeDo f a (_,     seen') = f seen' a
 
 traverseAncestorChains :: (Word256 `Alters` ChainIdEntry) m
                        => (Word256 -> m a) -> Word256 -> m [a]
-traverseAncestorChains action cId = go (Just cId)
+traverseAncestorChains action cId = snd <$> go cId (S.empty, [])
   where
-    go Nothing = pure []
-    go (Just chainId) = do
-      a <- action chainId
-      mmParent <- join . join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
-      (a:) <$> go mmParent
+    go chainId (seen, as) =
+      if chainId `S.member` seen
+        then pure (seen, as)
+        else do
+          a <- action chainId
+          parents <- fromMaybe [] . join . fmap (fmap (M.elems . parentChains . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+          let newSeen = seen <> S.singleton chainId
+           in fmap (a:) <$> foldrM go (newSeen, as) parents
 
 forAncestorChains :: (Word256 `Alters` ChainIdEntry) m
                   => Word256 -> (Word256 -> m a) -> m [a]

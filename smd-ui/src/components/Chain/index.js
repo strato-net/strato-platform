@@ -17,9 +17,9 @@ class Chain extends Component {
   showMembers(chain) {
     if (chain && chain.info && chain.info.members && chain.info.members.length > 0) { 
       const members = chain.info.members;
-      return members.map((member) => {
+      return members.map((member, index) => {
           return (
-            <tr>
+            <tr key={index}>
               <td>{member.orgName}</td>
               <td>{member.orgUnit}</td>
               <td>{member.commonName}</td>
