@@ -377,7 +377,7 @@ contract CertificateRegistry {
     string rootCert;
 
     constructor() {
-        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+        require(account(this, "self").chainId == "", "You must post this contract on the main chain!");
 
         initialized = false;
         rootCert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBIMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtFbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQyMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEUMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
@@ -3738,10 +3738,10 @@ contract qq {
   account a2;
   account a3;
   account a4;
-  uint cid1;
-  uint cid2;
-  uint cid3;
-  uint cid4;
+  string cid1;
+  string cid2;
+  string cid3;
+  string cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");    
@@ -3761,11 +3761,11 @@ contract qq {
   it "can get the chainId directly from the account constructor" . runTest $ do
     runBS [r|
 contract qq {
-  uint a1;
-  uint a2;
-  uint a3;
-  uint a4;
-  uint a5;
+  string a1;
+  string a2;
+  string a3;
+  string a4;
+  string a5;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
     a2 = account(0x123, "main").chainId;
@@ -6787,10 +6787,13 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
 
-  fit "can return chainId in a simple manner" . runTest $ do
+  it "can return chainId in a simple manner" . runTest $ do
     runBS [r|
 contract qq {
-  uint x = this.chainId ;
+  string x;
+  constructor() {
+    x = this.chainId;
+  }
 }
 |] 
     getFields ["x"] `shouldReturn` [BDefault]

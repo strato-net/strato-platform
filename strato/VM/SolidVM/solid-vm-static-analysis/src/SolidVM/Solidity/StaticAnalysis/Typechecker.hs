@@ -620,7 +620,7 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                          []
                ]
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of

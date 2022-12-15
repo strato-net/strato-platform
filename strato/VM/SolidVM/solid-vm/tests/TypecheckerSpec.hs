@@ -645,11 +645,11 @@ contract qq {
     let anns = runTypechecker [r|
 
 contract qq {
-  uint a1;
-  uint a2;
-  uint a3;
-  uint a4;
-  uint a5;
+  string a1;
+  string a2;
+  string a3;
+  string a4;
+  string a5;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
     a2 = account(0x123, "main").chainId;
