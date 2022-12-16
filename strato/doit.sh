@@ -48,23 +48,27 @@ function newnode {
   # if alternative log in methods are provided then use them
   mkdir -p logs
   
-VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
-VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
+  VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
+  VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
 
 
-if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
-  echo "Could not obtain OAUTH parameters for Vault Proxy"
-  exit 2
+  if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
+    echo "Could not obtain OAUTH parameters for Vault Proxy"
+    exit 2
+
+  [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
   runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${VPACI} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${VPACS} --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS} --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013  &>> logs/vault-proxy
+    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
+    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
 
-  echo 'Waiting for vault-proxy to be available...'
+  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
+  set +x
   until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
     sleep 0.1
   done
+  set -x
   echo 'vault-proxy is available'
 
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
@@ -380,6 +384,8 @@ function runBackgroundProcess {
   disown %
 }
 
+# If variable with name <arg 1> does not have non-empty value, set it to <arg 2>
+# setEnv (var_name, default_value)
 function setEnv {
   [[ -n ${!1} ]] || eval $1=$2
   echo "$1 = ${!1}"
@@ -438,6 +444,7 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
+setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 

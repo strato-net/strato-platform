@@ -5,10 +5,6 @@ author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
-extra-source-files:
-- README.md
-- ChangeLog.md
-
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -23,10 +19,13 @@ dependencies:
 - blockapps-vault-proxy-api
 - bytestring
 - common-log
+- concurrent-extra
 - lens
 - postgresql-simple
 - text
+- hflags
 - http-conduit
+- HTTP
 - monad-logger
 - servant-client
 - servant-client-core

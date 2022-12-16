@@ -170,7 +170,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` BlockSummary) m
                  , HasSelectX509CertDB m
                  , HasSelectX509FieldDB m
-                 , A.Selectable (Maybe Word256) ParentChainId m
+                 , A.Selectable Word256 ParentChainIds m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
@@ -239,7 +239,7 @@ instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
-instance A.Selectable (Maybe Word256) ParentChainId m => A.Selectable (Maybe Word256) ParentChainId (SM m) where
+instance A.Selectable Word256 ParentChainIds m => A.Selectable Word256 ParentChainIds (SM m) where
   select p = lift . A.select p
 
 instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where

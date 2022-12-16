@@ -15,7 +15,7 @@ import           Strato.Strato23.API.Types
 
 
 type GetUsers = "users"
-              :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+              :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
               :> QueryParam "address" Address
               :> QueryParam "limit" Int
               :> QueryParam "offset" Int

@@ -151,12 +151,12 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m)
   sign msg = do
     vc <- asks vaultClient
     $logInfoS "HasVault" "asking vault-proxy for a message signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash msg)) vc
+    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash msg)) vc
 
   getPub = do
     vc <- asks vaultClient
     $logInfoS "HasVault" "asking vault-proxy for the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vc
 
   getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
 

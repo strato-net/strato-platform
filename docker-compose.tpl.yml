@@ -149,6 +149,7 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - VAULT_URL=${VAULT_URL}
+    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
@@ -267,10 +268,12 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: zookeeper:3.4.14
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/opt/zookeeper-3.4.6/data
+      - zookeeperdata:/data
+    environment:
+      ZOO_DATA_LOG_DIR: /data
     logging:
       driver: "json-file"
       options:

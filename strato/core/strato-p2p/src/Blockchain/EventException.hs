@@ -11,7 +11,7 @@ data EventException =
     PeerDisconnected
   | EventBeforeHandshake Message
   | WrongGenesisBlock
-  | NetworkIDMismatch Integer Integer
+  | NetworkIDMismatch
   | RootCertificateMismatch
   | NoPeerPubKey deriving (Show)
 

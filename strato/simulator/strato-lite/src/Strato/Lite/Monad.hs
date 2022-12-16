@@ -503,10 +503,8 @@ instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest
   insert _ k v = sequencerContext . dbeRegistry . at k ?= v
   delete _ k = sequencerContext . dbeRegistry . at k .= Nothing
 
-instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (MonadTest m) where
-  select _ = \case
-    Nothing -> pure . Just $ ParentChainId Nothing
-    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+instance MonadIO m => A.Selectable Word256 ParentChainIds (MonadTest m) where
+  select _ cId = join . fmap (fmap (ParentChainIds . parentChains . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance MonadIO m => Mod.Modifiable SeenTransactionDB (MonadTest m) where
   get _ = use $ sequencerContext . seenTransactionDB
@@ -1466,6 +1464,12 @@ createConnection server' client' = do
 
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
+
+signChain :: PrivateKey -> UnsignedChainInfo -> ChainInfo
+signChain privKey u =
+  let (r', s', v') = getSigVals . signMsg privKey . keccak256ToByteString $ rlpHash u
+      chainSig = ChainSignature r' s' v'
+   in ChainInfo u chainSig
 
 mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
 mkSignedTx privKey utx md =

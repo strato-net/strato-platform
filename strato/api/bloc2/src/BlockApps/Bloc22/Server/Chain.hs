@@ -95,7 +95,7 @@ createChainInfo :: ( MonadIO m
                    , HasVault m
                    )
                 => Text -> Keccak256 -> ChainInput -> m ChainInfo
-createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
+createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChains mmd _) = do
   when (null (unChainMembers members)) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
@@ -153,15 +153,15 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
                            acctInfo
                            codeInfo
                            members
-                           pChain
+                           pChains
                            creationBlockHash
                            nonce
                            metaData
         )
       msgHash = keccak256ToByteString $ rlpHash unsigned
-  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  sig <- blocVaultWrapper $ postSignature (Just userName) (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
-      chainInfo = ChainInfo unsigned (Just $ ChainSignature r s v)
+      chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
 
 withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>
