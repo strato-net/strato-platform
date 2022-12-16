@@ -364,7 +364,7 @@ tyson101 = let eCert = bsToCert $ C8.pack $ unlines
                   "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
                   "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
                   "N8txKc8G9R27ZYAUuz15zF0=",
-                  "-----END CERTIFICATE-----",
+                  "-----END CERTIFICATE-----"
                 ]
             in case eCert of
               Left _ -> error "Somehow, Palpatine has returned"
@@ -392,7 +392,7 @@ tyson102 = let eCert = bsToCert $ C8.pack $ unlines
                   "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
                   "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
                   "N8txKc8G9R27ZYAUuz15zF0=",
-                  "-----END CERTIFICATE-----",
+                  "-----END CERTIFICATE-----"
                 ]
             in case eCert of
               Left _ -> error "Somehow, Palpatine has returned"
@@ -448,7 +448,7 @@ tyson104 = let eCert = bsToCert $ C8.pack $ unlines
                   "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
                   "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
                   "N8txKc8G9R27ZYAUuz15zF0=",
-                  "-----END CERTIFICATE-----",
+                  "-----END CERTIFICATE-----"
                 ]
             in case eCert of
               Left _ -> error "Somehow, Palpatine has returned"
