@@ -435,7 +435,7 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
-setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-0}
+setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
 setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
 

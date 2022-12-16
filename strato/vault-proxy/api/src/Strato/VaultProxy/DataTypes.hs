@@ -2,17 +2,10 @@ module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
     RawOauth(..)
-    -- accessToken,
-    -- expiresIn,
-    -- refreshExpiresIn,
-    -- refreshToken,
-    -- tokenType,
-    -- notBeforePolicy,
-    -- sessionState,
-    -- sconce
 ) where
 
 -- import           Control.Lens
+import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
@@ -88,7 +81,7 @@ instance FromJSON VaultToken where
 --TODO: use lenses (not important but would be nice)
 data VaultConnection = VaultConnection {
     vaultUrl :: T.Text,
-    httpManager :: Manager, --Please don't export this, not useful to the user (unless we put this not in its own executable, but then we shouldn't have this)
+    httpManager :: Manager,
     oauthUrl :: T.Text,
     oauthClientId :: T.Text,
     oauthClientSecret :: T.Text,
@@ -96,7 +89,9 @@ data VaultConnection = VaultConnection {
     vaultProxyUrl :: T.Text,
     vaultProxyPort :: Int,
     tokenCache :: Cache T.Text VaultToken,
-    additionalOauth :: RawOauth
+    additionalOauth :: RawOauth,
+    superLock :: L.Lock,
+    debuggingOn :: Bool
 }
 
 data RawOauth = RawOauth {

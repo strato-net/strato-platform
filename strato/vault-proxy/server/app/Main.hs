@@ -9,11 +9,11 @@
 
 module Main where
 
+import           Control.Concurrent.Lock                as L
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.ByteString                        as B hiding (putStrLn, map, filter)
 import qualified Data.Cache                             as Cache
--- import qualified Data.CaseInsensitive                   as CI
 import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
@@ -23,8 +23,6 @@ import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header              as TH
--- import           Network.HTTP.Types                     as TH1    
--- import           Network.HTTP.Headers                  as H   
 import           Network.Wai.Handler.Warp              (run)
 import           Network.Wai                           as W
 import           System.IO                              (BufferMode (..),
@@ -63,6 +61,9 @@ main = do
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
+  --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
+    --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
+  vaultLock <- liftIO $ L.new
   --Initialize the token cache
   tokenCash <- atomically $ Cache.newCacheSTM Nothing
   traceM "Trying to parse the oauth url"
@@ -73,8 +74,6 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
-  --get the awesome token, awesome token alters the token cash, so a result is not needed
-  _ <- liftIO $ getAwesomeToken tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
   --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
@@ -86,7 +85,9 @@ main = do
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
       tokenCache = tokenCash,
-      additionalOauth = noErrorOauth
+      additionalOauth = noErrorOauth,
+      superLock = vaultLock,
+      debuggingOn = flags_VAULT_PROXY_DEBUG
   }
   --Create the proxy server
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
@@ -156,9 +157,6 @@ checkXuat rev vc = do
     Nothing -> do
       vaultProxyDebug flags_VAULT_PROXY_DEBUG "X-USER-ACCESS-TOKEN was not present"
       pure Nothing
-
-vaultProxyDebug :: Applicative f => Int -> String -> f()
-vaultProxyDebug debug msg  = when (debug == 1) $ traceM msg
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "

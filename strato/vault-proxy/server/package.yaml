@@ -19,9 +19,11 @@ dependencies:
 - blockapps-vault-proxy-api
 - bytestring
 - common-log
+- concurrent-extra
 - lens
 - postgresql-simple
 - text
+- hflags
 - http-conduit
 - HTTP
 - monad-logger
