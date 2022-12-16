@@ -146,9 +146,9 @@ export function getOauthAccountsApi() {
     .then(handleErrors)
     .then(function (res) {
       const users = res.json();
-      users.forEach(user => {
+      for (user in users) {
         const url = cirrusUrl + user.address;
-        responses.push(
+        const certInfoResponse = 
           fetch (
             url,
             {
@@ -165,9 +165,10 @@ export function getOauthAccountsApi() {
             })
             .catch(function (error) {
               throw error;
-            })
-        )
-      });
+            });
+        responses.push(certInfoResponse);
+      }
+      return responses;
     })
     .catch(function (error) {
       throw error;

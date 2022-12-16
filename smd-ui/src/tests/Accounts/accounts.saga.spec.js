@@ -61,7 +61,7 @@ import {
   FETCH_OAUTH_ACCOUNTS_FAILURE
 } from '../../components/Accounts/accounts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
-import { accountsMock, userAddresses, error, accountDetail, getBalanceMock, oauthAccounts } from './accountsMock';
+import { accountsMock, userAddresses, error, accountDetail, getBalanceMock, oauthAccounts, oauthAccountsOld } from './accountsMock';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
 
@@ -341,7 +341,7 @@ describe('Accounts: saga', () => {
       });
 
       test('failure', (done) => {
-        fetch.mockReject('error');
+        fetch.mockReject(error);
         expectSaga(getOauthAccounts)
           .call.fn(getOauthAccountsApi).put.like({ action: { type: FETCH_OAUTH_ACCOUNTS_FAILURE } })
           .run().then((result) => { done() });
