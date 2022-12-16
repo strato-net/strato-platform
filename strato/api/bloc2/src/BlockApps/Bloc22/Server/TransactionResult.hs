@@ -353,6 +353,9 @@ functionResult i txHash txResult mmd toAccount = do
   case transactionResultMessage txResult of
     "Success!" -> do
       let r = Text.decodeUtf8 $ Base16.encode txResp
+      $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
+      $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r
+      $logInfoS "DEBUG__________________________" . Text.pack $ "mFormattedResponse" ++ show mFormattedResponse
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
     stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg

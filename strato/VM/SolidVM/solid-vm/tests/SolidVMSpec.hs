@@ -34,7 +34,7 @@ import Data.Char
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
-import Numeric
+import qualified Numeric (readHex, showHex)
 import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
@@ -1922,7 +1922,11 @@ contract qq {
     return (k, k);
   }
 }|]
-    let dec =  show $ parseHex "0123456789abcdef0123456789abcdef"
+    --let dec =  show $ Numeric.readHex "0123456789abcdef0123456789abcdef"
+    
+    let dec = case Numeric.readHex "0123456789abcdef0123456789abcdef" of
+          [(n, "")] -> show (n :: Integer)
+          _ -> error "Error parsing Hex: 0123456789abcdef0123456789abcdef"
         result = "("++dec++","++dec++")"
     er `shouldBe` Just result
 
@@ -2261,7 +2265,7 @@ contract qq {
 
   it "can return an address" . runTest $ do
     --works for address type
-    let want' = showHex (sender ^. accountAddress) ""
+    let want' = Numeric.showHex (sender ^. accountAddress) ""
         want = replicate (40 - length want') '0' ++ want' --etherum address has 40 bytes followed by 0x, short byte string has 32 bytes
     runCall' "a" "()" [r|
 contract qq {
@@ -2332,7 +2336,7 @@ contract qq {
 
   it "can return a contract" . runTest $ do
     --works for address type
-    let want' = showHex (uploadAddress ^. accountAddress) ""
+    let want' = Numeric.showHex (uploadAddress ^. accountAddress) ""
         want = replicate (40 - length want') '0' ++ want'
     runCall' "self" "()" [r|
 contract qq {
