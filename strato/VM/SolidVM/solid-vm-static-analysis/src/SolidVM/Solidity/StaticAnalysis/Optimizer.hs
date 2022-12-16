@@ -208,10 +208,9 @@ getVariableByName name = do
 
 optimizeExpression :: Expression -> SSS Expression
 optimizeExpression (Binary x "=" a b) = do
-  --a' <- optimizeExpression a
   b' <- optimizeExpression b
   pure $ Binary x "=" a b'
-  --pure $ Binary x "=" a' b'
+  --pure $ Binary x "=" a' b' ---TODO maybe for later fix
 --   case (a', b') of
 --     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
 --     (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
@@ -267,8 +266,8 @@ optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwra
             _ ->  pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
 
-
-optimizeExpression (Variable x name ) = do -- Is this really needed?
+--This needs further research before letting loose on the code base
+optimizeExpression (Variable x name ) = do 
   var <- getVariableByName name
   case var  of  _ -> pure $ (Variable x name )
   --case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
