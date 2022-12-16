@@ -32,7 +32,7 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
-import qualified Data.ByteString.Base16            as Base16
+--import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
 --import qualified Data.ByteString.Char8             as BC
 import           Data.Either
@@ -353,7 +353,7 @@ functionResult i txHash txResult mmd toAccount = do
   $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
-      let r = Text.decodeUtf8 $ Base16.encode txResp  
+      let r = Text.decodeUtf8  txResp  
       $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
       $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r
       $logInfoS "DEBUG__________________________" . Text.pack $ "mFormattedResponse" ++ show mFormattedResponse
