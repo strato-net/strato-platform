@@ -48,17 +48,13 @@ function newnode {
   # if alternative log in methods are provided then use them
   mkdir -p logs
   
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID} ]] ; then
-    VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
-  else 
-    VPACI=${OAUTH_VAULT_PROXY_CLIENT_ID}
-  fi
+VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
+VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
 
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET} ]] ; then
-    VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
-  else 
-    VPACS=${OAUTH_CLIENT_SECRET}
-  fi
+
+if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
+  echo "Could not obtain OAUTH parameters for Vault Proxy"
+  exit 2
 
   runBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${VPACI} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
