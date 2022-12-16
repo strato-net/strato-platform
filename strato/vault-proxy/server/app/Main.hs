@@ -171,5 +171,5 @@ inspectVaultUrl url = do
   if | (S.baseUrlHost purl == "172.17.0.1") -> do
         traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
         pure ()
-     | (S.baseUrlScheme purl == S.Http) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
+     | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
      | otherwise -> pure ()
