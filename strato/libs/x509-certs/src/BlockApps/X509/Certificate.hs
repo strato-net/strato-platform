@@ -23,6 +23,10 @@ module BlockApps.X509.Certificate (
   x509CertToCertInfoState,
   HasSelectX509CertDB,
   HasSelectX509FieldDB,
+  tyson101,
+  tyson102,
+  tyson103,
+  tyson104,
   rootCert,
   certToBytes,
   bsToCert,
@@ -332,6 +336,119 @@ rootCert = let eCert = bsToCert $ C8.pack $ unlines
                 , "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
                 , "N8txKc8G9R27ZYAUuz15zF0="
                 , "-----END CERTIFICATE-----"
+                ]
+            in case eCert of
+              Left _ -> error "Somehow, Palpatine has returned"
+              Right c -> c
+
+
+tyson101 :: X509Certificate
+tyson101 = let eCert = bsToCert $ C8.pack $ unlines
+                [ "-----BEGIN CERTIFICATE-----",
+                  "MIIBbzCCAROgAwIBAgIRAJqPHwnPLM0fQTINZjOob6gwDAYIKoZIzj0EAwIFADBI",
+                  "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
+                  "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMTIxNTIxMTgwMloXDTIzMTIx",
+                  "NTIxMTgwMlowKTETMBEGA1UEAwwKVHlzb24gUm9zZTESMBAGA1UECgwJQmxvY2tB",
+                  "cHBzMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEKKpo2Dny5BKQJxiyC+v9tFFAk5N4",
+                  "/IJMr3DUu1sSIk92eg5u/Lvv0R6EGqti93810Dii0MSMrWfwhb/YHXnVtzAMBggq",
+                  "hkjOPQQDAgUAA0gAMEUCIQC7NiqhCM1w3/k8LelL3nned0orx06CoinhvjqPHLKR",
+                  "UAIgDQgutk1QghDzfVpI9DvyqqyVD7XEJODDGFad89ha/0Y=",
+                  "-----END CERTIFICATE-----",
+                  "-----BEGIN CERTIFICATE-----",
+                  "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI",
+                  "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
+                  "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy",
+                  "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU",
+                  "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG",
+                  "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs",
+                  "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
+                  "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
+                  "N8txKc8G9R27ZYAUuz15zF0=",
+                  "-----END CERTIFICATE-----",
+                ]
+            in case eCert of
+              Left _ -> error "Somehow, Palpatine has returned"
+              Right c -> c
+
+tyson102 :: X509Certificate
+tyson102 = let eCert = bsToCert $ C8.pack $ unlines
+                [ "-----BEGIN CERTIFICATE-----",
+                  "MIIBbTCCARKgAwIBAgIQBt2BT225mnbMQZ+qMWV8lzAMBggqhkjOPQQDAgUAMEgx",
+                  "DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu",
+                  "Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIxMjE1MjEyMDM5WhcNMjMxMjE1",
+                  "MjEyMDM5WjApMRMwEQYDVQQDDApUeXNvbiBSb3NlMRIwEAYDVQQKDAlNaWNyb3Nv",
+                  "ZnQwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARPpEPnlVeDm2teu38nHBVEg5YnRbUU",
+                  "u8v/e5N1E/1olEwIUwZJKvgZ7mGpbsZoKS3oJSJP5IUqGOD0sRIjjLTbMAwGCCqG",
+                  "SM49BAMCBQADRwAwRAIgLsr7+0yV+RdZ97YRpxZ7zwPEJPuDaMXzdpRc2/E/B3oC",
+                  "IFmHm1TOK2hMs7+TVwO2HmSrcyllrK6MGwGgY+cIDkSD",
+                  "-----END CERTIFICATE-----",
+                  "-----BEGIN CERTIFICATE-----",
+                  "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI",
+                  "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
+                  "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy",
+                  "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU",
+                  "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG",
+                  "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs",
+                  "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
+                  "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
+                  "N8txKc8G9R27ZYAUuz15zF0=",
+                  "-----END CERTIFICATE-----",
+                ]
+            in case eCert of
+              Left _ -> error "Somehow, Palpatine has returned"
+              Right c -> c
+
+tyson103 :: X509Certificate
+tyson103 = let eCert = bsToCert $ C8.pack $ unlines
+                ["-----BEGIN CERTIFICATE-----"
+                ,"MIIBbTCCARGgAwIBAgIRAKuUfzXVWlw28Plo2IFFXKwwDAYIKoZIzj0EAwIFADBI"
+                ,"MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+                ,"bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMTIxNDIxNDc0MloXDTIzMTIx"
+                ,"NDIxNDc0MlowJzETMBEGA1UEAwwKVHlzb24gUm9zZTEQMA4GA1UECgwHU2t5bGlu"
+                ,"azBWMBAGByqGSM49AgEGBSuBBAAKA0IABMp/7up2+ZqCBRAPbg/cjSmV6oHcbyOK"
+                ,"2Zn5SN4CcaZhioWAaPaRL27aHdfSw+trBWXf1a8n76cxBqA21zU0v9UwDAYIKoZI"
+                ,"zj0EAwIFAANIADBFAiEAu3NAuLZqk0ntn7xBqkXDwFNtM25XfT2KJRnHOXw0X9EC"
+                ,"IB8N6nm8DTdaPan1TV8k8E8Dld3ncu01SWp+jJhI9ki4"
+                ,"-----END CERTIFICATE-----"
+                ,"-----BEGIN CERTIFICATE-----"
+                ,"MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+                ,"MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+                ,"bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+                ,"MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+                ,"MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+                ,"BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+                ,"9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+                ,"R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+                ,"N8txKc8G9R27ZYAUuz15zF0="
+                ,"-----END CERTIFICATE-----"
+                ]
+            in case eCert of
+              Left _ -> error "Somehow, Palpatine has returned"
+              Right c -> c
+
+tyson104 :: X509Certificate
+tyson104 = let eCert = bsToCert $ C8.pack $ unlines
+                [ "-----BEGIN CERTIFICATE-----",
+                  "MIIBbjCCARKgAwIBAgIQKdPAKQXxeRXLhoZ7gkNmjTAMBggqhkjOPQQDAgUAMEgx",
+                  "DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu",
+                  "Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIxMjE1MjEyODQxWhcNMjMxMjE1",
+                  "MjEyODQxWjApMRMwEQYDVQQDDApUeXNvbiBSb3NlMRIwEAYDVQQKDAlTdGFyYnVj",
+                  "a3MwVjAQBgcqhkjOPQIBBgUrgQQACgNCAASo47gbeSxbMFs+pqfn9G1h8XP+5jRG",
+                  "NvR1mjGPuZfMhKgSRrnCKmFdQQHr7GrqbrN2R0yWQPUv/BEuLYAj1eeuMAwGCCqG",
+                  "SM49BAMCBQADSAAwRQIhAIT/M/4D/X9M+k7ljsuI1FozFMOd/uJpL4JImuYEX/Qa",
+                  "AiAZkV1n5NFCQjzESOaMktLeNzFE9Un99Xhmj4iEMNii7Q==",
+                  "-----END CERTIFICATE-----",
+                  "-----BEGIN CERTIFICATE-----",
+                  "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI",
+                  "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
+                  "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy",
+                  "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU",
+                  "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG",
+                  "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs",
+                  "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
+                  "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
+                  "N8txKc8G9R27ZYAUuz15zF0=",
+                  "-----END CERTIFICATE-----",
                 ]
             in case eCert of
               Left _ -> error "Somehow, Palpatine has returned"
