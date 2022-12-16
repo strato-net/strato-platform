@@ -34,7 +34,7 @@ import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
-import qualified Data.ByteString.Char8             as BC
+--import qualified Data.ByteString.Char8             as BC
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
@@ -51,10 +51,10 @@ import           Data.Traversable
 import           Text.Format
 import           Text.Read                         (readMaybe)
 import           UnliftIO
-import           Text.Parsec                          (runParser)
-import           SolidVM.Solidity.Parse.Statement
+--import           Text.Parsec                          (runParser)
+--import           SolidVM.Solidity.Parse.Statement
 
-import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
+--import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
 
 
 import           BlockApps.Bloc22.API.Users
@@ -347,12 +347,13 @@ functionResult i txHash txResult mmd toAccount = do
       theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
   mFormattedResponse <- case theVM of
         "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
-        "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
+        "SolidVM" -> pure $ convertResultResToVals txResp mappedResultTypes 
+        -- "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
         _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
   $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
-      let r = Text.decodeUtf8 $ Base16.encode txResp
+      let r = Text.decodeUtf8 $ Base16.encode txResp  
       $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
       $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r
       $logInfoS "DEBUG__________________________" . Text.pack $ "mFormattedResponse" ++ show mFormattedResponse
@@ -373,13 +374,19 @@ convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 -- works for SolidVM only
-convertSvmResultResToVals :: String -> Maybe [SolidityValue]
-convertSvmResultResToVals resp =
-  let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
-   in case args of 
-        Left _ -> Nothing
-        Right y -> let values = traverse expressionToValue y
-                    in fmap valueToSolidityValue <$> values
+-- convertSvmResultResToVals :: String -> [Type]-> Maybe [SolidityValue]
+-- convertSvmResultResToVals resp =
+--   let byteResp = BC.pack resp
+--   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
+
+
+-- convertSvmResultResToVals :: String -> Maybe [SolidityValue]
+-- convertSvmResultResToVals resp =
+--   let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
+--    in case args of 
+--         Left _ -> Nothing
+--         Right y -> let values = traverse expressionToValue y
+--                     in fmap valueToSolidityValue <$> values
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n 
