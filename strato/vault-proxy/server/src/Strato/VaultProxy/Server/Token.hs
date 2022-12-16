@@ -85,7 +85,7 @@ getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTi
               else do
                 traceM "Waiting until my neighbor thread updates the token"
                 liftIO $ L.wait awesomeLock
-                vaultProxyDebug debuggingOn "My neighbor thread updated the token, I will now get the token from the cache"
+                traceM "Lock is released, will try to get the token again."
                 checkTokenAgain <- getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth
                 pure checkTokenAgain
 
