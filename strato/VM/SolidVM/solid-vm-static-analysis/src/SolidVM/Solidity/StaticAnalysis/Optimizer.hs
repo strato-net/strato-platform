@@ -17,9 +17,6 @@ import           Data.Map as M
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
---import           SolidVM.Solidity.Parse.UnParser
---import Debug.Trace
-
 
 data R = R
   { codeCollection :: CodeCollection
@@ -95,8 +92,7 @@ functionHelperForUserDefined f = f{ _funcArgs =  tForm  $ _funcArgs f, _funcVals
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $  []
-optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
-  let 
+optimizeStatements ((IfStatement cond thens mElse x) : ss) = do 
   cond' <- (evalStateT (optimizeExpression cond) M.empty) 
   case cond' of
     BoolLiteral _ True -> do
@@ -267,6 +263,7 @@ optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwra
     Nothing -> pure $ FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args
 
 --This needs further research before letting loose on the code base
+--This function as of now is neutured 
 optimizeExpression (Variable x name ) = do 
   var <- getVariableByName name
   case var  of  _ -> pure $ (Variable x name )
