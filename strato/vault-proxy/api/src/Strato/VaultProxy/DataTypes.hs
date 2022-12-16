@@ -98,7 +98,8 @@ data VaultConnection = VaultConnection {
     vaultProxyPort :: Int,
     tokenCache :: Cache T.Text VaultToken,
     additionalOauth :: RawOauth,
-    superLock :: L.Lock
+    superLock :: L.Lock,
+    debuggingOn :: Bool
 }
 
 data RawOauth = RawOauth {

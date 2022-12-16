@@ -23,6 +23,7 @@ dependencies:
 - lens
 - postgresql-simple
 - text
+- hflags
 - http-conduit
 - HTTP
 - monad-logger

@@ -14,7 +14,6 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.ByteString                        as B hiding (putStrLn, map, filter)
 import qualified Data.Cache                             as Cache
--- import qualified Data.CaseInsensitive                   as CI
 import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
@@ -24,8 +23,6 @@ import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header              as TH
--- import           Network.HTTP.Types                     as TH1    
--- import           Network.HTTP.Headers                  as H   
 import           Network.Wai.Handler.Warp              (run)
 import           Network.Wai                           as W
 import           System.IO                              (BufferMode (..),
@@ -77,8 +74,6 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
-  --get the awesome token, awesome token alters the token cash, so a result is not needed
-  _ <- liftIO $ getAwesomeToken vaultLock tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
   --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
@@ -91,7 +86,8 @@ main = do
       vaultProxyPort = flags_VAULT_PROXY_PORT,
       tokenCache = tokenCash,
       additionalOauth = noErrorOauth,
-      superLock = vaultLock
+      superLock = vaultLock,
+      debuggingOn = flags_VAULT_PROXY_DEBUG
   }
   --Create the proxy server
   let app' = (waiProxyTo (app vaultConnection) defaultOnExc)
