@@ -13,6 +13,7 @@ module Strato.VaultProxy.DataTypes (
 ) where
 
 -- import           Control.Lens
+import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
@@ -96,7 +97,8 @@ data VaultConnection = VaultConnection {
     vaultProxyUrl :: T.Text,
     vaultProxyPort :: Int,
     tokenCache :: Cache T.Text VaultToken,
-    additionalOauth :: RawOauth
+    additionalOauth :: RawOauth,
+    superLock :: L.Lock
 }
 
 data RawOauth = RawOauth {
