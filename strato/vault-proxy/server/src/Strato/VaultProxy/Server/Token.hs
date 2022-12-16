@@ -11,6 +11,7 @@ module Strato.VaultProxy.Server.Token where
 
 import           Control.Concurrent.STM
 import           Control.Concurrent.Lock  as L
+import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.ByteString.Base64   as B64
@@ -86,7 +87,6 @@ getAwesomeToken awesomeLock squirrel clientId clientSecret reserveTime additiona
                 checkTokenAgain <- getAwesomeToken awesomeLock squirrel clientId clientSecret reserveTime additionalOauth
                 pure checkTokenAgain
 
-
     pure vaultToken
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
@@ -113,3 +113,6 @@ vaulty vaultConn = getAwesomeToken ll tc cid csec rs ao
         rs = oauthReserveSeconds vaultConn
         tc = tokenCache vaultConn
         ll = superLock vaultConn
+
+vaultProxyDebug :: Applicative f => Int -> String -> f()
+vaultProxyDebug debug msg  = when (debug == 1) $ traceM msg
