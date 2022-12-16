@@ -141,11 +141,11 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
-    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
+    - requireCerts=${requireCerts:-true}
     - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
@@ -282,10 +282,12 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: zookeeper:3.4.14
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/opt/zookeeper-3.4.6/data
+      - zookeeperdata:/data
+    environment:
+      ZOO_DATA_LOG_DIR: /data
     logging:
       driver: "json-file"
       options:

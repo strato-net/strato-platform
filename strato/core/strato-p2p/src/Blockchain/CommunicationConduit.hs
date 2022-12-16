@@ -88,12 +88,12 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> String
                     -> EthCryptState
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
 --  tid <- myThreadId
 --  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
-    [ peerSource
+    [ peerSourceConduit
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
@@ -118,15 +118,14 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m, m `Mod.Outputs` [IngestEvent])
                      => String
                      -> EthCryptState
-                     -> ([IngestEvent] -> m ())
                      -> m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx unseqSink = do
+mkEthP2PEventConduit str outCtx = do
   tid <- myThreadId
   sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $ debounceTxSendsAndUnseq unseqSink
+  return $ debounceTxSendsAndUnseq
         .| CL.iterM recordMessage
         .| CL.iterM (displayMessage Outbound str)
         .| CL.iterM (const $ petWatchdog sendWatchdog)
@@ -134,8 +133,8 @@ mkEthP2PEventConduit str outCtx unseqSink = do
         .| CL.iterM (recordTraffic Outbound)
         .| ethEncrypt outCtx
 
-debounceTxSendsAndUnseq :: MonadIO m => ([IngestEvent] -> m ()) -> ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSendsAndUnseq unseqSink = do
+debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
+debounceTxSendsAndUnseq = do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do
@@ -146,7 +145,7 @@ debounceTxSendsAndUnseq unseqSink = do
       txs <- atomically $ flushTQueue txq
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
-    Left (ToUnseq ie) -> lift $ unseqSink ie
+    Left (ToUnseq ie) -> lift $ Mod.output ie
 
 handleMsgClientConduit :: MonadP2P m
                        => Point
@@ -191,7 +190,7 @@ handleMsgClientConduit myId peer = do
         Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
+                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch 
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -204,7 +203,7 @@ handleMsgClientConduit myId peer = do
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
+                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -241,7 +240,7 @@ handleMsgServerConduit myPubkey peer = do
             lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
-              when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
+              when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
               when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
               -- we set to 0 cause we dont necessarily know the number yet
               lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -257,11 +256,8 @@ handleMsgServerConduit myPubkey peer = do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              when (genHash /= peerGH) $ throwIO WrongGenesisBlock
-              when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
-
               -- we set to 0 cause we dont necessarily know the number yet
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,

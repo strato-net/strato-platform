@@ -5,6 +5,7 @@ import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import AddMember from './components/AddMember';
+import AddIntegration from './components/AddIntegration';
 import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
@@ -23,12 +24,15 @@ class CreateChain extends Component {
       },
       droppedFileName: '',
       members: [],
+      integrations: [],
       errors: null,
       governanceContract: '',
       vm: true
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
+    this.updateIntegrations = this.updateIntegrations.bind(this);
+    this.removeIntegration = this.removeIntegration.bind(this);
   }
 
   componentDidMount() {
@@ -45,6 +49,7 @@ class CreateChain extends Component {
 
   submit = (values) => {
     values.members = this.state.members;
+    values.integrations = this.state.integrations;
     values.governanceContract = this.state.governanceContract;
     values.vm = this.state.vm;
     let errors = validate(values);
@@ -53,17 +58,25 @@ class CreateChain extends Component {
     if (!Object.values(errors).length) {
       mixpanelWrapper.track('create_chain_submit_click');
       let members = [];
+      let integrations = {};
       let balances = [];
 
-      this.state.members.forEach(function (member, index) {
+      this.state.members.forEach(function (member) {
         members.push({
-          "address": member.address,
-          "enode": member.enode
+          "orgName": member.orgName && member.orgName !== '' ? member.orgName : undefined,
+          "orgUnit": member.orgUnit && member.orgUnit !== '' ? member.orgUnit : undefined,
+          "commonName": member.commonName && member.commonName !== '' ? member.commonName : undefined,
+          "access": member.access
         });
-        balances.push({
-          "balance": member.balance,
-          "address": member.address
-        });
+      });
+
+      this.state.integrations.forEach(function (i) {
+        integrations = { ...integrations, [i.name]: i.chainId }
+      });
+
+      balances.push({
+        "balance": 1000000000000000,
+        "address": '0000000000000000000000000000000000000100'
       });
 
       const args = {};
@@ -95,31 +108,36 @@ class CreateChain extends Component {
         });
       }
 
-      this.props.createChain(values.chainName, members, balances, values.governanceContract, args, values.vm);
+      this.props.createChain(values.chainName, members, balances, integrations, values.governanceContract, args, values.vm, this.props.limit, this.props.offset);
       this.setState({
         members: [],
+        integrations: [],
       });
     }
   }
 
   updateMembers(state) {
     const curMembers = this.state.members;
-    const addresses = [];
 
-    curMembers.forEach(function (member) {
-      addresses.push(member.address);
+    this.setState({
+      members: curMembers.concat({
+        orgName: state.orgName,
+        orgUnit: state.orgUnit,
+        commonName: state.commonName,
+        access: state.access
+      })
     });
+  }
 
-    if (!addresses.includes(state.address)) {
-      this.setState({
-        members: curMembers.concat({
-          username: state.username,
-          address: state.address,
-          enode: state.enode,
-          balance: parseInt(state.balance, 10)
-        })
-      });
-    }
+  updateIntegrations(state) {
+    const curIntegrations = this.state.integrations;
+
+    this.setState({
+      integrations: curIntegrations.concat({
+        name: state.name,
+        chainId: state.chainId,
+      })
+    });
   }
 
   removeMember(member) {
@@ -131,6 +149,15 @@ class CreateChain extends Component {
     });
   }
 
+  removeIntegration(integration) {
+    const integrations = this.state.integrations.slice(0);
+    const index = integrations.indexOf(integration);
+    const newIntegrations = integrations.slice(index, 1);
+    this.setState({
+      integrations: newIntegrations
+    });
+  }
+
   showMembers(members) {
     if (members.length && members.length > 0) {
       const ret = [];
@@ -139,7 +166,14 @@ class CreateChain extends Component {
           <div className="row smd-margin-8 member smd-vertical-center" key={index}>
             <div className="col-sm-1"></div>
             <div className="col-sm-9">
-              <span>{member.username ? member.username + ' (' + member.address + ')' : member.address}</span>
+              <span>{member.orgName
+                       ? member.orgUnit
+                         ? member.commonName
+                           ? `${member.access ? 'Include' : 'Exclude'} ${member.commonName} from ${member.orgUnit} at ${member.orgName}`
+                           : `${member.access ? 'Include' : 'Exclude'} everyone from ${member.orgUnit} at ${member.orgName}`
+                         : `${member.access ? 'Include' : 'Exclude'} everyone at ${member.orgName}`
+                       : `${member.access ? 'Include' : 'Exclude'} everyone`
+              }</span>
             </div>
             <div className="col-sm-2">
               <Button
@@ -158,6 +192,39 @@ class CreateChain extends Component {
       return (
         <div className="pt-dialog-header no-member">
           <span className="pt-dialog-header-title">No Members</span>
+        </div>
+      );
+    }
+  }
+
+  showIntegrations(integrations) {
+    if (integrations.length && integrations.length > 0) {
+      const ret = [];
+      integrations.forEach(function (integration, index) {
+        ret.push(
+          <div className="row smd-margin-8 integration smd-vertical-center" key={index}>
+            <div className="col-sm-1"></div>
+            <div className="col-sm-9">
+              <span>{`${integration.name} ${integration.chainId}`
+              }</span>
+            </div>
+            <div className="col-sm-2">
+              <Button
+                className="pt-button pt-icon-trash integration-remove"
+                onClick={() => {
+                  this.removeIntegration(integration)
+                }}
+              />
+            </div>
+          </div>
+        );
+      }.bind(this))
+      return ret;
+    }
+    else {
+      return (
+        <div className="pt-dialog-header no-integration">
+          <span className="pt-dialog-header-title">No DApp Integrations</span>
         </div>
       );
     }
@@ -518,7 +585,6 @@ class CreateChain extends Component {
                   </table>
                 </div>
               </div>
-              
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
@@ -527,6 +593,17 @@ class CreateChain extends Component {
                   {this.showMembers(this.state.members)}
                   <span className="error-text">{this.errorMessageFor('members')}</span>
                   <AddMember handler={this.updateMembers} publicKey={this.props.publicKey}/>
+                </div>
+              </div>
+              
+              <div className="row">
+                <div className="pt-form-group col-sm-12 pt-intent-danger">
+                  <label className="pt-label" htmlFor="input-b">
+                    DApp Integrations
+                  </label>
+                  {this.showIntegrations(this.state.integrations)}
+                  <span className="error-text">{this.errorMessageFor('integrations')}</span>
+                  <AddIntegration handler={this.updateIntegrations} />
                 </div>
               </div>
             </div>

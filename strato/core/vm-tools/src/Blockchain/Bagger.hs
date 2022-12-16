@@ -45,7 +45,6 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB, flushMemCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
@@ -99,7 +98,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
       $ mineTransactions theBlockHeader remainingGas txs
     timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
     timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
-    timeit "flushMemCertDB bagger" (Just vmBlockInsertionMined) $ flushMemCertDB baggerBlockHash
     newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
     let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
     return $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -121,7 +119,6 @@ rewardCoinbases us uncles ourNumber = do
         return ()
     flushMemStorageDB
     flushMemAddressStateDB
-    flushMemCertDB baggerBlockHash
     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
 -- todo batch insert results
@@ -253,7 +250,6 @@ processNewBestBlock bh bd txShas = do
                                        }
     putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
     migrateBlockHeader bd baggerBlockHash
-    migrateBlockHeaderCertDB bd baggerBlockHash
     withBagger $ do
       demoteUnexecutables
       promoteExecutables

@@ -25,7 +25,7 @@ import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
 
--- import           Control.Monad.State                       (put)
+import           Control.Monad.State
 import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
@@ -39,6 +39,7 @@ import           Text.Printf
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.StateMachine (validators)
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -53,7 +54,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Data.Block                     as BDB
-import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChain)
+import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChains)
 import qualified Blockchain.Data.DataDefs                  as BDB
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -255,6 +256,7 @@ checkForUnseq inEvents = do
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
+  _ <- get >>= (\sequencerContext -> traverse_  (\x -> writeSeqVmEvents [VmValidatorList [] (S.toList $ x ^. validators) ])  (_blockstanbulContext  sequencerContext) )-- add first validator to validators DB
   createFirstTimer
 
 blockstanbulSend :: ( MonadLogger m
@@ -273,7 +275,6 @@ blockstanbulSend = mapM_ $ \ie -> do
 
 blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
-                     , (Keccak256 `A.Alters` ChainHashEntry) m
                      , (Keccak256 `A.Alters` DependentBlockEntry) m
                      )
                   => InEvent
@@ -291,19 +292,31 @@ blockstanbulSend' msg = do
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
   rch <- Mod.access (Mod.Proxy @(TQueue VoteResult))
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
-  let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks) 
+
+  -- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
+  -- blockToIngestBlock  :: TO.TXOrigin -> BDB.Block -> IngestBlock
+
+  -- TXOrigin
+  -- getSequencedBlock ::  BDB.Block -> IngestBlock -> Maybe SequencedBlock
+
+  --  traverse (a -> f b) -> t a -> f (t b)
+
+  let getSequencedBlock = ingestBlockToSequencedBlock 
                         . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
-  rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
+  let rBlocks = catMaybes (map getSequencedBlock blocks)
   vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+  let (vms, p2pevs, ckpts) = vmEvenP2pCheckptFilterHelper resp
+  
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
-           ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
-      p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-            ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
-            ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
-      ckpts = [ck | NewCheckpoint ck <- resp]
+           ++ vms
+
+
+  -- let getSequencedBlock = ingestBlockToSequencedBlock 
+  --                       . blockToIngestBlock TO.Blockstanbul
+
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -319,12 +332,32 @@ blockstanbulSend' msg = do
   yieldMany $ ToP2p <$> p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldMany $ ToVm <$> vmevs
+  where 
+    vmEvenP2pCheckptFilterHelper :: [OutEvent] ->  ([VmEvent], [P2pEvent], [Checkpoint])
+    vmEvenP2pCheckptFilterHelper (x:xs) = do
+      let (vms, p2ps, ctxs) = vmEvenP2pCheckptFilterHelper xs
+      case x of 
+         ListOfValidators toDrop toAdd -> (VmValidatorList toDrop toAdd : vms, p2ps, ctxs)
+         PendingVote r d s             -> (VmVoteToMake r d s : vms, p2ps, ctxs)
+         OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m) : p2ps, ctxs)
+         GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
+         LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
+         NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
+         _                             -> (vms,  p2ps, ctxs)
+    vmEvenP2pCheckptFilterHelper [] = ([],[], [])
 
 privateWitnessableHash :: Keccak256 -> Keccak256 -> Keccak256
 privateWitnessableHash tHash cHash =
   hash
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
+
+
+
+
+-- wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
+
+
 
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
@@ -334,7 +367,7 @@ transformPrivateHashTXs :: ( MonadLogger m
                         => [(Timestamp, IngestTx)]
                         -> ConduitT a SeqEvent m ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  motx <- wrapTransaction lookupChainIdFromChainHash t
+  motx <- wrapTransaction t
   for_ motx $ \otx -> do
     let privateWitnessHash = privateWitnessableHash th' ch'
     pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
@@ -354,7 +387,7 @@ transformFullTransactions :: ( MonadLogger m
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
-    wrapTransaction lookupChainIdFromChainHash itx >>= \case
+    wrapTransaction itx >>= \case
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx
@@ -490,7 +523,6 @@ expandBlock sb = do
 runConsensus :: ( MonadLogger m
                 , MonadMonitor m
                 , MonadBlockstanbul m
-                , (Keccak256 `A.Alters` ChainHashEntry) m
                 , (Keccak256 `A.Alters` DependentBlockEntry) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
@@ -543,13 +575,17 @@ transformBlocks :: ( MonadLogger m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
-transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromChainHash ib >>= \case
-  Nothing -> do
-    $logWarnS "transformEvents/emitBlocks" . T.pack
-      $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-    P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-  Just sb -> do
-    runBlockWithConsensus sb
+-- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
+-- forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
+transformBlocks ibs = do
+  forM_ ibs $ \ib ->
+    case (ingestBlockToSequencedBlock ib) of
+      Nothing -> do
+        $logWarnS "transformEvents/emitBlocks" . T.pack
+          $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+        P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+      Just sb -> do
+        runBlockWithConsensus sb
 
 transformGenesis :: ( MonadLogger m
                     , MonadMonitor m
@@ -576,8 +612,8 @@ transformGenesis chains = forM_ chains $ \ig -> do
         Just (EmittedBlock emitted' depChains) | emitted' -> pure $ EmittedBlock emitted' M.empty
                                                | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
       logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show seenCreationBlock
-      let parentChainId = parentChain $ chainInfo cInfo
-      seenParentChains <- hasAllAncestorChains parentChainId
+      let parentChainIds = M.elems . parentChains $ chainInfo cInfo
+      seenParentChains <- and <$> traverse (hasAllAncestorChains . Just) parentChainIds
       logF $ "hasAllAncestorChains: " ++ show seenParentChains
       if seenParentChains
         then when seenCreationBlock $ do
@@ -587,15 +623,15 @@ transformGenesis chains = forM_ chains $ \ig -> do
           chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
           transformGenesis $ map (\ci -> ig{igGenesisInfo = ci}) chainsToEmit
           lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
-        else case parentChainId of
-          Nothing -> $logErrorS "transformGenesis" . T.pack $ concat
+        else case parentChainIds of
+          [] -> $logErrorS "transformGenesis" . T.pack $ concat
             [ "The database claims to be missing parent chain info for chain "
             , format chainId
             , ", but its parent chain is the main chain. This probably means there is a bug in the platform."
             ]
-          Just pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
-               Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
-               Just cie@ChainIdEntry{} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
+          pChains -> for_ pChains $ \pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
+            Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
+            Just cie@ChainIdEntry{} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
 
 splitEvents :: ( MonadLogger m
                , MonadMonitor m
@@ -623,12 +659,12 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       record "inevent_type_genesis" "IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
-    IETNewChainMember -> do
-      record "inevent_type_new_chain_member" "IngestNewChainMembers"
-      yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
+    -- IETNewChainMember -> do
+    --   record "inevent_type_new_chain_member" "IngestNewChainMembers"
+    --   yieldMany $ map (\(IENewChainMember c a e) -> ToP2p $ P2pNewChainMember c a e) events
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
-      yieldMany $ map (\(IENewChainOrgName c (n, u)) -> ToP2p $ P2pNewOrgName c (n, u)) events
+      yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events

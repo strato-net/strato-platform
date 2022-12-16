@@ -1,0 +1,88 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DeployDapp: action Add Integration Modal close overlay 1`] = `
+Object {
+  "isOpen": false,
+  "type": "CLOSE_ADD_INTEGRATION_MODAL",
+}
+`;
+
+exports[`DeployDapp: action Add Integration Modal open overlay 1`] = `
+Object {
+  "isOpen": true,
+  "type": "OPEN_ADD_INTEGRATION_MODAL",
+}
+`;
+
+exports[`DeployDapp: action Add Member Modal close overlay 1`] = `
+Object {
+  "isOpen": false,
+  "type": "CLOSE_ADD_MEMBER_MODAL",
+}
+`;
+
+exports[`DeployDapp: action Add Member Modal open overlay 1`] = `
+Object {
+  "isOpen": true,
+  "type": "OPEN_ADD_MEMBER_MODAL",
+}
+`;
+
+exports[`DeployDapp: action create chain failure 1`] = `
+Object {
+  "error": "error",
+  "isOpen": false,
+  "spinning": false,
+  "toasts": true,
+  "toastsMessage": "DApp deployment failed: error",
+  "type": "DEPLOY_DAPP_FAILURE",
+}
+`;
+
+exports[`DeployDapp: action create chain request 1`] = `
+Object {
+  "args": false,
+  "balances": Array [
+    Object {
+      "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
+      "balance": 500000000000000,
+    },
+  ],
+  "contract": Object {
+    "addRule": "MajorityRules",
+    "removeRule": "MajorityRules",
+  },
+  "integrations": Object {},
+  "isOpen": true,
+  "label": "airline cartel 9",
+  "members": Array [
+    Object {
+      "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
+      "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7…4cac9f77166ad92a0@172.16.0.5:30303?discport=30303",
+    },
+  ],
+  "spinning": true,
+  "src": "contract SimpleStorage {
+        uint public storedData;
+      }",
+  "type": "DEPLOY_DAPP_REQUEST",
+  "vm": undefined,
+}
+`;
+
+exports[`DeployDapp: action create chain success 1`] = `
+Object {
+  "isOpen": true,
+  "response": "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+  "spinning": false,
+  "toasts": true,
+  "toastsMessage": "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+  "type": "DEPLOY_DAPP_SUCCESS",
+}
+`;
+
+exports[`DeployDapp: action reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;

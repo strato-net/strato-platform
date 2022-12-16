@@ -127,7 +127,7 @@ function createCallListArgs(contract, method, args, value, count = 2) {
 const createChainArgs = (uid, members) => {
   const contractName = `TestContract_${uid}`;
   const memberList = members.map(address => {
-    return { address: address, enode };
+    return { orgName: 'BlockApps', access: true };
   });
   const balanceList = members.map(address => {
     return { address: address, balance };
@@ -135,7 +135,7 @@ const createChainArgs = (uid, members) => {
 
   const chain:Chain = {
     label: `airline-${uid}`,
-    src: `contract ${contractName} { }`,
+    src: `contract ${contractName} { constructor(){} }`,
     args: {},
     members: memberList,
     balances: balanceList,

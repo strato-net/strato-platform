@@ -9,6 +9,7 @@ description: The client described in the Ethereum Yellowpaper
 
 dependencies:
   - base
+  - x509-certs
 
 
 

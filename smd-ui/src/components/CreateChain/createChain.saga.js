@@ -20,19 +20,20 @@ import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/chain"
 
-export function createChainApiCall(label, members, balances, src, args, vm) {
+export function createChainApiCall(label, members, balances, integrations, src, args, vm) {
   return fetch(
     url,
     {
       method: 'POST',
       credentials: "include",
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json' 
       },
       body: JSON.stringify({
         "args": args,
         "balances": balances,
         "members": members,
+        "parentChains": integrations,
         "src": src,
         "label": label,
         "metadata": {
@@ -43,6 +44,11 @@ export function createChainApiCall(label, members, balances, src, args, vm) {
   )
     .then(handleErrors)
     .then(function (response) {
+      if (response.status !== 200) {
+        return response.text().then(error => {
+          throw error
+        })
+      }
       return response;
     })
     .catch(function (error) {
@@ -52,15 +58,15 @@ export function createChainApiCall(label, members, balances, src, args, vm) {
 
 export function* createChain(action) {
   try {
-    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args, action.vm);
+    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.integrations, action.src, action.args, action.vm);
     // TODO: Change when when we start getting actual error messages
     if (response.status === 200) {
       yield put(createChainSuccess(response));
       yield call(delay, 2000);
-      yield put(fetchChains());
+      yield put(fetchChains(action.limit, action.offset));
       yield put(fetchChainIds())
     } else {
-      yield put(createChainFailure(response.statusText));
+      yield put(createChainFailure(response));
     }
   }
   catch (err) {

@@ -3,7 +3,7 @@ import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
-import logo from './blockapps-cube-color-430x500.png';
+import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
 import { Field, reduxForm } from 'redux-form';
@@ -82,7 +82,7 @@ class MenuBar extends Component {
               <img
                 src={logo}
                 alt="Blockapps Logo"
-                height="32"
+                height="50"
                 className="smd-menu-logo"
               />
             </Link>

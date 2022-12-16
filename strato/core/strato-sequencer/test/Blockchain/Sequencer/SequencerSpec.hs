@@ -13,6 +13,7 @@ import           Data.IORef
 import           Data.Maybe                          (fromMaybe, isNothing)
 import           Data.Time.Clock.POSIX
 import qualified Data.Map                            as M
+import qualified Data.Set                            as S
 import           Data.Maybe                          (isJust)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
@@ -56,6 +57,7 @@ import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
@@ -168,8 +170,8 @@ feedBackOutputsToInput = map rebox
     where rebox (VmTx ts t) = IETx ts $ unboxTx t
           rebox (VmBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           rebox x = error $ "why are we testing against " ++ show x
-          unboxTx (OutputTx origin _ _ _ base _) = IngestTx origin base
-          unboxBlockTx (OutputTx _ _ _ _ base _) = base
+          unboxTx (OutputTx origin _ _ base _) = IngestTx origin base
+          unboxBlockTx (OutputTx _ _ _ base _) = base
 
 mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
@@ -428,8 +430,8 @@ spec = do
 
     describe "Private Chains" $ do
       let getChainInfo lbl = ChainInfo
-                                 (UnsignedChainInfo lbl [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
-                                 Nothing
+                                 (UnsignedChainInfo lbl [] [] (ChainMembers S.empty) M.empty (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
+                                 (ChainSignature 1 2 3)
           getChainIdAndDetails cInfo =
             let chainId = Keccak256.rlpHash cInfo
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
@@ -450,7 +452,7 @@ spec = do
 
       -- chain 3 (child of chain 1)
       let ChainInfo uci sig = getChainInfo "my test chain 3"
-          uci' = uci{parentChain = Just $ keccak256ToWord256 chainId1}
+          uci' = uci{parentChains = M.singleton "parent" $ keccak256ToWord256 chainId1}
       let (chainId3, chainDetails3) = getChainIdAndDetails $ ChainInfo uci' sig
       (hashTx3, tx3) <- getChainTx chainId3
 
@@ -656,13 +658,13 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm b1]
-        map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
+        map (map otPrivatePayload . obReceiptTransactions) obs `shouldBe` [[Nothing]]
         let h' = head [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1]
         b2 <- runBatch $ checkForUnseq [iev6' h']
         let bs' = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b2]
         map (map txType . blockReceiptTransactions) bs' `shouldBe` [[PrivateHash]]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash]]
+        map (map otPrivatePayload . obReceiptTransactions) obs' `shouldBe` [[Nothing]]
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash]]

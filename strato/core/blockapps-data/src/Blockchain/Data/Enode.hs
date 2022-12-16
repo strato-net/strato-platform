@@ -10,13 +10,9 @@ module Blockchain.Data.Enode
   ( Enode(..)
   , IPAddress(..)
   , OrgId(..)
-  , OrgName(..)
-  , OrgUnit(..)
-  , ChainMembers(..)
   , ChainTxsInBlock(..)
   , IPChains(..)
   , OrgIdChains(..)
-  , OrgNameChains(..)
   , showEnode
   , readEnode
   , showIP
@@ -49,7 +45,6 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Text.Regex
 
 import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
@@ -65,8 +60,6 @@ instance Arbitrary IPAddress where
   arbitrary = genericArbitrary
 
 newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
-newtype OrgName = OrgName { unOrgName :: String } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
-newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe String } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable OrgId where
   rlpEncode (OrgId bs) = rlpEncode bs
@@ -80,6 +73,7 @@ instance ToSchema OrgId where
 instance Arbitrary OrgId where
   arbitrary = genericArbitrary
 
+
 instance ToSchema IPAddress where
   
 
@@ -90,19 +84,17 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
+
 instance ToSchema Enode where
 
-newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
+
 newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [Keccak256] } deriving (Eq)
 newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
-newtype OrgNameChains = OrgNameChains { unOrgNameChains :: S.Set Word256 } deriving (Eq)
 
-instance Default ChainMembers    where def = ChainMembers M.empty
-instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty
-instance Default IPChains        where def = IPChains S.empty
+instance Default ChainTxsInBlock  where def = ChainTxsInBlock M.empty
+instance Default IPChains         where def = IPChains S.empty
 instance Default OrgIdChains     where def = OrgIdChains S.empty
-instance Default OrgNameChains   where def = OrgNameChains S.empty
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =

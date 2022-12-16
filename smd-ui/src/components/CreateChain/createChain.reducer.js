@@ -6,6 +6,8 @@ import {
   CREATE_CHAIN_SUCCESS,
   OPEN_ADD_MEMBER_MODAL,
   CLOSE_ADD_MEMBER_MODAL,
+  OPEN_ADD_INTEGRATION_MODAL,
+  CLOSE_ADD_INTEGRATION_MODAL,
   RESET_ERROR,
   COMPILE_CHAIN_CONTRACT_SUCCESS,
   COMPILE_CHAIN_CONTRACT_FAILURE,
@@ -14,6 +16,7 @@ import {
 
 const initialState = {
   isAddMemberModalOpen: false,
+  isAddIntegrationModalOpen: false,
   isOpen: false,
   spinning: false,
   key: null,
@@ -40,6 +43,16 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         isAddMemberModalOpen: false
+      };
+    case OPEN_ADD_INTEGRATION_MODAL:
+      return {
+        ...state,
+        isAddIntegrationModalOpen: true,
+      };
+    case CLOSE_ADD_INTEGRATION_MODAL:
+      return {
+        ...state,
+        isAddIntegrationModalOpen: false
       };
     case CREATE_CHAIN_REQUEST:
       return {

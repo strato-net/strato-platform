@@ -27,8 +27,9 @@ describe('CreateChain: saga', () => {
 
     const payload = {
       label: 'airline cartel 9',
-      members: [{ address: "f11b5c42f5b84efa07f6b0a32c3fc545ff509126", enode: "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7…4cac9f77166ad92a0@172.16.0.5:30303?discport=30303" }],
+      members: [{ "orgName": "BlockApps", "orgUnit": "Engineering" }],
       balances: [{ balance: 500000000000000, address: "f11b5c42f5b84efa07f6b0a32c3fc545ff509126" }],
+      integrations: {},
       src: `contract SimpleStorage {
         uint public storedData;
       }`,
@@ -40,7 +41,7 @@ describe('CreateChain: saga', () => {
 
       test('Without Error (status 200)', () => {
         const gen = createChain({ type: CREATE_CHAIN_REQUEST, ...payload });
-        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm));
+        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm));
         expect(gen.next({ status: 200, mockResponse }).value).toEqual(put(createChainSuccess({ status: 200, mockResponse })));
         expect(gen.next().value).toEqual(call(delay, 2000));
         expect(gen.next().value).toEqual(put(fetchChains()));
@@ -51,8 +52,8 @@ describe('CreateChain: saga', () => {
 
       test('With Error (status 500)', () => {
         const gen = createChain({ type: CREATE_CHAIN_REQUEST, ...payload });
-        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm));
-        expect(gen.next({ status: 500, statusText: 'error' }).value).toEqual(put(createChainFailure('error')));
+        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm));
+        expect(gen.next('error').value).toEqual(put(createChainFailure('error')));
         expect(gen.throw('error').value).toEqual(put(createChainFailure('error')));
         expect(gen.next().done).toBe(true);
       });

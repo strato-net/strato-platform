@@ -127,7 +127,6 @@ data Detail = Incremental | Eventual
 -- | A class for condensing information in a diff
 class Detailed (t :: Detail -> *) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
-  eventualToIncremental :: t 'Eventual -> t 'Incremental
 
 instance Detailed AccountDiff where
   incrementalToEventual AccountDiff{nonce, balance, code, codeHash, sourceCodeHash, contractRoot, storage} =
@@ -140,47 +139,30 @@ instance Detailed AccountDiff where
       contractRoot = fmap incrementalToEventual contractRoot,
       storage = incrementalToEventual storage
       }
-  eventualToIncremental AccountDiff{nonce, balance, code, codeHash, sourceCodeHash, contractRoot, storage} =
-    AccountDiff{
-      nonce = fmap eventualToIncremental nonce,
-      balance = fmap eventualToIncremental balance,
-      code = fmap eventualToIncremental code,
-      codeHash = codeHash,
-      sourceCodeHash = sourceCodeHash,
-      contractRoot = fmap eventualToIncremental contractRoot,
-      storage = eventualToIncremental storage
-      }
 
 instance {-# OVERLAPPABLE #-} (Num a) => Detailed (Diff a) where
   incrementalToEventual Delete{} = Value 0 --  ^ Ethereum-specific default value
   incrementalToEventual x        = Value $ newValue x
-  eventualToIncremental (Value x) = Create x
 
 instance Detailed (Diff String) where
   incrementalToEventual Delete{} = Value ""
   incrementalToEventual x        = Value $ newValue x
-  eventualToIncremental (Value x) = Create x
 
 instance Detailed (Diff StateRoot) where
   incrementalToEventual Delete{} = Value $ fromString ""
   incrementalToEventual x        = Value $ newValue x
-  eventualToIncremental (Value x) = Create x
 
 instance Detailed (Diff ByteString) where
   incrementalToEventual Delete{} = Value $ fromString ""
   incrementalToEventual x        = Value $ newValue x
-  eventualToIncremental (Value x) = Create x
 
 instance Detailed (Diff Keccak256) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
-  eventualToIncremental (Value x) = Create x
 
 instance Detailed StorageDiff where
   incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
-  eventualToIncremental (EVMDiff m) = EVMDiff $ Map.map eventualToIncremental m
-  eventualToIncremental (SolidVMDiff m) = SolidVMDiff $ Map.map eventualToIncremental m
 
 chainDiff :: ( MonadLogger m
              , HasStateDB m

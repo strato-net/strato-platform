@@ -18,7 +18,7 @@ import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
 --import           SolidVM.Solidity.Parse.UnParser
-import Debug.Trace
+--import Debug.Trace
 
 
 data R = R
@@ -30,15 +30,9 @@ data R = R
 type SSS = StateT (M.Map SolidString (Expression))   (Reader R) -- Is there a better data structure for this job?
 
 detector ::  CodeCollection -> CodeCollection
-detector cc = trace ("Before optmization\n" ++(show cc) ++
-          "\nAfter optmization\n" ++ (show (over (contracts . mapped) (contractHelper cc)
+detector cc = over (contracts . mapped) (contractHelper cc)
           $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)))
-
-
-          (over (contracts . mapped) (contractHelper cc)
-          $ over (flFuncs . mapped) (functionHelper cc  Nothing)
-          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc)
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc
 
 
 contractHelper :: CodeCollection

@@ -70,7 +70,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Event
@@ -95,7 +94,6 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.StateDiff             as SD
-
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
 
@@ -134,11 +132,6 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
 
-instance (Monad m, HasMemCertDB m) => HasMemCertDB (ConduitT i o m) where
-  getCertTxDBMap    = lift getCertTxDBMap
-  putCertTxDBMap    = lift . putCertTxDBMap
-  getCertBlockDBMap = lift getCertBlockDBMap
-  putCertBlockDBMap = lift . putCertBlockDBMap 
 
 -- todo: lovely!
 
@@ -212,7 +205,6 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
-    putBlockHeaderInCertDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
@@ -253,15 +245,13 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
-  $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
   let txs = filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t))
-          $ filter (isAnchored . otAnchorChain) transactions
+          $  transactions
   -- TODO: Run the checks Bagger does reject invalid transactions for private chains
   addTransactions bd txs
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-  lift $ timeit "flushMemCertDB" (Just vmBlockInsertionMined) $ flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 => BlockData
@@ -279,9 +269,8 @@ addTransactions blockData txs =
       let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
-      flushMemCertTxToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      let chainId = fromAnchorChain $ otAnchorChain t
+      let chainId = txChainId =<< otPrivatePayload t
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
 
       afterMap <- getAddressStateTxDBMap
@@ -313,21 +302,19 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult ->
-          let supportedPragmas = [("solidvm","3.0"),("solidvm","3.2"),("solidvm","3.3"),("solidvm","3.4")]
+          let supportedPragmas = []
               findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
                  then do
                   putAddressStateTxDBMap M.empty
                   putMemRawStorageTxMap M.empty
-                  putCertTxDBMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx)  (DL.toList ran) unran remGas -- use invalidPragmasUsed here
 
                  else do
                    let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
                    flushMemAddressStateTxToBlockDB
                    flushMemStorageTxDBToBlockDB
-                   flushMemCertTxToBlockDB
                    mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
 
         Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
@@ -385,7 +372,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
         coinbaseAcct = Account (blockDataCoinbase b) chainId
     lift $ P.incCounter txTypeCounter
-    if success
+    if success --this should handle exceptions,shouldnt it?
         then do
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
@@ -415,7 +402,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
-runCodeForTransaction :: VMBase m
+runCodeForTransaction ::(VMBase m)
                       => Bool
                       -> Bool
                       -> BlockData
@@ -742,14 +729,12 @@ completeDiff :: ( MonadLogger m
                 , Mod.Modifiable MemDBs m
                 , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
-                , Mod.Modifiable CertRoot m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
-                , HasMemCertDB m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do

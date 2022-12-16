@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
@@ -36,6 +37,7 @@ module Blockchain.SolidVM.SM (
   getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
+  getGasInfo,
   getVariableOfName,
   getTypeOfName,
   getXabiType,
@@ -43,6 +45,7 @@ module Blockchain.SolidVM.SM (
   getValueType,
   pushSender,
   initializeAction,
+  -- lookupX509AddrFromCBHash,
   markDiffForAction,
   getBlockHashWithNumber,
   getBSum,
@@ -63,9 +66,10 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
-import           Data.Traversable (for)
+import           Data.Traversable                   (for)
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
+
 
 --import           Data.IORef
 import           Data.Map (Map)
@@ -76,6 +80,7 @@ import qualified Data.Sequence as Q
 import           Data.Source
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Data.Either.Extra
 import           Debugger
 
 import           BlockApps.Logging
@@ -86,13 +91,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.X509CertDB
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Stream.Action           (Action)
 import qualified Blockchain.Stream.Action           as Action
 import qualified Blockchain.SolidVM.Environment     as Env
@@ -100,10 +104,13 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
+import           Blockchain.SolidVM.GasInfo
+import           BlockApps.X509.Certificate
 
 import qualified SolidVM.Model.CodeCollection as CC
 import           Blockchain.Data.BlockSummary 
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -151,6 +158,7 @@ data SState = SState
   , ssEvents        :: Q.Seq Event
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
+  , _gasInfo        :: GasInfo
   }
 makeLenses ''SState
 
@@ -160,13 +168,14 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
-                 , HasX509CertDB m
-                 , A.Selectable (Maybe Word256) ParentChainId m
+                 , HasSelectX509CertDB m
+                 , HasSelectX509FieldDB m
+                 , A.Selectable Word256 ParentChainIds m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
-                 , HasMemCertDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable GasInfo m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -189,12 +198,6 @@ instance Monad m => HasMemRawStorageDB (SM m) where
   putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
-
-instance Monad m => HasMemCertDB (SM m) where
-  getCertTxDBMap      = gets $ _certTxMap . _ssMemDBs
-  putCertTxDBMap    m = modify $ ssMemDBs . certTxMap .~ m
-  getCertBlockDBMap   = gets $ _certBlockMap . _ssMemDBs
-  putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
@@ -236,7 +239,7 @@ instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
-instance A.Selectable (Maybe Word256) ParentChainId m => A.Selectable (Maybe Word256) ParentChainId (SM m) where
+instance A.Selectable Word256 ParentChainIds m => A.Selectable Word256 ParentChainIds (SM m) where
   select p = lift . A.select p
 
 instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where
@@ -254,19 +257,30 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
-  get = lift . Mod.get
-  put p = lift . Mod.put p
-
-instance ( (Address `A.Alters` X509Certificate) m
-         , Mod.Modifiable CertRoot m
+instance ( (Address `A.Selectable` X509Certificate) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
-         ) => (Address `A.Alters` X509Certificate) (SM m) where
-  lookup _ k = do
-    mBH <- gets $ view $ ssMemDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
-  insert _ = putCert
-  delete _ = deleteCert
+         , (MonadLogger m)
+         ,(A.Alters (Maybe Word256) MP.StateRoot m)
+         ,(A.Alters N.NibbleString N.NibbleString m)
+         ) => (Address `A.Selectable` X509Certificate) (SM m) where
+  select _ k = do
+      let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+      mCertAddress <- lookupX509AddrFromCBHash k
+      fmap join . for mCertAddress $ \certAddress ->
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+
+instance ( ((Address,T.Text) `A.Selectable` X509CertificateField) m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (MonadLogger m)
+         ,(A.Alters (Maybe Word256) MP.StateRoot m)
+         ,(A.Alters N.NibbleString N.NibbleString m)
+         ) => ((Address,T.Text) `A.Selectable` X509CertificateField) (SM m) where
+  select _ (k,t) = do
+    let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+    mCertAddress <- lookupX509AddrFromCBHash k
+    fmap join . for mCertAddress $ \certAddress ->
+      maybe Nothing (readMaybe . T.unpack . decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
+
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
@@ -293,6 +307,10 @@ instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
 
+instance Monad m => Mod.Modifiable GasInfo (SM m) where
+  get _ = use gasInfo
+  put _ = assign gasInfo 
+
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
   put _ = assign action
@@ -313,10 +331,11 @@ runSM :: ( MonadIO m
          )
       => (Maybe ByteString)
       -> Env.Environment
+      -> GasInfo
       -> Maybe Word256
       -> SM m a
       -> m (Either SolidException a)
-runSM maybeCode env chainId' f = do
+runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
@@ -325,7 +344,8 @@ runSM maybeCode env chainId' f = do
         callStack = [],
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
-        _action = startingAction maybeCode env chainId'
+        _action = startingAction maybeCode env chainId',
+        _gasInfo = gi
         }
 
   eValState <- try $ runStateT f startingState
@@ -375,7 +395,8 @@ startingAction maybeCode env' chainId' = Action.Action
   }
 
 
-
+getGasInfo :: MonadSM m => m GasInfo
+getGasInfo = Mod.get (Mod.Proxy @GasInfo)
 
 getEnv :: MonadSM m => m Env.Environment
 getEnv = Mod.access (Mod.Proxy @Env.Environment)
@@ -404,7 +425,6 @@ getVariableOfName name = do
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
-                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
                               }
@@ -428,7 +448,7 @@ getVariableOfName name = do
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
-                                                  , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
+                                                  , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

@@ -62,10 +62,10 @@ Object {
 exports[`CreateChain: index remove members 1`] = `
 Array [
   Object {
-    "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
-    "balance": 1000,
-    "enode": "enode://",
-    "username": "tanuj1000",
+    "access": undefined,
+    "commonName": undefined,
+    "orgName": undefined,
+    "orgUnit": undefined,
   },
 ]
 `;
@@ -195,6 +195,20 @@ exports[`CreateChain: index render component with empty values 1`] = `
             </div>
             <span className=\\"error-text\\" />
             <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No DApp Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
           </div>
         </div>
       </div>
@@ -332,6 +346,20 @@ exports[`CreateChain: index render component with values 1`] = `
             </div>
             <span className=\\"error-text\\" />
             <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No DApp Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
           </div>
         </div>
       </div>

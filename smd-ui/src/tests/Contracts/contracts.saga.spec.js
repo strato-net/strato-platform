@@ -26,12 +26,14 @@ describe('Contracts: saga', () => {
 
   describe('fetchContracts generator', () => {
     const data = {
-      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+      limit: 10,
+      offset: 0
     }
 
     test('inspection', () => {
-      const gen = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId });
-      expect(gen.next().value).toEqual(call(getContracts, data.chainId));
+      const gen = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId, limit: data.limit, offset: data.offset });
+      expect(gen.next().value).toEqual(call(getContracts, data.chainId, data.limit, data.offset));
       expect(gen.next(contracts).value).toEqual(put(fetchContractsSuccess(contracts)));
       expect(gen.throw(error).value).toEqual(put(fetchContractsFailure(error)));
       expect(gen.next().done).toBe(true);
