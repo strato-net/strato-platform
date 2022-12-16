@@ -10,6 +10,7 @@
 module Main where
 
 import           Control.Concurrent.Lock                as L
+-- import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.ByteString                        as B hiding (putStrLn, map, filter)
@@ -23,16 +24,16 @@ import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header              as TH
-import           Network.Wai.Handler.Warp              (run)
-import           Network.Wai                           as W
+import           Network.Wai.Handler.Warp               (run)
+import           Network.Wai                            as W
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
 
 import           BlockApps.Init
-import           Servant.Client
-import           Strato.VaultProxy.DataTypes              as VaultProxy
-import           Strato.VaultProxy.RawOauth               as RO
+import           Servant.Client                         as S 
+import           Strato.VaultProxy.DataTypes            as VaultProxy
+import           Strato.VaultProxy.RawOauth             as RO
 import           Strato.VaultProxy.Server.Token
 
 import           Options
@@ -59,6 +60,8 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   -- $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
+  inspectVaultUrl flags_VAULT_URL
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
@@ -160,3 +163,13 @@ checkXuat rev vc = do
 
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
+
+inspectVaultUrl :: T.Text -> IO ()
+inspectVaultUrl url = do
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
+  purl <- S.parseBaseUrl $ T.unpack url
+  if | (S.baseUrlHost purl == "172.17.0.1") -> do
+        traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
+        pure ()
+     | (S.baseUrlScheme purl == S.Http) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
+     | otherwise -> pure ()
