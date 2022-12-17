@@ -340,6 +340,7 @@ functionResult i txHash txResult mmd toAccount = do
     for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
       either (throwIO . UserError . Text.pack) return $
         xabiTypeToType xabi indexedTypeType
+  
   let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
       txResp = fromShort $ transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
@@ -350,7 +351,13 @@ functionResult i txHash txResult mmd toAccount = do
         --"SolidVM" -> pure $ convertResultResToVals txResp mappedResultTypes 
         "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
         _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
-  $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show theVM
+  
+  $logInfoS "DEBUG__________________________orderedResultTypes: " . Text.pack $ show orderedResultTypes 
+  $logInfoS "DEBUG__________________________mappedResultTypes: " . Text.pack $ show mappedResultTypes 
+  $logInfoS "DEBUG__________________________transactionResultResponse: " . Text.pack $ show transactionResultResponse
+  $logInfoS "DEBUG__________________________txResult: " . Text.pack $ show txResult 
+  
+  $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show $ "VM type: "++theVM
   case transactionResultMessage txResult of
     "Success!" -> do
       {-
