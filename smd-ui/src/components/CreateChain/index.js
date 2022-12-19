@@ -105,10 +105,22 @@ class CreateChain extends Component {
               }
             });
           }
+          if (val.constr && val.constr.args !== undefined) {
+            Object.getOwnPropertyNames(val.constr.args).forEach((arg) => {
+              if (values[arg] !== undefined) {
+                let val = values[arg]
+                try {
+                  args[arg] = JSON.parse(val)
+                } catch (e) {
+                  args[arg] = val;
+                }
+              }
+            })
+          }
         });
       }
 
-      this.props.createChain(values.chainName, members, balances, integrations, values.governanceContract, args, values.vm, this.props.limit, this.props.offset);
+      this.props.createChain(values.chainName, members, balances, integrations, values.governanceContract, args, values.vm, this.props.contractName, this.props.limit, this.props.offset);
       this.setState({
         members: [],
         integrations: [],
@@ -375,7 +387,6 @@ class CreateChain extends Component {
 
   render() {
     const contracts = this.props.abi ? Object.keys(this.props.abi.src) : [];
-    console.log(contracts);
 
     return (
       <div className="smd-pad-16">
