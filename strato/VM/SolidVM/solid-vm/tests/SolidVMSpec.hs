@@ -1912,7 +1912,7 @@ contract qq {
     uint k = 99;
     return k;
   }
-}|] `shouldReturn` Just "99"
+}|] `shouldReturn` Just "(99)"
 
   it "can externally return tuples" . runTest $ do
     er <- runCall' "f" "()" [r|
@@ -2035,9 +2035,9 @@ contract qq is BaseContainer {
 }|]
 -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the decprecated function runCall
     runCall' "contains" "(10)" ctract `shouldReturn`
-        Just  "0"
+        Just  "(0)"
     runCall' "contains" "(4)" ctract `shouldReturn`
-        Just  "1"
+        Just  "(1)"
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall' "value" "()" [r|
@@ -2055,7 +2055,7 @@ contract qq is A, B {
     function value() public returns (uint) {
         return super.value();
     }
-}|] `shouldReturn` Just (show $ parseHex "b")
+}|] `shouldReturn` Just ("("++show (parseHex "b")++")")
 
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall' "value" "()" [r|
@@ -2069,7 +2069,7 @@ contract qq is A, B {
   function value() public returns (uint) {
     return super.value();
   }
-}|] `shouldReturn` Just (show $ parseHex "a")
+}|] `shouldReturn` Just ("("++show (parseHex "a")++")")
 
   it "can determine super instance by function name" . runTest $ do
     runBS [r|
@@ -2272,7 +2272,7 @@ contract qq {
   function a() public returns (address) {
     return msg.sender;
   }
-}|] `shouldReturn` Just (want)
+}|] `shouldReturn` Just ("("++want++")")
 
 
   it "can return an enum" . runTest $ do
@@ -2282,7 +2282,7 @@ contract qq {
   function a() public returns (Letter) {
     return Letter.c;
   }
-}|] `shouldReturn` Just "2"
+}|] `shouldReturn` Just "(2)"
 
   it "will initialize contracts as such" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
@@ -2343,7 +2343,7 @@ contract qq {
   function self() public returns (qq) {
     return qq(this);
   }
-}|] `shouldReturn` Just (want)
+}|] `shouldReturn` Just ("("++want++")")
 
   it "merges actions for concurrent modifications" . runTest $ do
     xr <- runBS' [r|
@@ -2421,7 +2421,7 @@ contract qq {
     string ret = "Ticket ID already exists";
     return ret;
   }
-}|] `shouldReturn` Just "\"Ticket ID already exists\""
+}|] `shouldReturn` Just "(\"Ticket ID already exists\")"
 
 
   it "can return tuples of strings" . runTest $ do
@@ -2449,7 +2449,7 @@ contract qq {
     bytes32 ret = bytes32(0x5469636b657420494420616c7265616479206578697374730000000000000000);
     return ret;
   }
-}|] `shouldReturn` Just "Ticket ID already exists"
+}|] `shouldReturn` Just "(Ticket ID already exists)"
 
   it "can return state variables" . runTest $ do
     runCall' "getS" "()" [r|
@@ -2458,7 +2458,7 @@ contract qq {
   function getS() public returns (string) {
     return s;
   }
-}|] `shouldReturn` Just "\"The mitochondria is the powerhouse of the cell\""
+}|] `shouldReturn` Just "(\"The mitochondria is the powerhouse of the cell\")"
 
   it "can return state variables in tuples" . runTest $ do
     runCall' "getSAndB" "()" [r|
@@ -5132,7 +5132,7 @@ contract qq {
     d.flags[1] = true;
     return d.flags[1];
   }
-}|] `shouldReturn` Just "1"
+}|] `shouldReturn` Just "(1)"
 
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5143,7 +5143,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "1"
+}|] `shouldReturn` Just "(1)"
 
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5154,7 +5154,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "1"
+}|] `shouldReturn` Just "(1)"
 
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall' "a" "()" [r|
@@ -5178,7 +5178,7 @@ contract qq {
   function a() public returns (bytes32) {
     return keccak256("hello", "world"); 
   }
-}|] `shouldReturn` Just ("\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\"")
+}|] `shouldReturn` Just ("(\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\")")
 --keccak256ToByteString function implementation wrong
   it "cant use  a commented pragma" . runTest $ do
     runCall' "a" "()" [r|
@@ -5187,7 +5187,7 @@ contract qq {
   function a() public returns (uint) {
     return 2;
   }
-}|] `shouldReturn` Just "2"
+}|] `shouldReturn` Just "(2)"
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
 
@@ -6127,7 +6127,7 @@ contract qq {
   }
 }
 
-|] `shouldReturn` Just "2"
+|] `shouldReturn` Just "(2)"
 
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
@@ -6146,7 +6146,7 @@ contract qq {
     p.y = 2;
     return p.x;
   }
-}|] `shouldReturn` (Just "1")
+}|] `shouldReturn` (Just "(1)")
 
   it "should bitshift assign" . runTest $ do
     runBS [r|
