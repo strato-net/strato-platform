@@ -67,6 +67,7 @@ executables:
     dependencies:
       - aeson
       - async
+      - base64
       - blockapps-data
       - blockapps-init
       - blockapps-vault-wrapper-api

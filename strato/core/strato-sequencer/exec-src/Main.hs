@@ -10,6 +10,8 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
+import           Data.ByteString.Base64
+import           Data.Text                  (unpack)
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -66,15 +68,19 @@ main = do
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
   maybeNetworkParams <- Net.getParams flags_network
-  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
+  let b64decode inp = 
+        case decodeBase64 inp of
+          Right v -> v
+          Left e -> error $ "invalid base64 input: " ++ unpack e
+      eValidators = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
       !validators' =
         case (maybeNetworkParams, eValidators) of
           (Just networkParams, Right []) -> map Net.identity networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid validators: " ++ e
-      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
+      eAuthSenders = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
-      eSelf = Ae.eitherDecodeStrict (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
+      eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
  
 

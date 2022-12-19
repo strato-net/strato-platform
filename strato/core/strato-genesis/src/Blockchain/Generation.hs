@@ -198,6 +198,7 @@ insertCertRegistryContract gi =
       rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
       addrToCertIdx   = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ "1337") MainChain) 
       certSubject     = fromJust $ getCertSubject rootCert
+      testCertSubject = fromJust $ getCertSubject testRootCert
       registryAcct    = SolidVMContractWithStorage 0x509 509 
         (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) 
         [
@@ -219,7 +220,21 @@ insertCertRegistryContract gi =
             (".isValid", rlpWrap (BBool True)),
             (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert)
         ]
-  in gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, certAcct],
+      testRootAcct = SolidVMContractWithStorage 0x9999 0
+        (SolidVMCode "Certificate" (KECCAK256.hash encodedCert))
+        [
+            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
+            (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ testCertSubject) MainChain)),
+            (".commonName", rlpWrap . BString . BC.pack . subCommonName $ testCertSubject),
+            (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ testCertSubject),
+            (".organization", rlpWrap . BString . BC.pack . subOrg $ testCertSubject),
+            (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ testCertSubject),
+            (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ testCertSubject),
+            (".publicKey", rlpWrap . BString . pubToBytes . subPub $ testCertSubject),
+            (".certificateString", rlpWrap . BString $ certToBytes testRootCert),
+            (".isValid", rlpWrap (BBool True)),
+            (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ testRootCert)
+        ]  in gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, certAcct, testRootAcct],
          genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]
                                               ++ [CodeInfo encodedCert certificateContract (Just "Certificate")]}
 
