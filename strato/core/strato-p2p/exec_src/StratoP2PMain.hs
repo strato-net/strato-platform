@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings     #-}
+import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
 import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
+import           BlockApps.Logging
 import           Blockchain.Context
 import           Blockchain.Options
 import           Blockchain.Participation (p2pApp, setParticipationMode)
@@ -17,14 +19,18 @@ import           Data.Set.Ordered (empty)
 
 main :: IO ()
 main = do
-  blockappsInit "strato_p2p"
-  resetPeers
-  _ <- $initHFlags "Strato P2P"
+  runLoggingT initP2P
+
+initP2P :: LoggingT IO ()
+initP2P = do
+  liftIO $ blockappsInit "strato_p2p"
+  liftIO $ resetPeers
+  _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
-  wireMessagesRef <- newIORef empty
+  wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   let sSource = seqEventNotificationSource $ contextKafkaState initContext
       runner f = runContextM cfg $ f sSource
-  race_
+  liftIO $ race_
     (run 10248 $ prometheus def p2pApp)
     (stratoP2P runner)
