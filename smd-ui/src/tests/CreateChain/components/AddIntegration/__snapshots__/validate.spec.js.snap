@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AddIntegration: validate when form has no values 1`] = `Object {}`;
+
+exports[`AddIntegration: validate when form has values 1`] = `Object {}`;

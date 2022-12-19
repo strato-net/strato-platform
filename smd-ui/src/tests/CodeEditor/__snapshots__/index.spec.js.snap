@@ -163,6 +163,13 @@ ShallowWrapper {
               sourceFromEditor={undefined}
               textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
             />
+            <withRouter(Connect(ReduxForm))
+              contractNameFromEditor="Cloner"
+              enableCreateContract={false}
+              onChangeEditorContractName={undefined}
+              sourceFromEditor={undefined}
+              textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+            />
           </div>
         </div>,
         <div
@@ -434,6 +441,13 @@ ShallowWrapper {
                 sourceFromEditor={undefined}
                 textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
               />
+              <withRouter(Connect(ReduxForm))
+                contractNameFromEditor="Cloner"
+                enableCreateContract={false}
+                onChangeEditorContractName={undefined}
+                sourceFromEditor={undefined}
+                textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+              />
             </div>,
           ],
           "className": "row",
@@ -519,6 +533,13 @@ ShallowWrapper {
                     />
                   </Blueprint.Button>
                 </Blueprint.Popover>,
+                <withRouter(Connect(ReduxForm))
+                  contractNameFromEditor="Cloner"
+                  enableCreateContract={false}
+                  onChangeEditorContractName={undefined}
+                  sourceFromEditor={undefined}
+                  textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+                />,
                 <withRouter(Connect(ReduxForm))
                   contractNameFromEditor="Cloner"
                   enableCreateContract={false}
@@ -618,6 +639,21 @@ ShallowWrapper {
                   },
                   "type": [Function],
                 },
+                "type": [Function],
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "contractNameFromEditor": "Cloner",
+                  "enableCreateContract": false,
+                  "onChangeEditorContractName": undefined,
+                  "sourceFromEditor": undefined,
+                  "textFromEditor": "contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}",
+                },
+                "ref": null,
+                "rendered": null,
                 "type": [Function],
               },
               Object {
@@ -1525,6 +1561,13 @@ ShallowWrapper {
                 sourceFromEditor={undefined}
                 textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
               />
+              <withRouter(Connect(ReduxForm))
+                contractNameFromEditor="Cloner"
+                enableCreateContract={false}
+                onChangeEditorContractName={undefined}
+                sourceFromEditor={undefined}
+                textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+              />
             </div>
           </div>,
           <div
@@ -1796,6 +1839,13 @@ ShallowWrapper {
                   sourceFromEditor={undefined}
                   textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
                 />
+                <withRouter(Connect(ReduxForm))
+                  contractNameFromEditor="Cloner"
+                  enableCreateContract={false}
+                  onChangeEditorContractName={undefined}
+                  sourceFromEditor={undefined}
+                  textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+                />
               </div>,
             ],
             "className": "row",
@@ -1881,6 +1931,13 @@ ShallowWrapper {
                       />
                     </Blueprint.Button>
                   </Blueprint.Popover>,
+                  <withRouter(Connect(ReduxForm))
+                    contractNameFromEditor="Cloner"
+                    enableCreateContract={false}
+                    onChangeEditorContractName={undefined}
+                    sourceFromEditor={undefined}
+                    textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
+                  />,
                   <withRouter(Connect(ReduxForm))
                     contractNameFromEditor="Cloner"
                     enableCreateContract={false}
@@ -1980,6 +2037,21 @@ ShallowWrapper {
                     },
                     "type": [Function],
                   },
+                  "type": [Function],
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "function",
+                  "props": Object {
+                    "contractNameFromEditor": "Cloner",
+                    "enableCreateContract": false,
+                    "onChangeEditorContractName": undefined,
+                    "sourceFromEditor": undefined,
+                    "textFromEditor": "contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}",
+                  },
+                  "ref": null,
+                  "rendered": null,
                   "type": [Function],
                 },
                 Object {

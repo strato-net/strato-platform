@@ -364,10 +364,14 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
-instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
-  select _ = \case
-    Nothing -> pure . Just $ ParentChainId Nothing
-    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+-- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
+--   -- TODO: Just using this to sneak past the compiler... actually completethese these out
+--   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
+--   insert _ _ _ = pure ()
+--   delete _ _ = pure ()
+
+instance A.Selectable Word256 ParentChainIds SequencerM where
+  select _ cId = join . fmap (fmap (ParentChainIds . parentChains . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB

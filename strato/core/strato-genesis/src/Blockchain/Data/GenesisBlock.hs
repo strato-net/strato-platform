@@ -272,7 +272,7 @@ initializeChainDBs :: ( MonadLogger m
                       , HasSQLDB m
                       , HasStateDB m
                       , (Account `A.Alters` AddressState) m
-                      , A.Selectable (Maybe Word256) ParentChainId m
+                      , A.Selectable Word256 ParentChainIds m
                       )
                    => Maybe Word256
                    -> ChainInfo

@@ -1,0 +1,45 @@
+.deploy-dapp-dialog .chain-field {
+  width: 100%;
+}
+
+.input {
+  padding: 1%;
+  margin-top: 1%;
+  margin-left: 10%;
+}
+
+.deploy-dapp-form .form-width {
+  width: 100%;
+}
+
+.no-member {
+  border-radius: 60px;
+}
+
+.member:hover {
+  cursor: pointer !important;
+  background: #30434D;
+  border-radius: 60px;
+}
+
+.member-remove:hover {
+  background-color: red !important;
+}
+
+.no-integration {
+  border-radius: 60px;
+}
+
+.integration:hover {
+  cursor: pointer !important;
+  background: #30434D;
+  border-radius: 60px;
+}
+
+.integration-remove:hover {
+  background-color: red !important;
+}
+
+.dropzoneContainer {
+  width: 100% !important;
+}

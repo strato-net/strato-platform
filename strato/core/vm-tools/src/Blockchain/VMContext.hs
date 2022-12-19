@@ -232,7 +232,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable BestBlockRoot m
                 , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
-                , A.Selectable (Maybe Word256) ParentChainId m
+                , A.Selectable Word256 ParentChainIds m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
@@ -439,8 +439,8 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
 
-instance A.Selectable (Maybe Word256) ParentChainId ContextM where
-  select _ chainId = fmap (\(_,_,p) -> ParentChainId p) <$> getChainGenesisInfo chainId
+instance A.Selectable Word256 ParentChainIds ContextM where
+  select _ chainId = fmap (\(_,_,p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ = genericLookupCodeDB $ getCodeDB

@@ -6804,37 +6804,41 @@ contract qq {
 }
 |]) `shouldThrow` anyTypeError
 
-  it "can get code from other contracts using type function" . runTest $ do
+  it "can make user defined types" . runTest $ do
     runBS [r|
+      type MagicInt is int;
+      type NagicIn is uint;
 
-contract qq {
-  string  bb = type(qq).creationCode;
-  string  dd = type(C).name;
-  string  cc = type(B).creationCode;
-}
+      contract B {
+        uint ggg =  NagicIn.unwrap(NagicIn.wrap(3));
+        MagicInt myInt;
+        int public regularInt;
+        
+        constructor() {
+            myInt = MagicInt.wrap( 1+ 1+ 1); //creates defined type using wrap function
+            regularInt = MagicInt.unwrap(myInt); // turn userDefined type back into underlying type
+        }
 
-contract B {
-  string  cc = type(qq).creationCode;
+        function foo() returns (MagicInt) { return  MagicInt.wrap(2);}
+      }
 
-}
+  contract qq {
+    B b =  new B();
+    int a;
+    int funcB;
+    MagicInt temp;
+    int temp2;
 
-contract C {
-  int b = 123;
-}
+    constructor() {
+        a = b.regularInt();
+        funcB = MagicInt.unwrap(b.foo()) + MagicInt.unwrap(b.foo());
+        temp = b.foo();
+        temp2 =  MagicInt.unwrap( MagicInt.wrap( MagicInt.unwrap(b.foo()) + MagicInt.unwrap(b.foo())  ));   
+    }
+  }
 
 |]
-    getFields ["bb", "cc", "dd"] `shouldReturn` 
-      [ BString "contract qq {\n  string bb = type(qq).creationCode;\n  string cc = type(B).creationCode;\n  string dd = type(C).name;\n  // no constructor found\n}"
-      , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
-      , BString "C"]
-
-  it "can detect when referencing a contract not at file level using type function" $ (runTest $
-    runBS [r|
-
-contract A {
-  uint x = type(B).name;
-
-}|]) `shouldThrow` anyTypeError
+    getFields ["funcB", "temp2", "a", "temp"] `shouldReturn` [BInteger 4, BInteger 4, BInteger 3, BInteger 2]
 
   xit "cant infinite loop" $ (runTestWithTimeout 20000000 $
     runBS [r|

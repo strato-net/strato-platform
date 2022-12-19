@@ -289,17 +289,16 @@ instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) 
                       . RBDB.withRedisBlockDB
                       . RBDB.getChainTxsInBlock
 
-instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (ReaderT Config m) where
-  selectWithDefault p sha = A.select p sha <&> fromMaybe (ParentChainId Nothing)
-  select _ Nothing = pure . Just $ ParentChainId Nothing
-  select _ (Just cId) = do
+instance MonadIO m => A.Selectable Word256 ParentChainIds (ReaderT Config m) where
+  selectWithDefault p sha = A.select p sha <&> fromMaybe (ParentChainIds M.empty)
+  select _ cId = do
     mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
-    pure $ mCInfo <&> ParentChainId . parentChain . chainInfo
+    pure $ mCInfo <&> ParentChainIds . parentChains . chainInfo
 
 instance (MonadIO m, MonadLogger m) => A.Selectable Word256 ChainMemberRSet (ReaderT Config m) where
   select p cid = Just <$> A.selectWithDefault p cid
   selectWithDefault _ cid = do
-    ancestors <- catMaybes <$> getAncestorChains (Just cid)
+    ancestors <- toList <$> getAncestorChains cid
     allRSets <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
     case allRSets of
       [] -> pure $ ChainMemberRSet rSetEmpty
