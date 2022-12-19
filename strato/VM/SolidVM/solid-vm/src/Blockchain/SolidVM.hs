@@ -56,7 +56,7 @@ import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
-import qualified Data.Vector as V
+import qualified Data.Vector as V     
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
@@ -92,7 +92,6 @@ import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
 import           BlockApps.X509.Certificate
 import           BlockApps.X509.Keys
--- import           BlockApps.Logging
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -121,9 +120,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
-
-
- 
+import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -2875,13 +2872,23 @@ logVals val1 val2 = onTraced . liftIO $ printf
 
 --TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 -- change the return type from ByteSTring to String
-encodeForReturn :: MonadSM m => Value -> m String
-encodeForReturn (SInteger i) = return . show $  i
-encodeForReturn (SEnumVal _ _ v) = return . show $ v
-encodeForReturn ((SAccount a _)) = return .  show $ a ^. namedAccountAddress
-encodeForReturn (SContract _ a) = return .  show $ a ^. namedAccountAddress
-encodeForReturn (SBool b) = return .  show . fromEnum $ b
-encodeForReturn (SString s) = return $ show s
+
+encodeForReturn ::  MonadSM m => Value -> m String
+encodeForReturn v = 
+  case trace ("DEBUG__________encodeForReturn: " ++ show v) v of
+    STuple{} ->  encodeForReturn' v
+    _ ->  do
+      v' <- encodeForReturn' v
+      return $ "(" <> v' <> ")"
+    
+
+encodeForReturn' :: MonadSM m => Value -> m String
+encodeForReturn' (SInteger i) = return . show $  i
+encodeForReturn' (SEnumVal _ _ v) = return . show $ v
+encodeForReturn' ((SAccount a _)) = return .  show $ a ^. namedAccountAddress
+encodeForReturn' (SContract _ a) = return .  show $ a ^. namedAccountAddress
+encodeForReturn' (SBool b) = return .  show . fromEnum $ b
+encodeForReturn' (SString s) = return $ show s
 {- The following comments are just for previous encodeForReturn function to return ByteString type. 
 -- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
 --   1) starting at the first value to encode, check if it is fixed length type (32), or
@@ -2905,14 +2912,14 @@ encodeForReturn (SString s) = return $ show s
 -- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 -}
-encodeForReturn (SArray _ items) = do
-  encodedItems <- mapM (encodeForReturn <=< getVar) $ V.toList items
+encodeForReturn' (SArray _ items) = do
+  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
   return $ "[" ++ ( intercalate "," encodedItems ) ++ "]"  --[,]
-encodeForReturn (STuple items)   = do
-  encodedItems <- mapM (encodeForReturn <=< getVar) $ V.toList items
+encodeForReturn' (STuple items)   = do
+  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
   return $ "(" ++ ( intercalate "," encodedItems ) ++ ")" 
 
-encodeForReturn x = todo "Cannot encode this return type: " x
+encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
 

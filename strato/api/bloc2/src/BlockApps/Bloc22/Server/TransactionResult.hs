@@ -85,6 +85,7 @@ import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
 import           SolidVM.Model.CodeCollection.Statement
+import           Debug.Trace
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -354,10 +355,9 @@ functionResult i txHash txResult mmd toAccount = do
   
   $logInfoS "DEBUG__________________________orderedResultTypes: " . Text.pack $ show orderedResultTypes 
   $logInfoS "DEBUG__________________________mappedResultTypes: " . Text.pack $ show mappedResultTypes 
-  $logInfoS "DEBUG__________________________transactionResultResponse: " . Text.pack $ show transactionResultResponse
+  $logInfoS "DEBUG__________________________transactionResultResponse: " . Text.pack $ show $ transactionResultResponse txResult
   $logInfoS "DEBUG__________________________txResult: " . Text.pack $ show txResult 
-  
-  $logInfoS "mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ show $ "VM type: "++theVM
+  $logInfoS "DEBUG__________________________mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ ", VM type: " ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
       {-
@@ -365,9 +365,12 @@ functionResult i txHash txResult mmd toAccount = do
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
       -}
-      let r = Text.decodeUtf8 $ Base16.encode txResp  
+      --let r = Text.decodeUtf8 $ Base16.encode txResp  --remove base16
+      let r = Text.decodeUtf8 $ txResp
       $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
-      $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r
+      $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r 
+      let temp = Text.decodeUtf8 $ Base16.encode txResp 
+      $logInfoS "DEBUG__________________________" . Text.pack $ "TEST" ++ show temp
       $logInfoS "DEBUG__________________________" . Text.pack $ "mFormattedResponse" ++ show mFormattedResponse
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
@@ -394,8 +397,9 @@ convertResultResToVals byteResp responseTypes =
 
 convertSvmResultResToVals :: String ->  Maybe [SolidityValue]
 convertSvmResultResToVals resp =
+  -- let respTuple = "("++resp
   let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
-   in case args of 
+   in case trace ("DEBUG__________run parser args: " ++ show args)  args of 
         Left _ -> Nothing
         Right y -> let values = traverse expressionToValue y
                     in fmap valueToSolidityValue <$> values
