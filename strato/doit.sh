@@ -444,6 +444,23 @@ if [[ -z ${VAULT_URL} ]] ; then
   exit 1
 fi
 
+# This will check if the link provided is valid format, and if it is HTTPS
+vaultUrlRegex='^(https|HTTPS):\/\/[-[:alnum:]\+&@#\/%?=~_|!:,.;]*[-[:alnum:]\+&@#\/%=~_|]'
+vaultUrlExceptionRegex='[ -~]*172\.17\.0\.1*[ -~]' ##172.17.0.1 is the only ip address that it should allow everything
+##There are also checks within the vault-proxy to detect if the VAULT_URL is valid, this one is just a basic check
+if [[ $VAULT_URL =~ $vaultUrlRegex ]]
+then 
+    echo "VAULT_URL provided is valid, check https"
+else
+    if [[ $VAULT_URL =~ $vaultUrlExceptionRegex ]]
+    then 
+        echo "Special case: VAULT_URL provided is valid"
+    else
+        echo "VAULT_URL provided is not valid"
+        exit 1
+    fi
+fi
+
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 [[ -n $network ]] && addBootnodes=true
