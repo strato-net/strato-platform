@@ -32,7 +32,7 @@ import           Text.Printf
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Type
 import           Blockchain.Strato.Model.Address
-import           Debug.Trace
+--import           Debug.Trace
 data SolidityValue
   = SolidityValueAsString Text
   | SolidityBool Bool
@@ -76,7 +76,7 @@ instance FromJSON SolidityValue where
 valueToSolidityValue ::  Value -> SolidityValue
 valueToSolidityValue v = 
   case  (valueToSolidityValue' v) of
-    Just sv ->  trace ("DEBUG__________sv: " ++ show sv)  sv
+    Just sv -> sv
     Nothing -> case v of
       -- This would be better handled by Value synthesis, but it seems difficult
       -- to distinguish the length of a nested array and an unaggregated sentinel.

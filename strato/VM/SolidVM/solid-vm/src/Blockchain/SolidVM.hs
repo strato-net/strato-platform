@@ -120,7 +120,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
-import           Debug.Trace
+--import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.

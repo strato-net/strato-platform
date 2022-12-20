@@ -85,7 +85,7 @@ import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
 import           SolidVM.Model.CodeCollection.Statement
-import           Debug.Trace
+--import           Debug.Trace
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
