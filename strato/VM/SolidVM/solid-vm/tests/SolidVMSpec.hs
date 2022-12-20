@@ -1573,13 +1573,13 @@ contract qq is Parent {
     getFields ["x", "y"]` shouldReturn` [BInteger 3, BInteger 999]
 
   it "can call functions" . runTest $ do
-    runCall "inc" "()" [r|
+    runCall' "inc" "()" [r|
 contract qq {
   uint x = 99;
   function inc() {
     x++;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["x"] `shouldReturn` [BInteger 100]
 
   it "can call external getters by variable name" . runTest $ do
@@ -1721,17 +1721,17 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
 
   it "can accept remote arrays" . runTest $ do
-    runCall "addHead" "([10, 17])" [r|
+    runCall' "addHead" "([10, 17])" [r|
 contract qq {
   uint x;
   function addHead(uint[] ts) public {
     x += ts[0];
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["x"] `shouldReturn` [BInteger 10]
 
   it "can push to memory arrays" . runTest $ do
-    runCall "pushMem" "([3, 5])" [r|
+    runCall' "pushMem" "([3, 5])" [r|
 contract qq {
   uint x;
   function pushMem(uint[] memory ts) public {
@@ -1739,7 +1739,7 @@ contract qq {
     uint[] cpy = ts; 
     x = cpy[2];
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()" 
     getFields ["x"] `shouldReturn` [BInteger 7]
 
   it "can store array literals" . runTest $ do
@@ -1869,7 +1869,7 @@ contract qq {
     void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
     getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 400]
 
-    call2 "a" "()" secondAddress `shouldReturn` Nothing
+    call2 "a" "()" secondAddress `shouldReturn` Just "()"
     getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
@@ -2272,7 +2272,7 @@ contract qq {
   function a() public returns (address) {
     return msg.sender;
   }
-}|] `shouldReturn` Just ("("++want++")")
+}|] `shouldReturn` Just ("(\""++want++"\")")
 
 
   it "can return an enum" . runTest $ do
@@ -2343,7 +2343,7 @@ contract qq {
   function self() public returns (qq) {
     return qq(this);
   }
-}|] `shouldReturn` Just ("("++want++")")
+}|] `shouldReturn` Just ("(\""++want++"\")")
 
   it "merges actions for concurrent modifications" . runTest $ do
     xr <- runBS' [r|
@@ -2384,18 +2384,18 @@ contract qq {
     getFields ["c"] `shouldReturn` [BEnumVal "E" "C" 2]
 
   it "can cast ints to enums" . runTest $ do
-    runCall "f" "(1)" [r|
+    runCall' "f" "(1)" [r|
 contract qq {
   enum E {A, B, C, D}
   E e;
   function f(E _e) {
     e = _e;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["e"] `shouldReturn` [BEnumVal "E" "B" 1]
 
   it "can compare ints to enums" . runTest $ do
-    runCall "f" "(1)" [r|
+    runCall' "f" "(1)" [r|
 contract qq {
   enum E {A, B, C, D}
   bool is_a;
@@ -2408,7 +2408,7 @@ contract qq {
     is_c = _e == E.C;
     is_d = _e == E.D;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
       [BDefault, BBool True, BDefault, BDefault]
 
@@ -2470,13 +2470,13 @@ contract qq {
 }|] `shouldReturn` Just "(\"The mitochondria is the powerhouse of the cell\",\"The mitochondria is the powerhouse of the cell\")"
 
   it "can accept string arguments" . runTest $ do
-    runCall' "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
+    runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
 contract qq {
   string st;
   function set(string _st) public {
     st = _st;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
 
   it "can accept Unicode string arguments" . runTest $ do
@@ -2486,7 +2486,7 @@ contract qq {
   function set(string _st) public {
     st = _st;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
 
   it "can encode Unicode strings in Solidtiy source" . runTest $ do
@@ -2503,7 +2503,7 @@ contract qq {
   function set(bytes32 _bs) public {
     bs = _bs;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
 
   it "should not compute remote arguments" $ runTest (do
@@ -2524,7 +2524,7 @@ contract qq {
     a = _a;
     b = _b;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["a", "b"] `shouldReturn` [BBool True, BDefault]
 
   it "sets the origin correctly" . runTest $ do
@@ -3340,7 +3340,7 @@ contract qq {
   function concat(string a, string b) public {
     c = a + b;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["c"] `shouldReturn` [BString "Hello World!"]
 
   it "can append to a string" . runTest $ do
@@ -3350,7 +3350,7 @@ contract qq {
   function append(string b) public {
     a += b;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
     getFields ["a"] `shouldReturn` [BString "Hello World!"]
 
   it "can cast accounts and addresses to string" . runTest $ do
@@ -5272,7 +5272,7 @@ contract qq {
         }
     }
 
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
 
 
 
@@ -5338,7 +5338,7 @@ contract qq {
     x = 5;
     return;
   }
-}|] `shouldReturn` Nothing
+}|] `shouldReturn` Just "()"
 
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
@@ -6130,7 +6130,7 @@ contract qq {
 |] `shouldReturn` Just "(2)"
 
   it "can declare structs at the file level" . runTest $ do
-    runCall "a" "()" [r|
+    runCall' "a" "()" [r|
 
 
 
