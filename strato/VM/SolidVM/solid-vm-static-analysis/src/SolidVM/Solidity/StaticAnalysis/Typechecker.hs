@@ -1264,7 +1264,6 @@ checkIfImmuteOperationValid (Variable y a)  = do
 checkIfImmuteOperationValid a = tcExpr a
 
 
-
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
   sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
@@ -1350,13 +1349,14 @@ tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
 
-tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
+tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do -- This is a special check for user defined types
   c <- asks contract
   if M.member nam (_userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
     then do
       case args of
         OrderedArgs es -> do
           let check = case  M.lookup nam (_userDefined c)  of
+                Just "uint" ->  intType' x ~>  tcExpr (head es)
                 Just "int" ->  intType' x ~>  tcExpr (head es)
                 Just "string" -> stringType' x ~>  tcExpr (head es)
                 Just "bool" -> boolType' x ~>  tcExpr  (head es)
@@ -1374,28 +1374,21 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
           NamedArgs es -> apply e a $ Just (fst <$> es)
           _ -> apply e a Nothing
 
-tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
+tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do -- Special function to catch user defined types using unwrap
   c <- asks contract
   if (M.member nam $ _userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False)
     then do
       case args of
         OrderedArgs es -> do
           expressionResult <- tcExpr (head es)
-          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          let actualTypeOfUserDefinedVar =   userTypeHelper' $ M.lookup nam (_userDefined c)
           let check  =  (case expressionResult of 
-                (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
-                  then case actual of 
-                    (SVMType.Int  _ _) ->  pure $ (intType' x)
-                    (SVMType.String  _) -> pure $ (stringType' x)
-                    SVMType.Bool -> pure $ (boolType' x) 
-                    (SVMType.Bytes _ _ ) -> pure $ (bytesType' x)
-
-                    _ ->  pure . bottom $ "Not supported for casting such type to user defined type" <$ x
-                  else pure . bottom $ "Wrong User defined type" <$ x
+                (Static (SVMType.UserDefined name actual)  _) -> pure $ checkerUserDefinedGetType (SVMType.UserDefined name actual) nam x
+                (Product  [(Static (SVMType.UserDefined name actual)  _)]  _) ->   pure $ checkerUserDefinedGetType (SVMType.UserDefined name actual) nam x
                 _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x)
           check !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
         _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
-    else do  --Case of no user defines
+    else do  --Case of not user defines, for other functions that define a wrap and unwrap
       e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
       a <- case args of
         OrderedArgs es -> productType' x <$> traverse tcExpr es
@@ -1403,6 +1396,19 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
       case args of
         NamedArgs es -> apply e a $ Just (fst <$> es)
         _ -> apply e a Nothing
+  where 
+        checkerUserDefinedGetType :: Type -> SolidString -> SourceAnnotation Text ->  Type'
+        checkerUserDefinedGetType  (SVMType.UserDefined nameOfVar actuall) namm spot  =
+                if namm == nameOfVar 
+                    then case actuall of 
+                      (SVMType.Int  _ _) ->  (intType' spot)
+                      (SVMType.String  _) ->  (stringType' spot)
+                      SVMType.Bool -> (boolType' spot) 
+                      (SVMType.Bytes _ _ ) ->  (bytesType' spot)
+                      _ ->  bottom $ "Not supported for casting such type to user defined type" <$ spot
+                    else bottom $ "Wrong User defined type" <$ spot
+        checkerUserDefinedGetType _ _ spot = bottom $ "Wrong User defined type" <$ spot
+
 
 tcExpr (FunctionCall x (Variable _ "type") args) =
   pure $ case args  of 
