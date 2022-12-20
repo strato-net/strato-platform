@@ -11,7 +11,6 @@ import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base64
-import           Data.Text                  (unpack)
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -48,7 +47,7 @@ main = do
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
-  
+
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
@@ -61,17 +60,15 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-  
+
   -- setup the connection with vault-wrapper
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
   maybeNetworkParams <- Net.getParams flags_network
-  let b64decode inp = 
-        case decodeBase64 inp of
-          Right v -> v
-          Left e -> error $ "invalid base64 input: " ++ unpack e
+  --  Allow these flags to accept base64-encoded JSONs optionally
+  let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
       eValidators = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
       !validators' =
         case (maybeNetworkParams, eValidators) of
@@ -82,12 +79,12 @@ main = do
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
- 
+
 
   mCtx <- if not flags_blockstanbul
              then return Nothing
              else do
-               validators <- 
+               validators <-
                  if flags_isRootNode then do
                    when (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me an empty validators list. \
@@ -100,11 +97,11 @@ main = do
                         \ node. This is a configuration error on your part. \
                         \ PBFT will almost certainly not function properly."
                    return validators'
-                
+
                authSenders <-
-                 if flags_isAdmin || flags_isRootNode then 
+                 if flags_isAdmin || flags_isRootNode then
                    return $ self : authSenders'
-                 else do 
+                 else do
                    when (length authSenders' == 0) . putStrLn
                        $ "WARNING: You haven't given me any blockstanbulAdmins. If you are starting \
                        \ a single node, this is OK. But, if you are starting a network or adding a \
@@ -122,16 +119,16 @@ main = do
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
-     
+
                putStrLn $ "ACTUAL validators list: " ++ show validators
                putStrLn $ "ACTUAL admins list: " ++ show authSenders
-               
+
                ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
                putStrLn $ "Checkpoint: " ++ show ckpt
- 
+
                return $ Just $ newContext ckpt self
-  
- 
+
+
   chr <- atomically newTQueue
   chv <- atomically newTQueue
   cht <- atomically newTMChan
