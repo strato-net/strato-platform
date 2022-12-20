@@ -424,7 +424,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
-    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
+    returnVal <- fmap Just . maybe (return "()") encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -2917,6 +2917,7 @@ encodeForReturn' (SArray _ items) = do
   return $ "[" ++ ( intercalate "," encodedItems ) ++ "]"  --[,]
 encodeForReturn' (STuple items)   = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
+
   return $ "(" ++ ( intercalate "," encodedItems ) ++ ")" 
 
 encodeForReturn' x = todo "Cannot encode this return type: " x
