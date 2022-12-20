@@ -75,7 +75,7 @@ instance FromJSON SolidityValue where
 
 valueToSolidityValue ::  Value -> SolidityValue
 valueToSolidityValue v = 
-  case trace ("DEBUG__________valueToSolidityValue: " ++ show v) (valueToSolidityValue' v) of
+  case  (valueToSolidityValue' v) of
     Just sv ->  trace ("DEBUG__________sv: " ++ show sv)  sv
     Nothing -> case v of
       -- This would be better handled by Value synthesis, but it seems difficult

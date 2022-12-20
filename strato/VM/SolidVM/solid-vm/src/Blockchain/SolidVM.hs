@@ -2872,14 +2872,13 @@ logVals val1 val2 = onTraced . liftIO $ printf
 
 --TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 -- change the return type from ByteSTring to String
-
 encodeForReturn ::  MonadSM m => Value -> m String
 encodeForReturn v = 
-  case trace ("DEBUG__________encodeForReturn: " ++ show v) v of
+  case  v of
     STuple{} ->  encodeForReturn' v
     _ ->  do
       v' <- encodeForReturn' v
-      return $ "(" <> v' <> ")"
+      return $ "(" <> v' <> ")" 
     
 
 encodeForReturn' :: MonadSM m => Value -> m String

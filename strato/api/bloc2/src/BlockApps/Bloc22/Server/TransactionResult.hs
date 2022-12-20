@@ -349,29 +349,15 @@ functionResult i txHash txResult mmd toAccount = do
       theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
   mFormattedResponse <- case theVM of
         "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
-        --"SolidVM" -> pure $ convertResultResToVals txResp mappedResultTypes 
         "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
         _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
-  
-  $logInfoS "DEBUG__________________________orderedResultTypes: " . Text.pack $ show orderedResultTypes 
-  $logInfoS "DEBUG__________________________mappedResultTypes: " . Text.pack $ show mappedResultTypes 
-  $logInfoS "DEBUG__________________________transactionResultResponse: " . Text.pack $ show $ transactionResultResponse txResult
-  $logInfoS "DEBUG__________________________txResult: " . Text.pack $ show txResult 
+
   $logInfoS "DEBUG__________________________mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ ", VM type: " ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
-      {-
-      let r = Text.decodeUtf8 $ Base16.encode txResp
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
-      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
-      -}
-      --let r = Text.decodeUtf8 $ Base16.encode txResp  --remove base16
-      let r = Text.decodeUtf8 $ txResp
+      let r = Text.decodeUtf8 $ txResp  --remove base16
       $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
       $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r 
-      let temp = Text.decodeUtf8 $ Base16.encode txResp 
-      $logInfoS "DEBUG__________________________" . Text.pack $ "TEST" ++ show temp
-      $logInfoS "DEBUG__________________________" . Text.pack $ "mFormattedResponse" ++ show mFormattedResponse
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
     stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
@@ -389,17 +375,10 @@ convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 -- works for SolidVM only
--- convertSvmResultResToVals :: String -> [Type]-> Maybe [SolidityValue]
--- convertSvmResultResToVals resp =
---   let byteResp = BC.pack resp
---   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
-
-
 convertSvmResultResToVals :: String ->  Maybe [SolidityValue]
 convertSvmResultResToVals resp =
-  -- let respTuple = "("++resp
   let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
-   in case trace ("DEBUG__________run parser args: " ++ show args)  args of 
+   in case args of 
         Left _ -> Nothing
         Right y -> let values = traverse expressionToValue y
                     in fmap valueToSolidityValue <$> values
