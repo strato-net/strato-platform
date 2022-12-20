@@ -43,6 +43,7 @@ import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.Data.RLP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -108,7 +109,7 @@ putAccount chainId acc = case acc of
     A.insert A.Proxy acct blankAddressState{ addressStateBalance=balance'
                                            , addressStateCodeHash=codeHash'
                                            }
-    putStorageTrie acct $ map (word256ToBytes *** word256ToBytes) slots
+    putStorageTrie acct $ map (word256ToBytes *** (rlpSerialize . rlpEncode)) slots
   SolidVMContractWithStorage address balance' codeHash' slots -> do
     let acct = Account address chainId
     A.insert A.Proxy acct blankAddressState{ addressStateBalance=balance'

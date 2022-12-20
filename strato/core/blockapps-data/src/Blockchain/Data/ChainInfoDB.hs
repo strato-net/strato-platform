@@ -27,6 +27,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
@@ -154,7 +155,7 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
           case aInfo of
             NonContract a i -> AccountInfoRef chid a i Nothing Nothing
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
-            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just $ map (word256ToBytes *** word256ToBytes) tup)
+            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just $ map (word256ToBytes *** (rlpSerialize . rlpEncode)) tup)
             SolidVMContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
         parseCInfo ch (CodeInfo bc cc cn)  =
           CodeInfoRef ch bc (T.unpack cc) (fmap T.unpack cn)
