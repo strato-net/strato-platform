@@ -338,7 +338,8 @@ rootCert = let eCert = bsToCert $ C8.pack $ unlines
               Left _ -> error "Somehow, Palpatine has returned"
               Right c -> c
 
--- TODO: DO NOT KEEP THIS!
+-- TODO: DO NOT KEEP THIS! 
+-- or... add a flag to init a test cert based on node pubkey for develop
 testRootCert :: X509Certificate
 testRootCert = let eCert = bsToCert $ C8.pack $ unlines
                     [ "-----BEGIN CERTIFICATE-----",
