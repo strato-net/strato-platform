@@ -32,7 +32,7 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
-import qualified Data.ByteString.Base16            as Base16
+--import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
 import qualified Data.ByteString.Char8             as BC
 import           Data.Either
