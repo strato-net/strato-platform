@@ -658,7 +658,7 @@ contract qq {
     a5 = account(this, "self").chainId;
   }
 }|]
-    in length anns `shouldBe` 0
+    in length anns `shouldBe` 5
 
   it "can use the string.concat(x,y) function and succeeds when the types are strings" $
     let anns = runTypechecker [r|

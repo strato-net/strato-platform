@@ -3738,10 +3738,10 @@ contract qq {
   account a2;
   account a3;
   account a4;
-  string cid1;
-  string cid2;
-  string cid3;
-  string cid4;
+  uint cid1;
+  uint cid2;
+  uint cid3;
+  uint cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");    
@@ -3761,11 +3761,11 @@ contract qq {
   it "can get the chainId directly from the account constructor" . runTest $ do
     runBS [r|
 contract qq {
-  string a1;
-  string a2;
-  string a3;
-  string a4;
-  string a5;
+  uint a1;
+  uint a2;
+  uint a3;
+  uint a4;
+  uint a5;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
     a2 = account(0x123, "main").chainId;
@@ -4665,7 +4665,7 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
-  it "can get a users cert" . runTest $ do
+  xit "can get a users cert" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 
 contract Certificate {
@@ -6787,16 +6787,16 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
 
-  it "can return chainId in a simple manner" . runTest $ do
+  it "can return chainIdString in a simple manner" . runTest $ do
     runBS [r|
 contract qq {
   string x;
   constructor() {
-    x = this.chainId;
+    x = this.chainIdString;
   }
 }
 |] 
-    getFields ["x"] `shouldReturn` [BDefault]
+    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
   it "View functions enforced in 3.4" $ (runTest $
     runBS [r|
