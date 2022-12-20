@@ -2885,8 +2885,8 @@ encodeForReturn v =
 encodeForReturn' :: MonadSM m => Value -> m String
 encodeForReturn' (SInteger i) = return . show $  i
 encodeForReturn' (SEnumVal _ _ v) = return . show $ v
-encodeForReturn' ((SAccount a _)) = return .  show $ a ^. namedAccountAddress
-encodeForReturn' (SContract _ a) = return .  show $ a ^. namedAccountAddress
+encodeForReturn' ((SAccount a _)) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
+encodeForReturn' (SContract _ a) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
 encodeForReturn' (SBool b) = return .  show . fromEnum $ b
 encodeForReturn' (SString s) = return $ show s
 {- The following comments are just for previous encodeForReturn function to return ByteString type. 
