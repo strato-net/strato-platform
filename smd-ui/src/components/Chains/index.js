@@ -14,6 +14,7 @@ import CreateChain from '../CreateChain';
 import Chain from '../Chain';
 import './chains.css';
 import HexText from '../HexText';
+import { Button } from '@blueprintjs/core';
 
 const tourSteps = [
   {
@@ -29,12 +30,14 @@ class Chains extends Component {
   constructor() {
     super()
     this.state = {
-      selected: null
+      selected: null,
+      limit: 2,
+      offset: 0,
     }
   }
 
   componentDidMount() {
-    this.props.fetchChains();
+    this.props.fetchChains(this.state.limit, this.state.offset);
     mixpanelWrapper.track('chains_page_load')
   }
 
@@ -54,6 +57,22 @@ class Chains extends Component {
       })
     }
   }
+
+  onNextClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = offset + limit;
+    this.setState({ offset: newOffset }, () => {
+      this.props.fetchChains(this.state.limit, this.state.offset);
+    });
+  };
+
+  onPrevClick = () => {
+    const { offset, limit } = this.state;
+    const newOffset = Math.max(0, offset - limit);
+    this.setState({ offset: newOffset }, () => {
+      this.props.fetchChains(this.state.limit, this.state.offset);
+    });
+  };
 
   render() {
     const labelIds = this.props.labelIds;
@@ -79,7 +98,7 @@ class Chains extends Component {
         if (this.state.selected === uniqueKey && chainIds.length > 0) {
           labelClasseName = ' selected';
           chainIds.map((chainid, key) =>
-            selectedChains.push(<Chain label={label} id={chainid} chain={key} />)
+            selectedChains.push(<Chain label={label} id={chainid} chain={key} key={key} />)
           );
         }
 
@@ -97,6 +116,8 @@ class Chains extends Component {
         );
       }.bind(this));
 
+    const isPaginationDisplay = rows.length ? true : Boolean(this.state.offset);
+
     return (
       <div className="container-fluid pt-dark">
         <Tour
@@ -111,7 +132,7 @@ class Chains extends Component {
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
-              <CreateChain />
+              <CreateChain limit={this.state.limit} offset={this.state.offset} />
             </div>
           </div>
         </div>
@@ -132,16 +153,24 @@ class Chains extends Component {
           <div className="row">
             <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
-                {rows.length === 0
-                  ?
+                {!rows.length && !this.props.isLoading &&
                   <table>
                     <tbody>
                       <tr>
                         <td colSpan={3}>No Chains</td>
                       </tr>
                     </tbody>
+                  </table>}
+                  {
+                    this.props.isLoading ? <table>
+                    <tbody>
+                      <tr>
+                        <td colSpan={3}>Fetching....</td>
+                      </tr>
+                    </tbody>
                   </table>
-                  : rows}
+                  : rows
+                  }
               </div>
             </div>
             <div className="col-sm-8 account-details">
@@ -150,6 +179,28 @@ class Chains extends Component {
               </div>
             </div>
           </div>
+          {isPaginationDisplay &&
+            <div className="row">
+              <div className="col-sm-1 smd-pad-16 text-left">
+                <Button
+                  onClick={this.onPrevClick}
+                  className="pt-icon-arrow-left"
+                  text="Previous"
+                  disabled={!(this.state.offset > 0)}
+                />
+              </div>
+              <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
+                {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(rows.length, this.state.limit)}`}
+              </div>
+              <div className="col-sm-1 smd-pad-16 text-right">
+                <Button
+                  onClick={this.onNextClick}
+                  className="pt-icon-arrow-right"
+                  text="Next"
+                  disabled={rows.length < this.state.limit}
+                />
+              </div>
+            </div>}
         </div>
       </div>
     );
@@ -162,6 +213,7 @@ export function mapStateToProps(state) {
     chains: state.chains.chains,
     labelIds: state.chains.labelIds,
     initialLabel: state.chains.initialLabel,
+    isLoading: state.chains.isLoading,
   };
 }
 

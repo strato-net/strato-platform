@@ -430,8 +430,8 @@ spec = do
 
     describe "Private Chains" $ do
       let getChainInfo lbl = ChainInfo
-                                 (UnsignedChainInfo lbl [] [] (ChainMembers S.empty) Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
-                                 Nothing
+                                 (UnsignedChainInfo lbl [] [] (ChainMembers S.empty) M.empty (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
+                                 (ChainSignature 1 2 3)
           getChainIdAndDetails cInfo =
             let chainId = Keccak256.rlpHash cInfo
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
@@ -452,7 +452,7 @@ spec = do
 
       -- chain 3 (child of chain 1)
       let ChainInfo uci sig = getChainInfo "my test chain 3"
-          uci' = uci{parentChain = Just $ keccak256ToWord256 chainId1}
+          uci' = uci{parentChains = M.singleton "parent" $ keccak256ToWord256 chainId1}
       let (chainId3, chainDetails3) = getChainIdAndDetails $ ChainInfo uci' sig
       (hashTx3, tx3) <- getChainTx chainId3
 
@@ -658,13 +658,13 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm b1]
-        map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
+        map (map otPrivatePayload . obReceiptTransactions) obs `shouldBe` [[Nothing]]
         let h' = head [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1]
         b2 <- runBatch $ checkForUnseq [iev6' h']
         let bs' = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b2]
         map (map txType . blockReceiptTransactions) bs' `shouldBe` [[PrivateHash]]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash]]
+        map (map otPrivatePayload . obReceiptTransactions) obs' `shouldBe` [[Nothing]]
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash]]

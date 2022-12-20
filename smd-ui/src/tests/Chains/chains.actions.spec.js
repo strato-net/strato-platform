@@ -14,14 +14,14 @@ import {
   resetChainId,
   resetInitailLabel
 } from "../../components/Chains/chains.actions";
-import { chains } from "./chainsMock";
+import { chains, payload } from "./chainsMock";
 
 describe('Chains: action', () => {
 
   describe('chain', () => {
 
     test('request', () => {
-      expect(fetchChains()).toMatchSnapshot();
+      expect(fetchChains(payload.limit, payload.offset)).toMatchSnapshot();
     });
 
     test('success', () => {

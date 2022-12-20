@@ -1,0 +1,133 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DeployDapp: reducer add integration modal close overlay 1`] = `
+Object {
+  "error": null,
+  "isAddIntegrationModalOpen": true,
+  "isOpen": true,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer add integration modal open overlay 1`] = `
+Object {
+  "error": null,
+  "isAddIntegrationModalOpen": false,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer add member modal close overlay 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": true,
+  "isOpen": true,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer add member modal open overlay 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer deploy dapp failure 1`] = `
+Object {
+  "error": "error",
+  "isAddMemberModalOpen": false,
+  "isOpen": true,
+  "isToasts": true,
+  "key": null,
+  "response": "Error Deploying DApp...: error",
+  "spinning": true,
+  "toastsMessage": "DApp deployment failed: error",
+}
+`;
+
+exports[`DeployDapp: reducer deploy dapp modal close overlay 1`] = `
+Object {
+  "error": null,
+  "isAddIntegrationModalOpen": false,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer deploy dapp modal open overlay 1`] = `
+Object {
+  "abi": "",
+  "chainName": "",
+  "contract": "",
+  "createDisabled": true,
+  "filename": "",
+  "integrations": Array [],
+  "isOpen": true,
+  "members": Array [],
+  "response": "Status: Deploy DApp",
+}
+`;
+
+exports[`DeployDapp: reducer deploy dapp request 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": true,
+  "key": null,
+  "response": "Deploying DApp...",
+  "spinning": false,
+}
+`;
+
+exports[`DeployDapp: reducer deploy dapp success 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "isToasts": true,
+  "key": null,
+  "response": "Deployment Success: 64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+  "spinning": true,
+  "toastsMessage": "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+}
+`;
+
+exports[`DeployDapp: reducer reset error 1`] = `
+Object {
+  "error": "error",
+  "isAddMemberModalOpen": true,
+  "isOpen": true,
+  "isToasts": null,
+  "key": null,
+  "spinning": false,
+  "toastsMessage": null,
+}
+`;
+
+exports[`DeployDapp: reducer set initial state 1`] = `
+Object {
+  "abi": undefined,
+  "chainName": "",
+  "contract": "",
+  "contractCompileErrors": undefined,
+  "createDisabled": true,
+  "error": "",
+  "filename": undefined,
+  "isAddIntegrationModalOpen": false,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "isToasts": false,
+  "response": "Status: Deploy DApp",
+  "toastsMessage": "",
+}
+`;

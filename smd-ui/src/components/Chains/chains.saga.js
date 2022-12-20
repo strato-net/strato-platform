@@ -22,9 +22,11 @@ import { createUrl } from '../../lib/url';
 const stratoChainUrl = env.STRATO_URL + "/chain";
 const blocChainUrl = env.BLOC_URL + "/chain";
 
-export function getChainsApi() {
+export function getChainsApi(limit, offset) {
+  const url = limit ? `${stratoChainUrl}?limit=${limit}&offset=${offset}` : `${stratoChainUrl}`;
+  
   return fetch(
-    stratoChainUrl,
+    url,
     {
       method: 'GET',
       credentials: "include",
@@ -63,9 +65,9 @@ export function getChainDetailApi(chainid) {
     })
 }
 
-export function* getChains() {
+export function* getChains(action) {
   try {
-    const response = yield call(getChainsApi);
+    const response = yield call(getChainsApi, action.limit, action.offset);
     yield put(fetchChainsSuccess(response));
   }
   catch (err) {

@@ -216,6 +216,8 @@ Object {
 
 exports[`Chains: action chain request 1`] = `
 Object {
+  "limit": 10,
+  "offset": 0,
   "type": "FETCH_CHAINS_REQUEST",
 }
 `;

@@ -11,7 +11,7 @@ exports[`Chains: index filter chain 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) />
+        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
       </div>
     </div>
   </div>
@@ -180,6 +180,17 @@ exports[`Chains: index filter chain 1`] = `
         <div />
       </div>
     </div>
+    <div className=\\"row\\">
+      <div className=\\"col-sm-1 smd-pad-16 text-left\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+      </div>
+      <div className=\\"col-sm-2 text-center\\" style={{...}}>
+        Rows 1-2
+      </div>
+      <div className=\\"col-sm-1 smd-pad-16 text-right\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={false} />
+      </div>
+    </div>
   </div>
 </div>"
 `;
@@ -261,6 +272,7 @@ Object {
   },
   "filter": "airline",
   "initialLabel": null,
+  "isLoading": undefined,
   "labelIds": Object {
     "airline cartel 1": Object {
       "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
@@ -348,7 +360,7 @@ exports[`Chains: index render component with empty values 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) />
+        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
       </div>
     </div>
   </div>
@@ -377,6 +389,17 @@ exports[`Chains: index render component with empty values 1`] = `
         <div />
       </div>
     </div>
+    <div className=\\"row\\">
+      <div className=\\"col-sm-1 smd-pad-16 text-left\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+      </div>
+      <div className=\\"col-sm-2 text-center\\" style={{...}}>
+        Rows 1-1
+      </div>
+      <div className=\\"col-sm-1 smd-pad-16 text-right\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
+      </div>
+    </div>
   </div>
 </div>"
 `;
@@ -392,7 +415,7 @@ exports[`Chains: index render component with values 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) />
+        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
       </div>
     </div>
   </div>
@@ -408,157 +431,30 @@ exports[`Chains: index render component with values 1`] = `
     <div className=\\"row\\">
       <div className=\\"col-sm-4 main-div\\">
         <div className=\\"accounts-margin-top\\">
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 9\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 1\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 2\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 3\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 4\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 5\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 6\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 7\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 10\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 11\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 12\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 13\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 14\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 89\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 200\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 822\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 52\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 900\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 1000\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 9000\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"smd-margin-8\\">
-            <div className=\\"row\\">
-              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                <HexText value=\\"airline cartel 2000\\" classes=\\"large smd-pad-4 chain-width\\" />
-              </div>
-            </div>
-          </div>
+          <table>
+            <tbody>
+              <tr>
+                <td colSpan={3}>
+                  Fetching....
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <div className=\\"col-sm-8 account-details\\">
         <div />
+      </div>
+    </div>
+    <div className=\\"row\\">
+      <div className=\\"col-sm-1 smd-pad-16 text-left\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+      </div>
+      <div className=\\"col-sm-2 text-center\\" style={{...}}>
+        Rows 1-2
+      </div>
+      <div className=\\"col-sm-1 smd-pad-16 text-right\\">
+        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={false} />
       </div>
     </div>
   </div>

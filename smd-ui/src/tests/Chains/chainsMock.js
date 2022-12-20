@@ -198,3 +198,8 @@ export const chains = [
     }
   }
 ]
+
+export const payload = {
+  limit: 10,
+  offset: 0
+}

@@ -47,10 +47,12 @@ describe('CreateChain: action', () => {
       }`,
       args: { addRule: "MajorityRules", removeRule: "MajorityRules" },
       vm: false,
+      limit: 10,
+      offset: 0
     }
 
     test('request', () => {
-      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm)).toMatchSnapshot();
+      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm, payload.limit, payload.offset)).toMatchSnapshot();
     });
 
     test('success', () => {

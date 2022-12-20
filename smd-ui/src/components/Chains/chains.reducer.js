@@ -22,7 +22,8 @@ const initialState = {
   listChain: {},
   listLabelIds: {},
   chainIds: [],
-  selectedChain: null
+  selectedChain: null,
+  isLoading: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -32,6 +33,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         filter: null,
         error: null,
+        isLoading: true
       };
     case FETCH_CHAINS_SUCCESS:
       const chainLabelIds = {};
@@ -53,7 +55,8 @@ const reducer = function (state = initialState, action) {
         labelIds: chainLabelIds,
         initialLabel: chains.length && chains[0].info.label,
         filter: state.filter,
-        error: null
+        error: null,
+        isLoading: false
       };
     case FETCH_CHAINS_FAILURE:
       return {
@@ -61,7 +64,8 @@ const reducer = function (state = initialState, action) {
         chains: state.chains,
         labelIds: state.labelIds,
         filter: state.filter,
-        error: action.error
+        error: action.error,
+        isLoading: false
       };
     case CHANGE_CHAIN_FILTER:
       return {

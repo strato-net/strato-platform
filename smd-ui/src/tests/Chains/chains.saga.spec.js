@@ -43,10 +43,11 @@ describe('Chains: saga', () => {
   })
 
   describe('getChains generator', () => {
+    const payload = { limit: 10, offset: 0 };
 
     test('inspection', () => {
-      const gen = getChains();
-      expect(gen.next().value).toEqual(call(getChainsApi));
+      const gen = getChains(payload);
+      expect(gen.next().value).toEqual(call(getChainsApi, 10, 0));
       expect(gen.next(chain).value).toEqual(put(fetchChainsSuccess(chain)));
       expect(gen.throw('error').value).toEqual(put(fetchChainsFailure('error')));
       expect(gen.next().done).toBe(true);
@@ -56,15 +57,15 @@ describe('Chains: saga', () => {
 
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify(chains));
-        expectSaga(getChains)
-          .call.fn(getChainsApi).put.like({ action: { type: FETCH_CHAINS_SUCCESS } })
+        expectSaga(getChains, payload.limit, payload.offset)
+          .call.fn(getChainsApi, payload.limit, payload.offset).put.like({ action: { type: FETCH_CHAINS_SUCCESS } })
           .run({ silenceTimeout: true }).then((result) => { done() });
       });
 
       test('failure', (done) => {
         fetch.mockReject('error');
-        expectSaga(getChains)
-          .call.fn(getChainsApi).put.like({ action: { type: FETCH_CHAINS_FAILURE } })
+        expectSaga(getChains, payload.limit, payload.offset)
+          .call.fn(getChainsApi, payload.limit, payload.offset).put.like({ action: { type: FETCH_CHAINS_FAILURE } })
           .run().then((result) => { done() });
       });
 

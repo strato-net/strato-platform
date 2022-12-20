@@ -135,7 +135,7 @@ const createChainArgs = (uid, members) => {
 
   const chain:Chain = {
     label: `airline-${uid}`,
-    src: `contract ${contractName} { }`,
+    src: `contract ${contractName} { constructor(){} }`,
     args: {},
     members: memberList,
     balances: balanceList,

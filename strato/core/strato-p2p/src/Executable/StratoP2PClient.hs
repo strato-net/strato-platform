@@ -90,7 +90,9 @@ runPeer peer sSource = do
                           pStr
     case attempt of
       Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
-      Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+      Just err -> do
+        $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+        throwIO err
 
 runEthClientConduit :: MonadP2P m
                     => PPeer
@@ -171,6 +173,7 @@ stratoP2PClient runner = runner $ \_ -> do
                    e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just WrongGenesisBlock <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just NetworkIDMismatch <- fromException e' -> lengthenPeerDisable thePeer
                    _  -> return $ Right ()
           whenLeft eErr $ \err -> do
             $logErrorLS "stratoP2PClient/handleRunPeerResult" err

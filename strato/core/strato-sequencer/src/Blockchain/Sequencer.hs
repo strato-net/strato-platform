@@ -54,7 +54,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Data.Block                     as BDB
-import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChain)
+import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChains)
 import qualified Blockchain.Data.DataDefs                  as BDB
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -612,8 +612,8 @@ transformGenesis chains = forM_ chains $ \ig -> do
         Just (EmittedBlock emitted' depChains) | emitted' -> pure $ EmittedBlock emitted' M.empty
                                                | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
       logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show seenCreationBlock
-      let parentChainId = parentChain $ chainInfo cInfo
-      seenParentChains <- hasAllAncestorChains parentChainId
+      let parentChainIds = M.elems . parentChains $ chainInfo cInfo
+      seenParentChains <- and <$> traverse (hasAllAncestorChains . Just) parentChainIds
       logF $ "hasAllAncestorChains: " ++ show seenParentChains
       if seenParentChains
         then when seenCreationBlock $ do
@@ -623,15 +623,15 @@ transformGenesis chains = forM_ chains $ \ig -> do
           chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
           transformGenesis $ map (\ci -> ig{igGenesisInfo = ci}) chainsToEmit
           lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
-        else case parentChainId of
-          Nothing -> $logErrorS "transformGenesis" . T.pack $ concat
+        else case parentChainIds of
+          [] -> $logErrorS "transformGenesis" . T.pack $ concat
             [ "The database claims to be missing parent chain info for chain "
             , format chainId
             , ", but its parent chain is the main chain. This probably means there is a bug in the platform."
             ]
-          Just pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
-               Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
-               Just cie@ChainIdEntry{} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
+          pChains -> for_ pChains $ \pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
+            Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
+            Just cie@ChainIdEntry{} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
 
 splitEvents :: ( MonadLogger m
                , MonadMonitor m

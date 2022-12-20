@@ -595,14 +595,10 @@ contract A {
     account d = account(0x1234, "main");
     account e = account(0x1234, "self");
     account f = account(0x1234, "parent");
-    account g = account(0x1234, "grandparent");
-    account h = account(0x1234, "ancestor", 3);
     account i = account(address(0xdeadbeef), 0x5678);
     account j = account(address(0xdeadbeef), "main");
     account k = account(address(0xdeadbeef), "self");
     account l = account(address(0xdeadbeef), "parent");
-    account m = account(address(0xdeadbeef), "grandparent");
-    account n = account(address(0xdeadbeef), "ancestor", 3);
   }
 }
 |]

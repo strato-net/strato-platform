@@ -28,7 +28,7 @@ let ouser1:OAuthUser;
 let ouser2:OAuthUser;
 
 const label = 'My chain label';
-const src = 'contract Governance { uint constant TEN = 10; }';
+const src = 'contract Governance { uint TEN = 10; constructor(){} } ';
 const args = {};
 const members = [{
     orgName: "BlockApps"

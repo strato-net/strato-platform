@@ -4,7 +4,8 @@ metadata:
   name: prometheus-pvc
 spec:
   accessModes:
-    - ReadWriteOncePod
+    - ReadWriteMany
+  storageClassName: efs-sc
   resources:
     requests:
       storage: 5Gi

@@ -197,6 +197,20 @@ exports[`CreateChain: index render component with empty values 1`] = `
             <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
           </div>
         </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No DApp Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
+          </div>
+        </div>
       </div>
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
@@ -332,6 +346,20 @@ exports[`CreateChain: index render component with values 1`] = `
             </div>
             <span className=\\"error-text\\" />
             <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              DApp Integrations
+            </label>
+            <div className=\\"pt-dialog-header no-integration\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No DApp Integrations
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateIntegrations]} />
           </div>
         </div>
       </div>

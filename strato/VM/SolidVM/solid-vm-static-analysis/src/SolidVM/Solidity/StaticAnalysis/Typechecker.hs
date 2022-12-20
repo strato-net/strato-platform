@@ -898,9 +898,6 @@ accountArgs x = Sum $ stringType' x :|
                     , Product [accountType' x, intType' x] x
                     , Product [addressType' x, stringType' x] x
                     , Product [accountType' x, stringType' x] x
-                    , Product [intType' x, stringType' x, intType' x] x
-                    , Product [addressType' x, stringType' x, intType' x] x
-                    , Product [accountType' x, stringType' x, intType' x] x
                     ]
 
 boolArgs :: SourceAnnotation Text -> Type'

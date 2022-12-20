@@ -22,6 +22,19 @@
   background-color: red !important;
 }
 
+.no-integration {
+  border-radius: 60px;
+}
+
+.integration:hover {
+  cursor: pointer !important;
+  background: #30434D;
+}
+
+.integration-remove:hover {
+  background-color: red !important;
+}
+
 .dropzoneContainer {
   width: 100% !important;
 }
