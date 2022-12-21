@@ -21,16 +21,5 @@ getPing = do
       traceM $ "There was an error trying to get the package.yaml file" <> show err
       pure $ "Unknown Version number"
     Right v -> pure $ version v
-  -- packageYaml <- case (liftIO $ decodeFileEither "../package.yaml") of
-  --   Left err -> do
-  --     traceM $ "There was an error trying to get the package.yaml file: " <> show err
-  --     pure $ "Unknown Version number"
-  --   Right y -> do
-  --     yy <- case y of
-  --       Left err -> do
-  --         traceM $ "There was an error trying to get the package.yaml file: " <> show err
-  --         pure $ "Unknown Version number"
-  --       right -> pure right
-  --     verson <- parseEither (.: T.pack "version") yy
 
   return $ Version verson

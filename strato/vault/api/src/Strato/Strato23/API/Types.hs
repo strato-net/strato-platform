@@ -37,7 +37,7 @@ import qualified LabeledError
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
-data Version = Version { version :: String } deriving (Show, Eq, Generic)
+data Version = Version { version :: String } deriving (Show, Eq, Generic, Ord)
 
 instance ToJSON Version where
   toJSON (Version v) = object ["version" .= v]

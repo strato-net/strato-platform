@@ -13,6 +13,7 @@ import           Data.Cache
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
+import           Strato.Strato23.API.Types (Version(..))
 
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
@@ -125,8 +126,9 @@ instance FromJSON RawPing where
         (Object _) -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
 
-    return $ RawPing vers 
+    return $ RawPing $ Version $ T.unpack vers 
   parseJSON wat = typeMismatch "Spec" wat
+
 data RawPing = RawPing {
-    ping :: T.Text
+    ping :: Version
 } deriving (Show, Eq)

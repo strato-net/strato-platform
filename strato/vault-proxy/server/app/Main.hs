@@ -9,6 +9,7 @@
 
 module Main where
 
+import           ASCII
 import           Control.Concurrent.Lock                as L
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -36,7 +37,7 @@ import           Strato.VaultProxy.RawOauth               as RO
 import           Strato.VaultProxy.GetPing                as GP
 
 import           Strato.VaultProxy.Server.Token
--- import           Strato.Strato23.Server.Ping              (getPing)
+import           Strato.Strato23.API.Types
 
 import           Options
 
@@ -72,7 +73,11 @@ main = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
   vaultVersion <- case foreignVaultPing of
           Left err -> error $ "Could not reach the foreign vault: " ++ show err
-          Right val -> return val
+          --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
+            --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
+          Right val -> do
+            when ((unicodeStringToCharListUnsafe $ version (ping val)) < (unicodeStringToCharListUnsafe "0.1.0.0")) $ error "The foreign vault is too old, please update it to the latest version" 
+            pure val
   traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
     --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
