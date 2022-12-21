@@ -60,7 +60,7 @@ function newnode {
   echo "Checking if the reserve seconds are provided"
   [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
-  runBackgroundProcess blockapps-vault-proxy-server \
+  checkFirstThenRunBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
@@ -384,6 +384,20 @@ function runBackgroundProcess {
   MONITORED_PIDS[${proc_pid}]=$@
   echo "process pid:: $proc_pid (command: $@)"
   disown %
+}
+
+#This function is used to ensure a process is running properly before starting the entire strato
+function checkFirstThenRunBackgroundProcess {
+  $@ &
+  proc_pid=$!
+  if ps -p $proc_pid >&-; then
+    MONITORED_PIDS[${proc_pid}]=$@
+    echo "process pid:: $proc_pid (command: $@)"
+    disown %
+  else
+    echo "process pid:: $proc_pid (command: $@) is not running"
+    exit 1
+  fi
 }
 
 # If variable with name <arg 1> does not have non-empty value, set it to <arg 2>
