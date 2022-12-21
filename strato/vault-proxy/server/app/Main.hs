@@ -76,7 +76,8 @@ main = do
           --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
             --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
           Right val -> do
-            when ((unicodeStringToCharListUnsafe $ version (ping val)) < (unicodeStringToCharListUnsafe "0.1.0.0")) $ error "The foreign vault is too old, please update it to the latest version" 
+            when ((unicodeStringToCharListUnsafe $ version (ping val)) < (unicodeStringToCharListUnsafe "1")) $ 
+              error "The foreign vault is too old, please update it to the latest version" 
             pure val
   traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
