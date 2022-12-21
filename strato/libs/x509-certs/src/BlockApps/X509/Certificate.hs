@@ -342,27 +342,27 @@ rootCert = let eCert = bsToCert $ C8.pack $ unlines
 -- or... add a flag to init a test cert based on node pubkey for develop
 testRootCert :: X509Certificate
 testRootCert = let eCert = bsToCert $ C8.pack $ unlines
-                    [ "-----BEGIN CERTIFICATE-----",
-                      "MIIBaDCCAQ2gAwIBAgIQcYybb1vQ8G5kxlmkFhkQBDAMBggqhkjOPQQDAgUAMEgx",
-                      "DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu",
-                      "Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIxMjE5MjA1NjEyWhcNMjMxMjE5",
-                      "MjA1NjEyWjAkMQ4wDAYDVQQDDAVEYXZpZDESMBAGA1UECgwJQmxvY2tBcHBzMFYw",
-                      "EAYHKoZIzj0CAQYFK4EEAAoDQgAEdR8A/tc1S7ADXhVucY8qA7WS6+0XoR/6xlf/",
-                      "Lkh2aR2PElEwSQeRfOlUvLWOaGPUEpGhIqZ9X9N0CazDzDb7EzAMBggqhkjOPQQD",
-                      "AgUAA0cAMEQCIDSF2KjQk4QmePQcl86RzQWlH1qNvhV7h6Y7ftTMpEauAiA2ScRJ",
-                      "riO7brUVmmoCcqNd0lpWiXvzXpT2oH7TwrHmJg==",
-                      "-----END CERTIFICATE-----",
-                      "-----BEGIN CERTIFICATE-----",
-                      "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI",
-                      "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
-                      "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy",
-                      "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU",
-                      "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG",
-                      "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs",
-                      "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
-                      "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
-                      "N8txKc8G9R27ZYAUuz15zF0=",
-                      "-----END CERTIFICATE-----"
+                    ["-----BEGIN CERTIFICATE-----"
+                    ,"MIIBbjCCARKgAwIBAgIQF4bMdhsLaG2GOrCvVxE3njAMBggqhkjOPQQDAgUAMEgx"
+                    ,"DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu"
+                    ,"Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjIxMjIxMTcwMzQ5WhcNMjMxMjIx"
+                    ,"MTcwMzQ5WjApMRMwEQYDVQQDDApUeXNvbiBSb3NlMRIwEAYDVQQKDAlCbG9ja0Fw"
+                    ,"cHMwVjAQBgcqhkjOPQIBBgUrgQQACgNCAAQoqmjYOfLkEpAnGLIL6/20UUCTk3j8"
+                    ,"gkyvcNS7WxIiT3Z6Dm78u+/RHoQaq2L3fzXQOKLQxIytZ/CFv9gdedW3MAwGCCqG"
+                    ,"SM49BAMCBQADSAAwRQIhAIUR09oPgX/p8VzsSwJKauaWx0hCCjbqcF0K3AbRv7xs"
+                    ,"AiArXR9dG9PSqJ1kZjzsrPZx2r1yMtjRJtPo8UlHVBkowg=="
+                    ,"-----END CERTIFICATE-----"
+                    ,"-----BEGIN CERTIFICATE-----"
+                    ,"MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+                    ,"MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+                    ,"bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+                    ,"MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+                    ,"MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+                    ,"BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+                    ,"9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+                    ,"R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+                    ,"N8txKc8G9R27ZYAUuz15zF0="
+                    ,"-----END CERTIFICATE-----"
                     ]
             in case eCert of
               Left _ -> error "Somehow, Palpatine has returned"
