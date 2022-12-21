@@ -6850,16 +6850,6 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
 
-  it "can return chainIdString in a simple manner" . runTest $ do
-    runBS [r|
-contract qq {
-  string x;
-  constructor() {
-    x = this.chainIdString;
-  }
-}
-|] 
-    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
   it "View functions enforced in 3.4" $ (runTest $
     runBS [r|
