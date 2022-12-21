@@ -32,8 +32,9 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
-import qualified Data.ByteString.Base16            as Base16
+--import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
+import qualified Data.ByteString.Char8             as BC
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
@@ -50,6 +51,11 @@ import           Data.Traversable
 import           Text.Format
 import           Text.Read                         (readMaybe)
 import           UnliftIO
+import           Text.Parsec                          (runParser)
+import           SolidVM.Solidity.Parse.Statement
+
+import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
+
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -62,7 +68,7 @@ import           BlockApps.Solidity.Contract()
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Type
-import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Value 
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
@@ -78,6 +84,8 @@ import           BlockApps.Bloc22.API.TypeWrappers
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
+import           SolidVM.Model.CodeCollection.Statement
+--import           Debug.Trace
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -333,14 +341,23 @@ functionResult i txHash txResult mmd toAccount = do
     for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
       either (throwIO . UserError . Text.pack) return $
         xabiTypeToType xabi indexedTypeType
+  
   let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
       txResp = fromShort $ transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
     -- workaround for enums
-      mFormattedResponse = convertResultResToVals txResp mappedResultTypes
+      theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+  mFormattedResponse <- case theVM of
+        "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
+        "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
+        _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
+
+  $logInfoS "DEBUG__________________________mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ ", VM type: " ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
-      let r = Text.decodeUtf8 $ Base16.encode txResp
+      let r = Text.decodeUtf8 $ txResp  --remove base16
+      $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
+      $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r 
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
     stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
@@ -352,13 +369,29 @@ convertEnumTypeToInt = \case
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
 
+-- works for EVM only
 convertResultResToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
+-- works for SolidVM only
+convertSvmResultResToVals :: String ->  Maybe [SolidityValue]
+convertSvmResultResToVals resp =
+  let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
+   in case args of 
+        Left _ -> Nothing
+        Right y -> let values = traverse expressionToValue y
+                    in fmap valueToSolidityValue <$> values
 
 
----------------------------------
+expressionToValue :: Expression -> Maybe Value
+expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n 
+expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
+expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue _ = Nothing
+-- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
+--expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
+--expressionToValue (ObjectLiteral _ n) = Just $ SMV.SStruct _ n --SStruct _ theMap
 
 constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
                                Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m (ByteString, Text)
