@@ -1475,7 +1475,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             return $ Constant $ SEnumVal enumName name num
 
 
-        
+
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do
         contract' <- getCurrentContract
@@ -2272,6 +2272,15 @@ evaluateAccountMember a _ "chainId" = do
         Just cid -> return $ Constant $ SInteger $ fromIntegral cid
     MainChain ->  return $ Constant $ SInteger 0 
     ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
+evaluateAccountMember a _ "chainIdString" = do 
+  case (a ^. namedAccountChainId) of
+    UnspecifiedChain -> do 
+      curCid <- view accountChainId <$> getCurrentAccount
+      case curCid of
+        Nothing -> return $ Constant $ SString $ replicate 64 '0'
+        Just cid -> return $ Constant $ SString $ format cid
+    MainChain ->  return $ Constant $ SString $ replicate 64 '0' 
+    ExplicitChain cid -> return $ Constant $ SString $ format cid
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
