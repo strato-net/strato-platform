@@ -3,19 +3,16 @@
 module Strato.Strato23.Server.Ping (getPing) where
 
 import           Strato.Strato23.Monad
+import           Strato.Strato23.API.Types
 import           Control.Monad.IO.Class
 import           Data.ByteString.Char8  as BS
-import           Data.Aeson
+-- import           Data.Aeson
 import           Data.Yaml              as Y
 import           Debug.Trace
-import           GHC.Generics
-
-
-data Version = Version { version :: String } deriving (Show, Eq, Generic)
-instance FromJSON Version
+-- import           GHC.Generics
 
 -- getPing will return the version of the vault found in the package.yaml file 
-getPing :: VaultM String
+getPing :: VaultM Version
 getPing = do
   packageYaml <- liftIO $ BS.readFile "../package.yaml"
   let parsedYaml = Y.decodeEither' packageYaml
@@ -36,4 +33,4 @@ getPing = do
   --       right -> pure right
   --     verson <- parseEither (.: T.pack "version") yy
 
-  return $ "pingDetail: " ++ verson
+  return $ Version verson

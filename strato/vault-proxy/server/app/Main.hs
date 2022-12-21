@@ -23,8 +23,8 @@ import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header              as TH
-import           Network.Wai.Handler.Warp              (run)
-import           Network.Wai                           as W
+import           Network.Wai.Handler.Warp               (run)
+import           Network.Wai                            as W
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
@@ -33,7 +33,10 @@ import           BlockApps.Init
 import           Servant.Client
 import           Strato.VaultProxy.DataTypes              as VaultProxy
 import           Strato.VaultProxy.RawOauth               as RO
+import           Strato.VaultProxy.GetPing                as GP
+
 import           Strato.VaultProxy.Server.Token
+-- import           Strato.Strato23.Server.Ping              (getPing)
 
 import           Options
 
@@ -57,10 +60,20 @@ main = do
     , "                                                                                                  :::        "
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
-  -- $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
+
+  --Check the version of the foreign shared vault
+  traceM "Checking the version of the foreign vault"
+  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
+  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault)
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
+  vaultVersion <- case foreignVaultPing of
+          Left err -> error $ "Could not reach the foreign vault: " ++ show err
+          Right val -> return val
+  traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
     --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
   vaultLock <- liftIO $ L.new
