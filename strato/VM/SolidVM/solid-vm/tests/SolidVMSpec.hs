@@ -377,7 +377,7 @@ contract CertificateRegistry {
     string rootCert;
 
     constructor() {
-        require(account(this, "self").chainId == "", "You must post this contract on the main chain!");
+        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
 
         initialized = false;
         rootCert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBIMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtFbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQyMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEUMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
@@ -4665,7 +4665,7 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
-  xit "can get a users cert" . runTest $ do
+  it "can get a users cert" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 
 contract Certificate {

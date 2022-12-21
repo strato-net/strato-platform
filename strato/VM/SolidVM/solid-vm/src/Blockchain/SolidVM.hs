@@ -1480,12 +1480,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             return $ Constant $ SEnumVal enumName name num
 
 
-      -- (SBuiltinVariable "this", "chainId") -> do
-      --   cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-      --   let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-      --   pure . ((flip SAccount) False) $ case currentChainId of
-      --     Nothing -> (namedAccountChainId .~ MainChain)
-      --     Just cid -> (namedAccountChainId .~ ExplicitChain cid)
+
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do
         contract' <- getCurrentContract
