@@ -28,7 +28,7 @@ class MenuBar extends Component {
           <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
         </a>
         {isOauthEnabled() && <span><span className="pt-navbar-divider" />
-          <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.username : ''} </small>
+          <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.commonName : ''} </small>
           <span className="pt-navbar-divider" />
           <a target="_blank" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={this.logout}>Logout</button>
