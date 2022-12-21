@@ -131,6 +131,7 @@ instance RLPSerializable CodeInfo where
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer CodePtr
                  | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
+                 | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, B.ByteString)]
    deriving (Show, Eq, Read, GHCG.Generic, Data)
 
 instance Format AccountInfo where
@@ -152,6 +153,14 @@ instance Format AccountInfo where
     , "-------------------------"
     , tab' $ "Address:   " ++ format addr
     , tab' $ "Nonce:     " ++ show nonce
+    , tab' $ "Code hash: " ++ format ch
+    , tab' $ "Storage:   " ++ show s
+    ]
+  format (SolidVMContractWithStorage addr nonce ch s) = unlines
+    [ "AccountInfo - SolidVMContractWithStorage"
+    , "-------------------------"
+    , tab' $ "Address:   " ++ format addr
+    , tab' $ "Balance:     " ++ show nonce
     , tab' $ "Code hash: " ++ format ch
     , tab' $ "Storage:   " ++ show s
     ]
@@ -183,7 +192,7 @@ instance FromJSON AccountInfo where
         case ms of
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
-            return $ ContractWithStorage a b c s
+            return $ SolidVMContractWithStorage a b c s
 
   parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
 
@@ -204,11 +213,18 @@ instance ToJSON AccountInfo where
     , "codeHash" .= c
     , "storage" .= s
     ]
+  toJSON (SolidVMContractWithStorage a b c s) = object
+    [ "address" .= a
+    , "balance" .= b
+    , "codeHash" .= c
+    , "storage" .= s
+    ]
 
 instance RLPSerializable AccountInfo where
   rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
   rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
   rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ map rlpEncode d]
+  rlpEncode (SolidVMContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ map rlpEncode d]
 
   rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (map rlpDecode d)
   rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
@@ -288,6 +304,7 @@ instance ToSchema CodeInfo where
       ( mempty )
     
 instance ToSchema AccountInfo where
+  declareNamedSchema _ = return $ NamedSchema (Just "AccountInfo") byteSchema
 instance ToSchema ChainSignature where
 instance ToSchema UnsignedChainInfo where
 instance ToSchema ChainInfo where

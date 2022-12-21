@@ -43,7 +43,7 @@ describe('Accounts: saga', () => {
 
     const action = {
       type: OAUTH_FAUCET_REQUEST,
-      name: oauthAccounts[0].username,
+      name: oauthAccounts[0].commonName,
       address: oauthAccounts[0].address,
       chainId: null
     }
