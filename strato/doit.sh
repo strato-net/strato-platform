@@ -56,6 +56,9 @@ function newnode {
   if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
     echo "Could not obtain OAUTH parameters for Vault Proxy"
     exit 2
+  else 
+    echo "OAUTH parameters for Vault Proxy are available"
+  fi
 
   echo "Checking if the reserve seconds are provided"
   [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
