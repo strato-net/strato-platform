@@ -154,10 +154,19 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash     --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
+  
+
+  $logInfoS "_____________________________________________________________________________DEBUG__________________________________________________________________________________________________________________________" ""
+  $logInfoS "msgHash" (T.pack $ show msgHash)
+  $logInfoS "mKey" (T.pack $ show mKey)
+  $logInfoS "mAddress" (T.pack $ show mAddress)
   res <- case mAddress of 
     Nothing -> return Nothing
     Just a -> A.select (A.Proxy @X509CertInfoState) a
+  $logInfoS "res" (T.pack $ show res)
   let cmAddress = getAddressFromCM cm =<< res
+  $logInfoS "cmAddress" (T.pack $ show cmAddress)
+  $logInfoS "_____________________________________________________________________________DEBUG__________________________________________________________________________________________________________________________" ""
   return (mAddress == cmAddress)
 authenticate _ = return True 
 
