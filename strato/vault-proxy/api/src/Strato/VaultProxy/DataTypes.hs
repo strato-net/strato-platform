@@ -124,8 +124,8 @@ instance FromJSON RawPing where
 
     vers <- case ver of
         (Number s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
+        (Object _) -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
+        _          -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
 
     return $ RawPing $ Version (base10Exponent vers)
   parseJSON wat = typeMismatch "Spec" wat
