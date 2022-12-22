@@ -24,8 +24,8 @@ class MenuBar extends Component {
     return (
       <div>
         <span className="pt-navbar-divider" />
-        <a href='/prometheus' target="_black" rel="noopener noreferrer">
-          <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
+        <a href='https://support.blockapps.net ' target="_black" rel="noopener noreferrer">
+          <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}>Contact BlockApps Support</button>
         </a>
         {isOauthEnabled() && <span><span className="pt-navbar-divider" />
           <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.commonName : ''} </small>
