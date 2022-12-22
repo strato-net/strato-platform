@@ -53,8 +53,8 @@ instance ToSchema Version where
     NamedSchema (Just "Version")
       ( mempty
         & type_ ?~ SwaggerString
-        & example ?~ "version : 0.1.0.0"
-        & description ?~ "Check to see if vault server is alive, and version the vault is running.")
+        & example ?~ "{\"version\" : \"1\"}"
+        & description ?~ "Check to see if vault server is alive, and version the vault is running. Contains an Int for the version number.")
 
 data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PublicKey } deriving (Show, Generic)
 
