@@ -88,9 +88,9 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Prometheus Graphs
+          Contact BlockApps Support
         </button>
       </a>
       <span>
@@ -156,9 +156,9 @@ exports[`MenuBar: index renders non Oauth mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Prometheus Graphs
+          Contact BlockApps Support
         </button>
       </a>
     </div>
@@ -209,9 +209,9 @@ exports[`MenuBar: index renders non Oauth mode component without values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Prometheus Graphs
+          Contact BlockApps Support
         </button>
       </a>
     </div>
