@@ -39,6 +39,7 @@ library:
   - unliftio
   - monad-alter
   - x509-certs
+  - monad-logger
 
 executables:
   blockstanbul-vote:
