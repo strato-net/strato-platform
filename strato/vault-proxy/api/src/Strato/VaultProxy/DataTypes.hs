@@ -10,6 +10,7 @@ import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
+import           Data.Scientific
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
@@ -122,11 +123,11 @@ instance FromJSON RawPing where
     ver  <- o .: T.pack "version"
 
     vers <- case ver of
-        (String s) -> pure s
+        (Number s) -> pure s
         (Object _) -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"authorization_endpoint\", but got something different."
 
-    return $ RawPing $ Version $ T.unpack vers 
+    return $ RawPing $ Version (base10Exponent vers)
   parseJSON wat = typeMismatch "Spec" wat
 
 data RawPing = RawPing {

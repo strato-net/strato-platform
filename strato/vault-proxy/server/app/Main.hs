@@ -9,7 +9,6 @@
 
 module Main where
 
-import           ASCII
 import           Control.Concurrent.Lock                as L
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -76,7 +75,7 @@ main = do
           --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
             --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
           Right val -> do
-            when ((unicodeStringToCharListUnsafe $ version (ping val)) < (unicodeStringToCharListUnsafe "1")) $ 
+            when ((version (ping val)) < 1) $ 
               error "The foreign vault is too old, please update it to the latest version" 
             pure val
   traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
