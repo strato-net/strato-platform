@@ -28,8 +28,8 @@ class MenuBar extends Component {
           <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}>Contact BlockApps Support</button>
         </a>
         <span className="pt-navbar-divider" />
-        <a href='https://internal.blockapps.net ' target="_black" rel="noopener noreferrer">
-          <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("internal_blockapps_click") }}>Dev Docs</button>
+        <a href='https://docs.blockapps.net/' target="_black" rel="noopener noreferrer">
+          <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("docs_blockapps_click") }}>Dev Docs</button>
         </a>
         {isOauthEnabled() && <span><span className="pt-navbar-divider" />
           <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.commonName : ''} </small>

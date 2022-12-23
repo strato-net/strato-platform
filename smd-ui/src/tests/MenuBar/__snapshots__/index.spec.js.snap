@@ -94,7 +94,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
         </button>
       </a>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://internal.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Dev Docs
         </button>
@@ -168,7 +168,7 @@ exports[`MenuBar: index renders non Oauth mode component with values 1`] = `
         </button>
       </a>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://internal.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Dev Docs
         </button>
@@ -227,7 +227,7 @@ exports[`MenuBar: index renders non Oauth mode component without values 1`] = `
         </button>
       </a>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://internal.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Dev Docs
         </button>
