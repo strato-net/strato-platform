@@ -121,6 +121,7 @@ services:
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - genesisBlockTestCert=${genesisBlockTestCert:-false}
     - isAdmin=${isAdmin:-false}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka

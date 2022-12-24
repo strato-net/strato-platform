@@ -29,6 +29,7 @@ import qualified Data.Sequence                                as S
 import           System.Directory
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
@@ -49,8 +50,10 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Generation                       (insertCertRegistryContract)
+import           Blockchain.Init.Options                     (flags_genesisBlockTestCert)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
@@ -103,6 +106,7 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , MonadLogger m
                                         , HasCodeDB m
                                         , HasHashDB m
+                                        , HasVault m
                                         , Mem.HasMemAddressStateDB m
                                         , HasStateDB m
                                         , HasStorageDB m
@@ -120,9 +124,17 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
                       _ -> error $ "invalid genesis: " ++ show genesis
         faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
         faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-        theJSON' = insertCertRegistryContract $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+    extraCerts <-
+      if flags_genesisBlockTestCert 
+        then do
+          nodePubkey <- getPub
+          let testCertSubject = Subject "Test Node" "BlockApps" (Just "Engineering") (Just "USA") nodePubkey
+          cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
+          return [cert]
+        else return []
+    let theJSON' = insertCertRegistryContract extraCerts $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
-    
+
     genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
 initializeGenesisBlock :: ( HasCodeDB m
@@ -133,6 +145,7 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasStateDB m
                           , HasStorageDB m
                           , HasMemStorageDB m
+                          , HasVault m
                           , MonadLogger m
                           , (Ac.Account `Alters` AddressState) m
                           )

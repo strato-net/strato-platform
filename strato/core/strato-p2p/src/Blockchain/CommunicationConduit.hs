@@ -70,7 +70,7 @@ import           BlockApps.X509
 
 -- This is a placeholder until the root certs can be held in a proper database
 rootCerts' :: S.Set X509Certificate
-rootCerts' = S.fromList [rootCert, testRootCert]
+rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
