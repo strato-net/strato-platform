@@ -22,6 +22,7 @@ module Blockchain.BlockChain
     , runCodeForTransaction
     , calculateIntrinsicGas'
     , compactDiffs -- For testing
+    , mkLogEntry
     , mkEventEntry
   ) where
 
@@ -536,6 +537,9 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAccount erResult
       return trr{trrNewAddresses = unseen}
 
+mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
+mkLogEntry bHash tHash chainId Log{..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
 mkEventEntry chainId Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
 
@@ -562,14 +566,13 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
       afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
       ranBlockHash = hashFunction b
-      mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       (!response, theTrace', theLogs, theEvents) =
         case result of
           Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
           Right r ->
             (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-  yieldMany $ OutLog . mkLogEntry <$> theLogs
+  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
