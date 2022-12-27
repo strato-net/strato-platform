@@ -53,7 +53,6 @@ pipeline {
             PASSWORD=123 ./strato --set-vault-password
             
             export NODE_HOST=$(</host)
-            export genesis=smokeTest
             export BLOC_DEBUG=true
             export SLIPSTREAM_OPTIONAL=false
             export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
