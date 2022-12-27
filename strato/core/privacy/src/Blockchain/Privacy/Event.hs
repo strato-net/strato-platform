@@ -85,8 +85,9 @@ findChainHashUses :: ( MonadLogger m
                      )
                   => Word256 -> [Keccak256] -> m ()
 findChainHashUses chainId cHashes = do
-  infos <- S.unions
-          . map (maybe S.empty _inBlocks)
+  infos <- S.fromList
+          . catMaybes
+          . map (maybe Nothing _inBlock)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
   logFF "Privacy/findChainHashUses" $ "blocksToRun unioning infos " ++ show infos
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
@@ -171,7 +172,7 @@ insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
     Just cid -> if cid == chainId
                   then return AlreadyExistsOnSameChain
                   else return $ WrongChainId cid
-    Nothing -> case S.lookupMin _inBlocks of
+    Nothing -> case _inBlock of
       Just bi | bi <= obi -> return $ SeenPreviouslyOnUnknownChain bi
       _ -> Inserted <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
@@ -372,15 +373,15 @@ hydratePrivateHashes chainF b = do
       return (tx, st)
       else do
         let cHash = txChainHash tx
-        used' <- _used <$> lookupWithDefault (Proxy @ChainHashEntry) cHash
-        if used'
-          then do
+        chainHashWasPreviouslyUsed <- _inBlock <$> lookupWithDefault (Proxy @ChainHashEntry) cHash
+        case chainHashWasPreviouslyUsed of
+          Just _ -> do
             notHydrating "its chain hash has already been used"
             return (tx, st)
-          else do
+          Nothing -> do
             runPrivateHashTX tHash cHash
             adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
-              inBlocks %= (S.insert $ BlockInfo bHash bOrdering)
+              inBlock ?= BlockInfo bHash bOrdering
             chainId <- join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) cHash
             case chainId of
               Nothing -> do
