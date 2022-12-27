@@ -1380,7 +1380,6 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
                                       let theParsedSet = CommonName ((T.pack . X509.orgName) certState) (T.pack $ fromMaybe "Nothing" $ X509.orgUnit certState) ((T.pack . X509.commonName) certState) True
                                       parsedSetToX509Map %= M.insert theParsedSet certState
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
-                                    CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
                                     TerminateChain _ -> pure ()
                                     PutLogDB _ -> pure ()
                                     PutEventDB _ -> pure ()

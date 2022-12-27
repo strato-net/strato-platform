@@ -17,6 +17,7 @@ import { env } from '../../env';
 const oauthUserUrl = env.APEX_URL + "/user";
 
 function getOrCreateOauthUserApi() {
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?address=eq.";
   return fetch(
     oauthUserUrl,
     {
@@ -28,8 +29,26 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
-    .then(function (response) {
-      return response.json()
+    .then(function (res) {
+      const user = res.json();
+      const url = cirrusUrl + user.address;
+      return fetch(
+        url,
+        {
+          method: 'GET',
+          credentials: "include",
+          headers: {
+            'Accept': 'application/json'
+          },
+        }
+      )
+        .then(handleErrors)
+        .then(function (response) {
+          return response.json();
+        })
+        .catch(function (error) {
+          throw error;
+        })
     })
     .catch(function (error) {
       throw error;
