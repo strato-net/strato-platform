@@ -46,13 +46,14 @@ describe('CreateChain: action', () => {
         uint public storedData;
       }`,
       args: { addRule: "MajorityRules", removeRule: "MajorityRules" },
+      contractName: 'SimpleStorage',
       vm: false,
       limit: 10,
       offset: 0
     }
 
     test('request', () => {
-      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm, payload.limit, payload.offset)).toMatchSnapshot();
+      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm, payload.contractName, payload.limit, payload.offset)).toMatchSnapshot();
     });
 
     test('success', () => {
