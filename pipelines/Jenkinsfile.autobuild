@@ -102,7 +102,7 @@ pipeline {
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                 usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
-              archiveArtifacts artifacts: "docker-compose.yml, docker-compose.ecr.yml, devops/eks/eks-strato-deployment.yaml, devops/eks/eks-vault-deployment.yaml"
+              archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, devops/eks/eks-strato-deployment.yaml, devops/eks/eks-vault-deployment.yaml"
               sh '''#!/bin/bash -le
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
