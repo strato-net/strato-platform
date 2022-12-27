@@ -1,3 +1,4 @@
+//Unused code notice. Api counter disabled, to be deprecated  #api-counter-deprecation
 'use strict';
 
 module.exports = function (sequelize, DataTypes) {

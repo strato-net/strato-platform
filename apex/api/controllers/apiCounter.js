@@ -1,3 +1,5 @@
+/* Unused code notice. Api counter disabled, to be deprecated  #api-counter-deprecation
+
 const winston = require('winston-color');
 
 const config = require('../config/app.config');
@@ -90,3 +92,4 @@ module.exports = {
   apiCounterRouteController,
   counter
 };
+*/
