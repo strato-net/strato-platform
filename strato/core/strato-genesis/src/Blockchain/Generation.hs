@@ -222,7 +222,8 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
                 (".certificateString", rlpWrap . BString $ certToBytes rootCert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert)
+                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert),
+                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) MainChain))
             ]
 
         -- Reversing the cert user address to create a placeholder Certificate contract address
@@ -248,7 +249,8 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
                 (".certificateString", rlpWrap . BString $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ cert)]
+                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ cert),
+                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))]
             ) certs
 
 certificateRegistryContract :: Text

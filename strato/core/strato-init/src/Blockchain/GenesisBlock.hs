@@ -112,6 +112,7 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , HasStorageDB m
                                         , HasMemStorageDB m
                                         , (Ac.Account `Alters` AddressState) m
+                                        , Accessible RBDB.RedisConnection m
                                         )
                                      => String
                                      -> [Ad.Address]
@@ -134,6 +135,20 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
         else return []
     let theJSON' = insertCertRegistryContract extraCerts $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+
+    -- Need to insert the X509 certificates INTO Redis
+    void . RBDB.withRedisBlockDB $ RBDB.insertRootCertificate
+    $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
+
+    mapM_ (\c -> do
+      let c'  = x509CertToCertInfoState c
+          ua' = userAddress c'
+          cr  = Ac.Account 0x509 Nothing 
+      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate cr ua' c'
+      case insertCert of 
+        Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
+        Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
+      ) extraCerts
 
     genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 

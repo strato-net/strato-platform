@@ -158,17 +158,17 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
       mAddress = fromPublicKey <$> mKey --getting the address of sender
   
 
-  $logInfoS "_____________________________________________________________________________DEBUG__________________________________________________________________________________________________________________________" ""
+  $logInfoS "__________________________DEBUG__________________________" ""
   $logInfoS "msgHash" (T.pack $ show msgHash)
   $logInfoS "mKey" (T.pack $ show mKey)
   $logInfoS "mAddress" (T.pack $ show mAddress)
-  res <- case mAddress of 
-    Nothing -> return Nothing
+  res <- case mAddress of -- TODO: why does this keeping coming out to Nothing?
+    Nothing -> error "Nothing"
     Just a -> A.select (A.Proxy @X509CertInfoState) a
   $logInfoS "res" (T.pack $ show res)
   let cmAddress = getAddressFromCM cm =<< res
   $logInfoS "cmAddress" (T.pack $ show cmAddress)
-  $logInfoS "_____________________________________________________________________________DEBUG__________________________________________________________________________________________________________________________" ""
+  $logInfoS "__________________________DEBUG__________________________" ""
   return (mAddress == cmAddress)
 authenticate _ = return True 
 
