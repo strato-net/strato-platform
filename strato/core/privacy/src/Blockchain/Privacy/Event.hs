@@ -373,12 +373,12 @@ hydratePrivateHashes chainF b = do
       return (tx, st)
       else do
         let cHash = txChainHash tx
-        chainHashWasPreviouslyUsed <- _inBlock <$> lookupWithDefault (Proxy @ChainHashEntry) cHash
-        case chainHashWasPreviouslyUsed of
-          Just _ -> do
+        chainHashInBlock <- _inBlock <$> lookupWithDefault (Proxy @ChainHashEntry) cHash
+        case chainHashInBlock of
+          Just (BlockInfo bHash' bOrdering') | bHash /= bHash' || bOrdering /= bOrdering' -> do
             notHydrating "its chain hash has already been used"
             return (tx, st)
-          Nothing -> do
+          _ -> do
             runPrivateHashTX tHash cHash
             adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
               inBlock ?= BlockInfo bHash bOrdering
