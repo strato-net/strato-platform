@@ -23,7 +23,6 @@ module Handlers.Metadata
 
 import           Data.Aeson                     hiding (Success)
 
-import qualified Data.Text                      as T
 import           Data.Swagger                   hiding (url)
        
 import           Control.Monad.Composable.SQL
@@ -61,11 +60,9 @@ data MetadataResponse = MetadataResponse
   } deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 
-type API = "metadata"
-  :> Servant.Header "X-USER-UNIQUE-NAME" T.Text
-  :> Get '[JSON] MetadataResponse
+type API = "metadata" :> Get '[JSON] MetadataResponse
 
-getMetaDataClient :: Maybe T.Text -> ClientM MetadataResponse
+getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
 server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
@@ -83,13 +80,12 @@ getMetaData :: (  MonadIO m
                 , HasVault m
                 , Accessible [Address] m
                 , HasSQL m )
-                =>   Maybe T.Text  
-                ->   m MetadataResponse
-getMetaData token = 
+                =>   m MetadataResponse
+getMetaData  = 
   do
   validators <- access (Proxy @[Address])
   isSynced <- checkIsSynced
-  mAddressAndKey <- getPubKeyAndAddress token
+  mAddressAndKey <- getPubKeyAndAddress
   case mAddressAndKey of
     Left  _      -> pure $ (MetadataResponse " "  "Error" validators False False) 
     Right addressAndKey -> pure $ (MetadataResponse 
@@ -111,11 +107,8 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m (Either VaultWrapperError (PublicKey, Address))
-getPubKeyAndAddress mAccessToken =
-  case mAccessToken of
-    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" 
-    Just _  -> try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  "nodekey" Nothing
+getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) =>  m (Either VaultWrapperError (PublicKey, Address))
+getPubKeyAndAddress  = try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  Nothing Nothing
 
 unaddressAndUnkey :: AddressAndKey -> (PublicKey, Address)
 unaddressAndUnkey addressAndKey = (Strato.Strato23.API.Types.unPubKey addressAndKey ,Strato.Strato23.API.Types.unAddress addressAndKey) 

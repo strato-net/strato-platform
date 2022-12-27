@@ -11,7 +11,6 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.Text                  as T
 import           Data.Either.Extra
 import           HFlags
 import           Safe
@@ -41,11 +40,11 @@ import           Flags
 
 waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
-  putStrLn "asking vault-wrapper for the node address"
+  putStrLn "asking vault-proxy for the node address"
   res <- action
   case res of
     Left err -> do 
-      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
+      putStrLn $ "failed to get node address from vault-proxy... got this error: " ++ show err
       threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> return val
@@ -62,7 +61,7 @@ main = do
   putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
-  putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
+  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   
   pkg <- atomically newCablePackage
@@ -78,13 +77,13 @@ main = do
         , cablePackage = pkg
         }
   
-  -- setup the connection with vault-wrapper
+  -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do
-    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress

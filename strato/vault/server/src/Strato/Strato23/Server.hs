@@ -23,11 +23,12 @@ import           Strato.Strato23.Server.User
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing
-          :<|> getKey
-          :<|> postKey
-          :<|> getSharedKey
-          :<|> getUsers
-          :<|> postSignature
+          :<|> getKey'
+          :<|> getKeys'
+          :<|> postKey'
+          :<|> getSharedKey'
+          :<|> getUsers'
+          :<|> postSignature'
           :<|> postPassword
           :<|> verifyPassword
 

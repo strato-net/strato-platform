@@ -9,10 +9,6 @@ PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
-stratoRoot=http://${stratoHost}/eth/v1.2
-
-vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
-
 slipMinLogLevel=LevelInfo
 if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
   slipMinLogLevel=LevelDebug
@@ -44,9 +40,29 @@ if [ ! -f _container_initialized ]; then
   date '+%Y-%m-%d %H:%M:%S' > _container_initialized
 fi
 
+# <Find the continuation of the script after the following function declarations>
+
 
 function newnode {
+  
+  mkdir -p logs
+  
+  [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
+  runBackgroundProcess blockapps-vault-proxy-server \
+    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
+    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
+
+  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
+  set +x
+  until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
+    sleep 0.1
+  done
+  set -x
+  echo 'vault-proxy is available'
+
+  # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
@@ -54,7 +70,6 @@ function newnode {
       sleep 10
     else
       touch .initNotFinished
-      mkdir logs
       cleanupDB
       doInit
       touch .initialized
@@ -67,6 +82,8 @@ function newnode {
   echo "Starting Strato processes. All output is logged to $PWD/logs."
   runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
+
+
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
@@ -78,7 +95,7 @@ function newnode {
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
@@ -110,7 +127,6 @@ function newnode {
      --maxConn=$maxConn \
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
-     --vaultWrapperUrl=$vaultWrapperRoot \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -154,13 +170,13 @@ function newnode {
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
-  vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
+
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" \
-    "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -196,7 +212,7 @@ function newnode {
                          ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
-  
+
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
   runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
@@ -210,13 +226,13 @@ function newnode {
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
       indexFlag=true
-  else 
+  else
       indexFlag=${indexEVM}
   fi
-  
+
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-    --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
+    --stratourl=${STRATO_API_LOCAL_ROOT_PATH}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -224,7 +240,7 @@ function newnode {
   else
       runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
   fi
-  
+
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
@@ -296,7 +312,7 @@ function doInit {
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-        --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
+        --addBootnodes=$addBootnodes $stratoBootnode \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
         --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag}"
 
@@ -338,7 +354,6 @@ function doInit {
   mkdir config
 
   echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
-
 }
 
 # Find all logs greater than 10M, then copy and truncate
@@ -360,18 +375,14 @@ function runBackgroundProcess {
   disown %
 }
 
-function rmEthereumH {
-  rm -rf .ethereumH/
-}
-
-#trap rmEthereumH EXIT
-
+# If variable with name <arg 1> does not have non-empty value, set it to <arg 2>
+# setEnv (var_name, default_value)
 function setEnv {
   [[ -n ${!1} ]] || eval $1=$2
   echo "$1 = ${!1}"
 }
 
-echo "Environment variables:"
+echo "Processed environment variables:"
 
 setEnv pgUser ${postgres_user}
 setEnv pgPass ${postgres_password}
@@ -424,7 +435,14 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
+setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
+setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
+
+if [[ -z ${VAULT_URL} ]] ; then
+  echo -e "Error: VAULT_URL is required"
+  exit 1
+fi
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
