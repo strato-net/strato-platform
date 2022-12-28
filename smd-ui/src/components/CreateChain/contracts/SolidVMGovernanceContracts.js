@@ -41,9 +41,9 @@ contract AdminOnly {
   event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
   struct chainMember {
-    string o,
-    string u,
-    string c
+    string o;
+    string u;
+    string c;
   }
 
   chainMember admin; 
@@ -72,12 +72,11 @@ contract MajorityRules {
   mapping(chainMember => uint) removeVotes; 
 
   struct chainMember {
-    string o,
-    string u,
-    string c
+    string o;
+    string u;
+    string c;
   }
 
-  }
   chainMember[] __members__; 
 
   function voteToAdd(string o, string u, string c) {
@@ -136,9 +135,9 @@ contract TwoIn {
   mapping(chainMember => uint) removeVotes; 
 
   struct chainMember {
-    string o,
-    string u,
-    string c
+    string o;
+    string u;
+    string c;
   }
 
   function voteToAdd(string o, string u, string c) {
