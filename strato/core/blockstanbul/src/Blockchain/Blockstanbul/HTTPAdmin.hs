@@ -29,7 +29,8 @@ import UnliftIO.STM
 import UnliftIO.Timeout
 
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Strato.Model.Address
+-- import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
 import Text.Format
 
 -- API
@@ -39,9 +40,9 @@ type AdminAPI = GetVote
 type GetVote = "vote" :> ReqBody '[JSON] CandidateReceived :> Post '[JSON] CandidateReceived
 
 -- A signed tuple of (recipient, votingdir, nonce) from sender
-data CandidateReceived = CandidateReceived { sender :: Address
+data CandidateReceived = CandidateReceived { sender :: ChainMemberParsedSet
                                            , signature :: String
-                                           , recipient :: Address
+                                           , recipient :: ChainMemberParsedSet
                                            , votingdir :: Bool
                                            , nonce :: Int
                                            } deriving (Eq, Show, GHCG.Generic)

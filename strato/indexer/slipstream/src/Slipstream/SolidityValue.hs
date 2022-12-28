@@ -29,11 +29,10 @@ import           Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text as Text
 import           GHC.Generics
 import           Text.Printf
-
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Type
 import           Blockchain.Strato.Model.Address
-
+--import           Debug.Trace
 data SolidityValue
   = SolidityValueAsString Text
   | SolidityBool Bool
@@ -74,16 +73,18 @@ instance FromJSON SolidityValue where
       fail "Failed to parse SolidityBytes"
   parseJSON _ = fail "Failed to parse solidity value"
 
-valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue v = case valueToSolidityValue' v of
-  Just sv -> sv
-  Nothing -> case v of
+valueToSolidityValue ::  Value -> SolidityValue
+valueToSolidityValue v = 
+  case  (valueToSolidityValue' v) of
+    Just sv -> sv
+    Nothing -> case v of
       -- This would be better handled by Value synthesis, but it seems difficult
       -- to distinguish the length of a nested array and an unaggregated sentinel.
-      ValueArraySentinel len -> SolidityArray $ replicate len $ SolidityValueAsString "0"
+      ValueArraySentinel len ->  SolidityArray $ replicate len $ SolidityValueAsString "0"
       _ -> error $ "internal error: unanticpated problem with value construction: " ++ show v
+  
 
-valueToSolidityValue' :: Value -> Maybe SolidityValue
+valueToSolidityValue' ::  Value -> Maybe SolidityValue
 valueToSolidityValue' = \case
   SimpleValue (ValueBool x) -> Just $ SolidityBool x
   SimpleValue (ValueInt _ _ v) ->  Just $ SolidityNum $ toInteger v

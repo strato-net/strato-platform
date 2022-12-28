@@ -95,7 +95,10 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org_unit);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_common_name);"
+
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
 
   exec "CREATE INDEX CONCURRENTLY ON address_state_ref (address);"
@@ -112,7 +115,7 @@ indexAll = do
 -- todo newtype me
 type Difficulty = Integer
 
-type MapPair = (Word256, Word256)
+type MapPair = (BS.ByteString, BS.ByteString)
 type TextPair = (Text, Text)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
@@ -187,7 +190,7 @@ instance Format BlockData where
     "parentHash: " ++ format (blockDataParentHash b) ++ "\n" ++
     "unclesHash: " ++ format (blockDataUnclesHash b) ++
     (if blockDataUnclesHash b == hash (BS.pack [0xc0]) then " (the empty array)\n" else "\n") ++
-    "coinbase: " ++ show (pretty $ blockDataCoinbase b) ++ "\n" ++
+    "coinbase: " ++ (format $ blockDataCoinbase b) ++ "\n" ++
     "stateRoot: " ++ format (blockDataStateRoot b) ++ "\n" ++
     "transactionsRoot: " ++ format (blockDataTransactionsRoot b) ++ "\n" ++
     "receiptsRoot: " ++ format (blockDataReceiptsRoot b) ++ "\n" ++
@@ -202,7 +205,7 @@ instance BlockHeaderLike BlockData where
     blockHeaderBlockNumber      = blockDataNumber
     blockHeaderParentHash       = blockDataParentHash
     blockHeaderOmmersHash       = blockDataUnclesHash
-    blockHeaderBeneficiary      = blockDataCoinbase
+    blockHeaderBeneficiary      = blockDataCoinbase -- blockHeaderBeneficiaryOrg      = blockDataCoinbaseOrg?
     blockHeaderStateRoot        = unboxStateRoot . blockDataStateRoot
     blockHeaderTransactionsRoot = unboxStateRoot . blockDataTransactionsRoot
     blockHeaderReceiptsRoot     = unboxStateRoot . blockDataReceiptsRoot

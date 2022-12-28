@@ -37,7 +37,6 @@ import           Control.Monad.Trans.Maybe
 import           Data.Bits
 import           Data.Typeable
 import           Data.Bool                            (bool)
-import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
@@ -55,10 +54,9 @@ import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
 import qualified Data.Text                            as T
-import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
-import qualified Data.Vector as V
+import qualified Data.Vector as V     
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
@@ -94,7 +92,6 @@ import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
 import           BlockApps.X509.Certificate
 import           BlockApps.X509.Keys
--- import           BlockApps.Logging
 import           Blockchain.Stream.Action             (Action)
 import qualified Blockchain.Stream.Action             as Action
 
@@ -123,9 +120,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
-
-
- 
+--import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -360,7 +355,9 @@ create' creator newAccount ch cc contractName' argExps = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erPragmas = CC._pragmas cc
+    erPragmas = CC._pragmas cc,
+    erOrgName = org,
+    erAppName = parentName
     }
 
 {-
@@ -429,7 +426,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
-    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
+    ((orgName, appName), returnVal) <- traverse (fmap Just . maybe (return "()") encodeForReturn)
+                                   =<< callWrapper' sender' codeAddress Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -437,7 +435,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
-      erReturnVal = BSS.toShort <$> returnVal,
+      erReturnVal = BSS.toShort .  BC.pack <$> returnVal,
       erTrace = [],
       erLogs = [],
       erEvents = toList finalEvs,
@@ -446,7 +444,9 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
       erAction = Just $ finalAct,
       erException = Nothing,      -- tells me if theres an exception
       erKind = SolidVM,
-      erPragmas=[]
+      erPragmas=[],
+      erOrgName = orgName,
+      erAppName = appName
       }
 
 
@@ -709,7 +709,10 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-callWrapper from to mContract functionName isRCC argExps  = do
+callWrapper from to mContract functionName isRCC argExps  = snd <$> callWrapper' from to mContract functionName isRCC argExps
+
+callWrapper' :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
+callWrapper' from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -730,22 +733,12 @@ callWrapper from to mContract functionName isRCC argExps  = do
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
--- grab the org for this codeAddress
-  when (not isRCC) $ do
-    org <- getOrg to
-    Mod.modifyStatefully_ (Mod.Proxy @Action) $
-      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-          " in app " ++ (show parentName) ++ " of org " ++ show org
-
 --  grab the org from the senders account and set it to the codeAddress
-  when (isRCC) $ do
-    org <- getOrg from
-    Mod.modifyStatefully_ (Mod.Proxy @Action) $
-      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+  org <- getOrg to
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+  when (isRCC) $
     (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
-    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
-          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
@@ -753,7 +746,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
           Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions                  --contract^. M.empty $ CC.functions 
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
         where
-          emptyFunction = CC.Func [] [] Nothing Nothing Nothing M.empty [] dummyAnnotation False [] 
+          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False [] 
           dummyAnnotation :: SourceAnnotation ()
           dummyAnnotation =
             SourceAnnotation
@@ -815,7 +808,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
                     SVMType.Array _ _-> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
-  logFunctionCall args to contract functionName f
+  ((org, parentName'),) <$> logFunctionCall args to contract functionName f
   
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
@@ -1547,7 +1540,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
       (SBuiltinVariable "block", "coinbase") ->
-        (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+        pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
         
 
       (SBuiltinVariable "block", "difficulty") -> 
@@ -2277,6 +2270,15 @@ evaluateAccountMember a _ "chainId" = do
         Just cid -> return $ Constant $ SInteger $ fromIntegral cid
     MainChain ->  return $ Constant $ SInteger 0 
     ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
+evaluateAccountMember a _ "chainIdString" = do 
+  case (a ^. namedAccountChainId) of
+    UnspecifiedChain -> do 
+      curCid <- view accountChainId <$> getCurrentAccount
+      case curCid of
+        Nothing -> return $ Constant $ SString $ replicate 64 '0'
+        Just cid -> return $ Constant $ SString $ format cid
+    MainChain ->  return $ Constant $ SString $ replicate 64 '0' 
+    ExplicitChain cid -> return $ Constant $ SString $ format cid
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
@@ -2449,21 +2451,21 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = do
-  let intHash = intBuiltin [SString h]
-  bytestringHash <- encodeForReturn intHash
-  rIntHash <-case Numeric.readHex r of
-    [(x, "")] -> return x
-    _ -> invalidArguments "parseHex: error parsing r: " r
-  sIntHash <- case Numeric.readHex s of
-    [(y, "")] -> return y
-    _ -> invalidArguments "parseHex: error parsing s: " s
-  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
-  let theZero ::  Integer
-      theZero = 0
-  case theSignerAddress of
-    Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
-    Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
+callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = case B16.decode (BC.pack h) of
+  Left err -> invalidArguments err ("" :: String)
+  Right bytestringHash -> do
+    rIntHash <-case Numeric.readHex r of
+      [(x, "")] -> return x
+      _ -> invalidArguments "parseHex: error parsing r: " r
+    sIntHash <- case Numeric.readHex s of
+      [(y, "")] -> return y
+      _ -> invalidArguments "parseHex: error parsing s: " s
+    let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
+    let theZero ::  Integer
+        theZero = 0
+    case theSignerAddress of
+      Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
+      Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
 callBuiltin ("sha256") args Nothing = do
   let allStrings [] = True
       allStrings ((SString _):xs) = True && (allStrings xs)
@@ -2906,23 +2908,24 @@ logVals val1 val2 = onTraced . liftIO $ printf
   \            %%%% val2 = %s\n" (show val1) (show val2)
 
 --TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
-encodeForReturn :: MonadSM m => Value -> m ByteString
+-- change the return type from ByteSTring to String
+encodeForReturn ::  MonadSM m => Value -> m String
+encodeForReturn v = 
+  case  v of
+    STuple{} ->  encodeForReturn' v
+    _ ->  do
+      v' <- encodeForReturn' v
+      return $ "(" <> v' <> ")" 
+    
 
-encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
-encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
-encodeForReturn ((SAccount a _)) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
-encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
-encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-
--- if it's just a single string, harcode offset as 32 and append strLen + str
-encodeForReturn (SString s) = do
-  let offset = word256ToBytes $ fromIntegral (32 :: Int)
-      encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
-      retStr = offset `B.append` (encodedLength `B.append` stringBytes)
-  return retStr
-  where stringBytes = TE.encodeUtf8 $ T.pack s
-
-
+encodeForReturn' :: MonadSM m => Value -> m String
+encodeForReturn' (SInteger i) = return . show $  i
+encodeForReturn' (SEnumVal _ _ v) = return . show $ v
+encodeForReturn' ((SAccount a _)) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
+encodeForReturn' (SContract _ a) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
+encodeForReturn' (SBool b) = return .  show . fromEnum $ b
+encodeForReturn' (SString s) = return $ show s
+{- The following comments are just for previous encodeForReturn function to return ByteString type. 
 -- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
 --   1) starting at the first value to encode, check if it is fixed length type (32), or
 --      dynamic (right now, this group is only strings since we don't return arrays). 
@@ -2944,43 +2947,18 @@ encodeForReturn (SString s) = do
 --                                            (offsetStr1)            (offsetStr2)
 -- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
+-}
+encodeForReturn' (SArray _ items) = do
+  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
+  return $ "[" ++ ( intercalate "," encodedItems ) ++ "]"  --[,]
+encodeForReturn' (STuple items)   = do
+  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
--- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn (SArray _ items) = do
-  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-  bs <- encodeVector items
-  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+  return $ "(" ++ ( intercalate "," encodedItems ) ++ ")" 
 
-encodeForReturn (STuple items) = encodeVector items
+encodeForReturn' x = todo "Cannot encode this return type: " x
 
-encodeForReturn x = todo "Cannot encode this return type: " x
-
-encodeVector :: MonadSM m => V.Vector Variable -> m ByteString
-encodeVector v = do
-  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList v)
-  return $ headers `B.append` strings
-  where
-    headerLen = (V.length v) * 32
-    buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
-    buildEncoding (headers, strings) val = case val of
-      SString s -> do
-        let offset = word256ToBytes $ fromIntegral (headerLen + (B.length strings))
-            encStr = TE.encodeUtf8 $ T.pack s
-            encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
-            strBS =  encStrLen `B.append` encStr
-        return (headers `B.append` offset, strings `B.append` strBS)
-      tup@(STuple _) -> todo "encoding nested tuples as return values" tup
-      val' -> do
-        bs <- encodeForReturn val'
-        return (headers `B.append` bs, strings)
-
-
-
-
-
-
-
-
+--formatAddressWithoutColor : padded the address with 40 bytes
 
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)

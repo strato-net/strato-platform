@@ -29,6 +29,7 @@ import qualified Data.Sequence                                as S
 import           System.Directory
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
@@ -48,8 +49,11 @@ import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.Generation                       (insertCertRegistryContract)
+import           Blockchain.Init.Options                     (flags_genesisBlockTestCert)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
@@ -102,15 +106,17 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , MonadLogger m
                                         , HasCodeDB m
                                         , HasHashDB m
+                                        , HasVault m
                                         , Mem.HasMemAddressStateDB m
                                         , HasStateDB m
                                         , HasStorageDB m
                                         , HasMemStorageDB m
                                         , (Ac.Account `Alters` AddressState) m
+                                        , Accessible RBDB.RedisConnection m
                                         )
                                      => String
                                      -> [Ad.Address]
-                                     -> m ([(AccountInfo, CodeInfo)], Block)
+                                     -> m ([(Ad.Address, X509CertInfoState)], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let genesis = JS.parseLazyByteString genesisParser theJSONString
@@ -119,9 +125,33 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
                       _ -> error $ "invalid genesis: " ++ show genesis
         faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
         faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-        theJSON' = theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+    extraCerts <-
+      if flags_genesisBlockTestCert 
+        then do
+          nodePubkey <- getPub
+          let testCertSubject = Subject "Test" "BlockApps" (Just "Engineering") (Just "USA") nodePubkey
+          cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
+          return [cert]
+        else return []
+    let theJSON' = insertCertRegistryContract extraCerts $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
-    genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
+
+    -- Need to insert the X509 certificates INTO Redis
+    void . RBDB.withRedisBlockDB $ RBDB.insertRootCertificate
+    $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
+
+    extraCertInfoStates <- mapM (\c -> do
+      let c'  = x509CertToCertInfoState c
+          ua' = userAddress c'
+          cr  = Ac.Account 0x509 Nothing 
+      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate cr ua' c'
+      case insertCert of 
+        Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
+        Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
+      pure (ua', c')
+      ) extraCerts
+
+    (extraCertInfoStates,) <$> genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
@@ -131,6 +161,7 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasStateDB m
                           , HasStorageDB m
                           , HasMemStorageDB m
+                          , HasVault m
                           , MonadLogger m
                           , (Ac.Account `Alters` AddressState) m
                           )
@@ -139,9 +170,9 @@ initializeGenesisBlock :: ( HasCodeDB m
                        -> m ()
 initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
-    (srcInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
+    (extraCertInfoStates, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
     _ <- produceVMOutputs [ChainBlock genesisBlock]
-    obGB <- liftIO $ bootstrapSequencer genesisBlock
+    obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries successfully created"
     void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
@@ -214,26 +245,26 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  (EVMCode ch)
+                                  (codeHash d)
                                   ""
                                   ""
-                                  EVM
+                                  (case codeHash d of
+                                    EVMCode _ -> EVM
+                                    SolidVMCode _ _ -> SolidVM
+                                    CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block")
                                   (case storage d of
-                                    EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
-                                    SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
+                                    SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
+                                    EVMDiff m -> A.EVMDiff $ Map.map fromDiff m)
                                   [A.Create]
-            , A._metadata = getMetadata ch
+            , A._metadata = getMetadata (case codeHash d of
+                  EVMCode ch' -> ch'
+                  SolidVMCode _ ch' -> ch'
+                  CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block")
             , A._events = S.empty
             }
-            where ch =
-                    case codeHash d of
-                      EVMCode ch' -> ch'
-                      SolidVMCode _ ch' -> ch'
-                      CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
-          fromDiff :: Diff Word256 'Eventual -> Word256
+          fromDiff :: Diff a 'Eventual -> a
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
-
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates

@@ -41,12 +41,13 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals)
+import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
@@ -61,6 +62,7 @@ import qualified LabeledError
 import           SQLM
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
+import           Text.Format
 
 import           UnliftIO
 
@@ -203,8 +205,12 @@ postChainInfo mUserName chainInput = case mUserName of
         chainInfo' <- createChainInfo userName bHash chainInput
         chainId <- CORE.postChain chainInfo'
         let isAsync = fromMaybe False $ chaininputAsync chainInput
-        unless isAsync $ waitForChainInfo chainId
-        return chainId
+        unless isAsync $ do
+          info <- waitForChainInfo chainId
+          let status = transactionResultStatus $ fst info
+          when (status /= Just Success) . throwIO . UserError . Text.pack $
+            "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
+        pure chainId
 
 postChainInfos :: ( MonadIO m
                   , A.Selectable Account AddressState m
@@ -223,23 +229,28 @@ postChainInfos mUserName chainInputs = case mUserName of
     chainIds <- postChains chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
         asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-    unless (null asyncChains) $ waitForChainInfos asyncChains
-    return chainIds
+    unless (null asyncChains) $ do
+      infos <- zip asyncChains <$> waitForChainInfos asyncChains
+      let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
+      unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
+        \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
+    pure chainIds
 
-waitForChainInfo :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
+
+waitForChainInfo :: (MonadLogger m,
                      HasSQL m) =>
-                    ChainId -> m ()
-waitForChainInfo chainId = waitForChainInfos [chainId]
+                    ChainId -> m (TransactionResult, Maybe ChainInfo)
+waitForChainInfo chainId = head <$> waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
+waitForChainInfos :: (MonadLogger m,
                       HasSQL m) =>
-                     [ChainId] -> m ()
+                     [ChainId] -> m [(TransactionResult, Maybe ChainInfo)]
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
   where go = do
-          infos <- getChainInfo chainIds Nothing Nothing
+          infos <- catMaybes <$> maybeChainBatchResult chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
           $logDebugLS "waitForChainInfo/resp" infos
-          return $ length infos == length chainIds
+          return (length infos == length chainIds, infos)
 
 getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) => 
                 ChainId -> m ChainIdChainOutput
@@ -261,6 +272,7 @@ getChainInfo chainIds lim off = do
                                     NonContract a b -> (a, b)
                                     ContractNoStorage a b _ -> (a, b)
                                     ContractWithStorage a b _ _ -> (a, b)
+                                    SolidVMContractWithStorage a b _ _ -> (a, b)
         let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
             mems = members chinfo
         NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput

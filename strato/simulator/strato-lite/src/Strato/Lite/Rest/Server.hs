@@ -62,8 +62,8 @@ getPeers mgr label = do
   pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
-postAddNode mgr label (AddNodeParams ip bootNodes) =
-  liftIO $ runReaderT (addNode label (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
+postAddNode mgr label (AddNodeParams ip identity bootNodes) =
+  liftIO $ runReaderT (addNode label identity (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr

@@ -54,6 +54,7 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , x509certInfoState
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -109,6 +110,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
+import           BlockApps.X509.Certificate
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -121,7 +123,7 @@ import qualified Strato.Strato23.Client                    as VC
 
 
 
-data Modification a = Modification a | Deletion
+data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
@@ -136,6 +138,7 @@ data SequencerContext = SequencerContext
   , _orgNameChainsRegistry :: !(Map ChainMembers (Modification Word256))
   -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
+  , _x509certInfoState   :: !(Map Address (Modification X509CertInfoState)) --map to pubkey
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -152,6 +155,8 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
+                           , (Address `A.Alters` X509CertInfoState) m
+                           , (Address `A.Selectable` X509CertInfoState) m
                            , HasVault m
                            )
 
@@ -240,6 +245,10 @@ instance HasNamespace TrueOrgNameChains where
 instance HasNamespace FalseOrgNameChains where
   type NSKey FalseOrgNameChains = Word256
   namespace _ = "pncf:"
+
+instance HasNamespace X509CertInfoState where
+  type NSKey X509CertInfoState = Address
+  namespace _ = "cis:"  -- make a namespace instance for new mapping
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -350,6 +359,20 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     genericDeleteSequencer chainIdRegistry p k
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
+
+instance (Address `A.Alters` X509CertInfoState) SequencerM where 
+  lookup = genericLookupSequencer x509certInfoState
+  insert p k v = do
+    genericInsertSequencer x509certInfoState p k v
+    sz <- M.size <$> use x509certInfoState
+    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer x509certInfoState p k
+    sz <- M.size <$> use x509certInfoState
+    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
+
+instance A.Selectable Address X509CertInfoState SequencerM where 
+  select = A.lookup
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do
@@ -476,6 +499,7 @@ runSequencerM c mbc m = do
             , _chainInfoRegistry   = M.empty
             , _orgNameChainsRegistry = M.empty
             , _x509certRegistry    = M.empty
+            , _x509certInfoState   = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty
