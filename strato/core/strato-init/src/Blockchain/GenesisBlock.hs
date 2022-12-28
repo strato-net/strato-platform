@@ -116,7 +116,7 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         )
                                      => String
                                      -> [Ad.Address]
-                                     -> m ([(AccountInfo, CodeInfo)], Block)
+                                     -> m ([(Ad.Address, X509CertInfoState)], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let genesis = JS.parseLazyByteString genesisParser theJSONString
@@ -129,7 +129,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
       if flags_genesisBlockTestCert 
         then do
           nodePubkey <- getPub
-          let testCertSubject = Subject "Test Node" "BlockApps" (Just "Engineering") (Just "USA") nodePubkey
+          let testCertSubject = Subject "Test" "BlockApps" (Just "Engineering") (Just "USA") nodePubkey
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
@@ -140,7 +140,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     void . RBDB.withRedisBlockDB $ RBDB.insertRootCertificate
     $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
 
-    mapM_ (\c -> do
+    extraCertInfoStates <- mapM (\c -> do
       let c'  = x509CertToCertInfoState c
           ua' = userAddress c'
           cr  = Ac.Account 0x509 Nothing 
@@ -148,9 +148,10 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
       case insertCert of 
         Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
         Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
+      pure (ua', c')
       ) extraCerts
 
-    genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
+    (extraCertInfoStates,) <$> genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
@@ -169,9 +170,9 @@ initializeGenesisBlock :: ( HasCodeDB m
                        -> m ()
 initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
-    (srcInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
+    (extraCertInfoStates, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
     _ <- produceVMOutputs [ChainBlock genesisBlock]
-    obGB <- liftIO $ bootstrapSequencer genesisBlock
+    obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries successfully created"
     void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False

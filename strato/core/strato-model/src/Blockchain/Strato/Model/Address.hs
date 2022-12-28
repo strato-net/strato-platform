@@ -18,7 +18,8 @@ module Blockchain.Strato.Model.Address
       getNewAddressWithSalt_unsafe,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
-      unAddress
+      unAddress,
+      parseHex
     ) where
 
 import           Control.DeepSeq
@@ -262,6 +263,30 @@ addressFromHex hex = case B16.decode hex of
                                   Right (_, _, a) -> return a
                                   Left (_, _, mesg) -> Left $ "cannot decode address: " ++ mesg
                      _ -> Left $ "invalid hex address: " ++ show hex
+
+hexChar :: Char -> Integer
+hexChar ch
+    | ch == '0' = 0
+    | ch == '1' = 1
+    | ch == '2' = 2
+    | ch == '3' = 3
+    | ch == '4' = 4
+    | ch == '5' = 5
+    | ch == '6' = 6
+    | ch == '7' = 7
+    | ch == '8' = 8
+    | ch == '9' = 9
+    | ch == 'a' = 10
+    | ch == 'b' = 11
+    | ch == 'c' = 12
+    | ch == 'd' = 13
+    | ch == 'e' = 14
+    | ch == 'f' = 15
+    | otherwise     = 0
+
+parseHex :: String -> Integer
+parseHex [] = 0
+parseHex hxStr = hexChar (last hxStr) + 16 * parseHex (init hxStr)
 
 instance Arbitrary Address where
   arbitrary = Address <$> arbitrary
