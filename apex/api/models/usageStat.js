@@ -1,4 +1,4 @@
-//Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
+/*Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
 'use strict';
 
 module.exports = function (sequelize, DataTypes) {
@@ -92,3 +92,4 @@ module.exports = function (sequelize, DataTypes) {
   };
   return UsageStat;
 };
+*/

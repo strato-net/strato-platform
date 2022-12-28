@@ -10,7 +10,8 @@ function getUserCount() {
   // Temporary counting users who posted at least one transaction:
   Transaction.count(
       {
-        distinct: 'from_address', 
+        distinct: true,
+        col: 'from_address', 
         where: {
           origin: 'API',
         }
