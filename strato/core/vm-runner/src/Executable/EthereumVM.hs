@@ -254,6 +254,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
           [] -> do
             yieldMany . concat $ map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
             yieldMany . concat $ map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
+            let (orgName, appName) = case mExecResults of
+                                       [] -> ("","")
+                                       x:_ -> (erOrgName x, erAppName x)
             when flags_createTransactionResults $
               yield . OutTXR $
                      TransactionResult { transactionResultBlockHash        = cBlock
@@ -274,6 +277,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
                                        , transactionResultStatus           = Just Success
                                        , transactionResultChainId          = Just cId
                                        , transactionResultKind             = Just kind
+                                       , transactionResultOrgName          = orgName
+                                       , transactionResultAppName          = appName
                                        }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x:_ -> do
@@ -298,6 +303,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
                                        , transactionResultStatus           = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt)
                                        , transactionResultChainId          = Just cId
                                        , transactionResultKind             = Just kind
+                                       , transactionResultOrgName          = ""
+                                       , transactionResultAppName          = ""
                                        }
             return Nothing
 
