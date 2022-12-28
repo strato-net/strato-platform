@@ -1,6 +1,6 @@
 /* jshint esnext: true */
 
-import jwt_decode from 'jwt-decode';
+const jwt_decode = require('jwt-decode');
 
 
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -18,7 +18,7 @@ async function createUserKey(req, res, next) {
   }
   
   const token_payload = jwt_decode(accessToken)
-  const username = token_payload['preferred_username'] || token_payload['email'] || token_payload['sub']
+  const username = token_payload['preferred_username'] || token_payload['email'] || token_payload['sub'] || 'Logged in user'
   
   try {
     const response = await getOrCreateKey(accessToken);

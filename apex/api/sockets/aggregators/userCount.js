@@ -7,15 +7,16 @@ let userCount
 
 function getUserCount() {
   // TODO: replace with query for the count of registered Certs
+  // Temporary counting users who posted at least one transaction:
   Transaction.count(
       {
-        distinct: 'to_address', 
+        distinct: 'from_address', 
         where: {
-          from_address: 'e1fd0d4a52b75a694de8b55528ad48e2e2cf7859', // faucet account from default genesis block // TODO: make it obtained dynamically?
           origin: 'API',
         }
       }
-  ).then(newUserCount => {
+  ).then(count => {
+    const newUserCount = count - 2  // Excluding the faucet account from genesis block and '0000000000000000000000000000000000000000'
     if (userCount !== newUserCount) {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)
