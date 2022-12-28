@@ -1,5 +1,8 @@
 /* jshint esnext: true */
 
+import jwt_decode from 'jwt-decode';
+
+
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const { getOrCreateKey } = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
@@ -9,15 +12,17 @@ async function createUserKey(req, res, next) {
 
 
   if (!accessToken) {
-    let err = new Error("invalid param, expected username to be a non-empty string");
+    let err = new Error("invalid param, expected value in x-user-access-token header");
     err.status = RestStatus.BAD_REQUEST;
     return next(err);
   }
-
+  
+  const token_payload = jwt_decode(accessToken)
+  const username = token_payload['preferred_username'] || token_payload['email'] || token_payload['sub']
+  
   try {
     const response = await getOrCreateKey(accessToken);
-    // TODO: Critical: return the actual username coming from VaultProxy instead #fix-before-shared-vault-done
-    const userKeyData = Object.assign({}, response.user, { username: '#todo-in-apex-#fix-before-shared-vault-done' });
+    const userKeyData = Object.assign({}, response.user, { username: username });
 
     res.status(200).json(userKeyData);
   } catch (error) {

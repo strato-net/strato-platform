@@ -31,6 +31,7 @@
     "expect": "latest",
     "express": "4.16.1",
     "is-reachable": "2.3.3",
+    "jwt-decode": "^3.1.2",
     "mocha": "5.0.0",
     "moment": "^2.18.1",
     "moment-duration-format": "^2.2.2",

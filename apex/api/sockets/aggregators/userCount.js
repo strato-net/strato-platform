@@ -1,13 +1,21 @@
 const { USERS_COUNT } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-const User = require('../../models/strato/oauth/user');
+const Transaction = require ('../../models/strato/eth/transaction');
 const config = require('../../config/app.config')
 
 let userCount
 
 function getUserCount() {
-  User.count().then(users => {
-    const newUserCount = users - 1; // The oauth/users table always contains a row that is the information for the "nodekey", which is the node's internal account, so the true user count is always one fewer than the number of rows in the table
+  // TODO: replace with query for the count of registered Certs
+  Transaction.count(
+      {
+        distinct: 'to_address', 
+        where: {
+          from_address: 'e1fd0d4a52b75a694de8b55528ad48e2e2cf7859', // faucet account from default genesis block // TODO: make it obtained dynamically?
+          origin: 'API',
+        }
+      }
+  ).then(newUserCount => {
     if (userCount !== newUserCount) {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)

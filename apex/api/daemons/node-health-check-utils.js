@@ -14,7 +14,7 @@ const neededJobs = {
   "strato_p2p": "strato-p2p",
   "vm_main": "vm-runner",
   "seq_main": "strato-sequencer",
-  "blockapps-vault-wrapper-server": "vault-wrapper",
+  // TODO: add vault-proxy in prometheus
   "core-api": "core-api"
 }
 
@@ -67,7 +67,6 @@ function getPrometheusMetrics() {
 async function checkIfGlobalPasswordSet() {
   const options = {
     method: 'GET',
-    // TODO: if you found this line, it's probably a time to fix the password check for Shared Vault, good luck!
     url: `${process.env.vaultProxyUrl}/strato/v2.3/verify-password`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,

@@ -24,8 +24,6 @@ async function createKey(accessToken, userParams = null) {
       //faucet user so they can do stuff
       await waitFaucet(userAccount.address);
       
-      // TODO: add the username to userAccount object here if not present #fix-before-shared-vault-done
-      
       return {
         status: RestStatus.OK,
         user: userAccount
