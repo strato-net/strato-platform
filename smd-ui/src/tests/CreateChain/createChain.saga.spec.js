@@ -33,6 +33,7 @@ describe('CreateChain: saga', () => {
       src: `contract SimpleStorage {
         uint public storedData;
       }`,
+      contractName: 'SimpleStorage',
       args: { addRule: "MajorityRules", removeRule: "MajorityRules" },
       vm: false,
     }
@@ -41,7 +42,7 @@ describe('CreateChain: saga', () => {
 
       test('Without Error (status 200)', () => {
         const gen = createChain({ type: CREATE_CHAIN_REQUEST, ...payload });
-        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm));
+        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm, payload.contractName));
         expect(gen.next({ status: 200, mockResponse }).value).toEqual(put(createChainSuccess({ status: 200, mockResponse })));
         expect(gen.next().value).toEqual(call(delay, 2000));
         expect(gen.next().value).toEqual(put(fetchChains()));
@@ -52,7 +53,7 @@ describe('CreateChain: saga', () => {
 
       test('With Error (status 500)', () => {
         const gen = createChain({ type: CREATE_CHAIN_REQUEST, ...payload });
-        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm));
+        expect(gen.next().value).toEqual(call(createChainApiCall, payload.label, payload.members, payload.balances, payload.integrations, payload.src, payload.args, payload.vm, payload.contractName));
         expect(gen.next('error').value).toEqual(put(createChainFailure('error')));
         expect(gen.throw('error').value).toEqual(put(createChainFailure('error')));
         expect(gen.next().done).toBe(true);

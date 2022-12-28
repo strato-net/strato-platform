@@ -12,6 +12,7 @@ import {
   COMPILE_CHAIN_CONTRACT_SUCCESS,
   COMPILE_CHAIN_CONTRACT_FAILURE,
   RESET_CONTRACT,
+  CONTRACT_NAME_CHANGE,
 } from './createChain.actions';
 
 const initialState = {
@@ -21,7 +22,8 @@ const initialState = {
   spinning: false,
   key: null,
   error: null,
-  abi: null
+  abi: null,
+  contractName: undefined
 };
 
 const reducer = function (state = initialState, action) {
@@ -93,6 +95,11 @@ const reducer = function (state = initialState, action) {
         ...state,
         abi: null
       }
+    case CONTRACT_NAME_CHANGE:
+      return {
+        ...state,
+        contractName: action.contractName
+      };
     default:
       return state;
   }
