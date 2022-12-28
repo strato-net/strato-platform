@@ -10,7 +10,6 @@ module Blockchain.Blockstanbul.Authentication
   ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad.Logger
 -- import Control.Monad (liftM2, liftM3, unless)
 --import Control.Monad.Trans.Except
 import Control.Monad.Except    hiding (sequence)
@@ -151,24 +150,15 @@ signMessage tm = do
   sig <- sign mesg
   return $ OMsg (MsgAuth addr sig) $ tm
 
-authenticate :: (A.Selectable Address X509CertInfoState m, MonadLogger m) => InEvent -> m Bool
+authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash     --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
-  
-
-  $logInfoS "__________________________DEBUG__________________________" ""
-  $logInfoS "msgHash" (T.pack $ show msgHash)
-  $logInfoS "mKey" (T.pack $ show mKey)
-  $logInfoS "mAddress" (T.pack $ show mAddress)
   res <- case mAddress of -- TODO: why does this keeping coming out to Nothing?
     Nothing -> error "Nothing"
     Just a -> A.select (A.Proxy @X509CertInfoState) a
-  $logInfoS "res" (T.pack $ show res)
   let cmAddress = getAddressFromCM cm =<< res
-  $logInfoS "cmAddress" (T.pack $ show cmAddress)
-  $logInfoS "__________________________DEBUG__________________________" ""
   return (mAddress == cmAddress)
 authenticate _ = return True 
 
