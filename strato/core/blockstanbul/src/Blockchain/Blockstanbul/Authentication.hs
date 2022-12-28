@@ -22,7 +22,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Either.Extra
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Test.QuickCheck
 import Text.Printf
 
