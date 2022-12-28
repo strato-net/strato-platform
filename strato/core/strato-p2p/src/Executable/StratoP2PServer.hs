@@ -24,14 +24,20 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
+import           Data.Time.Clock
+import           GHC.IO.Exception
 import           UnliftIO
 
 import           BlockApps.Logging
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
+import           Blockchain.EthEncryptionException
+import           Blockchain.EventException
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.TCPClientWithTimeout
+
 import qualified Text.Colors                           as C
 
 runEthServer :: (RunsServer n m, MonadP2P n)
@@ -55,6 +61,10 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
+
+      curTime <- liftIO getCurrentTime
+      when ((pPeerEnableTime p) > curTime) $ throwIO PeerDisabled
+
       case pPeerPubkey p of
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
@@ -63,7 +73,26 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
             runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
-            Just err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
+            Just err -> do
+              $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
+              _ <- case err of
+                e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable p
+                e' | Just WrongGenesisBlock <- fromException e' -> do
+                 _ <- disableUDPPeerForSeconds p 86400
+                 lengthenPeerDisable p
+                e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable p
+                e' | Just NetworkIDMismatch <- fromException e' -> do
+                 _ <- disableUDPPeerForSeconds p 86400
+                 lengthenPeerDisable p
+                e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable p
+                e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
+                 case ioErrType of
+                   NoSuchThing -> do
+                     _ <- disableUDPPeerForSeconds p 86400
+                     lengthenPeerDisable p
+                   _ -> return $ Right ()
+                _  -> return $ Right ()
+              throwIO err
 
 runEthServerConduit :: MonadP2P m
                     => PPeer
