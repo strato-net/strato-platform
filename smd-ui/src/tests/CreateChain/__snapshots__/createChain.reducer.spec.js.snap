@@ -140,6 +140,7 @@ Object {
 exports[`CreateChain: reducer set initial state 1`] = `
 Object {
   "abi": null,
+  "contractName": undefined,
   "error": null,
   "isAddIntegrationModalOpen": false,
   "isAddMemberModalOpen": false,

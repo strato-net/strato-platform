@@ -101,6 +101,7 @@ Object {
       "balance": 500000000000000,
     },
   ],
+  "contractName": 10,
   "integrations": "contract SimpleStorage {
         uint public storedData;
       }",
@@ -120,7 +121,7 @@ Object {
     "removeRule": "MajorityRules",
   },
   "type": "CREATE_CHAIN_REQUEST",
-  "vm": 10,
+  "vm": "SimpleStorage",
 }
 `;
 

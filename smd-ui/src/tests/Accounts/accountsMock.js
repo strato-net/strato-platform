@@ -220,13 +220,46 @@ export const getBalanceMock = [
  }
 ];
 
+// These values are randomly generated.
 export const oauthAccounts = [
   { 
-    username: "clinicaladmin",
-    address: "57f2ed9058d2e868d7bbae9db03af12d27675117"
+    record_id: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
+    address: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
+    chainId: "",
+    block_hash: "dcvn97pwo8yoh1ep9iwdo6hdulk9uxtz1dehps53emm6tpznqz7eba3p5p7pqoqc",
+    block_timestamp: "2022-11-09 23:13:38 UTC",
+    block_number: 107,
+    transaction_hash: "9hj1qyqu52wqn45kgk5c6doy3go7qfm3beuze4dw4rfdps8ffgperqxb08qv4y72",
+    transaction_sender: "a1n72r68azg8xgx5bnr6myz0npqs9setrw2tijoc",
+    certificateString: "-----BEGIN CERTIFICATE-----\nZFu7U9gH/tPDNlYKwV0JofxMwMgUuvsgHdGeSJju4d300QNAOFgUV10WeUQBgK486lwUcvk6o8nAhJWYDFGbfnWcA8midQ6iicps/m7/T7fTu7V4M0vpldEWqfxekFuG/0AUyujhoqfwSfLJPmo0iQEP8LT3ilASHwzMjOetzeujV9tOemSm/3tKZcWkmqNx8ayKhb4mDdcclQ8zOAhNIkGBVd1fybuqqJHXLQC4yzbLHkWZ/OZTN2VhthECeF5ryiUUGZdOYxN2EFYnGPIIoqlpYsl4ab0gZvXK6bBw0vR/JvtpQPhuyw25VUIpa3UVAYRcdjABrAKjRovYdpEb8T002C4BnMCQMbWs8za6mhaG15zGQw5bRngQvbzjypVP7rlgyNJaaaPW0/EISVuSb1oycITPsxSneoUAHty1NfFaqRlFiH8hWAKVQ5nCiCAbjHDK03QjAmRecA82nn0DKZXqlf67LsKZN4KNbtKVEHCsTdivymmx3AokxtbMx2Ca3EIPc3h2Eykby3f7nR857UskcmL600HYs4tPIlF=\n-----END CERTIFICATE-----\n",
+    commonName: "clinicaladmin",
+    country: "USA",
+    isValid: true,
+    organization: "BlockApps",
+    organizationalUnit: "Engineering",
+    owner: "6h2vbp7a08nevelwsyz6cnpuqr77diwi3wck720q",
+    parent: "0000000000000000000000000000000000000000",
+    publicKey: "-----BEGIN PUBLIC KEY-----\nVRBEESfuZn6/YKyN8YQfL6uwbLFUPZFWTwZZswyXv6KRDbpXwBcQuoNuB5AIiQ9saR4yxBJRhaHLSQEZ/JzJBABTSxEWEtibIneBx0h8eAjVA3Zrpio9RMq/==\n-----END PUBLIC KEY-----\n",
+    userAddress: "bzvlsnw1xpmipq866nuxkyjxb2crh0jcw1t8olbj",
   },
   { 
-    username: "clinicalops",
-    address: "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547"
+    record_id: "2pija4bap2id714a805tju8kgfti0g4zz92xb2p2",
+    address: "2pija4bap2id714a805tju8kgfti0g4zz92xb2p2",
+    chainId: "",
+    block_hash: "qsv3kkq2qj6te2lazhqwcmx8t3uwec92gfeujsajglc58f0b83eumifklcwbuu6y",
+    block_timestamp: "2022-11-08 23:13:38 UTC",
+    block_number: 420,
+    transaction_hash: "kaxjqjglb0uuue895oz8onmpzmybm7pp2k88n02kub4paoorazmn8o25egyf7mqb",
+    transaction_sender: "pa6ml06vx6pyxe16l99j6ed5s5ivoyi8k2txxpoj",
+    certificateString: "-----BEGIN CERTIFICATE-----\nHNzSWfySaQ7F9nJPmN4S3O0VjImiuYUxtkoecEQbvcj9bD0RPuXVpdXyVaUsBOPCK3FF0PVgqrmRd8DavK10TAo/Y3uK7XPTfRUc4Rpp1WX3nujsyx2UhzWLOgjSqooc6ElZA6S/ZVB6s3/77Ht/N1Kr86zqD2G0F3TEQDGKSTxN84Rq4/FDMlOACtV2s3csSHFjH9WyyZWjshWVC6KVQs0imMvXZbjyuep4Q0PmhkTyeUwsItPv7ZhXhZEVE3YtgJyqFcmGiIanSRQm7GUZJMMEtfBQl7WpHGO3ueNUMM/ePMbWvXbrj4R3m8tnbSKUPnySWetxr/RZTJorRFsnoR6bHfJL9E370EZPg9gTL1wmx53PGAff1BcQhww32KtBSkAYpXtHlFpvOaYo3aFIHuuQVxviv5jft1HgDWBsqWsh2cBbw3yBjskqiCBrJvahRq6Axk109xqcj8zWJqE1KzbSUhVRI3xcbavmb0jdnilJyoGr6mvrnxnwJc5b/YNhFuy2cr8u5vrtfXHbmPquqyDeCvwUIEOuBbSIjRm=\n-----END CERTIFICATE-----\n",
+    commonName: "clinicalops",
+    country: "USA",
+    isValid: true,
+    organization: "BlockApps",
+    organizationalUnit: "DevOps",
+    owner: "lcifb59wxctj6dp11c4h3gzrjhhx2tubk3o7j10h",
+    parent: "0000000000000000000000000000000000000000",
+    publicKey: "-----BEGIN PUBLIC KEY-----\nLjOJsnkZ8stbjPk2LyaYZCnjdfd3ehu5y8yHPfBT2iF49Hd2D/RseopgsmKMcyF5Zf7LeNY9XqhLlbt5pFhYrJ2jXW9S0sCrpaposrhmT0EnGyeWiyFHQZA7==\n-----END PUBLIC KEY-----\n",
+    userAddress: "ozw2xzoyais9e1p73sqeh9vd8mcvfm2oog6wc870",
   },
 ]

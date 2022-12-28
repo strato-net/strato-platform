@@ -182,25 +182,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when dividing before multiplying from the left" $
-      let anns = DivideBeforeMultiply.detector `forContract` [r|
-contract A {
-  function f(bool b) {
-    uint x = (7 / 6) * 9;
-  }
-}
-|]
-       in length anns `shouldBe` 1
-    it "warns when dividing before multiplying from the right" $
-      let anns = DivideBeforeMultiply.detector `forContract` [r|
-contract A {
-  function f(bool b) {
-    uint x = 9 * (7 / 6);
-  }
-}
-|]
-       in length anns `shouldBe` 1
-
+       
   describe "Constant function detectors" $ do
     it "can write pure and view functions" $
       let anns = ConstantFunctions.detector `forContract` [r|
