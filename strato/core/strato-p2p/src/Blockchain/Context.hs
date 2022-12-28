@@ -548,6 +548,7 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)
+                       , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
                        ] m
                   , All2 '[A.Alters]
