@@ -49,6 +49,9 @@ pipeline {
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
             export requireCerts=false
+            export certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}'
+            export genesisBlockTestCert=true
+            export validators='[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}]'
             ./strato --single
             docker ps
             # Few quick tests

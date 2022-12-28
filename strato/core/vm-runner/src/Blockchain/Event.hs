@@ -23,8 +23,8 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
@@ -36,7 +36,7 @@ import           Data.Map                           (Map)
 type VmInEvent = VmEvent
 
 data VmInEventBatch = InBatch
-  { votesToMake        :: [(Address, Bool, Address)]
+  { votesToMake        :: [(ChainMemberParsedSet, Bool, ChainMemberParsedSet)]
   , rpcCommands        :: [JsonRpcCommand]
   , txPairs            :: [(Timestamp, OutputTx)]
   , tLen               :: {-# UNPACK #-} !Int
@@ -44,7 +44,7 @@ data VmInEventBatch = InBatch
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
   , privateTxs         :: [OutputTx]
-  , validators         :: ([Address], [Address])
+  , validators         :: ([ChainMemberParsedSet], [ChainMemberParsedSet])
   }
 
 newInBatch :: VmInEventBatch
@@ -71,7 +71,7 @@ data VmOutEvent = OutAction Action
                 | OutTXR TransactionResult
                 | OutASM (Map Account AddressStateModification)
                 | OutJSONRPC String B.ByteString
-                | OutValidators [Address] [Address]
+                | OutValidators [ChainMemberParsedSet] [ChainMemberParsedSet]
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action

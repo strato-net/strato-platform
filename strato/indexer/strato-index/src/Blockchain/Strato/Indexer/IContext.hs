@@ -52,11 +52,10 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Kafka
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.ChainMember (ChainMembers(..))
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
@@ -96,10 +95,10 @@ instance (Word256 `A.Alters` API ChainInfo) IContextM where
   delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
 
-instance (([Address], [Address]) `A.Alters` API ValidatorRef) IContextM where
-  lookup _ _               = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
-  delete _ _               = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
-  insert _ addrs _    = void . lift $ addRemoveValidator addrs
+instance (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) IContextM where
+  lookup _ _      = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
+  delete _ _      = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
+  insert _ vals _ = void . lift $ addRemoveValidator vals
 
 instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
   lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"

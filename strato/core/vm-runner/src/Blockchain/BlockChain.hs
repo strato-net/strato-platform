@@ -187,7 +187,7 @@ setParentStateRoot OutputBlock{..} = do
     BSDB.getBSum (blockDataParentHash obBlockData)
 
 addBlock :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
-addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} =
+addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b in withCurrentBlockHash obh $ do
     $logInfoS "addBlocks" . T.pack $
       "Inserting Block #"
@@ -219,9 +219,9 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     addBlockTransactions b
 
-    postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
+    postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-    when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
+    when (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR) $ do
       $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
       error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
@@ -370,17 +370,17 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-        coinbaseAcct = Account (blockDataCoinbase b) chainId
+        -- coinbaseAcct = Account (blockDataCoinbase b) chainId
     lift $ P.incCounter txTypeCounter
     if success --this should handle exceptions,shouldnt it?
         then do
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-            s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
-            unless s1 $ error "addToBalance failed even after a check in addBlock"
+            -- s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
+            -- unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
 
-            success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
-            unless success' $ error "oops, refund was too much"
+            -- success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
+            -- unless success' $ error "oops, refund was too much"
 
             case erException execResults of
                 Just e -> do
@@ -394,8 +394,8 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
                     lift $ P.incCounter vmTxsSuccessful
             return execResults
         else do
-            s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
-            unless s1 $ error "addToBalance failed even after a check in addTransaction"
+            -- s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
+            -- unless s1 $ error "addToBalance failed even after a check in addTransaction"
             balance <- lift $ addressStateBalance <$>
               A.lookupWithDefault (Proxy @AddressState) tAcct
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance

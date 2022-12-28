@@ -25,7 +25,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -62,7 +62,7 @@ main = do
   let blockData = BlockData {
         blockDataParentHash = unsafeCreateKeccak256FromWord256 0xabcd,
         blockDataNumber = 1,
-        blockDataCoinbase = Address 0xabcd,
+        blockDataCoinbase = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,
         blockDataDifficulty = 1,
         blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0xabcd,
         blockDataStateRoot = MP.blankStateRoot,

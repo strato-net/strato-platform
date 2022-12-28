@@ -59,6 +59,7 @@ library:
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
+  - strato-p2p
   - temporary
   - text
   - transformers

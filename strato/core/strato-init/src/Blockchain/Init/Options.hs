@@ -36,4 +36,6 @@ defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis blo
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize - deprecated, except for upgraded networks (pre-6.0)"
 
+defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
+
 $(return [])

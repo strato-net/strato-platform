@@ -383,7 +383,7 @@ runOperation BLOCKHASH = do
           let h = hash $ BC.pack $ show $ toInteger number
           push $ keccak256ToWord256 h
 
-runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
+runOperation COINBASE = pushEnvVar (const $ Address 0) -- (blockDataCoinbase . envBlockHeader) -- TODO: fix?
 runOperation TIMESTAMP = do
   VMState{environment=env} <- vmstateGet
   push $ ((round . utcTimeToPOSIXSeconds . blockDataTimestamp . envBlockHeader) env::Word256)

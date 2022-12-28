@@ -27,6 +27,7 @@ library:
   dependencies:
     - QuickCheck
     - aeson
+    - aeson-casing
     - ansi-wl-pprint
     - asn1-types
     - base16-bytestring

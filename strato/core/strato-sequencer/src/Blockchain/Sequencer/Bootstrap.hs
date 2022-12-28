@@ -5,8 +5,10 @@ module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
 import qualified Control.Monad.Change.Alter as A
 import qualified Data.ByteString.Char8 as C8
+import           Data.Foldable (for_)
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Constants
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
@@ -30,10 +32,10 @@ import           Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
 --
-bootstrapSequencer :: Block -> IO OutputBlock
-bootstrapSequencer Block{blockBlockData = bd,
-                    blockReceiptTransactions = txs,
-                    blockBlockUncles = us} = do
+bootstrapSequencer :: [(Address, X509CertInfoState)] -> Block -> IO OutputBlock
+bootstrapSequencer extraCerts Block{blockBlockData = bd,
+                                    blockReceiptTransactions = txs,
+                                    blockBlockUncles = us} = do
   pkg <- atomically newCablePackage
   initLevelDB pkg
   initKafka pkg
@@ -85,6 +87,7 @@ bootstrapSequencer Block{blockBlockData = bd,
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
         A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
+        for_ extraCerts . uncurry $ A.insert (A.Proxy @X509CertInfoState)
         flushLdbBatchOps
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do

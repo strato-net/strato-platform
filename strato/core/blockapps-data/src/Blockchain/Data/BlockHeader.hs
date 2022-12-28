@@ -24,7 +24,7 @@ import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Strato.Model.Keccak256
 
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 
@@ -36,7 +36,7 @@ data BlockHeader =
   BlockHeader {
     parentHash       :: Keccak256,
     ommersHash       :: Keccak256,
-    beneficiary      :: Address,
+    beneficiary      :: ChainMemberParsedSet,
     stateRoot        :: MP.StateRoot,
     transactionsRoot :: MP.StateRoot,
     receiptsRoot     :: MP.StateRoot,
