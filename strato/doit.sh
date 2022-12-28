@@ -150,6 +150,9 @@ function newnode {
   if [ -n "${blockstanbulAdmins}" ]; then
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
+  if [ -n "${certInfo}" ]; then
+    ciFlag="--certInfo=${certInfo}"
+  fi
 
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
@@ -159,7 +162,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" \
+    "${networkFlag}" "${ciFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
