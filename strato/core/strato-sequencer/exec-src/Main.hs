@@ -81,6 +81,9 @@ main = do
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
 
+  putStrLn $ "authSenders'" ++ show authSenders
+  putStrLn $ "self'" ++ show self
+  putStrLn $ "eSelf'" ++ show eSelf
 
   mCtx <- if not flags_blockstanbul
              then return Nothing
@@ -91,12 +94,14 @@ main = do
                       $ "WARNING: You have given me an empty validators list. \
                         \ This is a configuration error on your part. \
                         \ PBFT will almost certainly not function properly."
+                   putStrLn $ "validators'" ++ show validator'
                    return validators'
                  else do
                    when (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me an empty validators list, but this node is not the root \
                         \ node. This is a configuration error on your part. \
                         \ PBFT will almost certainly not function properly."
+                   putStrLn $ "validators'" ++ show validator'
                    return validators'
 
                authSenders <-
@@ -108,6 +113,7 @@ main = do
                        \ a single node, this is OK. But, if you are starting a network or adding a \
                        \ validator node to a network, be warned - this node will not accept any votes \
                        \ to add or remove validators, as it has no authorized senders."
+                   putStrLn $ "authSenders'" ++ show authSenders'
                    return authSenders'
 
                unless (self `elem` validators) . putStrLn
