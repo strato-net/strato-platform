@@ -15,6 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
     , getSHAsByNumber
     , getChainInfo, putChainInfo
+    , addValidators, removeValidators
     , getChainMembers, putChainMembers
     , addChainMember -- , removeChainMember
     , registerCertificate
@@ -111,7 +112,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions  -> "pt:"
             PrivateTxsInBlocks   -> "pb:"
             PrivateOrgNameChains -> "pnc:"
-            -- Validators           -> "v:"
+            Validators           -> "v:"
             PrivateTrueOrgNameChains -> "pnct:"
             PrivateFalseOrgNameChains -> "pncf:"
             X509Certificates     -> "x509:"
@@ -127,7 +128,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
-  -- "v" -> Validators
+  "v" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
@@ -159,17 +160,23 @@ putChainInfo cId cInfo = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
--- putValidator :: Word256
---           -> ValidatorRef
---           -> Redis (Either Reply Status)
--- putChainInfo cId cInfo = do --validator
---     let rChain    = RedisValidatorRef validator
+addValidators :: [CM.ChainMemberParsedSet]
+              -> Redis (Either Reply Status)
+addValidators vals = do
+    res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue ("true" :: S8.ByteString))) <$> vals
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addValidators - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addValidators - Error" ++ e)
 
---     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
---     case res of
---         TxSuccess _ -> pure $ Right Ok
---         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
---         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
+removeValidators :: [CM.ChainMemberParsedSet]
+                 -> Redis (Either Reply Status)
+removeValidators vals = do
+    res <- multiExec . del $ inNamespace Validators <$> vals
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Error" ++ e)
 
 getChainMembers :: Word256
                 -> Redis CM.ChainMemberRSet

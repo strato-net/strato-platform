@@ -841,6 +841,11 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
 
+instance MonadIO m => (ChainMemberParsedSet `A.Alters` P2P (A.Proxy ChainMemberParsedSet)) (MonadTest m) where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
 instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
   output ies = unseqEvents %= (++ies)
 
