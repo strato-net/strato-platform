@@ -64,6 +64,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
                  | IENewCertRegistered  A.Address X509CertInfoState
+                 | IECertRevoked A.Address
                  | IENewChainOrgName Word256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
@@ -75,6 +76,7 @@ data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
                      | IETNewCertRegistered
+                     | IETCertRevoked
                      | IETNewChainOrgName
                      | IETBlockstanbul
                      | IETForcedConfigChange
@@ -86,17 +88,19 @@ iEventType = \case
   IETx{}                 -> IETTransaction
   IEBlock{}              -> IETBlock
   IEGenesis{}            -> IETGenesis
-  IENewCertRegistered{}     -> IETNewCertRegistered
+  IENewCertRegistered{}  -> IETNewCertRegistered
+  IECertRevoked{}        -> IETCertRevoked
   IENewChainOrgName{}    -> IETNewChainOrgName
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
-  IEValidatorBehavior{}   -> IETValidatorBehavior
+  IEValidatorBehavior{}  -> IETValidatorBehavior
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
   format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
+  format (IECertRevoked a) = CL.yellow $ format a
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o

@@ -73,21 +73,23 @@ doRemoveOrgName chainId cm = do
   lift $ removeMember chainId cm
   void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain (ChainMembers $ S.singleton cm) chainId
 
-doRegisterCertificate :: Account -> Address -> X509CertInfoState -> IContextM ()
-doRegisterCertificate contractAddress userAddress x509CertInfoState = do
+doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
+doRegisterCertificate userAddress x509CertInfoState = do
   logF [ "Registering X.509 Certificate -- key/userAddress: "
        , format userAddress
        , "; value/x509CertInfoState: "
        , format x509CertInfoState
        ]
-  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate contractAddress userAddress x509CertInfoState
+  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress x509CertInfoState
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewCertRegistered userAddress x509CertInfoState]
 
-doRevokeCertificate :: Account -> Address -> IContextM ()
-doRevokeCertificate contractAddress userAddress = do
+doRevokeCertificate :: Address -> IContextM ()
+doRevokeCertificate userAddress = do
   logF [ "Revoking X.509 Certificate -- key/userAddress: "
         , format userAddress
         ]
-  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate contractAddress userAddress
+  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
+  void . withKafkaRetry1s $ writeUnseqEvents [IECertRevoked userAddress]
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -103,8 +105,8 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddOrgName (Either String (Word256, ChainMemberParsedSet))
                | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
-               | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
-               | CertificateRevoked (Either String (Account, Address))
+               | RegisterCertificate (Either String (Address, X509CertInfoState))
+               | CertificateRevoked (Either String Address)
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -131,12 +133,12 @@ indexEventToTxrResults = \case
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit, commonName=commonName})
+            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit, commonName=commonName})
       (Address 0x509, Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of
             Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
-            Just ua -> Just . CertificateRevoked . Right $ (eventDBContractAddress ev, ua)
+            Just ua -> Just . CertificateRevoked $ Right ua
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -150,10 +152,10 @@ txrResultHandler = \case
     Right (chainId, chainMember) -> doRemoveOrgName chainId chainMember
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RegisterCertificate e -> case e of
-    Right (contractAddress, ua, certInfoState) -> doRegisterCertificate contractAddress ua certInfoState
+    Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   CertificateRevoked e -> case e of
-    Right (contractAddress, userAddress) -> doRevokeCertificate contractAddress userAddress
+    Right userAddress -> doRevokeCertificate userAddress
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId

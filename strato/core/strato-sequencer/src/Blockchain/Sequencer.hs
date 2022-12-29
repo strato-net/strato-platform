@@ -666,6 +666,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETNewCertRegistered -> do
       record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
       traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
+    IETCertRevoked -> do
+      record "inevent_type_cert_revoked" "IngestCertRevoked"
+      traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
       yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events

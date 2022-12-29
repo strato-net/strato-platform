@@ -143,8 +143,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     extraCertInfoStates <- mapM (\c -> do
       let c'  = x509CertToCertInfoState c
           ua' = userAddress c'
-          cr  = Ac.Account 0x509 Nothing 
-      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate cr ua' c'
+      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate ua' c'
       case insertCert of 
         Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
         Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e

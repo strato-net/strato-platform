@@ -1383,7 +1383,7 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
                                         )
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
                                     RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    RegisterCertificate (Right (_, addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
+                                    RegisterCertificate (Right (addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
                                       let setOrg = Org (T.pack o) True
                                           setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
                                           setCommonName = CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
