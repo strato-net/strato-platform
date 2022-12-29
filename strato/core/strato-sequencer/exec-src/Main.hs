@@ -81,7 +81,7 @@ main = do
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
 
-  putStrLn $ "authSenders'" ++ show authSenders
+  putStrLn $ "authSenders'" ++ show authSenders'
   putStrLn $ "self'" ++ show self
   putStrLn $ "eSelf'" ++ show eSelf
 
@@ -94,14 +94,14 @@ main = do
                       $ "WARNING: You have given me an empty validators list. \
                         \ This is a configuration error on your part. \
                         \ PBFT will almost certainly not function properly."
-                   putStrLn $ "validators'" ++ show validator'
+                   putStrLn $ "validators'" ++ show validators'
                    return validators'
                  else do
                    when (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me an empty validators list, but this node is not the root \
                         \ node. This is a configuration error on your part. \
                         \ PBFT will almost certainly not function properly."
-                   putStrLn $ "validators'" ++ show validator'
+                   putStrLn $ "validators'" ++ show validators'
                    return validators'
 
                authSenders <-
