@@ -161,6 +161,7 @@ putChainInfo cId cInfo = do
 
 addValidators :: [CM.ChainMemberParsedSet]
               -> Redis (Either Reply Status)
+addValidators [] = pure $ Right Ok
 addValidators vals = do
     res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue ("true" :: S8.ByteString))) <$> vals
     case res of
@@ -170,6 +171,7 @@ addValidators vals = do
 
 removeValidators :: [CM.ChainMemberParsedSet]
                  -> Redis (Either Reply Status)
+removeValidators [] = pure $ Right Ok
 removeValidators vals = do
     res <- multiExec . del $ inNamespace Validators <$> vals
     case res of

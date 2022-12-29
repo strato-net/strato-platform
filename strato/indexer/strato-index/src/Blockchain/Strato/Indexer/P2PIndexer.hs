@@ -72,8 +72,8 @@ indexP2P idxEvents = do
       let cMembers = members $ chainInfo cInfo
       A.insert (A.Proxy @(P2P ChainMembers)) cId (P2P $ cMembers)
     ValidatorsG (remove, add) -> do
-      A.insertMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) . M.fromList . zip add . repeat $ P2P A.Proxy
-      A.deleteMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) remove
+      unless (null add) . A.insertMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) . M.fromList . zip add . repeat $ P2P A.Proxy
+      unless (null remove) $ A.deleteMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) remove
     _ -> return ()
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
