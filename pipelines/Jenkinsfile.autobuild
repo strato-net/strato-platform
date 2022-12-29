@@ -83,17 +83,13 @@ pipeline {
               echo "STRATO health endpoint is available through nginx - node is running"
             }
             
-# TEMPORARY REPLACED WITH JUST SLEEP UNTIL APEX HEALTH CHECKS ARE FIXED
-            # check_availability
-            sleep 20
+            check_availability
             
             echo "Restarting docker containers to simulate computer restart..."
             docker-compose -p strato --log-level ERROR stop
             docker-compose -p strato --log-level ERROR start
             
-# TEMPORARY REPLACED WITH JUST SLEEP UNTIL APEX HEALTH CHECKS ARE FIXED
-            # check_availability
-            sleep 20
+            check_availability
           '''
       }
     }
