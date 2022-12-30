@@ -21,8 +21,10 @@ module Handlers.Metadata
     , server
   ) where
 
+import           Control.Lens
 import           Data.Aeson                     hiding (Success)
-
+import           Data.Aeson.Casing.Internal     (camelCase)
+import           Data.Maybe                     (fromJust, fromMaybe)
 import           Data.Swagger                   hiding (url)
        
 import           Control.Monad.Composable.SQL
@@ -37,28 +39,27 @@ import           GHC.Stack
 import           BlockApps.Logging
 
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault(..))
 import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatusNow)
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Strato.Strato23.Client   hiding (verifyPassword)
-import           Strato.Strato23.API.Types 
-import           Strato.Strato23.Monad (VaultWrapperError)
+import qualified Strato.Strato23.API.Types as V
 import           Servant
 import           Servant.Client
 
+import qualified LabeledError
 import           UnliftIO
 import           SQLM
 
-
-
 data MetadataResponse = MetadataResponse
-  { nodePubKey            ::  String
-  , nodeAddress           ::  String
-  , validators            ::  [Address]
+  { nodePubKey            ::  V.PublicKey
+  , nodeAddress           ::  Address
+  , validators            ::  [ChainMemberParsedSet]
   , isSynced              ::  Bool
   , isVaultPasswordSet    ::  Bool
   } deriving (Eq, Show, Generic, FromJSON, ToJSON)
-
 
 type API = "metadata" :> Get '[JSON] MetadataResponse
 
@@ -68,35 +69,48 @@ getMetaDataClient = client (Proxy @API)
 server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
 server = getMetaData
 
-instance HasSQL m => Accessible [Address] m where 
-    access _ = do
-        txrs <-  fmap (map E.entityVal) $  sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
-        pure $  (\(ValidatorRef x) -> x ) <$> txrs
-instance ToSchema MetadataResponse
+instance HasSQL m => Accessible [ChainMemberParsedSet] m where 
+  access _ = do
+    txrs <-  fmap (map E.entityVal) $  sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
+    pure $  (\(ValidatorRef o u c) -> CommonName o u c True) <$> txrs
+
+instance ToSchema MetadataResponse where
+  declareNamedSchema proxy = genericDeclareNamedSchema metadataSchemaOptions proxy
+    & mapped.schema.description ?~ "MetadataResponse"
+    & mapped.schema.example ?~ toJSON exMetadataRespone
+
+exMetadataRespone :: MetadataResponse
+exMetadataRespone =
+  let pubKey = (fromJust $ importPublicKey $ LabeledError.b16Decode "exMetadataResponse" "04b1145444ab72758420e9dec9dc21b5aab0b84ed5f709677b9e9bfe477b8dffcd8e9a88338769f6d1a958c3063620593d504f6b4e0c56f72a6ca98fae7ce92eb7")
+   in MetadataResponse
+        pubKey
+        (fromPublicKey pubKey)
+        [CommonName "BlockApps" "Engineering" "Admin" True]
+        True
+        True
+
+-- | The model's field modifiers will match the JSON instances
+metadataSchemaOptions :: SchemaOptions
+metadataSchemaOptions = SchemaOptions
+  { fieldLabelModifier = camelCase . dropFPrefix
+  , constructorTagModifier = id
+  , datatypeNameModifier = id
+  , allNullaryToStringTag = True
+  , unwrapUnaryRecords = True
+  }
 
 getMetaData :: (  MonadIO m
                 , MonadLogger m
-                , MonadUnliftIO m
                 , HasVault m
-                , Accessible [Address] m
+                , Accessible [ChainMemberParsedSet] m
                 , HasSQL m )
                 =>   m MetadataResponse
 getMetaData  = 
   do
-  validators <- access (Proxy @[Address])
+  validators <- access (Proxy @[ChainMemberParsedSet])
   isSynced <- checkIsSynced
-  mAddressAndKey <- getPubKeyAndAddress
-  case mAddressAndKey of
-    Left  _      -> pure $ (MetadataResponse " "  "Error" validators False False) 
-    Right addressAndKey -> pure $ (MetadataResponse 
-          ((\l -> drop 1 $ init  l )  $ ((\(PublicKey pubkey) ->   show  pubkey ) $ fst addressAndKey )) --pretty prints pubkey
-          (show $ snd  addressAndKey) 
-          validators  
-          isSynced 
-          True)
-
-
-
+  V.AddressAndKey a k <- getPubKeyAndAddress
+  pure $ MetadataResponse k a validators isSynced True
 
 blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
                     ClientM x -> m x
@@ -107,11 +121,8 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKeyAndAddress ::  (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m) =>  m (Either VaultWrapperError (PublicKey, Address))
-getPubKeyAndAddress  = try $ fmap unaddressAndUnkey .  blocVaultWrapper $ getKey  Nothing Nothing
-
-unaddressAndUnkey :: AddressAndKey -> (PublicKey, Address)
-unaddressAndUnkey addressAndKey = (Strato.Strato23.API.Types.unPubKey addressAndKey ,Strato.Strato23.API.Types.unAddress addressAndKey) 
+getPubKeyAndAddress ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => m (Either VaultWrapperError V.AddressAndKey)
+getPubKeyAndAddress = try . blocVaultWrapper $ getKey Nothing Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
-checkIsSynced = (runStratoRedisIO getSyncStatusNow) >>= \case Nothing -> pure False; Just c ->pure  c; 
+checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

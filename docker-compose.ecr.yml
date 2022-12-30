@@ -1,4 +1,4 @@
-#strato-version:<VERSION>
+#strato-version:latest
 #strato-getting-started-min-version:2.7
 version: "3"
 volumes:
@@ -25,8 +25,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - NODE_NAME=${NODE_NAME}
     - ssl=${ssl:-false}
-    build: .
-    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
+    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -38,18 +37,21 @@ services:
     - postgres
     - prometheus
     - strato
+    - vault-wrapper
     environment:
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
-    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    - STRATO_PORT_API=${STRATO_PORT_API}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
-    build: .
-    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    - prometheusHost=prometheus:9090
+    - STATS_ENABLED=${STATS_ENABLED}
+    - STATS_DEBUG_CUSTOM_SERVER_URL=${STATS_DEBUG_CUSTOM_SERVER_URL}
+    - STATS_SUBMIT_ENABLED=${STATS_SUBMIT_ENABLED}
+    - STATS_SUBMIT_CONTRACT_TYPES_ENABLED=${STATS_SUBMIT_CONTRACT_TYPES_ENABLED}
+    - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
+    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -67,11 +69,30 @@ services:
         max-file: "3"
     volumes:
       - redisdata:/data
+  vault-wrapper:
+    depends_on:
+    - postgres
+    environment:
+    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgres_vault_wrapper_db=oauth
+    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
+    image: ${VAULTWRAPPER_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:latest}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
   strato:
     depends_on:
     - kafka
     - postgres
     - redis
+    - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
     - appFetchLimit=${appFetchLimit}
@@ -84,7 +105,6 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - cacheTransactionResults=${cacheTransactionResults}
-    - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
@@ -114,12 +134,6 @@ services:
     - network=${network:-blockappsnet}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
-    - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -146,8 +160,7 @@ services:
     - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
-    - VAULT_URL=${VAULT_URL}
-    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
+    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
     - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
@@ -155,8 +168,7 @@ services:
     - zkHost=zookeeper
     - EVM_COMPATIBLE=${EVM_COMPATIBLE}
     - indexEVM=${indexEVM:-false}
-    build: .
-    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
+    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:latest}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -179,8 +191,7 @@ services:
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
-    build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -213,6 +224,7 @@ services:
     - prometheus
     - smd
     - strato
+    - vault-wrapper
     environment:
     - APEX_HOST=${APEX_HOST}
     - blockstanbul=${blockstanbul}
@@ -223,7 +235,7 @@ services:
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_JWT_USER_ID_CLAIM=${OAUTH_JWT_USER_ID_CLAIM}
+    - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
     - POSTGREST_HOST=${POSTGREST_HOST}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
@@ -238,12 +250,11 @@ services:
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
+    - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
+    - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     - vmDebug=${vmDebug}
-    build: .
-    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
+    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:latest}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
@@ -266,12 +277,10 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: zookeeper:3.4.14
+    image: wurstmeister/zookeeper:3.4.6
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/data
-    environment:
-      ZOO_DATA_LOG_DIR: /data
+      - zookeeperdata:/opt/zookeeper-3.4.6/data
     logging:
       driver: "json-file"
       options:
@@ -302,10 +311,9 @@ services:
         max-size: "100m"
         max-file: "3"
   prometheus:
-    build: .
     environment:
       - NODE_HOST=${NODE_HOST}
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:latest}
     volumes:
     - prometheusdata:/prometheus
     restart: unless-stopped

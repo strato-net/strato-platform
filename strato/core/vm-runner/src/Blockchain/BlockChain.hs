@@ -22,6 +22,7 @@ module Blockchain.BlockChain
     , runCodeForTransaction
     , calculateIntrinsicGas'
     , compactDiffs -- For testing
+    , mkLogEntry
     , mkEventEntry
   ) where
 
@@ -187,7 +188,7 @@ setParentStateRoot OutputBlock{..} = do
     BSDB.getBSum (blockDataParentHash obBlockData)
 
 addBlock :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
-addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} =
+addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b in withCurrentBlockHash obh $ do
     $logInfoS "addBlocks" . T.pack $
       "Inserting Block #"
@@ -219,9 +220,9 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     addBlockTransactions b
 
-    postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
+    postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-    when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
+    when (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR) $ do
       $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
       error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
@@ -370,17 +371,17 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-        coinbaseAcct = Account (blockDataCoinbase b) chainId
+        -- coinbaseAcct = Account (blockDataCoinbase b) chainId
     lift $ P.incCounter txTypeCounter
     if success --this should handle exceptions,shouldnt it?
         then do
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-            s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
-            unless s1 $ error "addToBalance failed even after a check in addBlock"
+            -- s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
+            -- unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
 
-            success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
-            unless success' $ error "oops, refund was too much"
+            -- success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
+            -- unless success' $ error "oops, refund was too much"
 
             case erException execResults of
                 Just e -> do
@@ -394,8 +395,8 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
                     lift $ P.incCounter vmTxsSuccessful
             return execResults
         else do
-            s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
-            unless s1 $ error "addToBalance failed even after a check in addTransaction"
+            -- s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
+            -- unless s1 $ error "addToBalance failed even after a check in addTransaction"
             balance <- lift $ addressStateBalance <$>
               A.lookupWithDefault (Proxy @AddressState) tAcct
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance
@@ -536,6 +537,9 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAccount erResult
       return trr{trrNewAddresses = unseen}
 
+mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
+mkLogEntry bHash tHash chainId Log{..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
 mkEventEntry chainId Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
 
@@ -546,13 +550,13 @@ outputTransactionResult :: VMBase m
                         -> ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining) =
+      (txrStatus, message, gasRemaining, orgName, appName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
           Right r  -> case erException r of
-                        Nothing -> (Success, "Success!", erRemainingTxGas r)
+                        Nothing -> (Success, "Success!", erRemainingTxGas r, erOrgName r, erAppName r)
                         Just ex -> let fmt = either show show ex
-                                    in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+                                    in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -562,14 +566,13 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
       afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
       ranBlockHash = hashFunction b
-      mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       (!response, theTrace', theLogs, theEvents) =
         case result of
           Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
           Right r ->
             (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-  yieldMany $ OutLog . mkLogEntry <$> theLogs
+  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
@@ -589,6 +592,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
                              , transactionResultStatus           = Just txrStatus
                              , transactionResultChainId          = chainId
                              , transactionResultKind             = erKind <$> eitherToMaybe result
+                             , transactionResultOrgName          = orgName
+                             , transactionResultAppName          = appName
                              }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result

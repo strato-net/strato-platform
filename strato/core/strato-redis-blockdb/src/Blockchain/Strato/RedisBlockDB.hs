@@ -31,6 +31,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChildren
     , getGenesisHash
     , getCertificate
+    , insertRootCertificate
     , putHeader, putHeaders, insertHeader, insertHeaders, deleteHeader, deleteHeaders
     , putBlock, putBlocks, insertBlock, insertBlocks, deleteBlock, deleteBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
@@ -247,8 +248,8 @@ registerCertificate contractAddress userAddr x509CertInfoState = do
         -- We can not register this certificate
         _ -> pure . Left . SingleLine $ "registerCertificate - invalid contractAddress, contract is not CertificateRegistry"
     where
-        insertNewX509 = set (inNamespace X509Certificates userAddr) (toValue x509CertInfoState)
-        updateParent p@X509CertInfoState{..} = set (inNamespace X509Certificates $ toKey userAddress) (toValue p{children=userAddr:children})
+        insertNewX509 = set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
+        updateParent p@X509CertInfoState{..} = set (inNamespace X509Certificates userAddress) (toValue p{children=userAddr:children})
         txToEither = \case
             TxSuccess _ -> Right Ok
             TxAborted -> Left . SingleLine $ "registerCertificate - Aborted registering cert"
@@ -274,11 +275,30 @@ revokeCertificate contractAddress userAddress = do
         else pure . Left $ SingleLine (S8.pack "revokeCertificate - invalid contractAddress, contract is not CertificateRegistry")
 
 getCertificate :: Address -> Redis (Maybe X509CertInfoState)
-getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \case
+getCertificate userAddress = getInNamespace X509Certificates (toKey userAddress) >>= \case
         Left _          -> return Nothing
         Right Nothing   -> return Nothing
         Right (Just state) -> let certInfoState = fromValue state
                               in return (Just certInfoState)
+
+insertRootCertificate :: Redis (Either Reply Status)
+insertRootCertificate = do
+    -- TODO: check if root cert has already been added
+    res1 <- modifyParsedSetFromCert rootCertInfoState
+    res2 <- addParsedSet rootCertInfoState
+    res3 <- fmap txToEither . multiExec $ insertNewX509
+    case (res1, res2, res3) of
+        (Right _, Right _, Right _) -> pure $ Right Ok
+        (Left e1, Left e2, Left e3) -> pure $ Left . SingleLine $ S8.pack (show e1) <> S8.pack (show e2) <> S8.pack (show e3)
+        (_, _, _) -> pure $ Left . SingleLine $ "insertRootCertificate failed."
+    where
+        rootCertInfoState = x509CertToCertInfoState rootCert
+        ua = userAddress rootCertInfoState
+        insertNewX509 = set (inNamespace X509Certificates $ toKey ua) (toValue rootCertInfoState)
+        txToEither = \case
+            TxSuccess _ -> Right Ok
+            TxAborted -> Left . SingleLine $ "insertRootCertificate - Aborted"
+            TxError e -> Left . SingleLine $ "insertRootCertificate - Error " <> S8.pack e
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])

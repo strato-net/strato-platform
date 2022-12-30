@@ -24,6 +24,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Class
 
@@ -33,7 +34,7 @@ blk2BlkDataRef :: Block
                -> Bool
                -> BlockDataRef
 blk2BlkDataRef b hash' difficulty' makeHashOne =
-  BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
+  BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
       bd = blockBlockData b
@@ -41,6 +42,11 @@ blk2BlkDataRef b hash' difficulty' makeHashOne =
       pH = blockDataParentHash bd
       uH = blockDataUnclesHash bd
       cB = blockDataCoinbase bd
+      (cO, cU, cC) = case cB of
+        Org o True -> (o, "", "")
+        OrgUnit o u True -> (o, u, "")
+        CommonName o u c True -> (o, u, c)
+        _ -> ("", "", "")
       sR = blockDataStateRoot bd
       tR = blockDataTransactionsRoot bd
       rR = blockDataReceiptsRoot bd

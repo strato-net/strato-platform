@@ -41,6 +41,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
@@ -69,8 +70,8 @@ data Options = State{root::String, db::String}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
-             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}  
-             | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}  
+             | PushBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}
              | AskForTxs
              | RSVP {chainId :: Word256, memberId :: String, address::Address}
              | Redis { key :: String }
@@ -241,18 +242,18 @@ checkpointOptions =
 
 askOptions :: Annotate Ann
 askOptions =
-  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = emptyChainMember}
          [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
          , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
-         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         , peer := emptyChainMember += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
          ]
 
 pushOptions :: Annotate Ann
 pushOptions =
-  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = emptyChainMember}
          [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
          , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
-         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         , peer := emptyChainMember += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
          ]
 
 txOptions :: Annotate Ann

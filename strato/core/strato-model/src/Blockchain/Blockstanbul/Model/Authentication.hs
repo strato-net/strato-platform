@@ -5,13 +5,14 @@ import Control.Lens
 import qualified Data.ByteString as B
 
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.Address
+-- import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.ChainMember
 
 type RawExtraData = B.ByteString
 
 data IstanbulExtra = IstanbulExtra {
-  _validatorList :: [Address],
+  _validatorList :: ChainMembers,
   _proposedSig :: Maybe Signature,
   _commitment :: [Signature]
 } deriving (Eq, Show)
@@ -25,11 +26,11 @@ makeLenses ''ExtraData
 
 instance RLPSerializable IstanbulExtra where
   rlpEncode (IstanbulExtra vls mp cs) =
-      RLPArray [RLPArray . map rlpEncode $ vls,
+      RLPArray [rlpEncode $ vls,
                 maybe (RLPScalar 0) rlpEncode mp,
                 RLPArray . map rlpEncode $ cs]
-  rlpDecode (RLPArray [RLPArray rvls, rp, RLPArray rcs]) =
-      IstanbulExtra (map rlpDecode rvls)
+  rlpDecode (RLPArray [rvls, rp, RLPArray rcs]) =
+      IstanbulExtra (rlpDecode rvls)
                     (case rp of
                         RLPScalar _ -> Nothing
                         _ -> Just . rlpDecode $ rp)
