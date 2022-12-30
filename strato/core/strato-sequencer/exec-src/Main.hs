@@ -80,10 +80,18 @@ main = do
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
+  putStrLn $ "flags_blockstanbul_admins'" ++ show flags_blockstanbul_admins
 
+  putStrLn $ "DAVID______flags_certInfo'" ++ show flags_certInfo
+  putStrLn $ "DAVID______(C8.pack flags_certInfo)" ++ show (C8.pack flags_certInfo)
+  putStrLn $ "DAVID______b64decode (C8.pack flags_certInfo)" ++ show (b64decode(C8.pack flags_certInfo))
+  -- putStrLn $ "DAVID______(Ae.eitherDecodeStrict . b64decode)(C8.pack flags_certInfo)" ++ show ((Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo))
+  putStrLn $ "DAVID______flags_certInfo'" ++ show flags_certInfo
+  putStrLn $ "DAVID______eSelf'" ++ show eSelf
+  putStrLn $ "DAVID______self'" ++ show self
   putStrLn $ "authSenders'" ++ show authSenders'
-  putStrLn $ "self'" ++ show self
-  putStrLn $ "eSelf'" ++ show eSelf
+
+
 
   mCtx <- if not flags_blockstanbul
              then return Nothing
