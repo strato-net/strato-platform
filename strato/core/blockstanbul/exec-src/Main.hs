@@ -124,8 +124,6 @@ parseArgs = do
 main :: IO ()
 main = do
   Options{..} <- parseArgs
-  mgr <- newManager defaultManagerSettings
-  vaultUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
   
   putStrLn $ "Sender (admin node): " ++ show optSender
   putStrLn $ "Starting nonce: " ++ show optNonce
