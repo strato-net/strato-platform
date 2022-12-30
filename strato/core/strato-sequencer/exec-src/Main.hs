@@ -80,7 +80,8 @@ main = do
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
-
+  putStrLn $ "flags_blockstanbul_admins'" ++ show flags_blockstanbul_admins
+  putStrLn $ "flags_certInfo'" ++ show flags_certInfo
   putStrLn $ "authSenders'" ++ show authSenders'
   putStrLn $ "self'" ++ show self
   putStrLn $ "eSelf'" ++ show eSelf
