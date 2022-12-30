@@ -55,7 +55,6 @@ import           BlockApps.X509.Certificate            as X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction  as U
@@ -188,8 +187,6 @@ data TestContext = TestContext
   , _sequencerContext      :: SequencerContext
   , _blockPeriod           :: BlockPeriod
   , _roundPeriod           :: RoundPeriod
-  , _candidatesReceived    :: TQueue CandidateReceived
-  , _voteResults           :: TQueue VoteResult
   , _timeoutChan           :: TMChan RoundNumber
   , _vmContext             :: MemContext
   , _apiChainInfoMap       :: Map Word256 ChainInfo
@@ -527,12 +524,6 @@ instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
 
 instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
   access _ = use roundPeriod
-
-instance MonadIO m => Mod.Accessible (TQueue CandidateReceived) (MonadTest m) where
-  access _ = use candidatesReceived
-
-instance MonadIO m => Mod.Accessible (TQueue VoteResult) (MonadTest m) where
-  access _ = use voteResults
 
 instance MonadIO m => Mod.Accessible View (MonadTest m) where
   access _ = currentView
@@ -1135,13 +1126,11 @@ newSequencerContext bc = do
 -- Kafka, postgres, redis, or ethconf.
 testContext :: PrivateKey
             -> [IPAsText]
-            -> TQueue CandidateReceived
-            -> TQueue VoteResult
             -> TMChan RoundNumber
             -> SequencerContext
             -> MemContext
             -> TestContext
-testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
+testContext prv bootNodes rNum seqCtx vmCtx = TestContext
   { _blocks                = []
   , _connectionTimeout     = ConnectionTimeout 60
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
@@ -1168,8 +1157,6 @@ testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
   , _sequencerContext      = seqCtx
   , _blockPeriod           = BlockPeriod 1
   , _roundPeriod           = RoundPeriod 10
-  , _candidatesReceived    = candRecv
-  , _voteResults           = vRes
   , _timeoutChan           = rNum
   , _vmContext             = vmCtx
   , _apiChainInfoMap       = M.empty
@@ -1260,8 +1247,6 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   txrIndexerSource <- newTQueueIO
-  chr <- atomically newTQueue
-  chv <- atomically newTQueue
   cht <- atomically newTMChan
   tcpVSock <- newTQueueIO
   udpVSock <- newTQueueIO
@@ -1306,7 +1291,7 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
         , obReceiptTransactions = []
         , obBlockUncles         = []
         }
-  testContextTVar <- newTVarIO $ testContext privKey bootNodes chr chv cht seqCtx vmCtx
+  testContextTVar <- newTVarIO $ testContext privKey bootNodes cht seqCtx vmCtx
   let seqTimerSource = runConduit $ sourceTMChan cht .| mapC ((:[]) . TimerFire) .| sinkTQueue unseqSource
   let sequencer = do
         DBDB.bootstrapGenesisBlock genHash 1

@@ -123,7 +123,6 @@ services:
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - genesisBlockTestCert=${genesisBlockTestCert:-false}
-    - isAdmin=${isAdmin:-false}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - kafkaPort=9092

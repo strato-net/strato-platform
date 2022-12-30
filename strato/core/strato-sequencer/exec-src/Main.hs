@@ -18,7 +18,6 @@ import           Safe
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.EthConf         as EC
 import qualified Blockchain.Network         as Net
@@ -42,8 +41,6 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators
-  putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
-  putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
   putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
@@ -76,8 +73,6 @@ main = do
           (Just networkParams, Right []) -> map Net.identity networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid validators: " ++ e
-      eAuthSenders = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
-      !authSenders' = fromRight (error "invalid admins") eAuthSenders
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
 
@@ -99,17 +94,6 @@ main = do
                         \ PBFT will almost certainly not function properly."
                    return validators'
 
-               authSenders <-
-                 if flags_isAdmin || flags_isRootNode then
-                   return $ self : authSenders'
-                 else do
-                   when (length authSenders' == 0) . putStrLn
-                       $ "WARNING: You haven't given me any blockstanbulAdmins. If you are starting \
-                       \ a single node, this is OK. But, if you are starting a network or adding a \
-                       \ validator node to a network, be warned - this node will not accept any votes \
-                       \ to add or remove validators, as it has no authorized senders."
-                   return authSenders'
-
                unless (self `elem` validators) . putStrLn
                     $ "WARNING: NODEKEY does not correspond to a validator identity.\
                       \ This probably means that you are connecting to an existing network,\
@@ -122,16 +106,13 @@ main = do
                     $ "--blockstanbul_round_period_s must be positive"
 
                putStrLn $ "ACTUAL validators list: " ++ show validators
-               putStrLn $ "ACTUAL admins list: " ++ show authSenders
 
-               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
+               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
                putStrLn $ "Checkpoint: " ++ show ckpt
 
                return $ Just $ newContext ckpt self
 
 
-  chr <- atomically newTQueue
-  chv <- atomically newTQueue
   cht <- atomically newTMChan
 
   let seqCfg = SequencerConfig
@@ -141,8 +122,6 @@ main = do
         , syncWrites            = flags_syncwrites
         , blockstanbulBlockPeriod = BlockPeriod $ fromIntegral flags_blockstanbul_block_period_ms / 1000.0
         , blockstanbulRoundPeriod = RoundPeriod $ fromIntegral flags_blockstanbul_round_period_s
-        , blockstanbulBeneficiary = chv
-        , blockstanbulVoteResps = chr
         , blockstanbulTimeouts = cht
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
@@ -152,6 +131,4 @@ main = do
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
       . run flags_blockstanbul_port
-      . prometheus def{ prometheusInstrumentApp = False }
-      . instrumentApp "blockstanbul-admin"
-      $ createWebServer chv chr
+      $ metricsApp

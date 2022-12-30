@@ -24,6 +24,7 @@ import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, te
 import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import qualified Blockchain.Data.LogDB              as LogDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
+import           Blockchain.Data.ValidatorRef
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 
 import           Blockchain.Sequencer.Event
@@ -35,19 +36,9 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
 import           Text.Format
-
-addTopic :: Keccak256
-addTopic = hash $ C8.pack "MemberAdded(address,string)"
-
-removeTopic :: Keccak256
-removeTopic = hash $ C8.pack "MemberRemoved(address)"
-
-terminateTopic :: Keccak256
-terminateTopic = hash $ C8.pack "ChainTerminated()"
 
 logF :: MonadLogger m => [String] -> m ()
 logF = $logInfoS "txrIndexer" . T.pack . concat
@@ -91,6 +82,24 @@ doRevokeCertificate userAddress = do
   void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
   void . withKafkaRetry1s $ writeUnseqEvents [IECertRevoked userAddress]
 
+doValidatorAdded :: ChainMemberParsedSet -> IContextM ()
+doValidatorAdded cm = do
+  logF [ "Adding validator "
+       , format cm
+       ]
+  lift $ addRemoveValidator ([], [cm])
+  void . RBDB.withRedisBlockDB $ RBDB.addValidators [cm]
+  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorAdded cm]
+
+doValidatorRemoved :: ChainMemberParsedSet -> IContextM ()
+doValidatorRemoved cm = do
+  logF [ "Removing validator "
+       , format cm
+       ]
+  lift $ addRemoveValidator ([cm],[])
+  void . RBDB.withRedisBlockDB $ RBDB.removeValidators [cm]
+  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorRemoved cm]
+
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
@@ -107,6 +116,8 @@ data TxrResult = AddOrgName (Either String (Word256, ChainMemberParsedSet))
                | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
                | RegisterCertificate (Either String (Address, X509CertInfoState))
                | CertificateRevoked (Either String Address)
+               | ValidatorAdded (Either String ChainMemberParsedSet)
+               | ValidatorRemoved (Either String ChainMemberParsedSet)
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -123,6 +134,8 @@ indexEventToTxrResults = \case
       (Address 0x100, Just chainId, "OrgRemoved", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) False))
       (Address 0x100, Just chainId, "OrgUnitRemoved", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
       (Address 0x100, Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
+      (Address 0x100, Nothing, "ValidatorAdded", [o, u, c]) -> Just . ValidatorAdded $ Right (CommonName (T.pack o) (T.pack u) (T.pack c) True)
+      (Address 0x100, Nothing, "ValidatorRemoved", [o, u, c]) -> Just . ValidatorRemoved $ Right (CommonName (T.pack o) (T.pack u) (T.pack c) True)
       (Address 0x509, Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
@@ -159,6 +172,12 @@ txrResultHandler = \case
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  ValidatorAdded e -> case e of
+    Right chainMember -> doValidatorAdded chainMember
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  ValidatorRemoved e -> case e of
+    Right chainMember -> doValidatorRemoved chainMember
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   PutLogDB l -> do
     logF [ "Inserting LogDB entry for tx: "

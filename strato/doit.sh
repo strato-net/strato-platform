@@ -155,13 +155,12 @@ function newnode {
   fi
 
   vbFlag="--validatorBehavior=${validatorBehavior}"
-  adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
   vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
-    "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
+    "${scFlag}" "${vbFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" "${ciFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 

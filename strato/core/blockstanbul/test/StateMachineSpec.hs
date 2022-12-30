@@ -36,7 +36,6 @@ import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
-import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Strato.Model.Address
@@ -116,13 +115,9 @@ spec = parallel $ do
     it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
         let as = nubBy (\l r -> sender l == sender r) . sortOn sender $ as'
-            -- The nonce is set to avoid voting out the sole validator
-            setNonce :: Block -> Block
-            setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
         let (blk', blk2') = over both ( addProposerSeal seal
                                       . addValidators (S.fromList $ map sender as)
-                                      . truncateExtra
-                                      . setNonce)
+                                      . truncateExtra)
                            (blk'', blk2'')
             blk = setBlockNo 19 blk'
         validators .= S.fromList (map sender as)
@@ -601,27 +596,13 @@ spec = parallel $ do
         let ps = [(k, l) | Prepare k l <- map oMessage omsgs]
         ps `shouldBe` [(v, blockHash lockBlk)]
 
-  describe "A NewBeneficiary" $ do
-    it "yields a vote" $ property $ \auth -> runTest $ do
-      me <- use selfAddr
-      sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
-        [PendingVote 0xdeadbeef True me, VoteResponse HA.Enqueued]
-
-    it "rejects a badly signed vote" $ property $ \auth -> runAuthTest $ do
-      let vote = NewBeneficiary auth (0xdeadbeef, True, 30)
-      resp <- sendMessages [vote]
-      let [VoteResponse (HA.Rejected msg)] = resp
-      msg `shouldStartWith` "Rejecting NewBeneficiary"
-
   describe "PreviousBlock" $ do
-    let selfSignBlock :: Word64 -> Address -> Integer -> PrivateKey -> [PrivateKey]
+    let selfSignBlock :: Integer -> PrivateKey -> [PrivateKey]
                       -> StateT BlockstanbulContext (LoggingT IO) Block
-        selfSignBlock nonc cb num proper committers = do
+        selfSignBlock num proper committers = do
           let blk0 = votingBlock
               blk1 = blk0{blockBlockData = (blockBlockData blk0)
-                            { blockDataCoinbase = cb
-                            , blockDataNonce = nonc
-                            , blockDataNumber = num
+                            { blockDataNumber = num
                             }}
           let commitAddresses = S.fromList $ map fromPrivateKey committers
           vals <- use validators
@@ -652,69 +633,13 @@ spec = parallel $ do
     it "will accept a previous block with the current sequence number" $ runTest $ do
       me <- use selfAddr
       validators .= S.singleton me
-      checkedSend =<< selfSignBlock 6 0x0ddba11 19 myPriv [myPriv]
+      checkedSend =<< selfSignBlock 19 myPriv [myPriv]
       use validators `shouldReturn` S.singleton me
 
     it "will reject a previous block in the future" $ runTest $ do
       me <- use selfAddr
       validators .= S.singleton me
-      blk <- selfSignBlock 6 0xdeadbeef 20 myPriv [myPriv]
+      blk <- selfSignBlock 20 myPriv [myPriv]
       sendMessages [PreviousBlock blk] `shouldReturn` []
       use validators `shouldReturn` S.singleton me
-
-    it "updates validators from a historic block" $ runTest $ do
-      me <- use selfAddr
-      validators .= S.singleton me
-      checkedSend =<< selfSignBlock maxBound 0xdeadbeef 19 myPriv [myPriv]
-      use validators `shouldReturn` S.fromList [me, 0xdeadbeef]
-
-    it "does not update validators from a rejected historic block" $ runTest $ do
-      me <- use selfAddr
-      validators .= S.singleton me
-      blk <- selfSignBlock maxBound 0xdeadbeef 20 myPriv [myPriv]
-
-      sendMessages [PreviousBlock blk] `shouldReturn` []
-      use validators `shouldReturn` S.singleton me
-
-    it "requires 3 votes with four validators" . runTest $ do
-      prvKeys@[key1, key2, key3, key4] <- genKeys 4
-      let valSet = S.fromList $ map fromPrivateKey prvKeys
-      validators .= valSet
-      let sgn n pk = selfSignBlock maxBound 0x6643 n pk prvKeys
-      checkedSend =<< sgn 19 key1
-      checkedSend =<< sgn 20 key2
-      use validators `shouldReturn` valSet
-      checkedSend =<< sgn 21 key3
-      use validators `shouldReturn` S.insert 0x6643 valSet
-      checkedSend =<< sgn 22 key4
-      use validators `shouldReturn` S.insert 0x6643 valSet
-
-    it "can interleave votes for two different candidates" . runTest $ do
-      prvKeys@[key1, key2] <- genKeys 2
-      let valSet = S.fromList $ map fromPrivateKey prvKeys
-      validators .= valSet
-
-      [key3, key4] <- genKeys 2
-      let (cand3, cand4) = (fromPrivateKey key3, fromPrivateKey key4)
-
-      -- Key1 Votes for Key3
-      checkedSend =<< selfSignBlock maxBound cand3 19 key1 [key1, key2]
-      use validators `shouldReturn` valSet
-
-      -- Key1 votes for Key4
-      checkedSend =<< selfSignBlock maxBound cand4 20 key1 [key1, key2]
-      use validators `shouldReturn` valSet
-
-      -- Key2 votes for Key3
-      checkedSend =<< selfSignBlock maxBound cand3 21 key2 [key1, key2]
-      use validators `shouldReturn` S.insert cand3 valSet
-
-      -- Key2 votes for Key4
-      checkedSend =<< selfSignBlock maxBound cand4 22 key2 [key1, key2, key3]
-      -- Vote is no longer enough, 3 votes needed with 3 validators
-      use validators `shouldReturn` S.insert cand3 valSet
-
-      -- Key3 votes for Key4
-      checkedSend =<< selfSignBlock maxBound cand4 23 key3 [key1, key2, key3]
-      use validators `shouldReturn` S.fromList (map fromPrivateKey [key1, key2, key3, key4])
 -}

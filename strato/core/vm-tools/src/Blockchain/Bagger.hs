@@ -271,7 +271,8 @@ makeNewBlock mineTransactions = do
             else do
                 $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                 isPBFT <- isBlockstanbul
-                (coinbaseAddr, nonce) <- peekPendingVote
+                let coinbaseAddr    = emptyChainMember
+                let nonce           = 0
                 let lastSR          = B.lastExecutedStateRoot cache
                 let lastSHA         = B.bestBlockSHA cache
                 let lastHead        = B.bestBlockHeader cache
@@ -529,7 +530,8 @@ buildFromMiningCache = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     state <- getBaggerState
     isPBFT <- isBlockstanbul
-    (coinbaseAddr, nonce) <- peekPendingVote
+    let coinbaseAddr = emptyChainMember
+    let nonce        = 0
     let cache        = B.miningCache state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
@@ -570,7 +572,6 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
         --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
-                        -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
                         , DD.blockDataCoinbase         = coinbaseAddr -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)

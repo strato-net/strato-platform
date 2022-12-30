@@ -12,6 +12,7 @@
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
+import Control.Applicative (liftA2)
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Extra (whenM)
@@ -35,10 +36,8 @@ import BlockApps.X509.Certificate
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
-import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
-import Blockchain.Blockstanbul.Voting
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
@@ -82,29 +81,6 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
   case iev of                         -- cases of valid and non valid input (for approval of messages and tx's?)
-    NewBeneficiary (MsgAuth addr sig) (benf, dir, nonc) -> do
-      -- Check nonce for replay attack
-      -- let convertedAddr = getAddressFromCM addr <- this doesn't work
-      slist <- use authSenders    -- authSenders::generateNonceMap senderlist
-      let ifAuthMember = M.member addr slist
-          nonceAuth = Just nonc > M.lookup addr slist
-          benAddress = verifyBenfInfo (benf,dir,nonc) sig
-      res <- case benAddress of 
-        Nothing -> return Nothing
-        Just a -> lift $ A.select (A.Proxy @X509CertInfoState) a
-      let signAuth = (getAddressFromCM addr =<< res) == benAddress
-     --conflict benf being cmps verifybenfinfo takes in address and signature (rewritting needed)
-     --should i eliminate this function and just use authenticate (authentication.hs to verify benf info)
-     -- only used twice
-      unless ifAuthMember $
-        raiseInProd $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
-                   ++ " is not a authorized sender" ++ show slist
-      unless nonceAuth $
-        raiseInProd $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
-      unless signAuth $
-        raiseInProd $ "Rejecting NewBeneficiary; bad seal, address: " ++ show addr ++ " Seal: "
-                   ++ show sig ++ " info: " ++ show (benf, dir, nonc) ++ " address decoded: "
-                   ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sig))
     -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
     -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do     
@@ -167,18 +143,6 @@ roundChange = do
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
-  --update validators list
-  val <- uses validators $ S.toList . unChainMembers
-  vot <- use voted
-  let (newVals, toDrop, toAdd) = updateValidator val vot
-  when (val /= newVals) $ do
-    validators .= ChainMembers (S.fromList newVals)
-    yieldR $ ListOfValidators toDrop toAdd
-  $logInfoS "blockstanbul/voting" . T.pack $
-                 "nextRound: voted map" ++ show vot
-  valNew <- use validators
-  $logInfoS "blockstanbul/voting" . T.pack $
-                 "nextRound: validators updated" ++ show valNew
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
@@ -187,11 +151,6 @@ nextRound nt = do
   use view >>= recordView
   vals <- unChainMembers <$> use validators
   thisR <- use $ view . round
-  epocheck <- use $ view . sequence
-  when (epocheck `mod` 10000 == 0) $ do
-      voted .= M.empty
-      $logInfoS "blockstanbul/voting" . T.pack $
-        "nextRound: voted map reset to empty with epocheck = " ++ show epocheck
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
@@ -218,10 +177,8 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
-                                              (use voted)
-                                              (uses validators (S.toList . unChainMembers))
-                                              (uses authSenders M.keys)
+  yieldR . NewCheckpoint =<< liftA2 Checkpoint (use view)
+                                               (uses validators (S.toList . unChainMembers))
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
@@ -239,16 +196,25 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   recordAuthResult authz
   v <- use view
   case authz of
-   AuthFailure reason -> case ev of
-      NewBeneficiary{} -> yieldR . VoteResponse $ HA.Rejected reason
-      _ -> return ()
+   AuthFailure _ -> return ()
    AuthSuccess -> case ev of
     ValidatorBehaviorChange vc -> do
       case vc of
           ForcedValidator fv -> modify' $ validatorBehavior .~ fv
       valB <- use validatorBehavior
       $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
-
+    ValidatorChange val dir -> do
+      modify' $ validators %~ (\(ChainMembers cm) ->
+        let cm' = (if dir then S.insert else S.delete) val cm in ChainMembers cm')
+      vals' <- use validators
+      $logInfoLS "blockstanbul/ValidatorChange" . T.pack $ concat
+        [ "Validator "
+        , format val
+        , " was "
+        , if dir then "added" else "removed"
+        , ". New validator set: "
+        , format vals'
+        ]
     ForcedConfigChange cc -> do
       $logWarnLS "blockstanbul/config_change" cc
       case cc of
@@ -257,10 +223,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             then nextRound (Round rn)
             else $logErrorS "blockstanbul/config_change" . T.pack $
                    printf "Refusing to move round backwards in time %d to %d" (_round v) rn
-    NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
-      authSenders %= M.insert addr nonc
-      self <- use selfAddr 
-      yieldManyR [PendingVote benf dir self, VoteResponse HA.Enqueued]
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
@@ -272,10 +234,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           rejectHistoric
           $logWarnS "blockstanbul" . T.pack
                       . printf "Rejecting historical block #%d: %s" blockNo $ err
-        Right (_, props) -> do
+        Right _ -> do
           acceptHistoric
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
-          editVoted blk props
           yieldR . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
@@ -340,7 +301,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   wasProposed <- isJust <$> use proposal
                   unless wasProposed . yieldL $ OMsg auth ppp
                   proposal .= Just pp
-                  editVoted pp pr
                   valB <- use validatorBehavior
                   when (valB) $ do
                     msg <- signMessage (Prepare v (blockHash pp))
@@ -479,22 +439,6 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
 
-editVoted :: (MonadIO m, MonadLogger m, MonadState BlockstanbulContext m) => Block -> ChainMemberParsedSet -> m ()
-editVoted pp pr = do
-  case extractBeneficiary pp of
-    Nothing -> return()
-    Just (bnef,vot) -> do
-      -- insert the vote into map
-      val <- uses voted $ M.lookup bnef
-      $logInfoS "blockstanbul/voting" . T.pack $
-        "extractBeneficiary" ++ show val
-      let unwrapVal = fromMaybe M.empty val
-      let nval = M.insert pr vot unwrapVal
-      voted %= M.insert bnef nval
-      voted' <- use voted
-      $logInfoS "blockstanbul/voting" . T.pack $
-        "insert into voted map:" ++ show voted'
-
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
   in case ev of
@@ -506,9 +450,9 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    CommitResult{} -> inc "commit_result"
    UnannouncedBlock{} -> inc "unannounced_block"
    PreviousBlock{} -> inc "previous_block"
-   NewBeneficiary{} -> inc "new_beneficiary"
    ForcedConfigChange{} -> inc "forced_config_change"
    ValidatorBehaviorChange{} -> inc "validator_behavior_change"
+   ValidatorChange{} -> inc "validator_change"
    
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
@@ -523,7 +467,4 @@ recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCoun
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
     LeadFound{} -> inc "lead_found"
-    PendingVote{} -> inc "pending_vote"
-    VoteResponse{} -> inc "vote_response"
     NewCheckpoint{} -> inc "new_checkpoint"
-    ListOfValidators{} -> inc "new_validators"

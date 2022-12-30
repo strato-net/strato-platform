@@ -36,7 +36,6 @@ import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 
 import qualified Blockchain.Blockstanbul                   as PBFT
-import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
@@ -49,14 +48,12 @@ import           Text.Format
 import           Text.Tools
 
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
-                  | VoteMade PBFT.CandidateReceived
                   | UnseqEvent IngestEvent
                   | WaitTerminated
                   deriving (Eq, Show, GHCG.Generic)
 
 instance Format SeqLoopEvent where
   format (TimerFire rn) = "TimerFire " ++ format rn
-  format (VoteMade vote) = "VoteMade " ++ show vote
   format (UnseqEvent ev) = "UnseqEvent " ++ format ev
   format WaitTerminated = "WaitTerminated"
 
@@ -66,6 +63,8 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewCertRegistered  A.Address X509CertInfoState
                  | IECertRevoked A.Address
                  | IENewChainOrgName Word256 ChainMemberParsedSet
+                 | IEValidatorAdded ChainMemberParsedSet
+                 | IEValidatorRemoved ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -78,6 +77,8 @@ data IngestEventType = IETTransaction
                      | IETNewCertRegistered
                      | IETCertRevoked
                      | IETNewChainOrgName
+                     | IETValidatorAdded
+                     | IETValidatorRemoved
                      | IETBlockstanbul
                      | IETForcedConfigChange
                      | IETValidatorBehavior
@@ -91,6 +92,8 @@ iEventType = \case
   IENewCertRegistered{}  -> IETNewCertRegistered
   IECertRevoked{}        -> IETCertRevoked
   IENewChainOrgName{}    -> IETNewChainOrgName
+  IEValidatorAdded{}     -> IETValidatorAdded
+  IEValidatorRemoved{}   -> IETValidatorRemoved
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
   IEValidatorBehavior{}  -> IETValidatorBehavior
@@ -102,6 +105,8 @@ instance Format IngestEvent where
   format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
   format (IECertRevoked a) = CL.yellow $ format a
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
+  format (IEValidatorAdded a) = CL.yellow $ format a
+  format (IEValidatorRemoved a) = CL.yellow $ format a
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
@@ -166,9 +171,7 @@ data VmEvent =
   | VmGenesis OutputGenesis
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
-  | VmVoteToMake { voteRecipient :: ChainMemberParsedSet, voteVotingDir :: Bool, voteSender :: ChainMemberParsedSet }
   | VmPrivateTx OutputTx
-  | VmValidatorList [ChainMemberParsedSet] [ChainMemberParsedSet]
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where
@@ -524,18 +527,16 @@ instance Arbitrary JsonRpcCommand where
 -- has to go down here because of Lens TH shenanigans
 data BatchSeqLoopEvent = BatchSeqLoopEvent
   { _timerFires  :: [PBFT.RoundNumber]
-  , _votesMade   :: [PBFT.CandidateReceived]
   , _ingestEvents :: [IngestEvent]
   }
 makeLenses ''BatchSeqLoopEvent
 
 emptyBatchSeqLoopEvent :: BatchSeqLoopEvent
-emptyBatchSeqLoopEvent = BatchSeqLoopEvent [] [] []
+emptyBatchSeqLoopEvent = BatchSeqLoopEvent [] []
 
 batchSeqLoopEvents :: [SeqLoopEvent] -> BatchSeqLoopEvent
 batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
   where f s b = case s of
           TimerFire r -> (timerFires %~ (r:)) b
-          VoteMade r -> (votesMade %~ (r:)) b
           UnseqEvent r -> (ingestEvents %~ (r:)) b
           WaitTerminated -> b

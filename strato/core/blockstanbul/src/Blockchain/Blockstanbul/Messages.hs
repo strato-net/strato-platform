@@ -19,7 +19,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Data
 import Data.Default
-import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
@@ -27,7 +26,6 @@ import Test.QuickCheck.Arbitrary.Generic
 import Text.Printf
 
 import BlockApps.Logging
-import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
@@ -142,9 +140,9 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
-             | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (ChainMemberParsedSet, Bool,Int)}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
+             | ValidatorChange ChainMemberParsedSet Bool
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -154,28 +152,19 @@ instance Format InEvent where
   format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
-  format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) =  "ValidatorBehaviorChange " ++ format theBool
+  format (ValidatorChange val theBool) =  "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
-              | ListOfValidators [ChainMemberParsedSet] [ChainMemberParsedSet] --Left list is remove right list is add to current validator list
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
               | GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
-              -- A PendingVote should be authenticated by blockstanbul, but applied
-              -- by a Bagger monad. This is so that the stateroot is computed after
-              -- the coinbase is modified to hold the vote.
-              | PendingVote { pendingRecipient :: ChainMemberParsedSet
-                            , pendingVotingDir :: Bool
-                            , pendingVoteSender :: ChainMemberParsedSet 
-                            }
-              | VoteResponse HA.VoteResult
               | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
 
@@ -191,10 +180,7 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
-  format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
-  format (VoteResponse resp) = "VoteResponse " ++ show resp
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
-  format (ListOfValidators _ _) = "NewValidators "
 
 
 blkNum :: Block -> String
@@ -214,9 +200,9 @@ inShortLog loc iev = $logInfoS loc . pack $
     CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
-    NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "FORCED_VALIDATOR_CHANGE" ++ show vc
+    ValidatorChange val dir -> CL.blue "FORCED_VALIDATOR_CHANGE" ++ format val ++ if dir then " ADDED" else " REMOVED"
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do
@@ -229,10 +215,7 @@ outShortLog loc eoev = do
       ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-      PendingVote r d s-> prefix ++ CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
-      VoteResponse resp -> prefix ++ CL.blue "VOTE_RESPONSE " ++ show resp
       NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
-      ListOfValidators  _ _ -> prefix ++ CL.blue "New Validator(s)"
 
 instance NFData OutEvent
 
@@ -327,13 +310,11 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
                 { checkpointView :: View
-                , checkpointVoteRecord :: M.Map ChainMemberParsedSet (M.Map ChainMemberParsedSet Bool)
                 , checkpointValidators :: [ChainMemberParsedSet]
-                , checkpointAdmins :: [ChainMemberParsedSet]
                 } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
 instance Default Checkpoint where
-  def = Checkpoint (View 0 0 ) M.empty [] []
+  def = Checkpoint (View 0 0 ) []
 
 instance Arbitrary Checkpoint where
   arbitrary = genericArbitrary

@@ -40,11 +40,9 @@ import           Debugger
 import qualified Network.Kafka.Protocol                as KP
 import           Prometheus
 import           Text.Printf
-import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate
 import           Blockchain.BlockChain
 import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
@@ -60,7 +58,6 @@ import           Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
@@ -145,15 +142,11 @@ handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   rpcResps <- lift $ do
-    mapM_ (uncurry3 queuePendingVote) votesToMake
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $ uncurry OutJSONRPC <$> rpcResps
-  _ <- case ValidatorsG validators of
-    ValidatorsG ([], []) -> pure ()
-    _        -> yieldMany $  [OutIndexEvent $ ValidatorsG validators]
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
@@ -167,14 +160,13 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    hasVotes <- (/= emptyChainMember) . fst <$> peekPendingVote
     let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
         shouldOutputBlocks = isCaughtUp && (
           if pbft
-            then reqd && (hasTxs || hasVotes)
+            then reqd && hasTxs
             else not makeLazyBlocks || hasTxs)
     $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
@@ -270,8 +262,6 @@ processBlocks blocks = do
 processBlockSummaries :: ( MonadIO m
                          , MonadLogger m
                          , HasBlockSummaryDB m
-                         , Mod.Modifiable ContextState m
-                         , A.Selectable Address X509Certificate m
                          )
                       => [OutputBlock]
                       -> m ()
@@ -286,7 +276,6 @@ processBlockSummaries = mapM_ $ \b -> do
     , show txCount
     , " transactions from seqEvents"
     ]
-  clearPendingVote (outputBlockToBlock b)
   writeBlockSummary b
 
 processTransactions :: ( MonadLogger m
@@ -478,9 +467,7 @@ logEventSummaries events = do
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
 
     getNames VmCreateBlockCommand = "CreateBlockCommand"
-    getNames (VmVoteToMake _ _ _) = "VoteToMake"
     getNames (VmPrivateTx _) = "PrivateTx"
-    getNames (VmValidatorList _ _) = "VmValidatorList"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x

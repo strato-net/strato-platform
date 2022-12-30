@@ -29,7 +29,7 @@ import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.ChainMember (ChainMembers(..), ChainMemberParsedSet)
+import           Blockchain.Strato.Model.ChainMember (ChainMembers(..))
 
 import           Text.Format
 
@@ -48,7 +48,6 @@ indexP2P :: ( MonadLogger m
             , Mod.Modifiable (P2P BestBlock) m
             , (Word256 `A.Alters` P2P ChainInfo) m
             , (Word256 `A.Alters` P2P ChainMembers) m
-            , (ChainMemberParsedSet `A.Alters` P2P (A.Proxy ChainMemberParsedSet)) m
             )
          => [IndexEvent] -> m ()
 indexP2P idxEvents = do
@@ -71,9 +70,6 @@ indexP2P idxEvents = do
       A.insert (A.Proxy @(P2P ChainInfo)) cId $ P2P cInfo
       let cMembers = members $ chainInfo cInfo
       A.insert (A.Proxy @(P2P ChainMembers)) cId (P2P $ cMembers)
-    ValidatorsG (remove, add) -> do
-      unless (null add) . A.insertMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) . M.fromList . zip add . repeat $ P2P A.Proxy
-      unless (null remove) $ A.deleteMany (A.Proxy @(P2P (A.Proxy ChainMemberParsedSet))) remove
     _ -> return ()
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)

@@ -66,8 +66,6 @@ spec:
           value: "true"
         - name: genesis
           value: "gettingStarted"
-        - name: isAdmin
-          value: "false"
         - name: isRootNode
           value: "false"
         - name: kafkaHost
