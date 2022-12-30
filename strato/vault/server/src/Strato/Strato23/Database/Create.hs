@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users(
   UNIQUE (x_user_unique_name, x_identity_provider_id)
 );
 CREATE INDEX IF NOT EXISTS indexed_address ON users (address);
+CREATE INDEX IF NOT EXISTS indexed_nameId  ON users (x_user_unique_name , x_identity_provider_id);
 |]
 
 messageTable :: Query
