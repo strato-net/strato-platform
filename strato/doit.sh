@@ -45,8 +45,22 @@ fi
 
 function newnode {
   
+  # if alternative log in methods are provided then use them
   mkdir -p logs
   
+  VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
+  VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
+
+  echo "trying to see if the alternative OAUTH parameters are available"
+
+  if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
+    echo "Could not obtain OAUTH parameters for Vault Proxy"
+    exit 2
+  else 
+    echo "OAUTH parameters for Vault Proxy are available"
+  fi
+
+  echo "Checking if the reserve seconds are provided"
   [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
   runBackgroundProcess blockapps-vault-proxy-server \
