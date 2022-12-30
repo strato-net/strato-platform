@@ -10,7 +10,7 @@ sslCertFileType=${sslCertFileType:-pem}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
-OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
+OAUTH_JWT_USER_ID_CLAIM=${OAUTH_JWT_USER_ID_CLAIM:-sub}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
@@ -115,7 +115,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate .lua scripts from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
-  sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_JWT_USER_ID_CLAIM_PLACEHOLDER>*'"$OAUTH_JWT_USER_ID_CLAIM"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
