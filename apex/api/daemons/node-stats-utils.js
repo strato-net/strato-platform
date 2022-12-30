@@ -1,3 +1,4 @@
+/* Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
 const axios = require('axios');
 const { posix } = require('path');
 const { Sequelize, Op } = require('sequelize');
@@ -206,3 +207,4 @@ class StatsDaemon {
 }
 
 module.exports = { StatsDaemon }
+*/

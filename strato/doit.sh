@@ -458,6 +458,20 @@ if [[ -z ${VAULT_URL} ]] ; then
   exit 1
 fi
 
+# This will check if the link provided is valid format, and if it is HTTPS
+if [[ "$VAULT_URL" =~ "https"* ]]
+then
+    echo "VAULT_URL provided is likely valid"
+else
+    if [[ "$VAULT_URL" =~ *"172.17.0.1"* ]]
+    then
+        echo "VAULT_URL is special case."
+    else 
+        echo "VAULT_URL provided is not valid, it should be https"
+        exit 1
+    fi
+fi
+
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 [[ -n $network ]] && addBootnodes=true

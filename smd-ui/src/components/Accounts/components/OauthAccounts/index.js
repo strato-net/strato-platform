@@ -29,7 +29,7 @@ class OauthAccounts extends Component {
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('accounts_row_click');
-      this.props.fetchOauthAccountDetail(user.username, user.address, this.props.selectedChain);
+      this.props.fetchOauthAccountDetail(user.commonName, user.address, this.props.selectedChain);
     }
   }
 
@@ -42,12 +42,12 @@ class OauthAccounts extends Component {
       if (!filter) {
         return true;
       }
-      return user.username.toLowerCase().indexOf(filter) > -1
+      return user.commonName.toLowerCase().indexOf(filter) > -1
     })
       .forEach(function (user, index) {
         const position = index + 1;
 
-        if (user.username === 'nodekey') {
+        if (user.address === '8b312340d741b6fd1b1cab30b3360adc36e9f64a') {
           return
         }
         
@@ -55,15 +55,15 @@ class OauthAccounts extends Component {
         if (this.state.selected === position) {
           userClasseName = ' selected';
         }
-
+        // change this
         rows.push(
-          <div className="smd-margin-8" key={user.username}>
+          <div className="smd-margin-8" key={user.commonName}>
             <div className="row">
               <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
                 this.setState({ selected: position });
                 this.onUserClick(user, position);
               }}>
-                {user.username}
+                {user.commonName}
               </div>
             </div>
           </div>
