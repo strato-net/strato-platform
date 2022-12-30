@@ -105,6 +105,7 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - cacheTransactionResults=${cacheTransactionResults}
+    - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
