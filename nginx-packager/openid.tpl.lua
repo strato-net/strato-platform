@@ -24,7 +24,7 @@ local function isEmpty(s)
 end
 
 -- Which property of access token payload to use as STRATO account name
-local username_property = "<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>"
+local username_property = "<OAUTH_JWT_USER_ID_CLAIM_PLACEHOLDER>"
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 

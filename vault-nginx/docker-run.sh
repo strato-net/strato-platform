@@ -3,10 +3,10 @@
 set -e
 
 ssl=${ssl:-false}
-sslCertFileType=${sslCertFileType:-crt}
+sslCertFileType=${sslCertFileType:-pem}
 INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL:-NULL}
 INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER:-NULL}
-INITIAL_OAUTH_JWT_USERNAME_CLAIM=${INITIAL_OAUTH_JWT_USERNAME_CLAIM:-sub}
+INITIAL_OAUTH_JWT_USER_ID_CLAIM=${INITIAL_OAUTH_JWT_USER_ID_CLAIM:-sub}
 VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
 
 # If container is running for the first time - generate config:
@@ -29,7 +29,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     {
       \"ISSUER\": \"${INITIAL_OAUTH_ISSUER}\",
       \"DISCOVERY_URL\": \"${INITIAL_OAUTH_DISCOVERY_URL}\",
-      \"USER_ID_CLAIM\": \"${INITIAL_OAUTH_JWT_USERNAME_CLAIM}\"
+      \"USER_ID_CLAIM\": \"${INITIAL_OAUTH_JWT_USER_ID_CLAIM}\"
     }
   ]
 }" > /config/config.json

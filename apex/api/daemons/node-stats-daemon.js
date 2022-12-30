@@ -1,3 +1,4 @@
+/* Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
 const winston = require('winston-color');
 
 const config = require('../config/app.config');
@@ -49,3 +50,4 @@ if (process.env.STATS_ENABLED === "true") {
 } else {
   winston.info('STATS feature is disabled on this node')
 }
+*/
