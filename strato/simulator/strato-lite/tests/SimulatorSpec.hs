@@ -572,6 +572,186 @@ contract RegisterCert {
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
+    it "can add vote in a new validator" $ do
+        privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+        let validatorAddresses = fromPrivateKey <$> privKeys
+            validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                             , CommonName "Microsoft" "Sales" "Person" True
+                             , CommonName "Amazon" "Product" "Jeff Bezos" True
+                             ]
+            zippedValidators = take 1 $ zip validatorAddresses validatorInfos
+        certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
+        peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators certs n i) $ zip (zip privKeys validatorInfos)
+          [ ("node1", "1.2.3.4")
+          , ("node2", "5.6.7.8")
+          , ("node3", "9.10.11.12")
+          ]
+        connections' <- traverse (uncurry createConnection)
+          [ (peers !! 0, peers !! 1)
+          , (peers !! 0, peers !! 2)
+          , (peers !! 1, peers !! 2)
+          ]
+        ts <- liftIO getCurrentMicrotime
+        let toIetx = IETx ts . IngestTx Origin.API
+            args = "(\"Microsoft\",\"Sales\",\"Person\")"
+            txMd = M.fromList [("funcName", "voteToAddValidator"), ("args", args)]
+            setupTx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
+
+            routine = do
+              threadDelay 200000
+              for_ peers $ postEvent (TimerFire 0)
+              threadDelay 200000
+              flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
+
+        void . timeout 2000000 $ concurrently_ (runNetworkOld peers connections') routine
+        ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
+        ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
+
+    it "can add and remove vote in a new validator" $ do
+        privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+        let validatorAddresses = fromPrivateKey <$> privKeys
+            validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                             , CommonName "Microsoft" "Sales" "Person" True
+                             , CommonName "Amazon" "Product" "Jeff Bezos" True
+                             ]
+            zippedValidators = take 1 $ zip validatorAddresses validatorInfos
+        certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
+        peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators certs n i) $ zip (zip privKeys validatorInfos)
+          [ ("node1", "1.2.3.4")
+          , ("node2", "5.6.7.8")
+          , ("node3", "9.10.11.12")
+          ]
+        connections' <- traverse (uncurry createConnection)
+          [ (peers !! 0, peers !! 1)
+          , (peers !! 0, peers !! 2)
+          , (peers !! 1, peers !! 2)
+          ]
+        ts <- liftIO getCurrentMicrotime
+        let toIetx = IETx ts . IngestTx Origin.API
+            args = "(\"Microsoft\",\"Sales\",\"Person\")"
+            addTxMd = M.fromList [("funcName", "voteToAddValidator"), ("args", args)]
+            addTx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            signedAddTx = mkSignedTx (privKeys !! 0) addTx addTxMd
+            removeTxMd = M.fromList [("funcName", "voteToRemoveValidator"), ("args", args)]
+            removeTx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 1
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            signedRemoveTx = mkSignedTx (privKeys !! 0) removeTx removeTxMd
+
+            routine1 = do
+              threadDelay 200000
+              for_ peers $ postEvent (TimerFire 0)
+              threadDelay 200000
+              flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedAddTx
+              threadDelay 1000000
+              ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+              ifor_ ctxs1 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
+              flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedRemoveTx
+
+        void . timeout 3000000 $ concurrently_ (runNetworkOld peers connections') routine1
+        ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+        ifor_ ctxs2 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
+
+    it "can sync a new node after voting in a new validator" $ do
+        privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..4]
+        let validatorAddresses = fromPrivateKey <$> privKeys
+            validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                             , CommonName "Microsoft" "Sales" "Person" True
+                             , CommonName "Amazon" "Product" "Jeff Bezos" True
+                             , CommonName "Facebook" "Executive" "Mark Zuckerberg" True
+                             ]
+            zippedValidators = take 2 $ zip validatorAddresses validatorInfos
+        certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
+        peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators certs n i) $ zip (zip privKeys validatorInfos)
+          [ ("node1", "1.2.3.4")
+          , ("node2", "5.6.7.8")
+          , ("node3", "9.10.11.12")
+          , ("node4", "13.14.15.16")
+          ]
+        connections' <- traverse (uncurry createConnection)
+          [ (peers !! 0, peers !! 1)
+          , (peers !! 0, peers !! 2)
+          , (peers !! 1, peers !! 2)
+          , (peers !! 0, peers !! 3)
+          , (peers !! 1, peers !! 3)
+          , (peers !! 2, peers !! 3)
+          ]
+        ts <- liftIO getCurrentMicrotime
+        let toIetx = IETx ts . IngestTx Origin.API
+            args = "(\"Amazon\",\"Product\",\"Jeff Bezos\")"
+            txMd = M.fromList [("funcName", "voteToAddValidator"), ("args", args)]
+            setupTx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
+            mainChainSrc = [r|
+contract B {
+  uint y;
+
+  constructor() {
+    y = 47;
+  }
+}
+|]
+            mainChainContractName = "B"
+            mainChainArgs = "()"
+            mainChainUtx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Nothing
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
+            mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
+                               in mkSignedTx (privKeys !! 1) utx mainChainTxMd
+            mainChainRoutine n = do
+              threadDelay 200000
+              flip postEvent (peers !! 1) . UnseqEvent . toIetx $ mkMainChainTx n
+              mainChainRoutine $ n + 1
+            routine = do
+              threadDelay 200000
+              for_ peers $ postEvent (TimerFire 0)
+              threadDelay 1000000
+              flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
+              threadDelay 5000000
+              runNetworkOld (drop 3 peers) (drop 3 connections')
+
+        void . timeout 10000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
+        ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
+        ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
+
   describe "X.509 Private Chain exchange" $ do
     it "can add an organization to a private chain" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]

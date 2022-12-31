@@ -370,10 +370,10 @@ addToQueued stage t@OutputTx{otSigner = signer} =
                 $logDebugS "Bagger.addToQueued/Left" . T.pack $ "rejection :: " ++ show rejection
                 txsDroppedCallback [rejection] txShas
             Right _ -> do
-                --  $logDebugS "Bagger.addToQueued/Right" "non-rejection "
+                $logDebugS "Bagger.addToQueued/Right" "non-rejection "
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
-                --  $logDebugS "Bagger.addToQueued/Right" . T.pack $show newState
+                $logDebugS "Bagger.addToQueued/Right" . T.pack $ show newState
                 forM_ toDiscard $ \d -> do
                     removeFromSeen d
                     logDiscard' "addToQueued" signer d

@@ -822,7 +822,9 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ (P2P OutputBlock{..}) = canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
+  insert _ k (P2P v@OutputBlock{..}) = do
+    canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
+    genericTestInsert (sequencerContext . blockHashRegistry) (A.Proxy @OutputBlock) k v
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _          = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
@@ -1272,8 +1274,9 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
   let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
       initialValidators = fst <$> initialValidators'
   cache  <- TRC.new 64
-  let gi = insertCertRegistryContract extraCerts defaultGenesisInfo
-  let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
+  let vals = snd <$> initialValidators'
+      gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+      (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do
           sr <- State.gets fst
@@ -1431,6 +1434,10 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                                         )
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
                                     RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
+                                    ValidatorAdded (Right cm) -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded cm
+                                    ValidatorRemoved (Right cm) -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorRemoved cm
                                     RegisterCertificate (Right (addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
                                       let setOrg = Org (T.pack o) True
                                           setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
