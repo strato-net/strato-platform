@@ -289,9 +289,8 @@ spec = do
         atomically . writeTBQueue uch $ iev
         src0 <- sealConduitT <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
-        (src2, ev2) <- src1 $$++ headC
-        (_, ev3) <- src2 $$++ headC
-        [ev1, ev2, ev3] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev]
+        (_, ev2) <- src1 $$++ headC
+        [ev1, ev2] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev]
 
     describe "sequencer" $ do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
