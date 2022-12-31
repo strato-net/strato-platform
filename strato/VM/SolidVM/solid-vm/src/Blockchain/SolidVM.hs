@@ -1683,15 +1683,17 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) = do --TODO- generalize all of these Bi
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  acct <- getCurrentAccount
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ valEquals ctract val1 val2
+  return . Constant . SBool . not $ valEquals (acct ^. accountChainId) ctract val1 val2
 
 expToVar' (CC.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  acct <- getCurrentAccount
   logVals val1 val2
-  return . Constant . SBool $ valEquals ctract val1 val2
+  return . Constant . SBool $ valEquals (acct ^. accountChainId) ctract val1 val2
 
 expToVar' (CC.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1

@@ -147,9 +147,6 @@ function newnode {
   if [ -n "${seqMaxUsPerIter}" ]; then
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
-  if [ -n "${blockstanbulAdmins}" ]; then
-    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
-  fi
   if [ -n "${certInfo}" ]; then
     ciFlag="--certInfo=${certInfo}"
   fi
@@ -294,13 +291,20 @@ function doInit {
   if [ -n "${network}" ]; then
     networkFlag="--network=${network}"
   fi
+  if [ -n "${validators}" ]; then
+    vsFlag="--validators=${validators}"
+  fi
+  if [ -n "${blockstanbulAdmins}" ]; then
+    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
+  fi
 
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag} --genesisBlockTestCert=$genesisBlockTestCert"
+        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag} \
+        ${vsFlag} ${baFlag} --genesisBlockTestCert=$genesisBlockTestCert"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -313,7 +317,7 @@ function doInit {
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert 2>&1 | tee --append logs/strato-setup
+    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert ${vsFlag} ${baFlag} 2>&1 | tee --append logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
