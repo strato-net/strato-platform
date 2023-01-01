@@ -5,6 +5,7 @@
 module Main where
 
 import           Control.Monad
+import           Control.Concurrent         (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
@@ -19,6 +20,7 @@ import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.EthConf         as EC
 import qualified Blockchain.Network         as Net
@@ -31,6 +33,8 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Servant.Client
+import qualified Strato.Strato23.Client     as VC
+import qualified Strato.Strato23.API.Types  as VC
 
 import           Flags
 
