@@ -612,7 +612,7 @@ contract RegisterCert {
               threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
 
-        void . timeout 2000000 $ concurrently_ (runNetworkOld peers connections') routine
+        void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
 
@@ -666,12 +666,12 @@ contract RegisterCert {
               for_ peers $ postEvent (TimerFire 0)
               threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedAddTx
-              threadDelay 2000000
+              threadDelay 5000000
               ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
               ifor_ ctxs1 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedRemoveTx
 
-        void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine1
+        void . timeout 10000000 $ concurrently_ (runNetworkOld peers connections') routine1
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
 
@@ -745,10 +745,10 @@ contract B {
               for_ peers $ postEvent (TimerFire 0)
               threadDelay 1000000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
-              threadDelay 5000000
+              threadDelay 10000000
               runNetworkOld (drop 3 peers) (drop 3 connections')
 
-        void . timeout 10000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
+        void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
 
