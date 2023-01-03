@@ -98,7 +98,8 @@ spec = describe "Action conversions" $ do
            "src": "contract Vehicle {}"
          },
          "events" : 
-         [ { "eventContractOrganization": "BlockApps2",
+         [ { "eventBlockHash": "0000000000000000000000000000000000000000000000000000000000000000",
+             "eventContractOrganization": "BlockApps2",
              "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
