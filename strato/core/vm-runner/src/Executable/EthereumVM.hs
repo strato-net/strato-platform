@@ -84,6 +84,7 @@ import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
