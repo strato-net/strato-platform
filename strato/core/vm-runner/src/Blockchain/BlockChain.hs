@@ -537,7 +537,7 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       return trr{trrNewAddresses = unseen}
 
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+mkEventEntry chainId Event{..} = EventDB evBlockHash evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult :: VMBase m
                         => BlockData

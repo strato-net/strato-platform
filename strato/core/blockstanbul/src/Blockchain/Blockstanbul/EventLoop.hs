@@ -234,6 +234,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           rejectHistoric
           $logWarnS "blockstanbul" . T.pack
                       . printf "Rejecting historical block #%d: %s" blockNo $ err
+          yieldR $ FailedHistoric blk
         Right _ -> do
           acceptHistoric
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
@@ -463,6 +464,7 @@ recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCoun
     OMsg _ Commit{} -> inc "commit_message"
     OMsg _ RoundChange{} -> inc "roundchange_message"
     ToCommit{} -> inc "to_commit_block"
+    FailedHistoric{} -> inc "failed_historic"
     MakeBlockCommand -> inc "make_block_command"
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"

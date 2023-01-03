@@ -260,16 +260,12 @@ blockstanbulSend' msg = do
         -- should be feedback here
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
-  mapM_ createNewTimer [rn | ResetTimer rn <- resp]
+  for_ resp $ \case
+    ResetTimer rn -> createNewTimer rn
+    FailedHistoric blk ->
+      for_ (ingestBlockToSequencedBlock $ blockToIngestBlock TO.Blockstanbul blk) appendChildFailure
+    _ -> pure ()
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks) 
-
-  -- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
-  -- blockToIngestBlock  :: TO.TXOrigin -> BDB.Block -> IngestBlock
-
-  -- TXOrigin
-  -- getSequencedBlock ::  BDB.Block -> IngestBlock -> Maybe SequencedBlock
-
-  --  traverse (a -> f b) -> t a -> f (t b)
 
   let getSequencedBlock = ingestBlockToSequencedBlock 
                         . blockToIngestBlock TO.Blockstanbul
@@ -281,11 +277,6 @@ blockstanbulSend' msg = do
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
            ++ vms
-
-
-  -- let getSequencedBlock = ingestBlockToSequencedBlock 
-  --                       . blockToIngestBlock TO.Blockstanbul
-
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -318,13 +309,6 @@ privateWitnessableHash tHash cHash =
   hash
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
-
-
-
-
--- wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
-
-
 
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
@@ -636,10 +620,16 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
       yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
     IETValidatorAdded  -> do
       record "inevent_type_validator_added" "ValidatorChange"
-      blockstanbulSend $ map (\(IEValidatorAdded vc) -> ValidatorChange vc True) events
+      let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
+      blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc True) bs
+      retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+      blockstanbulSend retries
     IETValidatorRemoved  -> do
       record "inevent_type_validator_removed" "ValidatorChange"
-      blockstanbulSend $ map (\(IEValidatorRemoved vc) -> ValidatorChange vc False) events
+      let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
+      blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc False) bs
+      retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+      blockstanbulSend retries
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events

@@ -1422,7 +1422,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                                     $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
-                                    AddOrgName (Right (chainId, cm)) -> do
+                                    AddOrgName chainId cm -> do
                                       let org = ChainMembers $ Set.singleton cm
                                           newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
                                       chainMembersMap . at chainId %= \case
@@ -1433,12 +1433,12 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                                           Just (TrueOrgNameChains s) -> M.insert org (TrueOrgNameChains $ Set.insert chainId s) m
                                         )
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
-                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    ValidatorAdded (Right cm) -> do
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded cm
-                                    ValidatorRemoved (Right cm) -> do
-                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorRemoved cm
-                                    RegisterCertificate (Right (addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
+                                    RemoveOrgName _ _ -> pure () --(Right (cid, (n, u)))
+                                    ValidatorAdded bHash cm -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded bHash cm
+                                    ValidatorRemoved bHash cm -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorRemoved bHash cm
+                                    RegisterCertificate addr certState@(X509CertInfoState _ _ _ _ o u c) -> do
                                       let setOrg = Org (T.pack o) True
                                           setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
                                           setCommonName = CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True

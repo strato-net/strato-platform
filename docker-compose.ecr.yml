@@ -105,6 +105,7 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - cacheTransactionResults=${cacheTransactionResults}
+    - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
@@ -119,7 +120,6 @@ services:
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - genesisBlockTestCert=${genesisBlockTestCert:-false}
-    - isAdmin=${isAdmin:-false}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -277,10 +277,12 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: zookeeper:3.4.14
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/opt/zookeeper-3.4.6/data
+      - zookeeperdata:/data
+    environment:
+      ZOO_DATA_LOG_DIR: /data
     logging:
       driver: "json-file"
       options:

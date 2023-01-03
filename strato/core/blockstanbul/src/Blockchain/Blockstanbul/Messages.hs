@@ -158,6 +158,7 @@ instance Format InEvent where
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
+              | FailedHistoric Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
                 -- Announce that the global consensus is ahead of us by
@@ -176,6 +177,7 @@ fromE = either id id
 instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
   format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
+  format (FailedHistoric blk) = "FailedHistoric " ++ format (blockHash blk)
   format MakeBlockCommand = "MakeBlockCommand"
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
@@ -201,8 +203,8 @@ inShortLog loc iev = $logInfoS loc . pack $
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
-    ValidatorBehaviorChange vc -> CL.blue "FORCED_VALIDATOR_CHANGE" ++ show vc
-    ValidatorChange val dir -> CL.blue "FORCED_VALIDATOR_CHANGE" ++ format val ++ if dir then " ADDED" else " REMOVED"
+    ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
+    ValidatorChange val dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do
@@ -211,6 +213,7 @@ outShortLog loc eoev = do
     case fromE eoev of
       OMsg a m -> shortFormat $ WireMessage a m
       ToCommit blk -> prefix ++ CL.blue "TO_COMMIT " ++ blkNum blk
+      FailedHistoric blk -> prefix ++ CL.blue "FAILED_HISTORIC " ++ blkNum blk
       MakeBlockCommand -> prefix ++ CL.blue "MAKE_BLOCK_COMMAND"
       ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r

@@ -36,6 +36,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
 import           Text.Format
@@ -82,23 +83,27 @@ doRevokeCertificate userAddress = do
   void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
   void . withKafkaRetry1s $ writeUnseqEvents [IECertRevoked userAddress]
 
-doValidatorAdded :: ChainMemberParsedSet -> IContextM ()
-doValidatorAdded cm = do
+doValidatorAdded :: Keccak256 -> ChainMemberParsedSet -> IContextM ()
+doValidatorAdded bHash cm = do
   logF [ "Adding validator "
        , format cm
+       , " at block "
+       , format bHash
        ]
   lift $ addRemoveValidator ([], [cm])
   void . RBDB.withRedisBlockDB $ RBDB.addValidators [cm]
-  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorAdded cm]
+  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorAdded bHash cm]
 
-doValidatorRemoved :: ChainMemberParsedSet -> IContextM ()
-doValidatorRemoved cm = do
+doValidatorRemoved :: Keccak256 -> ChainMemberParsedSet -> IContextM ()
+doValidatorRemoved bHash cm = do
   logF [ "Removing validator "
        , format cm
+       , " at block "
+       , format bHash
        ]
   lift $ addRemoveValidator ([cm],[])
   void . RBDB.withRedisBlockDB $ RBDB.removeValidators [cm]
-  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorRemoved cm]
+  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorRemoved bHash cm]
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -112,30 +117,31 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
         output = awaitForever $ lift . txrResultHandler
 
 
-data TxrResult = AddOrgName (Either String (Word256, ChainMemberParsedSet))
-               | RemoveOrgName (Either String (Word256, ChainMemberParsedSet))
-               | RegisterCertificate (Either String (Address, X509CertInfoState))
-               | CertificateRevoked (Either String Address)
-               | ValidatorAdded (Either String ChainMemberParsedSet)
-               | ValidatorRemoved (Either String ChainMemberParsedSet)
-               | TerminateChain (Either String Word256)
+data TxrResult = AddOrgName Word256 ChainMemberParsedSet
+               | RemoveOrgName Word256 ChainMemberParsedSet
+               | RegisterCertificate Address X509CertInfoState
+               | CertificateRevoked Address
+               | ValidatorAdded Keccak256 ChainMemberParsedSet
+               | ValidatorRemoved Keccak256 ChainMemberParsedSet
+               | TerminateChain Word256
                | PutLogDB LogDB
                | PutEventDB EventDB
                | PutTxResult TransactionResult
+               | Failure String
                deriving (Show, Eq)
 
 indexEventToTxrResults :: IndexEvent -> [TxrResult]
 indexEventToTxrResults = \case
   EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $
      case (_accountAddress $ eventDBContractAddress ev, eventDBChainId ev, eventDBName ev, eventDBArgs ev) of
-      (Address 0x100, Just chainId, "OrgAdded", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) True))
-      (Address 0x100, Just chainId, "OrgUnitAdded", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) True))
-      (Address 0x100, Just chainId, "CommonNameAdded", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) True))
-      (Address 0x100, Just chainId, "OrgRemoved", [o]) -> Just . AddOrgName $ Right (chainId, (Org (T.pack o) False))
-      (Address 0x100, Just chainId, "OrgUnitRemoved", [o, u]) -> Just . AddOrgName $ Right (chainId, (OrgUnit (T.pack o) (T.pack u) False))
-      (Address 0x100, Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . AddOrgName $ Right (chainId, (CommonName (T.pack o) (T.pack u) (T.pack c) False))
-      (Address 0x100, Nothing, "ValidatorAdded", [o, u, c]) -> Just . ValidatorAdded $ Right (CommonName (T.pack o) (T.pack u) (T.pack c) True)
-      (Address 0x100, Nothing, "ValidatorRemoved", [o, u, c]) -> Just . ValidatorRemoved $ Right (CommonName (T.pack o) (T.pack u) (T.pack c) True)
+      (Address 0x100, Just chainId, "OrgAdded", [o]) -> Just . AddOrgName chainId $ Org (T.pack o) True
+      (Address 0x100, Just chainId, "OrgUnitAdded", [o, u]) -> Just . AddOrgName chainId $ OrgUnit (T.pack o) (T.pack u) True
+      (Address 0x100, Just chainId, "CommonNameAdded", [o, u, c]) -> Just . AddOrgName chainId $ CommonName (T.pack o) (T.pack u) (T.pack c) True
+      (Address 0x100, Just chainId, "OrgRemoved", [o]) -> Just . AddOrgName chainId $ Org (T.pack o) False
+      (Address 0x100, Just chainId, "OrgUnitRemoved", [o, u]) -> Just . AddOrgName chainId $ OrgUnit (T.pack o) (T.pack u) False
+      (Address 0x100, Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . AddOrgName chainId $ CommonName (T.pack o) (T.pack u) (T.pack c) False
+      (Address 0x100, Nothing, "ValidatorAdded", [o, u, c]) -> Just . ValidatorAdded (eventDBBlockHash ev) $ CommonName (T.pack o) (T.pack u) (T.pack c) True
+      (Address 0x100, Nothing, "ValidatorRemoved", [o, u, c]) -> Just . ValidatorRemoved (eventDBBlockHash ev) $ CommonName (T.pack o) (T.pack u) (T.pack c) True
       (Address 0x509, Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
@@ -143,42 +149,28 @@ indexEventToTxrResults = \case
             orgUnit = fromMaybe Nothing $ Just . subUnit =<< getCertSubject =<< eitherToMaybe cert
             commonName = maybe "" subCommonName $ getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
-            (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
-            (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
-            (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit, commonName=commonName})
+            (Left s, Nothing) -> Just . Failure $ "Failed to parse the certString for the CertificateRegistered event: " <> s
+            (Left s, Just ua) -> Just . Failure $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
+            (Right s, Nothing) -> Just . Failure $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
+            (Right c, Just ua) -> Just $ RegisterCertificate ua X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit, commonName=commonName}
       (Address 0x509, Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of
-            Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
-            Just ua -> Just . CertificateRevoked $ Right ua
+            Nothing -> Just . Failure $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
+            Just ua -> Just $ CertificateRevoked ua
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
 
 txrResultHandler :: TxrResult -> IContextM ()
 txrResultHandler = \case
-  AddOrgName e -> case e of
-    Right (chainId, chainMember) -> doAddOrgName chainId chainMember
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  RemoveOrgName e -> case e of
-    Right (chainId, chainMember) -> doRemoveOrgName chainId chainMember
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  RegisterCertificate e -> case e of
-    Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  CertificateRevoked e -> case e of
-    Right userAddress -> doRevokeCertificate userAddress
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  TerminateChain e -> case e of
-    Right chainId -> lift $ terminateChain chainId
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  ValidatorAdded e -> case e of
-    Right chainMember -> doValidatorAdded chainMember
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
-  ValidatorRemoved e -> case e of
-    Right chainMember -> doValidatorRemoved chainMember
-    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  AddOrgName chainId chainMember -> doAddOrgName chainId chainMember
+  RemoveOrgName chainId chainMember -> doRemoveOrgName chainId chainMember
+  RegisterCertificate ua certInfoState -> doRegisterCertificate ua certInfoState
+  CertificateRevoked userAddress -> doRevokeCertificate userAddress
+  TerminateChain chainId -> lift $ terminateChain chainId
+  ValidatorAdded bHash chainMember -> doValidatorAdded bHash chainMember
+  ValidatorRemoved bHash chainMember -> doValidatorRemoved bHash chainMember
   PutLogDB l -> do
     logF [ "Inserting LogDB entry for tx: "
          , format $ logDBTransactionHash l
@@ -199,6 +191,7 @@ txrResultHandler = \case
          , formatChainId $ eventDBChainId ev
          ]
   PutTxResult _ -> return () --do
+  Failure err -> $logErrorS "txrIndexer" $ T.pack err
 --    logF [ "Inserting TXResult for tx "
 --         , format $ transactionResultTransactionHash r
 --         , " at block "

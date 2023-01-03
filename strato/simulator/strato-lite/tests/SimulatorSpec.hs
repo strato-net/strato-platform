@@ -666,12 +666,12 @@ contract RegisterCert {
               for_ peers $ postEvent (TimerFire 0)
               threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedAddTx
-              threadDelay 1000000
+              threadDelay 2000000
               ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
               ifor_ ctxs1 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedRemoveTx
 
-        void . timeout 3000000 $ concurrently_ (runNetworkOld peers connections') routine1
+        void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine1
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
 

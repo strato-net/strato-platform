@@ -63,8 +63,8 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewCertRegistered  A.Address X509CertInfoState
                  | IECertRevoked A.Address
                  | IENewChainOrgName Word256 ChainMemberParsedSet
-                 | IEValidatorAdded ChainMemberParsedSet
-                 | IEValidatorRemoved ChainMemberParsedSet
+                 | IEValidatorAdded Keccak256 ChainMemberParsedSet
+                 | IEValidatorRemoved Keccak256 ChainMemberParsedSet
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -105,8 +105,8 @@ instance Format IngestEvent where
   format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
   format (IECertRevoked a) = CL.yellow $ format a
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
-  format (IEValidatorAdded a) = CL.yellow $ format a
-  format (IEValidatorRemoved a) = CL.yellow $ format a
+  format (IEValidatorAdded b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
+  format (IEValidatorRemoved b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
