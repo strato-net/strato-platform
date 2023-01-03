@@ -19,6 +19,7 @@ kubectl delete pv redis-pv
 kubectl delete pv strato-pv
 kubectl delete pv zookeeper-pv
 kubectl delete pv postgres-pv
+kubectl delete service nginx-service
 
 **Note that** *strato* above is the name of the deployment.
 
@@ -42,7 +43,7 @@ kubectl apply -f zookeeper-pvc.yaml
 kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
-kubectl apply -f deployment.yaml
+kubectl apply -f eks-deployment.tpl.yaml
 
 # Create nginx Service
 kubectl apply -f nginx-service.yaml
