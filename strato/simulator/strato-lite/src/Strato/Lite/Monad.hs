@@ -29,6 +29,7 @@ import qualified Control.Monad.State                   as State
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Crypto.Types.PubKey.ECC
+import           Data.Bifunctor                        (first)
 import           Data.Bits
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
@@ -262,9 +263,6 @@ instance (MonadIO m, MonadLogger m) => A.Selectable ChainMembers TrueOrgNameChai
 instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
 
-instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
-  select _ a = M.lookup a <$> use x509certMap
-
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
@@ -497,6 +495,14 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . chainIdRegistry
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
+
+instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . x509certInfoState
+  insert = genericTestInsert $ sequencerContext . x509certInfoState
+  delete = genericTestDelete $ sequencerContext . x509certInfoState
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  select = A.lookup
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -805,7 +811,7 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) wher
   delete _ _   = pure ()
   insert _ _ _ = pure ()
 
-instance MonadIO m => (([Address],[Address]) `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
+instance MonadIO m => (([ChainMemberParsedSet],[ChainMemberParsedSet]) `A.Alters` API (A.Proxy DataDefs.ValidatorRef)) (MonadTest  m) where
   lookup _ _   = pure Nothing
   delete _ _   = pure ()
   insert _ _ _ = pure ()
@@ -1091,10 +1097,10 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
 instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-startingCheckpoint :: [Address] -> Checkpoint
+startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
-newBlockstanbulContext :: Address -> [Address] -> BlockstanbulContext
+newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
 newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
   in newContext ckpt paddr
@@ -1118,6 +1124,7 @@ newSequencerContext bc = do
       , _chainInfoRegistry   = M.empty
       , _orgNameChainsRegistry = M.empty
       , _x509certRegistry    = M.empty
+      , _x509certInfoState   = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -1229,8 +1236,18 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot
   insert _ k v = State.modify' $ \(a, b) -> (a, M.insert k v b)
   delete _ k   = State.modify' $ \(a, b) -> (a, M.delete k b)
 
+type CertMap = Map Address (Modification X509CertInfoState)
+
+addValidatorsToCertMap :: [(Address, ChainMemberParsedSet)] -> CertMap -> CertMap
+addValidatorsToCertMap vals m =
+  let cmpsToXcis a (CommonName o u n True) = X509CertInfoState a rootCert True [] (T.unpack o) (Just $ T.unpack u) (T.unpack n)
+      cmpsToXcis _ _ = error "cmpsToXcis"
+      insertValidatorInfo (a, b) = M.insert a (Modification (cmpsToXcis a b))
+   in foldr insertValidatorInfo m vals
+
 createPeer :: PrivateKey
-           -> [Address]
+           -> ChainMemberParsedSet
+           -> [(Address, ChainMemberParsedSet)]
            -> TVar Internet
            -> Text
            -> IPAsText
@@ -1238,7 +1255,7 @@ createPeer :: PrivateKey
            -> UDPPort
            -> [IPAsText]
            -> IO P2PPeer
-createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
+createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -1253,7 +1270,9 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
   atomically $ do
     modifyTVar inet $ tcpPorts . at (ipAsText, tcpPort) ?~ tcpVSock
     modifyTVar inet $ udpPorts . at (ipAsText, udpPort) ?~ udpVSock
-  seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
+  seqCtx' <- newSequencerContext $ newBlockstanbulContext selfId (snd <$> initialValidators')
+  let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
+      initialValidators = fst <$> initialValidators'
   cache  <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
@@ -1268,7 +1287,7 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
       genesisBlock = DataDefs.BlockData
         zeroHash
         zeroHash
-        (Address 0)
+        emptyChainMember
         stateRoot
         MP.emptyTriePtr
         MP.emptyTriePtr
@@ -1461,8 +1480,8 @@ createConnection server' client' = do
     serverExceptionTVar
     clientExceptionTVar
 
-makeValidators :: [PrivateKey] -> [Address]
-makeValidators = map fromPrivateKey
+makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
+makeValidators = map (first fromPrivateKey)
 
 signChain :: PrivateKey -> UnsignedChainInfo -> ChainInfo
 signChain privKey u =
@@ -1533,21 +1552,21 @@ makeLenses ''ThreadPool
 data NetworkManager = NetworkManager
   { _threads :: TVar ThreadPool
   , _network :: TVar Network
-  , _initialValidators :: [Address]
+  , _initialValidators :: [(Address, ChainMemberParsedSet)]
   }
 makeLenses ''NetworkManager
 
-createNode :: Text -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> TVar Internet -> ReaderT NetworkManager IO P2PPeer
-createNode nodeLabel ipAddr tcpPort udpPort bootNodes inet = do 
+createNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> TVar Internet -> ReaderT NetworkManager IO P2PPeer
+createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do 
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
-  liftIO $ createPeer pKey vals inet nodeLabel ipAddr tcpPort udpPort bootNodes
+  liftIO $ createPeer pKey identity vals inet nodeLabel ipAddr tcpPort udpPort bootNodes
 
-addNode :: Text -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
-addNode nodeLabel ipAddr tcpPort udpPort bootNodes = do
+addNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
+addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
   mgr <- ask
   inet <- _internet <$> readTVarIO (mgr ^. network)
-  node <- createNode nodeLabel ipAddr tcpPort udpPort bootNodes inet
+  node <- createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet
   didCreate <- liftIO . atomically $ do
     net <- readTVar $ mgr ^. network
     case M.lookup nodeLabel $ net ^. nodes of
@@ -1601,13 +1620,14 @@ removeConnection serverLabel clientLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
-runNetwork :: [(Text, (IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
+runNetwork :: [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
 runNetwork nodesList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
-  let validators' = makeValidators $ validatorsFilter privKeys
+  let identities = (\(_,(c,_,_,_)) -> c) <$> nodesList
+      validators' = makeValidators $ validatorsFilter $ zip privKeys identities
   inet <- newTVarIO preAlGoreInternet
-  let bootNodes = (\(_, (i,_,_)) -> i) <$> nodesList
-  peers <- traverse (\(p,(n,(i,t,u))) -> createPeer p validators' inet n i t u bootNodes) $ zip privKeys nodesList
+  let bootNodes = (\(_, (_,i,_,_)) -> i) <$> nodesList
+  peers <- traverse (\(p,(n,(c,i,t,u))) -> createPeer p c validators' inet n i t u bootNodes) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
   nodeThreads' <- for nodesMap $ async . runNode
@@ -1616,13 +1636,14 @@ runNetwork nodesList validatorsFilter = do
   threadsTVar <- newTVarIO threadPool
   pure $ NetworkManager threadsTVar networkTVar validators'
 
-runNetworkWithStaticConnections :: [(Text, IPAsText)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
+runNetworkWithStaticConnections :: [(Text, IPAsText, ChainMemberParsedSet)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
-  let validators' = makeValidators $ validatorsFilter privKeys
+  let identities = (\(_,_,c) -> c) <$> nodesList
+      validators' = makeValidators . validatorsFilter $ zip privKeys identities
   inet <- newTVarIO preAlGoreInternet
-  peers <- traverse (\(p,(n,i)) -> createPeer p validators' inet n i (TCPPort 30303) (UDPPort 30303) []) $ zip privKeys nodesList
-  let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
+  peers <- traverse (\(p,(n,i,c)) -> createPeer p c validators' inet n i (TCPPort 30303) (UDPPort 30303) []) $ zip privKeys nodesList
+  let nodesMap = M.fromList $ zip ((\(a,_,_) -> a) <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
     clientPeer <- maybeToExceptT ("Couldn't find client " <> client') . MaybeT . pure $ M.lookup client' nodesMap

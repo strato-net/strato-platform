@@ -383,7 +383,7 @@ runOperation BLOCKHASH = do
           let h = hash $ BC.pack $ show $ toInteger number
           push $ keccak256ToWord256 h
 
-runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
+runOperation COINBASE = pushEnvVar (const $ Address 0) -- (blockDataCoinbase . envBlockHeader) -- TODO: fix?
 runOperation TIMESTAMP = do
   VMState{environment=env} <- vmstateGet
   push $ ((round . utcTimeToPOSIXSeconds . blockDataTimestamp . envBlockHeader) env::Word256)
@@ -1100,6 +1100,8 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         , erKind               = EVM
         -- , erNewX509Certs       = M.empty
         , erPragmas            = []
+        , erOrgName            = ""
+        , erAppName            = ""
         }
     Right _ -> do
       vmState'@VMState{..} <- readIORef vmStateRef
@@ -1482,6 +1484,8 @@ vmStateToExecResults vmState = do
       , erKind               = EVM
       -- , erNewX509Certs       = M.empty
       , erPragmas            =[]
+      , erOrgName            = ""
+      , erAppName            = ""
       }
 
 getEVMCode' :: HasCodeDB m => CodePtr -> m BC.ByteString

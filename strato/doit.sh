@@ -150,6 +150,9 @@ function newnode {
   if [ -n "${blockstanbulAdmins}" ]; then
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
+  if [ -n "${certInfo}" ]; then
+    ciFlag="--certInfo=${certInfo}"
+  fi
 
   vbFlag="--validatorBehavior=${validatorBehavior}"
   adFlag="--isAdmin=${isAdmin}"
@@ -159,7 +162,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${vbFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" \
+    "${networkFlag}" "${ciFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -298,7 +301,7 @@ function doInit {
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag}"
+        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag} --genesisBlockTestCert=$genesisBlockTestCert"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -311,7 +314,7 @@ function doInit {
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert 2>&1 | tee --append logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -396,6 +399,7 @@ else
 fi
 setEnv requireCerts true
 setEnv genesisBlock ""
+setEnv genesisBlockTestCert false
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000
 

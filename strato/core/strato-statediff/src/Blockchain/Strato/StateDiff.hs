@@ -364,7 +364,7 @@ decodeStorageKV :: ( MonadLogger m
 decodeStorageKV k v = do
   key <- lookupStorageKey k
   let val = decodeMPDBValue v
-  $logInfoS "decodeStorageKV" . T.pack $ "decoded storage key/value: " ++ show val
+  $logDebugS "decodeStorageKV" . T.pack $ "decoded storage key/value: " ++ show val
   return (key, val)
 
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address

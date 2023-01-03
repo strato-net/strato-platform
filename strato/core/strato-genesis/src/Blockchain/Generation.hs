@@ -187,101 +187,71 @@ insertContracts slotss name src code start gi =
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]}
 
-insertCertRegistryContract :: GenesisInfo -> GenesisInfo
-insertCertRegistryContract gi =
-  let initialAccounts = genesisInfoAccountInfo gi
-      initialCode     = genesisInfoCodeInfo gi
-      rlpWrap         = rlpSerialize . rlpEncode
-      encodedRegistry = encodeUtf8 certificateRegistryContract
-      encodedCert     = encodeUtf8 certificateContract
-      rootAddress'    = fromPublicKey rootPubKey
-      rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
-      addrToCertIdx   = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ "1337") MainChain) 
-      certSubject     = fromJust $ getCertSubject rootCert
-      registryAcct    = SolidVMContractWithStorage 0x509 509 
-        (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) 
-        [
-            (".owner", rootAddress),
-            (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx)
-        ]
-      certAcct = SolidVMContractWithStorage 0x1337 1337
-        (SolidVMCode "Certificate" (KECCAK256.hash encodedCert))
-        [
-            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
-            (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSubject) MainChain)),
-            (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSubject),
-            (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ certSubject),
-            (".organization", rlpWrap . BString . BC.pack . subOrg $ certSubject),
-            (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ certSubject),
-            (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ certSubject),
-            (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSubject),
-            (".certificateString", rlpWrap . BString $ certToBytes rootCert),
-            (".isValid", rlpWrap (BBool True)),
-            (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert)
-        ]
-  in gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, certAcct],
-         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]
-                                              ++ [CodeInfo encodedCert certificateContract (Just "Certificate")]}
+-- | Inserts a Certificate Registry contract into the genesis block with the BlockApps root cert as owner
+-- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root
+insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo -- remove Monad
+insertCertRegistryContract certs gi =
+    gi {genesisInfoAccountInfo = initialAccounts ++ registryAcct:rootAcct:certAccts,
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]}
+    where 
+        initialAccounts = genesisInfoAccountInfo gi
+        initialCode     = genesisInfoCodeInfo gi
 
-certificateContract :: Text
-certificateContract = [r|
-contract Certificate {
-    address owner;  // The CertificateRegistry Contract
+        rlpWrap         = rlpSerialize . rlpEncode
+        encodedRegistry = encodeUtf8 certificateRegistryContract
 
-    address public userAddress;
-    address public parent;
-    address[] public children;
+        rootAddress'    = fromPublicKey rootPubKey
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
+        rootSub         = fromJust $ getCertSubject rootCert
 
-    
-    // Store all the fields of a certificate in a Cirrus record
-    string commonName;
-    string country;
-    string organization;
-    string group;
-    string organizationalUnit;
-    string public publicKey;
-    string public certificateString;
-    bool public isValid;
-    uint expirationDate;
+        certSub' crt =
+            case getCertSubject crt of
+                Just s -> s
+                Nothing -> error "Certificate requires a subject"
+        maybeCertField = fromMaybe ""
+        certUserAddress = fromPublicKey . subPub . certSub'
+        rootAcct = SolidVMContractWithStorage 0x1337 1337
+            (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) MainChain)),
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
+                (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
+                (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
+                (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
+                (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
+                (".certificateString", rlpWrap . BString $ certToBytes rootCert),
+                (".isValid", rlpWrap (BBool True)),
+                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert),
+                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) MainChain))
+            ]
 
-    constructor(string _certificateString) {
-        owner = msg.sender;
+        -- Reversing the cert user address to create a placeholder Certificate contract address
+        reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
+        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+        registryAcct = SolidVMContractWithStorage 0x509 509
+            (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) $
+            [
+                (".owner", rootAddress),
+                (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
+            ] ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c)  ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
 
-        mapping(string => string) parsedCert = parseCert(_certificateString);
-
-        userAddress = address(parsedCert["userAddress"]);
-        commonName = parsedCert["commonName"];
-        organization = parsedCert["organization"];
-        group = parsedCert["group"];
-        organizationalUnit = parsedCert["organizationalUnit"];
-        country = parsedCert["country"];
-        publicKey = parsedCert["publicKey"];
-        certificateString = parsedCert["certString"];
-        isValid = true;
-        expirationDate = uint(parsedCert["expirationDate"],10);
-        parent = address(parsedCert["parent"]);
-        children = [];
-    }
-    
-    function addChild(address _child) public {
-        require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
-
-        children.push(_child);
-    }
-    
-    function revoke() public returns (int){
-        require(msg.sender == owner,"You don't have permission to CALL revoke!");
-
-        isValid = false;
-        return children.length;
-    }
-    
-    function getChild(int index) public returns (address){
-        require(msg.sender == owner,"You don't have permission to get children!");
-        
-        return children[index];
-    }
-}|]
+        certAccts = map (\cert -> do
+            let certSub = certSub' cert
+            SolidVMContractWithStorage (reverseAddr cert) 0 (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) MainChain)),
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
+                (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
+                (".organization", rlpWrap . BString . BC.pack . subOrg $ certSub),
+                (".group", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
+                (".organizationalUnit", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
+                (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
+                (".certificateString", rlpWrap . BString $ certToBytes cert),
+                (".isValid", rlpWrap (BBool True)),
+                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ cert),
+                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))]
+            ) certs
 
 certificateRegistryContract :: Text
 certificateRegistryContract = [r|

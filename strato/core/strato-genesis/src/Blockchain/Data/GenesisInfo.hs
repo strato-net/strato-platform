@@ -23,7 +23,7 @@ import           Data.Word
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 
 import qualified LabeledError
@@ -32,7 +32,7 @@ data GenesisInfo =
   GenesisInfo {
     genesisInfoParentHash       :: Keccak256,
     genesisInfoUnclesHash       :: Keccak256,
-    genesisInfoCoinbase         :: Address,
+    genesisInfoCoinbase         :: ChainMemberParsedSet,
     genesisInfoAccountInfo      :: [AccountInfo],
     genesisInfoCodeInfo         :: [CodeInfo],
     genesisInfoTransactionRoot  :: StateRoot, -- Misspelled to match the existing parser
@@ -57,7 +57,7 @@ defaultGenesisInfo =
   GenesisInfo {
     genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
     genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
-    genesisInfoCoinbase = Address 0,
+    genesisInfoCoinbase = emptyChainMember,
     genesisInfoAccountInfo = [],
     genesisInfoCodeInfo = [],
     genesisInfoTransactionRoot = nullStateRoot,

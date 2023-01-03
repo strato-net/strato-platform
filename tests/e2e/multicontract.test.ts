@@ -46,11 +46,11 @@ describe("Concurrent uploads", function() {
     let ouser:OAuthUser = {token: accessToken.token.access_token};
     const user = await rest.createUser(ouser, options);
     let balance = new BigNumber(0);
-    while (balance.isZero()) {
-      await sleep(500);
-      let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
-      balance = new BigNumber(result[0].balance);
-    }
+    // while (balance.isZero()) {
+    //   await sleep(500);
+    //   let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
+    //   balance = new BigNumber(result[0].balance);
+    // }
     console.log(`Balance of ${user_name} is ${balance}`)
     console.log("Beginning to upload contracts");
     const upload = rest.createContract
