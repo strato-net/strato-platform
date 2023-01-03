@@ -63,14 +63,15 @@ contract AdminOnly {
 }`
 
 const MajorityRules = `
- 
 contract MajorityRules { 
   event CommonNameAdded(string orgName, string orgUnit, string commonName);
   event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
-  mapping(chainMember => uint) addVotes; 
-  mapping(chainMember => uint) removeVotes; 
+  constructor () {}
 
+  mapping(string => mapping(string => mapping (string => uint))) addVotes;
+  mapping(string => mapping(string => mapping (string => uint))) removeVotes;
+  
   struct chainMember {
     string o;
     string u;
@@ -79,13 +80,13 @@ contract MajorityRules {
 
   chainMember[] __members__; 
 
-  function voteToAdd(string o, string u, string c) {
-    chainMember m = chainMember(o, u, c); 
+  function voteToAdd(string orgName, string orgUnit, string commonName) {
+    chainMember m = chainMember(orgName, orgUnit, commonName); 
 
-    uint votes = addVotes[m] + 1; 
+    uint votes = addVotes[orgName][orgUnit][commonName] + 1; 
     uint mlen = __members__.length; 
     if (votes > mlen / 2) { 
-      addVotes[m] = 0; 
+      addVotes[orgName][orgUnit][commonName] = 0; 
       bool found = false; 
       for (uint i = 0; i < mlen; i++) { 
         if (__members__[i] == m) { 
@@ -95,44 +96,45 @@ contract MajorityRules {
       } 
       if (!found) { 
         __members__.push(m); 
-        emit CommonNameAdded(o, u, c); 
+        emit CommonNameAdded(orgName, orgUnit, commonName); 
       } 
     } 
     else { 
-      addVotes[m] = votes; 
+      addVotes[orgName][orgUnit][commonName] = votes; 
     } 
   } 
 
-  function voteToRemove(string o, string u, string c) { 
-    chainMember m = chainMember(o, u, c); 
-    uint votes = removeVotes[m] + 1; 
+  function voteToRemove(string orgName, string orgUnit, string commonName) { 
+    chainMember m = chainMember(orgName, orgUnit, commonName); 
+    uint votes = removeVotes[orgName][orgUnit][commonName] + 1; 
     uint mlen = __members__.length; 
     if (votes > mlen / 2) { 
-      removeVotes[m] = 0; 
+      removeVotes[orgName][orgUnit][commonName] = 0; 
       for (uint i = 0; i < mlen; i++) { 
         if (__members__[i] == m) { 
           __members__[i] = __members__[mlen - 1]; 
           delete __members__[mlen - 1]; 
           __members__.length--; 
-          emit CommonNameRemoved(o,u,c); 
+          emit CommonNameRemoved(orgName, orgUnit, commonName); 
           i = mlen; 
         } 
       } 
     } 
     else { 
-      removeVotes[m] = votes; 
+      removeVotes[orgName][orgUnit][commonName] = votes; 
     } 
   } 
 }`
 
 const TwoIn = `
- 
 contract TwoIn { 
   event CommonNameAdded(string orgName, string orgUnit, string commonName);
   event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
-  mapping(chainMember => uint) addVotes; 
-  mapping(chainMember => uint) removeVotes; 
+  constructor () {}
+
+  mapping(string => mapping(string => mapping (string => uint))) addVotes;
+  mapping(string => mapping(string => mapping (string => uint))) removeVotes;
 
   struct chainMember {
     string o;
@@ -140,27 +142,27 @@ contract TwoIn {
     string c;
   }
 
-  function voteToAdd(string o, string u, string c) {
-    chainMember m = chainMember(o, u, c); 
-    uint votes = addVotes[m] + 1; 
+  function voteToAdd(string orgName, string orgUnit, string commonName) {
+    chainMember m = chainMember(orgName, orgUnit, commonName); 
+    uint votes = addVotes[orgName][orgUnit][commonName] + 1; 
     if (votes >= 2) { 
-      emit CommonNameAdded(o, u, c); 
-      addVotes[m] = 0; 
+      emit CommonNameAdded(orgName, orgUnit, commonName); 
+      addVotes[orgName][orgUnit][commonName] = 0; 
     } 
     else { 
-      addVotes[m] = votes; 
+      addVotes[orgName][orgUnit][commonName] = votes; 
     } 
   } 
 
-  function voteToRemove(string o, string u, string c) { 
-    chainMember m = chainMember(o, u, c); 
-    uint votes = removeVotes[m] + 1; 
+  function voteToRemove(string orgName, string orgUnit, string commonName) { 
+    chainMember m = chainMember(orgName, orgUnit, commonName); 
+    uint votes = addVotes[orgName][orgUnit][commonName] + 1; 
     if (votes >= 2) { 
-      emit CommonNameRemoved(o,u,c); 
-      removeVotes[m] = 0; 
+      emit CommonNameRemoved(orgName, orgUnit, commonName); 
+      addVotes[orgName][orgUnit][commonName] = 0; 
     } 
     else { 
-      removeVotes[m] = votes; 
+      addVotes[orgName][orgUnit][commonName] = votes; 
     } 
   } 
 }`
