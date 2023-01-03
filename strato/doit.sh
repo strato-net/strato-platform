@@ -504,3 +504,4 @@ done
 
 global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode
+
