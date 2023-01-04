@@ -20,7 +20,6 @@ ValidatorRef
     org Text
     orgUnit Text
     commonName Text
-    UniqueValidator org orgUnit commonName
     deriving Eq Read Show
 
 BlockDataRef
