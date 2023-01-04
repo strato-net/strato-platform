@@ -35,7 +35,7 @@ defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
 defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
-defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "The Vault-Wrapper URL"
+defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
