@@ -23,7 +23,7 @@ module Handlers.Metadata
 
 import           Control.Lens
 import           Data.Aeson                     hiding (Success)
-import           Data.Aeson.Casing.Internal     (camelCase)
+import           Data.Aeson.Casing.Internal     (camelCase, dropFPrefix)
 import           Data.Maybe                     (fromJust, fromMaybe)
 import           Data.Swagger                   hiding (url)
        
@@ -121,8 +121,8 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKeyAndAddress ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => m (Either VaultWrapperError V.AddressAndKey)
-getPubKeyAndAddress = try . blocVaultWrapper $ getKey Nothing Nothing
+getPubKeyAndAddress ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
+getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow
