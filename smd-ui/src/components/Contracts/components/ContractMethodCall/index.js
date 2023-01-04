@@ -87,8 +87,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth ? this.props.oAuthUser.username : null}>
-          {isModeOauth && this.props.oAuthUser.username}
+        <option value={isModeOauth ? this.props.oAuthUser.commonName : null}>
+          {isModeOauth && this.props.oAuthUser.commonName}
         </option>
         {
           users.map((user, i) => {

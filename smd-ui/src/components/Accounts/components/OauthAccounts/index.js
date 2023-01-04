@@ -47,27 +47,25 @@ class OauthAccounts extends Component {
       .forEach(function (user, index) {
         const position = index + 1;
 
-        if (user.address === '8b312340d741b6fd1b1cab30b3360adc36e9f64a') {
-          return
-        }
-        
-        let userClasseName = '';
-        if (this.state.selected === position) {
-          userClasseName = ' selected';
-        }
-        // change this
-        rows.push(
-          <div className="smd-margin-8" key={user.commonName}>
-            <div className="row">
-              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
-                this.setState({ selected: position });
-                this.onUserClick(user, position);
-              }}>
-                {user.commonName}
+        if (user.commonName) {
+          let userClasseName = '';
+          if (this.state.selected === position) {
+            userClasseName = ' selected';
+          }
+          // change this
+          rows.push(
+            <div className="smd-margin-8" key={user.commonName}>
+              <div className="row">
+                <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
+                  this.setState({ selected: position });
+                  this.onUserClick(user, position);
+                }}>
+                  {user.commonName}
+                </div>
               </div>
             </div>
-          </div>
-        );
+          );
+        }
       }.bind(this));
 
     return (

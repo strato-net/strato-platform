@@ -31,7 +31,10 @@ function getOrCreateOauthUserApi() {
     })
     .then(r => { return r.json() })
     .then(function (res) {
-      const url = cirrusUrl + res.address;
+      return res.json();
+    })
+    .then(function (user) {
+      const url = cirrusUrl + user.address;
       return fetch(
         url,
         {

@@ -145,9 +145,12 @@ export function getOauthAccountsApi() {
   )
     .then(handleErrors)
     .then(function (res) {
-      const users = res.json();
-      for (let user in users) {
-        const url = cirrusUrl + user.address;
+      return res.json();
+    })
+    .then(function (users) {
+      for (let x in users) {
+        console.log(users[x]);
+        const url = cirrusUrl + users[x].address;
         const certInfoResponse = 
           fetch (
             url,

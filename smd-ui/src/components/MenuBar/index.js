@@ -32,7 +32,7 @@ class MenuBar extends Component {
           <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("docs_blockapps_click") }}>Dev Docs</button>
         </a>
         {isOauthEnabled() && <span><span className="pt-navbar-divider" />
-          <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.commonName : ''} </small>
+          <small className="pt-text-muted welcome-user"> {(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : 'Uncertified User'} </small>
           <span className="pt-navbar-divider" />
           <a target="_blank" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={this.logout}>Logout</button>

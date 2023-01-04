@@ -261,7 +261,7 @@ export function mapStateToProps(state) {
     isLoading: state.attest.isLoading,
     accounts: state.accounts.accounts,
     initialValues: {
-      username: state.user.oauthUser ? state.user.oauthUser.username : '',
+      username: state.user.oauthUser ? state.user.oauthUser.commonName : '',
       address: state.user.oauthUser ? state.user.oauthUser.address : ''
     }
   };
