@@ -460,7 +460,7 @@ instance (Address `A.Selectable` X509Certificate) ContextM where
       let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
       mCertAddress <- lookupX509AddrFromCBHash k
       fmap join . for mCertAddress $ \certAddress ->
-        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
 
 lookupX509AddrFromCBHash ::(
                      (A.Alters (Account, B.ByteString) B.ByteString) m
@@ -469,7 +469,7 @@ lookupX509AddrFromCBHash ::(
 lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
-    maybe Nothing (stringAddress . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+    maybe Nothing (stringAddress . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor k <> ">")
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
