@@ -1,4 +1,4 @@
-#strato-version:latest
+#strato-version:8.1.0-4be9b3a3f
 #strato-getting-started-min-version:2.7
 version: "3"
 volumes:
@@ -26,7 +26,7 @@ services:
     - NODE_NAME=${NODE_NAME}
     - ssl=${ssl:-false}
     build: .
-    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:latest}
+    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:8.1.0-4be9b3a3f}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -53,7 +53,7 @@ services:
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
     build: .
-    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:latest}
+    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:8.1.0-4be9b3a3f}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -83,7 +83,7 @@ services:
     - postgres_vault_wrapper_db=oauth
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
-    image: ${VAULTWRAPPER_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:latest}
+    image: ${VAULTWRAPPER_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:8.1.0-4be9b3a3f}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -173,7 +173,7 @@ services:
     - EVM_COMPATIBLE=${EVM_COMPATIBLE}
     - indexEVM=${indexEVM:-false}
     build: .
-    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:latest}
+    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:8.1.0-4be9b3a3f}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -197,7 +197,7 @@ services:
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
     build: .
-    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:latest}
+    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:8.1.0-4be9b3a3f}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -261,7 +261,7 @@ services:
     - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     - vmDebug=${vmDebug}
     build: .
-    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:latest}
+    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:8.1.0-4be9b3a3f}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
@@ -284,10 +284,12 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: zookeeper:3.4.14
     restart: unless-stopped
     volumes:
-      - zookeeperdata:/opt/zookeeper-3.4.6/data
+      - zookeeperdata:/data
+    environment:
+      ZOO_DATA_LOG_DIR: /data
     logging:
       driver: "json-file"
       options:
@@ -321,7 +323,7 @@ services:
     build: .
     environment:
       - NODE_HOST=${NODE_HOST}
-    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:latest}
+    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:8.1.0-4be9b3a3f}
     volumes:
     - prometheusdata:/prometheus
     restart: unless-stopped
