@@ -19,7 +19,6 @@ import           Data.Default
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
 import qualified Data.Map.Strict               as M
-import           Data.Maybe                    (maybeToList)
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
@@ -99,7 +98,7 @@ instance Format EmittedBlock where
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
-  , _inBlock      :: Maybe BlockInfo
+  , _inBlocks     :: Set BlockInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainHashEntry
 
@@ -107,7 +106,7 @@ instance ToJSON ChainHashEntry where
 instance FromJSON ChainHashEntry where
 
 blankChainHashEntry :: ChainHashEntry
-blankChainHashEntry = ChainHashEntry False Nothing Nothing
+blankChainHashEntry = ChainHashEntry False Nothing S.empty
 
 instance Default ChainHashEntry where
   def = blankChainHashEntry
@@ -118,17 +117,17 @@ instance Format ChainHashEntry where
     , "--------------"
     , tab' $ "Used:      " ++ show _used
     , tab' $ "On chain:  " ++ CL.yellow (format _onChainId)
-    , tab' $ "In block:  " ++ format (maybeToList _inBlock)
+    , tab' $ "In blocks: " ++ format (toList _inBlocks)
     ]
 
 chainHashEntryUsed :: ChainHashEntry
-chainHashEntryUsed = ChainHashEntry True Nothing Nothing
+chainHashEntryUsed = ChainHashEntry True Nothing S.empty
 
 chainHashEntryWithChainId :: Word256 -> ChainHashEntry
-chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) Nothing
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty
 
 chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
-chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (Just bInfo)
+chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: Maybe ChainInfo

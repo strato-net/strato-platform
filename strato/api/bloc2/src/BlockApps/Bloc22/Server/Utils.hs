@@ -6,7 +6,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils
   ( toMaybe
-  , maybeChainBatchResult
   , getBatchBlocTxStatus
   , partitionWith
   , indexedPartitionWith
@@ -20,7 +19,7 @@ module BlockApps.Bloc22.Server.Utils
   ) where
 
 import           Control.Concurrent               (threadDelay)
-import           Control.Monad                    (forM, when)
+import           Control.Monad                    (forM, unless, when)
 import qualified Crypto.Secp256k1                 as S
 import qualified Data.ByteString.Short            as BSS
 import qualified Data.Map.Strict                  as M
@@ -37,14 +36,12 @@ import           BlockApps.Bloc22.API.Utils
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json            (rtPrimeToRt)
-import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
-import           Handlers.Chain
 import           Handlers.Transaction
 import qualified LabeledError
 import qualified MaybeNamed
@@ -64,17 +61,6 @@ maybeTxBatchResult hashes = do
   where maybeHeads :: M.Map Keccak256 [TransactionResult] -> (Keccak256, [RawTransaction]) -> Maybe (RawTransaction, TransactionResult)
         maybeHeads btxr (h, rtxs) = case (rtxs, M.lookup h btxr) of
           ((rtx:_), Just (txr:_)) -> Just (rtx, txr)
-          _ -> Nothing
-
-maybeChainBatchResult :: HasSQL m =>
-                         [ChainId] -> m [Maybe (TransactionResult, Maybe ChainInfo)]
-maybeChainBatchResult chainIds = do
-  cIdsAndInfos <- M.fromList . map unNamedTuple <$> getChain chainIds Nothing Nothing
-  mtxrs <- postBatchTransactionResult $ unsafeCreateKeccak256FromWord256 . unChainId <$> chainIds
-  pure $ maybeHeads mtxrs cIdsAndInfos <$> chainIds
-  where maybeHeads :: M.Map Keccak256 [TransactionResult] -> M.Map ChainId ChainInfo -> ChainId -> Maybe (TransactionResult, Maybe ChainInfo)
-        maybeHeads btxr cInfos cId = case M.lookup (unsafeCreateKeccak256FromWord256 $ unChainId cId) btxr of
-          Just (txr:_) -> Just (txr, M.lookup cId cInfos)
           _ -> Nothing
 
 getBatchBlocTxStatus :: HasSQL m =>
@@ -119,16 +105,14 @@ mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
                                 else y:merge (x:xs) ys
 
 waitFor :: MonadIO m =>
-           Text.Text -> m (Bool, a) -> m a
+           Text.Text -> m Bool -> m ()
 waitFor msg action = go 20
   where go ms = do
           when (ms > 30000) . throwIO $ CouldNotFind msg
-          (b, a) <- action
-          if b
-            then pure a
-            else do
-              liftIO . threadDelay $ ms * 1000
-              go $ 2 * ms
+          b <- action
+          unless b $ do
+            liftIO . threadDelay $ ms * 1000
+            go $ 2 * ms
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)

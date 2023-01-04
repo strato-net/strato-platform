@@ -355,9 +355,7 @@ create' creator newAccount ch cc contractName' argExps = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erPragmas = CC._pragmas cc,
-    erOrgName = org,
-    erAppName = parentName
+    erPragmas = CC._pragmas cc
     }
 
 {-
@@ -426,8 +424,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
-    ((orgName, appName), returnVal) <- traverse (fmap Just . maybe (return "()") encodeForReturn)
-                                   =<< callWrapper' sender' codeAddress Nothing funcName isRCC args
+    returnVal <- fmap Just . maybe (return "()") encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -444,9 +441,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
       erAction = Just $ finalAct,
       erException = Nothing,      -- tells me if theres an exception
       erKind = SolidVM,
-      erPragmas=[],
-      erOrgName = orgName,
-      erAppName = appName
+      erPragmas=[]
       }
 
 
@@ -709,10 +704,7 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-callWrapper from to mContract functionName isRCC argExps  = snd <$> callWrapper' from to mContract functionName isRCC argExps
-
-callWrapper' :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
-callWrapper' from to mContract functionName isRCC argExps  = do
+callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -733,12 +725,22 @@ callWrapper' from to mContract functionName isRCC argExps  = do
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
+-- grab the org for this codeAddress
+  when (not isRCC) $ do
+    org <- getOrg to
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
+
 --  grab the org from the senders account and set it to the codeAddress
-  org <- getOrg to
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-  when (isRCC) $
+  when (isRCC) $ do
+    org <- getOrg from
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
     (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
@@ -746,7 +748,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
           Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions                  --contract^. M.empty $ CC.functions 
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
         where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False [] 
+          emptyFunction = CC.Func [] [] Nothing Nothing Nothing M.empty [] dummyAnnotation False [] 
           dummyAnnotation :: SourceAnnotation ()
           dummyAnnotation =
             SourceAnnotation
@@ -808,7 +810,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
                     SVMType.Array _ _-> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
-  ((org, parentName'),) <$> logFunctionCall args to contract functionName f
+  logFunctionCall args to contract functionName f
   
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)

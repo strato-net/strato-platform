@@ -85,9 +85,8 @@ findChainHashUses :: ( MonadLogger m
                      )
                   => Word256 -> [Keccak256] -> m ()
 findChainHashUses chainId cHashes = do
-  infos <- S.fromList
-          . catMaybes
-          . map (maybe Nothing _inBlock)
+  infos <- S.unions
+          . map (maybe S.empty _inBlocks)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
   logFF "Privacy/findChainHashUses" $ "blocksToRun unioning infos " ++ show infos
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
@@ -172,7 +171,7 @@ insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
     Just cid -> if cid == chainId
                   then return AlreadyExistsOnSameChain
                   else return $ WrongChainId cid
-    Nothing -> case _inBlock of
+    Nothing -> case S.lookupMin _inBlocks of
       Just bi | bi <= obi -> return $ SeenPreviouslyOnUnknownChain bi
       _ -> Inserted <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
@@ -373,73 +372,67 @@ hydratePrivateHashes chainF b = do
       return (tx, st)
       else do
         let cHash = txChainHash tx
-        chainHashInBlock <- _inBlock <$> lookupWithDefault (Proxy @ChainHashEntry) cHash
-        case chainHashInBlock of
-          Just (BlockInfo bHash' bOrdering') | bHash /= bHash' || bOrdering /= bOrdering' -> do
-            notHydrating "its chain hash has already been used"
+        runPrivateHashTX tHash cHash
+        adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
+          inBlocks %= (S.insert $ BlockInfo bHash bOrdering)
+        chainId <- join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) cHash
+        case chainId of
+          Nothing -> do
+            notHydrating "we don't know the chain ID"
             return (tx, st)
-          _ -> do
-            runPrivateHashTX tHash cHash
-            adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
-              inBlock ?= BlockInfo bHash bOrdering
-            chainId <- join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) cHash
-            case chainId of
-              Nothing -> do
-                notHydrating "we don't know the chain ID"
+          Just cId -> do
+            isDiscluded <- discluded cs chainId
+            if isDiscluded
+              then do
+                notHydrating "its chain ID is discluded from this hydration round"
                 return (tx, st)
-              Just cId -> do
-                isDiscluded <- discluded cs chainId
-                if isDiscluded
-                  then do
-                    notHydrating "its chain ID is discluded from this hydration round"
-                    return (tx, st)
-                  else lookup (Proxy @ChainIdEntry) cId >>= \case
-                    Nothing -> do
-                      notHydrating "we don't have the info for its chain"
-                      return (tx, st)
-                    Just ChainIdEntry{} -> do
-                      allBlocksToRun <- getAllBlocksToRun cId
-                      if not (S.null allBlocksToRun || (_bhash $ S.elemAt 0 allBlocksToRun) == bHash)
-                        then do
-                          notHydrating "this is not the chain's next block to run"
-                          logF $ "If blocksToRun is null: " ++ show (S.null allBlocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 allBlocksToRun)
-                          logF $ "All the blocksToRun: " ++ show allBlocksToRun
-                          logF $ "bHash of this tx: " ++ show bHash
-                          when (isNothing chainF) . void . forAncestorChains cId $ \ancestorChainId -> do
-                            adjustStatefully_ (Proxy @ChainIdEntry) ancestorChainId $
-                              --logF $ "blocksToRun inserting " ++ format bHash
+              else lookup (Proxy @ChainIdEntry) cId >>= \case
+                Nothing -> do
+                  notHydrating "we don't have the info for its chain"
+                  return (tx, st)
+                Just ChainIdEntry{} -> do
+                  allBlocksToRun <- getAllBlocksToRun cId
+                  if not (S.null allBlocksToRun || (_bhash $ S.elemAt 0 allBlocksToRun) == bHash)
+                    then do
+                      notHydrating "this is not the chain's next block to run"
+                      logF $ "If blocksToRun is null: " ++ show (S.null allBlocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 allBlocksToRun)
+                      logF $ "All the blocksToRun: " ++ show allBlocksToRun
+                      logF $ "bHash of this tx: " ++ show bHash
+                      when (isNothing chainF) . void . forAncestorChains cId $ \ancestorChainId -> do
+                        adjustStatefully_ (Proxy @ChainIdEntry) ancestorChainId $
+                          --logF $ "blocksToRun inserting " ++ format bHash
+                          blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
+                      return (tx, (dts,S.insert chainId cs))
+                    else do
+                      lookup (Proxy @OutputTx) tHash >>= \case
+                        Nothing -> do
+                          notHydrating "we don't have this transaction's body"
+                          when (isNothing chainF)
+                            . adjustStatefully_ (Proxy @ChainIdEntry) cId $ do
+                              -- logF $ "blocksToRun inserting " ++ format bHash
                               blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
-                          return (tx, (dts,S.insert chainId cs))
-                        else do
-                          lookup (Proxy @OutputTx) tHash >>= \case
-                            Nothing -> do
-                              notHydrating "we don't have this transaction's body"
-                              when (isNothing chainF)
-                                . adjustStatefully_ (Proxy @ChainIdEntry) cId $ do
-                                  -- logF $ "blocksToRun inserting " ++ format bHash
-                                  blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
-                              return (tx, (tHash:dts, S.insert chainId cs))
-                            Just ptx -> do
-                              logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
-                              if chainId == txChainId ptx
-                                then do
-                                  insertPrivateHash bInfo ptx
-                                else do
-                                  logF $ concat
-                                    [ "Transaction hash "
-                                    , format tHash
-                                    , " is not missing,"
-                                    , " but it's chain ID does not match"
-                                    , " that of its chain hash entry."
-                                    , " Not inserting chain hashes,"
-                                    , " but still sending transaction to the VM,"
-                                    , " where it will fail."
-                                    ]
-                              let tx' = tx{ 
-                                            otSigner = otSigner ptx
-                                          , otPrivatePayload = Just $ otBaseTx ptx
-                                          }
-                              return (tx', st)
+                          return (tx, (tHash:dts, S.insert chainId cs))
+                        Just ptx -> do
+                          logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
+                          if chainId == txChainId ptx
+                            then do
+                              insertPrivateHash bInfo ptx
+                            else do
+                              logF $ concat
+                                [ "Transaction hash "
+                                , format tHash
+                                , " is not missing,"
+                                , " but it's chain ID does not match"
+                                , " that of its chain hash entry."
+                                , " Not inserting chain hashes,"
+                                , " but still sending transaction to the VM,"
+                                , " where it will fail."
+                                ]
+                          let tx' = tx{ 
+                                        otSigner = otSigner ptx
+                                      , otPrivatePayload = Just $ otBaseTx ptx
+                                      }
+                          return (tx', st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation

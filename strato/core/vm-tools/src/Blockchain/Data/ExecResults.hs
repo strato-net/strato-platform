@@ -42,9 +42,7 @@ data ExecResults =
     erException          :: Maybe (Either SolidException VMException),
     erKind               :: CodeKind,
     -- erNewX509Certs       :: M.Map Address X509Certificate,
-    erPragmas            :: [(String, String)],
-    erOrgName            :: String,
-    erAppName            :: String
+    erPragmas            :: [(String, String)]
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
@@ -82,8 +80,6 @@ errorResults ck remainingGas e =
     , erKind = ck
     -- , erNewX509Certs = M.empty
     , erPragmas=[]
-    , erOrgName = ""
-    , erAppName = ""
     }
 
 

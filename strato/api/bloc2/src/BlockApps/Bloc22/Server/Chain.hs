@@ -41,13 +41,12 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
+import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
@@ -62,7 +61,6 @@ import qualified LabeledError
 import           SQLM
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
-import           Text.Format
 
 import           UnliftIO
 
@@ -205,12 +203,8 @@ postChainInfo mUserName chainInput = case mUserName of
         chainInfo' <- createChainInfo userName bHash chainInput
         chainId <- CORE.postChain chainInfo'
         let isAsync = fromMaybe False $ chaininputAsync chainInput
-        unless isAsync $ do
-          info <- waitForChainInfo chainId
-          let status = transactionResultStatus $ fst info
-          when (status /= Just Success) . throwIO . UserError . Text.pack $
-            "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
-        pure chainId
+        unless isAsync $ waitForChainInfo chainId
+        return chainId
 
 postChainInfos :: ( MonadIO m
                   , A.Selectable Account AddressState m
@@ -229,28 +223,23 @@ postChainInfos mUserName chainInputs = case mUserName of
     chainIds <- postChains chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
         asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-    unless (null asyncChains) $ do
-      infos <- zip asyncChains <$> waitForChainInfos asyncChains
-      let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
-      unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
-        \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
-    pure chainIds
+    unless (null asyncChains) $ waitForChainInfos asyncChains
+    return chainIds
 
-
-waitForChainInfo :: (MonadLogger m,
+waitForChainInfo :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
                      HasSQL m) =>
-                    ChainId -> m (TransactionResult, Maybe ChainInfo)
-waitForChainInfo chainId = head <$> waitForChainInfos [chainId]
+                    ChainId -> m ()
+waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m,
+waitForChainInfos :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
                       HasSQL m) =>
-                     [ChainId] -> m [(TransactionResult, Maybe ChainInfo)]
+                     [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
   where go = do
-          infos <- catMaybes <$> maybeChainBatchResult chainIds
+          infos <- getChainInfo chainIds Nothing Nothing
           $logInfoLS "waitForChainInfo/req" chainIds
           $logDebugLS "waitForChainInfo/resp" infos
-          return (length infos == length chainIds, infos)
+          return $ length infos == length chainIds
 
 getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) => 
                 ChainId -> m ChainIdChainOutput

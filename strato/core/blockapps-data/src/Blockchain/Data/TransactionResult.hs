@@ -78,8 +78,6 @@ exampleTxResult = TransactionResult (hash "blockHask")
                                     Nothing
                                     Nothing
                                     (Just SolidVM)
-                                    "BlockApps"
-                                    "Sample App"
 
 
 instance ToSchema TransactionResult where

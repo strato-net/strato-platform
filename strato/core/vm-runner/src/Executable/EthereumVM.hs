@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE DerivingStrategies  #-}
@@ -26,7 +25,6 @@ import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BC
-import qualified Data.ByteString.Short                 as BSS
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
@@ -52,8 +50,7 @@ import           Blockchain.Data.Block                 (BestBlock(..), WorldBest
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..), TransactionResult(..))
-import           Blockchain.Data.TransactionResultStatus
+import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..))
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -80,7 +77,7 @@ import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import           Blockchain.Data.ExecResults
-import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
+import           Blockchain.DB.CodeDB                  (getCode)
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
@@ -216,12 +213,12 @@ processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
 processBlocksAndNewChains blocksAndChains = do
   let grouped = groupEithers blocksAndChains
   for_ grouped $ \case
-    Left newChains -> outputNewChains =<< insertNewChains newChains
+    Left newChains -> outputNewChains =<< lift (insertNewChains newChains)
     Right blocks -> processBlocks blocks
 
 insertNewChains :: VMBase m
                 => [OutputGenesis]
-                -> ConduitT a VmOutEvent m [(Word256, ChainInfo, Keccak256, [ExecResults])]
+                -> m [(Word256, ChainInfo, Keccak256, [ExecResults])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -245,70 +242,15 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       withCurrentBlockHash bHash $ do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-            tHash = Keccak256.unsafeCreateKeccak256FromWord256 cId
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChains
-        (kind, (sr, addrsCreated, mExecResults)) <-           
+        (sr, mExecResults) <-           
           case theVM of
-            "SolidVM" -> lift $ (SolidVM,) <$> runChainConstructors cId cInfo
-            _ -> return (EVM, (sr', [], [])) -- TODO: add contracts from accountInfo list?
-        case catMaybes $ erException <$> mExecResults of
-          [] -> do
-            yieldMany . concat $ map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $ map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
-            let (orgName, appName) = case mExecResults of
-                                       [] -> ("","")
-                                       x:_ -> (erOrgName x, erAppName x)
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                     TransactionResult { transactionResultBlockHash        = cBlock
-                                       , transactionResultTransactionHash  = tHash
-                                       , transactionResultMessage          = "Success!"
-                                       , transactionResultResponse         = case kind of
-                                                                               EVM -> BSS.empty
-                                                                               SolidVM -> "()"
-                                       , transactionResultTrace            = unlines $ unlines . reverse . erTrace <$> mExecResults
-                                       , transactionResultGasUsed          = 0
-                                       , transactionResultEtherUsed        = 0
-                                       , transactionResultContractsCreated = intercalate "," $ map show addrsCreated
-                                       , transactionResultContractsDeleted = ""
-                                       , transactionResultStateDiff        = ""
-                                       , transactionResultTime             = 0.0
-                                       , transactionResultNewStorage       = ""
-                                       , transactionResultDeletedStorage   = ""
-                                       , transactionResultStatus           = Just Success
-                                       , transactionResultChainId          = Just cId
-                                       , transactionResultKind             = Just kind
-                                       , transactionResultOrgName          = orgName
-                                       , transactionResultAppName          = appName
-                                       }
-            Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
-          x:_ -> do
-            let fmt = either show show x
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                     TransactionResult { transactionResultBlockHash        = cBlock
-                                       , transactionResultTransactionHash  = tHash
-                                       , transactionResultMessage          = fmt
-                                       , transactionResultResponse         = case kind of
-                                                                               EVM -> BSS.empty
-                                                                               SolidVM -> "()"
-                                       , transactionResultTrace            = unlines $ unlines . reverse . erTrace <$> mExecResults
-                                       , transactionResultGasUsed          = 0
-                                       , transactionResultEtherUsed        = 0
-                                       , transactionResultContractsCreated = ""
-                                       , transactionResultContractsDeleted = ""
-                                       , transactionResultStateDiff        = ""
-                                       , transactionResultTime             = 0.0
-                                       , transactionResultNewStorage       = ""
-                                       , transactionResultDeletedStorage   = ""
-                                       , transactionResultStatus           = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt)
-                                       , transactionResultChainId          = Just cId
-                                       , transactionResultKind             = Just kind
-                                       , transactionResultOrgName          = ""
-                                       , transactionResultAppName          = ""
-                                       }
-            return Nothing
+            "SolidVM" -> runChainConstructors cId cInfo
+            _ -> return (sr', [])
+        if any (isJust . erException) mExecResults
+          then return Nothing
+          else Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
@@ -379,7 +321,7 @@ outputPrivateTransactions :: [OutputTx] -> [VmOutEvent]
 outputPrivateTransactions = map $ OutIndexEvent . IndexPrivateTx
 
 -- TODO: maybe move this into solid-vm?
-runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Address], [ExecResults])
+runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [ExecResults])
 runChainConstructors cId cInfo = do
   -- We are inventing the rules of how the constructor should run when a chain is created.
   -- Since all VM runs need some environment variables passed in, we need to define what all of
@@ -405,13 +347,13 @@ runChainConstructors cId cInfo = do
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
   curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash )
   curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
-  (addrs, actions) <- fmap (unzip . catMaybes) . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
+  actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
       NonContract{} -> pure Nothing
       ContractNoStorage a _ ch -> resolveSrc a ch
       ContractWithStorage a _ ch _ -> resolveSrc a ch
       SolidVMContractWithStorage a _ ch _ -> resolveSrc a ch
-    for addrSrc $ \(addr,ms) -> (addr,) <$> SolidVM.call
+    for addrSrc $ \(addr,ms) -> SolidVM.call
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
@@ -458,7 +400,7 @@ runChainConstructors cId cInfo = do
   Mem.flushMemAddressStateDB
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
-  return (sr, addrs, actions) 
+  return (sr,actions) 
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
