@@ -342,8 +342,9 @@ spec = do
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
-        _toP2p `shouldBe` []
+        length _toP2p `shouldBe` 1
         _toVm `shouldContain` [VmCreateBlockCommand]
+        map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` [blk4]
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` [blk4]
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
@@ -360,8 +361,9 @@ spec = do
         blkChn <- mkBlkChn (5 :: Int) h 1
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch . checkForUnseq $ ieBlk <$> reverse blkChn
-        _toP2p `shouldBe` []
+        length _toP2p `shouldBe` 5
         _toVm `shouldContain` [VmCreateBlockCommand]
+        map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` blkChn
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` blkChn
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 5

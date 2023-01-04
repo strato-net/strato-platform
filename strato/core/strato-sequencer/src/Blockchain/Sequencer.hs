@@ -271,12 +271,14 @@ blockstanbulSend' msg = do
                         . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   let rBlocks = catMaybes (map getSequencedBlock blocks)
-  vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
-  let (vms, p2pevs, ckpts) = vmEvenP2pCheckptFilterHelper resp
+  committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+  let (vms, p2ps, ckpts) = vmEvenP2pCheckptFilterHelper resp
   
   let vmevs = creates
-           ++ (VmBlock <$> vmBlocks)
+           ++ (VmBlock <$> committedBlocks)
            ++ vms
+  let p2pevs = (P2pBlock <$> committedBlocks)
+            ++ p2ps
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks

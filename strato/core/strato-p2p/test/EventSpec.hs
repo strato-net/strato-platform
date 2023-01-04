@@ -1042,6 +1042,12 @@ instance MonadIO m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet
 instance (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadP2PTest m) where
   select p cm = lift $ A.select p cm
 
+instance MonadIO m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadTest m) where
+  select _ _ = pure . Just $ IsValidator False
+
+instance (ChainMemberParsedSet `A.Selectable` IsValidator) m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadP2PTest m) where
+  select p cm = lift $ A.select p cm
+
 instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadTest m) where
   select _ cm = M.lookup cm <$> use parsedSetToX509Map 
 
@@ -1207,7 +1213,7 @@ runNode p = do
   concurrently_
     (runNodeWithoutP2P p)
     (concurrently_
-      (stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
+      (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
       (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
