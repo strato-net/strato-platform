@@ -180,6 +180,15 @@ spec:
           value: "8050"
         - name: VAULT_WRAPPER_HOST
           value: "localhost:8000"
+
+      - image: zookeeper:3.4.14
+        name: zookeeper
+        volumeMounts:
+          - mountPath: /data
+            name: zookeeper-data
+        env:
+        - name: ZOO_DATA_LOG_DIR:
+          value: "/data"
       - image: wurstmeister/zookeeper:3.4.6
         name: zookeeper
         volumeMounts:
