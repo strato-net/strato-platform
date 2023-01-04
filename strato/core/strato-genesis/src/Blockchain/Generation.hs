@@ -222,7 +222,6 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
                 (".certificateString", rlpWrap . BString $ certToBytes rootCert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert),
                 (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) MainChain))
             ]
 
@@ -249,7 +248,6 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
                 (".certificateString", rlpWrap . BString $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ cert),
                 (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))]
             ) certs
 
@@ -272,7 +270,6 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
-    uint expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -288,7 +285,6 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
-        expirationDate = uint(parsedCert["expirationDate"],10);
         parent = address(parsedCert["parent"]);
         children = [];
     }
