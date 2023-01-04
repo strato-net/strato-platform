@@ -466,7 +466,7 @@ fi
 if [[ "$VAULT_URL" == "https"* ]]; then
     echo "VAULT_URL provided is using secure https connection."
 else
-    if [[ "$VAULT_URL" =~ *"172.17.0.1"* ]]; then
+    if [[ "$VAULT_URL" == *"172.17.0.1"* ]]; then
         echo "VAULT_URL provided is http with local docker ip for debugging."
     else 
         echo "VAULT_URL provided is not valid, expected the value starting with 'https://' or 'http://172.17.0.1'"
