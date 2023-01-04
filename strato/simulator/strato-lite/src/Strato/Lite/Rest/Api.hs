@@ -22,6 +22,7 @@ import qualified Data.Text       as T
 import           GHC.Generics
 import           Servant
 import           Blockchain.Data.AlternateTransaction
+import           Blockchain.Strato.Model.ChainMember
 
 type ThreadResultMap = M.Map T.Text (Maybe (Either String ()))
 
@@ -60,6 +61,7 @@ type PostTimeout = "timeout" :> ReqBody '[JSON] Int :> Post '[JSON] ()
 
 data AddNodeParams = AddNodeParams
   { _ip :: T.Text
+  , _identity :: ChainMemberParsedSet
   , _bootNodes :: [T.Text]
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 

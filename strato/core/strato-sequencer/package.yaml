@@ -58,6 +58,7 @@ library:
     - resourcet
     - stm-chans
     - unliftio
+    - x509-certs
 
 executables:
   strato-sequencer:
@@ -66,6 +67,7 @@ executables:
     dependencies:
       - aeson
       - async
+      - base64
       - blockapps-data
       - blockapps-init
       - blockapps-vault-wrapper-api
@@ -140,11 +142,13 @@ tests:
       - stm-chans
       - strato-model
       - strato-sequencer
+      - text
       - time
       - unliftio
       - wai-extra
       - wai-middleware-prometheus
       - warp
+      - x509-certs
 
 benchmarks:
   send-to-blockstanbul:

@@ -29,14 +29,19 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Init.Options (flags_vaultWrapperUrl)
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Certificate
-
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
+import           Servant.Client
+import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 
 data SetupDBs =
   SetupDBs {
@@ -46,6 +51,7 @@ data SetupDBs =
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: RBDB.RedisConnection,
+    vaultDB :: ClientEnv,
     localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
     localStorageBlock :: IORef (M.Map (Account, B.ByteString) B.ByteString),
     localAddressStateTx :: IORef (M.Map Account AddressStateModification),
@@ -65,8 +71,28 @@ runSetupDBM mv = do
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
   pool <- createPostgresqlPool connStr 20
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn m1 m2 m3 m4
+  vdb <- do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
+    return $ mkClientEnv mgr url
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn vdb m1 m2 m3 m4
 
+waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
+waitOnVault action = do
+  res <- action
+  case res of 
+    Left _ -> waitOnVault action
+    Right val -> return val
+
+instance HasVault SetupDBM where
+  getPub = do
+    vc <- asks vaultDB
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+  sign bs = do
+    vc <- asks vaultDB
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc  
+  getShared _ = error "should not be calling getShared in strato-init"
+    
 instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
   insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< asks stateRoots

@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:2.7
+#strato-getting-started-min-version:4.0
 version: "3"
 volumes:
   pgdata:
@@ -84,6 +84,7 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - cacheTransactionResults=${cacheTransactionResults}
+    - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
@@ -97,6 +98,7 @@ services:
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - genesisBlockTestCert=${genesisBlockTestCert:-false}
     - isAdmin=${isAdmin:-false}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
@@ -115,6 +117,8 @@ services:
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
     - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}

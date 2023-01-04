@@ -103,6 +103,7 @@ import           Blockchain.Strato.Indexer.TxrIndexer
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
@@ -110,7 +111,6 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Wei
 import           Blockchain.VMContext                 (lookupX509AddrFromCBHash)
 import qualified Blockchain.TxRunResultCache           as TRC
@@ -270,9 +270,6 @@ instance (MonadIO m, MonadLogger m) => A.Selectable ChainMembers TrueOrgNameChai
 
 instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
-
-instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
-  select _ a = M.lookup a <$> use x509certMap
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
@@ -506,6 +503,14 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . chainIdRegistry
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
+
+instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . x509certInfoState
+  insert = genericTestInsert $ sequencerContext . x509certInfoState
+  delete = genericTestDelete $ sequencerContext . x509certInfoState
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  select = A.lookup
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -807,7 +812,7 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) wher
   delete _ _   = pure ()
   insert _ _ _ = pure ()
 
-instance MonadIO m => (([Address],[Address]) `A.Alters` API DataDefs.ValidatorRef) (MonadTest  m) where
+instance MonadIO m => (([ChainMemberParsedSet],[ChainMemberParsedSet]) `A.Alters` API (A.Proxy DataDefs.ValidatorRef)) (MonadTest  m) where
   lookup _ _   = pure Nothing
   delete _ _   = pure ()
   insert _ _ _ = pure ()
@@ -1093,16 +1098,16 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
 instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-startingCheckpoint :: [Address] -> Checkpoint
+startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
-newBlockstanbulContext :: Address -> [Address] -> BlockstanbulContext
+newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
 newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
   in newContext ckpt paddr
 
 emptyBlockstanbulContext :: BlockstanbulContext
-emptyBlockstanbulContext = newBlockstanbulContext undefined []
+emptyBlockstanbulContext = newBlockstanbulContext emptyChainMember []
   
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
@@ -1120,6 +1125,7 @@ newSequencerContext bc = do
       , _chainInfoRegistry   = M.empty
       , _orgNameChainsRegistry = M.empty
       , _x509certRegistry    = M.empty
+      , _x509certInfoState   = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -1201,13 +1207,13 @@ makeLenses ''P2PPeer
 runNodeWithoutP2P :: P2PPeer -> IO ()
 runNodeWithoutP2P p = do
   concurrently_
-    (concurrently_ (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
-                                  (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
-                   (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
+    (concurrently_ (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
+                                  (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
+                   (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
     (concurrently_ 
-      (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
-                     (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
-      (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
+      (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
+                     (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
+      (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
 
 runNode :: P2PPeer -> IO ()
 runNode p = do
@@ -1218,7 +1224,7 @@ runNode p = do
     (runNodeWithoutP2P p)
     (concurrently_
       (stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
-      (runLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
+      (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1231,8 +1237,18 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot
   insert _ k v = State.modify' $ \(a, b) -> (a, M.insert k v b)
   delete _ k   = State.modify' $ \(a, b) -> (a, M.delete k b)
 
+type CertMap = Map Address (Modification X509CertInfoState)
+
+addValidatorsToCertMap :: [(Address, ChainMemberParsedSet)] -> CertMap -> CertMap
+addValidatorsToCertMap vals m =
+  let cmpsToXcis a (CommonName o u n True) = X509CertInfoState a rootCert True [] (T.unpack o) (Just $ T.unpack u) (T.unpack n)
+      cmpsToXcis _ _ = error "cmpsToXcis"
+      insertValidatorInfo (a, b) = M.insert a (Modification (cmpsToXcis a b))
+   in foldr insertValidatorInfo m vals
+
 createPeer :: PrivateKey
-           -> [Address]
+           -> ChainMemberParsedSet
+           -> [(Address, ChainMemberParsedSet)]
            -> TVar Internet
            -> Text
            -> IPAsText
@@ -1240,7 +1256,7 @@ createPeer :: PrivateKey
            -> UDPPort
            -> [IPAsText]
            -> IO P2PPeer
-createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
+createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -1255,7 +1271,9 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
   atomically $ do
     modifyTVar inet $ tcpPorts . at (ipAsText, tcpPort) ?~ tcpVSock
     modifyTVar inet $ udpPorts . at (ipAsText, udpPort) ?~ udpVSock
-  seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey privKey) initialValidators
+  seqCtx' <- newSequencerContext $ newBlockstanbulContext selfId (snd <$> initialValidators')
+  let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
+      initialValidators = fst <$> initialValidators'
   cache  <- TRC.new 64
   let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
@@ -1270,7 +1288,7 @@ createPeer privKey initialValidators inet name ipAsText@(IPAsText ipAddr) tcpPor
       genesisBlock = DataDefs.BlockData
         zeroHash
         zeroHash
-        (Address 0)
+        emptyChainMember
         stateRoot
         MP.emptyTriePtr
         MP.emptyTriePtr
@@ -1508,10 +1526,10 @@ runConnection :: P2PConnection
               -> IO ()
 runConnection connection = do
   let rServer = do
-        mEx <- runLoggingT . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
+        mEx <- runNoLoggingT . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
         atomically $ writeTVar (connection ^. serverException) mEx
       rClient = do
-        mEx <- runLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
+        mEx <- runNoLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
         atomically $ writeTVar (connection ^. clientException) mEx
   concurrently_ rServer rClient
 
@@ -1583,10 +1601,10 @@ instance HasVault (ReaderT PrivateKey IO) where
 --         toIP = L.intersperse '.' . map show
 --         generateThem = toIP <$> ips (galois 1)
 
-createPeer' :: PrivateKey -> [Address] -> T.Text -> T.Text -> IO P2PPeer
-createPeer' pk as n ip = do
+createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> T.Text -> T.Text -> IO P2PPeer
+createPeer' pk selfId as n ip = do
   inet <- newTVarIO preAlGoreInternet
-  createPeer pk as inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
+  createPeer pk selfId as inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
 
 spec :: Spec
 spec = do
@@ -1595,8 +1613,12 @@ spec = do
       serverPKey <- newPrivateKey
       clientPKey <- newPrivateKey
       let validatorAddresses = makeValidators [serverPKey, clientPKey]
-      server' <- createPeer' serverPKey validatorAddresses "server" "1.2.3.4"
-      client' <- createPeer' clientPKey validatorAddresses "client" "5.6.7.8"
+          validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                           , CommonName "Microsoft" "Sales" "Person" True
+                           ]
+          zippedValidators = zip validatorAddresses validatorInfos
+      server' <- createPeer' serverPKey (validatorInfos !! 0) zippedValidators "server" "1.2.3.4"
+      client' <- createPeer' clientPKey (validatorInfos !! 1) zippedValidators "client" "5.6.7.8"
       connection <- createConnection server' client'
       let clearChainId tx = case tx of
             MessageTX{} -> tx{transactionChainId = Nothing}
@@ -1615,9 +1637,19 @@ spec = do
 
     it "should update the round number on every node in the network" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..7]
-      let validatorsPrivKeys' = take 2 privKeys
+      let identities = [ CommonName "BlockApps" "Engineering" "Admin" True
+                       , CommonName "Microsoft" "Sales" "Person" True
+                       , CommonName "Amazon" "Product" "Jeff Bezos" True
+                       , CommonName "Apple" "Hardware" "Tim Apple" True
+                       , CommonName "Netflix" "Casting" "Block Buster" True
+                       , CommonName "Meta" "Metaverse" "Zark Muckerberg" True
+                       , CommonName "Google" "Search" "Larry PageRank" True
+                       ]
+          validatorsPrivKeys' = take 2 privKeys
           validatorAddresses = makeValidators validatorsPrivKeys'
-      peers <- traverse (\(p,(n,i)) -> createPeer' p validatorAddresses n i) $ zip privKeys
+          validatorInfos = take 2 identities
+          zippedValidators = zip validatorAddresses validatorInfos
+      peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators n i) $ zip (zip privKeys identities)
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -1654,7 +1686,14 @@ spec = do
           primaryValidatorsPrivKeys = [head validatorsPrivKeys']
           primaryValidatorAddresses = makeValidators primaryValidatorsPrivKeys
           validatorAddresses = makeValidators validatorsPrivKeys'
-      peers <- traverse (\(p,(n,i)) -> createPeer' p primaryValidatorAddresses n i) $ zip privKeys
+          validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                           , CommonName "Microsoft" "Sales" "Person" True
+                           , CommonName "Amazon" "Product" "Jeff Bezos" True
+                           ]
+          primaryValidatorInfos = [head validatorInfos]
+          primaryValidators' = zip primaryValidatorAddresses primaryValidatorInfos
+          zippedValidators = zip validatorAddresses validatorInfos
+      peers <- traverse (\((p,c),(n,i)) -> createPeer' p c primaryValidators' n i) $ zip (zip privKeys validatorInfos)
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -1668,11 +1707,13 @@ spec = do
         , (peers !! 1, peers !! 2)
         ]
       atomically $ modifyTVar' ((peers !! 1) ^. p2pTestContext)
-                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
-                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorInfos))
+                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000)
+                               . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators))
       atomically $ modifyTVar' ((peers !! 2) ^. p2pTestContext)
-                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
-                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorInfos))
+                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000)
+                               . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators))
       let runForTwoSeconds = void . timeout 2000000
           postTimeoutPrimary1 = do
             threadDelay 1000000
@@ -1687,7 +1728,8 @@ spec = do
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       atomically $ modifyTVar' ((peers !! 0) ^. p2pTestContext)
-                               (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               ((sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorInfos))
+                               . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators))
       runForTwoSeconds $ concurrently_ (runNetwork peers connections') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
@@ -1696,12 +1738,17 @@ spec = do
       let Right privKey = bsToPriv "-----BEGIN EC PRIVATE KEY-----\nMC4CAQEEIAK4aeMOUuoDv/zOIBypht779qzK44JWbxl2lA7id/amoAcGBSuBBAAK\n-----END EC PRIVATE KEY-----"
       nodePrivKeys <- (privKey:) <$> traverse (const newPrivateKey) [(2 :: Integer)..3]
       let nodePubKeys = derivePublicKey <$> nodePrivKeys
-          nodeCertInfos = [ ("BlockApps", "Engineering", "James Hormuzdiar", nodePubKeys !! 0)
-                          , ("Microsoft", "Sales", "Bob Smith", nodePubKeys !! 1)
-                          , ("Amazon", "CEO", "Jeffrey Bezos", nodePubKeys !! 2)
+          nodeCertInfos = [ ("BlockApps", "Engineering", "Admin", nodePubKeys !! 0)
+                          , ("Microsoft", "Sales", "Person", nodePubKeys !! 1)
+                          , ("Amazon", "Product", "Jeff Bezos", nodePubKeys !! 2)
                           ]
-      let validators' = makeValidators nodePrivKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip nodePrivKeys
+      let validatorAddresses = makeValidators nodePrivKeys
+          validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                           , CommonName "Microsoft" "Sales" "Person" True
+                           , CommonName "Amazon" "Product" "Jeff Bezos" True
+                           ]
+          zippedValidators = zip validatorAddresses validatorInfos
+      peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators n i) $ zip (zip nodePrivKeys validatorInfos)
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -1797,7 +1844,7 @@ contract A {
           chainInfo' = signChain privKey $
             UnsignedChainInfo { chainLabel     = "My test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode privContractName $ hash privChainSrc)
-                                                 , NonContract (validators' !! 0) 1000000000000000000000
+                                                 , NonContract (validatorAddresses !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" privChainSrc $ Just privContractName]
                               , members        = chainMember1
@@ -1850,8 +1897,13 @@ contract A {
 
     it "can sync a new node to a chain after running multiple transactions on that chain" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
-      let validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
+      let validatorAddresses = makeValidators privKeys
+          validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                           , CommonName "Microsoft" "Sales" "Person" True
+                           , CommonName "Amazon" "Product" "Jeff Bezos" True
+                           ]
+          zippedValidators = zip validatorAddresses validatorInfos
+      peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators n i) $ zip (zip privKeys validatorInfos)
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
@@ -1903,15 +1955,14 @@ contract CertRegistry {
 
       let src = [r|
 
-pragma solidvm 3.2;
 contract A {
-  event CommonNameAdded(string name, string unit, string commonName);
+  event OrgAdded(string name);
   uint x = 0;
 
   constructor() {}
 
-  function addMember(string _name, string _unit, string _commonName) {
-    emit CommonNameAdded(_name, _unit, _commonName);
+  function addMember(string _name) {
+    emit OrgAdded(_name);
   }
 
   function incX() {
@@ -1939,8 +1990,8 @@ contract A {
           mkChainInfo bHash = signChain (privKeys !! 0) $
             UnsignedChainInfo { chainLabel     = "My parent test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
-                                                 , NonContract (validators' !! 0) 1000000000000000000000
-                                                 , NonContract (validators' !! 1) 1000000000000000000000
+                                                 , NonContract (validatorAddresses !! 0) 1000000000000000000000
+                                                 , NonContract (validatorAddresses !! 1) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = ChainMembers (Set.fromList [chainMember1, chainMember2])
@@ -1952,7 +2003,7 @@ contract A {
           mkChainInfo2 bHash pChain = signChain (privKeys !! 0) $
             UnsignedChainInfo { chainLabel     = "My child test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
-                                                 , NonContract (validators' !! 0) 1000000000000000000000
+                                                 , NonContract (validatorAddresses !! 0) 1000000000000000000000
                                                  ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = ChainMembers (Set.fromList [chainMember1])
@@ -2003,7 +2054,7 @@ contract A {
       cInfoRef <- newIORef undefined
       cId2Ref <- newIORef undefined
       cInfo2Ref <- newIORef undefined
-      let addMemberArgs = "(" <> "\"BlockApps\", \"Engineering\", \"David Nallapu\")"
+      let addMemberArgs = "(\"Microsoft\")"
           addMemberUtx chainId = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 5
             , U.unsignedTransactionGasPrice   = Wei 1
@@ -2085,8 +2136,12 @@ contract A {
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..2]
       let globalAdmin = privKeys !! 0
           orgAdmin = privKeys !! 1
-          validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
+          validatorAddresses = makeValidators privKeys
+          validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                           , CommonName "Microsoft" "Sales" "Person" True
+                           ]
+          zippedValidators = zip validatorAddresses validatorInfos
+      peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators n i) $ zip (zip privKeys validatorInfos)
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         ]
@@ -2185,8 +2240,13 @@ contract RegisterCert {
     describe "X.509 Private Chain exchange" $ do
       it "can add an organization to a private chain" $ do
           privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
-          let validators' = makeValidators privKeys
-          peers <- traverse (\(p,(n,i)) -> createPeer' p validators' n i) $ zip privKeys
+          let validatorAddresses = makeValidators privKeys
+              validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                               , CommonName "Microsoft" "Sales" "Person" True
+                               , CommonName "Amazon" "Product" "Jeff Bezos" True
+                               ]
+              zippedValidators = zip validatorAddresses validatorInfos
+          peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators n i) $ zip (zip privKeys validatorInfos)
             [ ("node1", "1.2.3.4")
             , ("node2", "5.6.7.8")
             , ("node3", "9.10.11.12")
@@ -2203,7 +2263,7 @@ contract RegisterCert {
           let runForTwelveSeconds = void . timeout 12000000
               -- enode1 = readEnode "enode://abcd@1.2.3.4:30303"
               chainMember1 :: ChainMembers
-              chainMember1 = (ChainMembers $ Set.singleton $ (CommonName (T.pack "BlockApps") (T.pack "Engineering") (T.pack "David Nallapu") True))
+              chainMember1 = (ChainMembers $ Set.singleton $ (Org (T.pack "BlockApps") True))
            
               toIetx = IETx ts . IngestTx Origin.API
               mkChainId = keccak256ToWord256 . rlpHash
@@ -2248,24 +2308,24 @@ contract RegisterCert {
               -- Post a mock dApp to a private chain
               src = [r|
                     contract A {
-                      event OrgUnitAdded(string name, string unit);
+                      event OrgAdded(string name);
 
                       constructor() {}
 
-                      function addOrg(string _name, string _unit) {
-                        emit OrgUnitAdded(_name, _unit);
+                      function addOrg(string _name) {
+                        emit OrgAdded(_name);
                       }
                     }
                     |]
               contractName = "A"
-              args = "(" <> "\"BlockApps\"" <> ", \"Engineering\"" <> ")"
+              args = "(\"Microsoft\")"
               txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
               addMd t = t{transactionMetadata = M.union txMd <$> transactionMetadata t}
               tChainInfo = signChain (privKeys !! 0) $
                 UnsignedChainInfo { chainLabel     = "My organization's private chain"
                                   , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
-                                                    , NonContract (validators' !! 0) 1000000000000000000000
-                                                    , NonContract (validators' !! 1) 1000000000000000000000
+                                                    , NonContract (validatorAddresses !! 0) 1000000000000000000000
+                                                    , NonContract (validatorAddresses !! 1) 1000000000000000000000
                                                     ]
                                   , codeInfo       = [CodeInfo "" src $ Just contractName]
                                   , members        = chainMember1
@@ -2308,7 +2368,7 @@ contract RegisterCert {
 
           -- Node 1's cert was registered in the contract so it should receive the chain ID
           (ctxs1 !! 1) ^. trueOrgNameChainsMap `shouldBe`
-            M.singleton (ChainMembers $ Set.singleton $ (OrgUnit (T.pack "BlockApps") (T.pack "Engineering") True)) (TrueOrgNameChains $ Set.singleton testCid)
+            M.singleton (ChainMembers $ Set.singleton $ (Org (T.pack "Microsoft") True)) (TrueOrgNameChains $ Set.singleton testCid)
 
           -- Node 2's cert is not registered so it should not have any in the set
           (ctxs1 !! 2) ^. trueOrgNameChainsMap `shouldBe` M.empty

@@ -23,6 +23,7 @@ import qualified Blockchain.Data.DataDefs           as DD
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 
 {-# NOINLINE upsertPT #-}
@@ -72,7 +73,7 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = unsafeCreateKeccak256FromWord256 0
                                   , bestBlockHeader       = (DD.BlockData
-                                      (unsafeCreateKeccak256FromWord256 0) (unsafeCreateKeccak256FromWord256 0) (Address 0x7777)
+                                      (unsafeCreateKeccak256FromWord256 0) (unsafeCreateKeccak256FromWord256 0) (Everyone False)
                                       blankStateRoot blankStateRoot blankStateRoot
                                       "" 100 100 100 100
                                       (posixSecondsToUTCTime 0)

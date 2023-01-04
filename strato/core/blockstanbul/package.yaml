@@ -37,6 +37,8 @@ library:
   - text
   - transformers
   - unliftio
+  - monad-alter
+  - x509-certs
 
 executables:
   blockstanbul-vote:
@@ -44,7 +46,8 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
-      - blockapps-vault-wrapper-api   #This will need to be changed
+      - aeson
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
       - blockstanbul
       - base16-bytestring
@@ -65,6 +68,7 @@ tests:
     source-dirs: test/
     dependencies:
       - QuickCheck
+      - aeson
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
@@ -79,9 +83,12 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - lens
+      - monad-alter
+      - mtl
       - strato-model
       - time
       - transformers
+      - x509-certs
 
 
 benchmarks:
