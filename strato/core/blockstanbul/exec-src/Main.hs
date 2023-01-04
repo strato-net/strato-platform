@@ -14,7 +14,7 @@ import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
-import qualified Data.Text                  as T
+--import qualified Data.Text                  as T
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Network.HTTP.Simple
 import           Network.HTTP.Types.Status
@@ -37,8 +37,8 @@ import qualified Strato.Strato23.Client     as VC
 instance HasVault IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
-    url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
+    url <- parseBaseUrl "http://localhost:8013/strato/v2.3"
+    eSig <- runClientM (VC.postSignature Nothing (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig

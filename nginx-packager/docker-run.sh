@@ -6,11 +6,11 @@ MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
-sslCertFileType=${sslCertFileType:-crt}
+sslCertFileType=${sslCertFileType:-pem}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
-OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
+OAUTH_JWT_USER_ID_CLAIM=${OAUTH_JWT_USER_ID_CLAIM:-sub}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
@@ -28,7 +28,7 @@ STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
-VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST:-vault-wrapper:8000}
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -109,13 +109,13 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_BLOCKSTANBUL_VOTE__/$STRATO_PORT_BLOCKSTANBUL_VOTE/g" /tmp/nginx.conf
-  sed -i "s/__VAULT_WRAPPER_HOST__/$VAULT_WRAPPER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__STRATO_PORT_VAULT_PROXY__/$STRATO_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
-  sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_JWT_USER_ID_CLAIM_PLACEHOLDER>*'"$OAUTH_JWT_USER_ID_CLAIM"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
@@ -148,12 +148,12 @@ do
 done
 echo 'apex is available'
 
-echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://${VAULT_WRAPPER_HOST}/strato/v2.3/_ping
+echo 'Waiting for VaultProxy to be available with node key added to Vault...'
+until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/key
 do
   sleep 0.5
 done
-echo 'vault-wrapper is available'
+echo 'VaultProxy is available'
 
 echo  'nginx is now running. See the logs below...'
 openresty -g "daemon off;"

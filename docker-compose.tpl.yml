@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:2.7
+#strato-getting-started-min-version:4.0
 version: "3"
 volumes:
   pgdata:
@@ -38,20 +38,16 @@ services:
     - postgres
     - prometheus
     - strato
-    - vault-wrapper
     environment:
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - prometheusHost=prometheus:9090
-    - STATS_ENABLED=${STATS_ENABLED}
-    - STATS_DEBUG_CUSTOM_SERVER_URL=${STATS_DEBUG_CUSTOM_SERVER_URL}
-    - STATS_SUBMIT_ENABLED=${STATS_SUBMIT_ENABLED}
-    - STATS_SUBMIT_CONTRACT_TYPES_ENABLED=${STATS_SUBMIT_CONTRACT_TYPES_ENABLED}
-    - stratoHost=strato:3000
-    - vaultWrapperHost=vault-wrapper:8000
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
+    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+    - STRATO_PORT_API=${STRATO_PORT_API}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     restart: unless-stopped
@@ -71,31 +67,11 @@ services:
         max-file: "3"
     volumes:
       - redisdata:/data
-  vault-wrapper:
-    depends_on:
-    - postgres
-    environment:
-    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
-    - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
-    - postgres_port=5432
-    - postgres_user=postgres
-    - postgres_vault_wrapper_db=oauth
-    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
-    build: .
-    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   strato:
     depends_on:
     - kafka
     - postgres
     - redis
-    - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
     - appFetchLimit=${appFetchLimit}
@@ -138,6 +114,12 @@ services:
     - network=${network:-blockappsnet}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
+    - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -164,7 +146,8 @@ services:
     - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
-    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
+    - VAULT_URL=${VAULT_URL}
+    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
@@ -230,7 +213,6 @@ services:
     - prometheus
     - smd
     - strato
-    - vault-wrapper
     environment:
     - APEX_HOST=${APEX_HOST}
     - blockstanbul=${blockstanbul}
@@ -241,7 +223,7 @@ services:
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
+    - OAUTH_JWT_USER_ID_CLAIM=${OAUTH_JWT_USER_ID_CLAIM}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
     - POSTGREST_HOST=${POSTGREST_HOST}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
@@ -256,9 +238,9 @@ services:
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
-    - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
+    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}

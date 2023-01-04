@@ -446,14 +446,14 @@ instance HasVault SequencerM where
     mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
-      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash mesg)) vc
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
 
 waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
 waitOnVault action = do
-  $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
+  $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
   res <- action
   case res of
     Left err -> do
