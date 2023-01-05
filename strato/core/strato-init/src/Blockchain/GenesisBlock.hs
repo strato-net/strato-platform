@@ -49,7 +49,7 @@ import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.Generation                       (insertCertRegistryContract)
+import           Blockchain.Generation                       (insertCertRegistryContract, insertMercataGovernanceContract)
 import           Blockchain.Init.Options                     (flags_genesisBlockTestCert)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
@@ -79,6 +79,7 @@ import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.Model.Account      as Ac
 import qualified Blockchain.Strato.Model.Address      as Ad
+import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
@@ -116,8 +117,10 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         )
                                      => String
                                      -> [Ad.Address]
+                                     -> [ChainMemberParsedSet]
+                                     -> [ChainMemberParsedSet]
                                      -> m ([(Ad.Address, X509CertInfoState)], ([(AccountInfo, CodeInfo)], Block))
-getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
+getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators admins = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let genesis = JS.parseLazyByteString genesisParser theJSONString
         theJSON = case genesis of
@@ -133,7 +136,9 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let theJSON' = insertCertRegistryContract extraCerts $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+    let theJSON' = insertMercataGovernanceContract validators admins
+                 . insertCertRegistryContract extraCerts
+                 $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
     -- Need to insert the X509 certificates INTO Redis
@@ -143,13 +148,17 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     extraCertInfoStates <- mapM (\c -> do
       let c'  = x509CertToCertInfoState c
           ua' = userAddress c'
-          cr  = Ac.Account 0x509 Nothing 
-      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate cr ua' c'
+      insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate ua' c'
       case insertCert of 
         Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
         Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
       pure (ua', c')
       ) extraCerts
+
+    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
+    case insertValidators of 
+      Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
+      Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
 
     (extraCertInfoStates,) <$> genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
@@ -167,10 +176,12 @@ initializeGenesisBlock :: ( HasCodeDB m
                           )
                        => String
                        -> [Ad.Address]
+                       -> [ChainMemberParsedSet]
+                       -> [ChainMemberParsedSet]
                        -> m ()
-initializeGenesisBlock genesisBlockName extraFaucets = do
+initializeGenesisBlock genesisBlockName extraFaucets validators admins = do
     $logInfoS "initgen" "Begin of initgen"
-    (extraCertInfoStates, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
+    (extraCertInfoStates, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators admins
     _ <- produceVMOutputs [ChainBlock genesisBlock]
     obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
     putGenesisHash $ blockHash genesisBlock

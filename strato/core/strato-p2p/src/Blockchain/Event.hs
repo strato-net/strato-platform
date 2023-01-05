@@ -424,28 +424,40 @@ handleEvents peer = awaitForever $ \case
           when (isJust cInfo) $ do 
             yieldR $ ChainDetails [(cId, fromJust cInfo)]
 
-      P2pBlockstanbul msg -> do
-        let outbound = Blockstanbul msg
-        $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-        let msgHash = rlpHash msg
-        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-        msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
-        if msgExists
-          then $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
-                 [ "Already seen outbound wire message "
-                 , T.pack (format msgHash)
-                 , ". Not forwarding to peer "
-                 , pPeerIp peer
-                 ]
-          else do
-            $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
-              [ "First time seeing outbound wire message "
-              , T.pack (format msgHash)
-              , ". Forwarding to peer "
-              , pPeerIp peer
-              ]
-            lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
-            yieldR outbound
+      P2pBlockstanbul msg -> lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
+        Nothing -> $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ concat
+          [ "Peer "
+          , show (pPeerIp peer)
+          , " does not have a registered certificate"
+          ]
+        Just cm -> maybe False unIsValidator <$> lift (select (Proxy @IsValidator) cm) >>= \case
+          False -> $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ concat
+            [ "Peer "
+            , show (pPeerIp peer)
+            , " is not a validator"
+            ]
+          True -> do
+            let outbound = Blockstanbul msg
+            $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
+            let msgHash = rlpHash msg
+            lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+            msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+            if msgExists
+              then $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
+                     [ "Already seen outbound wire message "
+                     , T.pack (format msgHash)
+                     , ". Not forwarding to peer "
+                     , pPeerIp peer
+                     ]
+              else do
+                $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
+                  [ "First time seeing outbound wire message "
+                  , T.pack (format msgHash)
+                  , ". Forwarding to peer "
+                  , pPeerIp peer
+                  ]
+                lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+                yieldR outbound
       P2pAskForBlocks start _ _ -> do
         $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
         syncFetch Forward start
@@ -546,7 +558,7 @@ shouldSend peer txo = case txo of
     Origin.Quarry        -> True -- this should never reach this far anyway
     Origin.Morphism      -> -- probably means it was converted, see if this is a problem
         trace "NewTx of type Morphism came in. Should this even happen?" True
-    Origin.Blockstanbul -> False
+    Origin.Blockstanbul -> True
 
 shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
 shouldSendGossip peer txo = recordGossipFinal

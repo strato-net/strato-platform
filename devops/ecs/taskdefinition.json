@@ -179,10 +179,6 @@
                     "value": "gettingStarted"
                 },
                 {
-                    "name": "isAdmin",
-                    "value": "false"
-                },
-                {
                     "name": "isRootNode",
                     "value": "false"
                 },

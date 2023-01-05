@@ -1,4 +1,4 @@
-#strato-version:<VERSION>
+#strato-version:latest
 #strato-getting-started-min-version:4.0
 version: "3"
 volumes:
@@ -26,7 +26,7 @@ services:
     - NODE_NAME=${NODE_NAME}
     - ssl=${ssl:-false}
     build: .
-    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
+    image: ${SMD_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -49,7 +49,7 @@ services:
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     build: .
-    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    image: ${APEX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -155,7 +155,7 @@ services:
     - EVM_COMPATIBLE=${EVM_COMPATIBLE}
     - indexEVM=${indexEVM:-false}
     build: .
-    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
+    image: ${STRATO_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:latest}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -179,7 +179,7 @@ services:
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
     build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+    image: ${POSTGREST_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:latest}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -242,7 +242,7 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     - vmDebug=${vmDebug}
     build: .
-    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
+    image: ${NGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:latest}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
@@ -304,7 +304,7 @@ services:
     build: .
     environment:
       - NODE_HOST=${NODE_HOST}
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    image: ${PROMETHEUS_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:latest}
     volumes:
     - prometheusdata:/prometheus
     restart: unless-stopped

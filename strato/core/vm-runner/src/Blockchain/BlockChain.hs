@@ -36,7 +36,6 @@ import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
 import qualified Data.ByteString                         as B
-import qualified Data.ByteString.Short                   as BSS
 import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.Foldable                           (traverse_)
@@ -541,7 +540,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
 mkLogEntry bHash tHash chainId Log{..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event{..} = EventDB evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+mkEventEntry chainId Event{..} = EventDB evBlockHash evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult :: VMBase m
                         => BlockData
@@ -568,9 +567,9 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       ranBlockHash = hashFunction b
       (!response, theTrace', theLogs, theEvents) =
         case result of
-          Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
+          Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
           Right r ->
-            (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
