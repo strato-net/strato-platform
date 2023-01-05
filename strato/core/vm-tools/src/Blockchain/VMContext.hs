@@ -467,15 +467,19 @@ instance (Address `A.Selectable` X509Certificate) ContextM where
             _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::(
+                      MonadLogger m,
                      (A.Alters (Account, B.ByteString) B.ByteString) m
                       )
       => Address -> m (Maybe Address)
 lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
-    mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor k <> ">")
+    mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+    $logInfoS "lookupX509AddrFromCBHash" $ T.pack . show $ mAccount
     case mAccount of
-        Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
+        Just (BAccount a) -> do
+          $logInfoS "lookupX509AddrFromCBHash" $ T.pack . show $ a
+          pure . Just $ a ^. namedAccountAddress
         _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where

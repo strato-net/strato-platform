@@ -227,7 +227,7 @@ requireOriginCert :: MonadSM m => Account -> m ()
 requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
   originHasCert <- do
     c <- A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress
-    liftIO . putStrLn $ C.green "requireOriginCert" ++ show c
+    liftIO . putStrLn $ C.green "requireOriginCert from account address: " ++ show c
     return $ isJust c
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
