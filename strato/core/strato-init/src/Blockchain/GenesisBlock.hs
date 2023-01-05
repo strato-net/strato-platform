@@ -134,7 +134,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
           Right a -> a
           Left _ -> error "invalid cert format"
     $logInfoS "flag_genesisCerts" $ T.pack . show $ genesisCerts
-    extraCerts <-
+    extraCerts' <-
       if flags_genesisBlockTestCert 
         then do
           nodePubkey <- getPub
@@ -142,7 +142,8 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let theJSON' = insertCertRegistryContract (genesisCerts ++ extraCerts) $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+    let extraCerts = genesisCerts ++ extraCerts'
+        theJSON' = insertCertRegistryContract extraCerts $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
     -- Need to insert the X509 certificates INTO Redis
