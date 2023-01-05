@@ -127,7 +127,7 @@ import           Network.Socket
 import           UnliftIO
 
 loggingFunc :: LoggingT m a -> m a
-loggingFunc = runLoggingT
+loggingFunc = runNoLoggingT
 
 data VSocket = VSocket
   { _inbound :: TQueue B.ByteString
