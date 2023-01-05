@@ -170,12 +170,19 @@ checkXuat rev vc = do
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
 
--- inspectVaultUrl :: T.Text -> IO ()
--- inspectVaultUrl url = do
---   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
---   purl <- S.parseBaseUrl $ T.unpack url
---   if | (S.baseUrlHost purl == "172.17.0.1") -> do
---         traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
---         pure ()
---      | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
---      | otherwise -> pure ()
+inspectVaultUrl :: T.Text -> IO ()
+inspectVaultUrl url = do
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
+  purl <- S.parseBaseUrl $ T.unpack url
+  allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the "
+
+  dockerIps <- matchRegexAll (mkRegex allowedIPAddressRegex) $ S.baseUrlHost purl
+  if | (dockerIps \= Nothing) -> do
+        traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
+        pure ()
+     | (S.baseUrlHost purl == "docker.for.mac.localhost") -> do
+        traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
+        pure () 
+     | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
+     | otherwise -> pure ()
