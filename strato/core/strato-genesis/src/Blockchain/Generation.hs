@@ -201,7 +201,7 @@ insertCertRegistryContract certs gi =
         encodedRegistry = encodeUtf8 certificateRegistryContract
 
         rootAddress'    = fromPublicKey rootPubKey
-        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
         rootSub         = fromJust $ getCertSubject rootCert
 
         certSub' crt =
@@ -212,8 +212,8 @@ insertCertRegistryContract certs gi =
         certUserAddress = fromPublicKey . subPub . certSub'
         rootAcct = SolidVMContractWithStorage 0x1337 1337
             (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) MainChain)),
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
                 (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
                 (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
@@ -222,12 +222,12 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
                 (".certificateString", rlpWrap . BString $ certToBytes rootCert),
                 (".isValid", rlpWrap (BBool True)),
-                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) MainChain))
+                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
             ]
 
         -- Reversing the cert user address to create a placeholder Certificate contract address
         reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
-        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
         registryAcct = SolidVMContractWithStorage 0x509 509
             (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) $
             [
@@ -238,8 +238,8 @@ insertCertRegistryContract certs gi =
         certAccts = map (\cert -> do
             let certSub = certSub' cert
             SolidVMContractWithStorage (reverseAddr cert) 0 (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) MainChain)),
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
                 (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
                 (".organization", rlpWrap . BString . BC.pack . subOrg $ certSub),
@@ -248,7 +248,7 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
                 (".certificateString", rlpWrap . BString $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
-                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))]
+                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))]
             ) certs
 
 certificateRegistryContract :: Text
