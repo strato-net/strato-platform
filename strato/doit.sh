@@ -228,7 +228,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"

@@ -40,7 +40,6 @@ import           Data.Bool                            (bool)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
-import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
 import qualified Numeric                              (readHex)
 import           Data.ByteString.Internal             (c2w)
@@ -347,7 +346,7 @@ create' creator newAccount ch cc contractName' argExps = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = Just BSS.empty,
+    erReturnVal = Just "",
     erTrace = [],
     erLogs = [],
     erEvents = toList finalEvs,
@@ -436,7 +435,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
-      erReturnVal = BSS.toShort .  BC.pack <$> returnVal,
+      erReturnVal = returnVal,
       erTrace = [],
       erLogs = [],
       erEvents = toList finalEvs,
@@ -2923,11 +2922,11 @@ encodeForReturn v =
     
 
 encodeForReturn' :: MonadSM m => Value -> m String
-encodeForReturn' (SInteger i) = return . show $  i
-encodeForReturn' (SEnumVal _ _ v) = return . show $ v
-encodeForReturn' ((SAccount a _)) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
-encodeForReturn' (SContract _ a) = return $  "\""++(show $ a ^. namedAccountAddress) ++"\""
-encodeForReturn' (SBool b) = return .  show . fromEnum $ b
+encodeForReturn' (SInteger i) = return $ show i
+encodeForReturn' (SEnumVal _ _ v) = return $ show v
+encodeForReturn' (SAccount a _) = return $  "\"" ++ (show $ a ^. namedAccountAddress) ++ "\""
+encodeForReturn' (SContract _ a) = return $ "\"" ++ (show $ a ^. namedAccountAddress) ++ "\""
+encodeForReturn' (SBool b) = return $ if b then "true" else "false"
 encodeForReturn' (SString s) = return $ show s
 {- The following comments are just for previous encodeForReturn function to return ByteString type. 
 -- in the case of tuples, we need to follow the EVM/Solidity encoding convention:

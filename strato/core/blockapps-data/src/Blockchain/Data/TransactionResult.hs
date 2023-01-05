@@ -15,9 +15,7 @@ module Blockchain.Data.TransactionResult
     ) where
 
 import           Control.DeepSeq
-import qualified Data.ByteString.Short                   as BSS
 import           Data.Swagger                 hiding (Format, format)
-import           Data.Word
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 import qualified Generic.Random               as GR
@@ -65,7 +63,7 @@ exampleTxResult :: TransactionResult
 exampleTxResult = TransactionResult (hash "blockHask")
                                     (hash "txhash")
                                     "I'm a tx result message"
-                                    (BSS.pack [5 :: Word8])
+                                    "05"
                                     "I'm a tx trace"
                                     (21 :: Word256)
                                     (42 :: Word256)

@@ -9,7 +9,6 @@ module Blockchain.Data.ExecResults
   ) where
 
 import           Control.DeepSeq
-import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
 -- import           Data.Map                as M
@@ -32,7 +31,7 @@ data ExecResults =
   ExecResults {
     erRemainingTxGas     :: Integer,
     erRefund             :: Integer,
-    erReturnVal          :: Maybe BSS.ShortByteString,
+    erReturnVal          :: Maybe String,
     erTrace              :: [String],
     erLogs               :: [Log],
     erEvents             :: [Event],

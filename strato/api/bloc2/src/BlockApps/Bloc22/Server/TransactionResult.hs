@@ -32,8 +32,7 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
---import qualified Data.ByteString.Base16            as Base16
-import           Data.ByteString.Short             (fromShort)
+import qualified Data.ByteString.Base16            as Base16
 import qualified Data.ByteString.Char8             as BC
 import           Data.Either
 import           Data.Foldable
@@ -78,6 +77,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.CodePtr   (CodeKind(..))
 import           Blockchain.Strato.Model.Keccak256
 import qualified BlockApps.Bloc22.API.DeprecatedPostTransaction as Deprecated
 import           BlockApps.Bloc22.API.TypeWrappers
@@ -343,22 +343,16 @@ functionResult i txHash txResult mmd toAccount = do
         xabiTypeToType xabi indexedTypeType
   
   let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-      txResp = fromShort $ transactionResultResponse txResult
+      txResp = transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
     -- workaround for enums
-      theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-  mFormattedResponse <- case theVM of
-        "EVM" -> pure $ convertResultResToVals txResp mappedResultTypes
-        "SolidVM" -> pure $ convertSvmResultResToVals $ BC.unpack txResp 
-        _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
+  mFormattedResponse <- case transactionResultKind txResult of
+    Just SolidVM -> convertSvmResultResToVals txResp 
+    _ -> pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
 
-  $logInfoS "DEBUG__________________________mFormattedResponse: " . Text.pack $ show mFormattedResponse ++ ", VM type: " ++ show theVM
   case transactionResultMessage txResult of
     "Success!" -> do
-      let r = Text.decodeUtf8 $ txResp  --remove base16
-      $logInfoS "DEBUG__________________________" . Text.pack $ "txResp" ++ show txResp
-      $logInfoS "DEBUG__________________________" . Text.pack $ "r" ++ show r 
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
+      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
     stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
 
@@ -375,19 +369,25 @@ convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 -- works for SolidVM only
-convertSvmResultResToVals :: String ->  Maybe [SolidityValue]
-convertSvmResultResToVals resp =
+convertSvmResultResToVals :: MonadLogger m => String ->  m (Maybe [SolidityValue])
+convertSvmResultResToVals resp = do
+  $logDebugS "convertSvmResultResToVals" . Text.pack $ "response: " ++ resp
   let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
-   in case args of 
-        Left _ -> Nothing
-        Right y -> let values = traverse expressionToValue y
-                    in fmap valueToSolidityValue <$> values
-
+  $logDebugS "convertSvmResultResToVals" . Text.pack $ "args: " ++ show args
+  case args of 
+    Left _ -> pure Nothing
+    Right y -> do
+      let values = traverse expressionToValue y
+      $logDebugS "convertSvmResultResToVals" . Text.pack $ "values: " ++ show values
+      let solVals = fmap valueToSolidityValue <$> values
+      $logDebugS "convertSvmResultResToVals" . Text.pack $ "solVals: " ++ show solVals
+      pure solVals
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n 
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
 expressionToValue _ = Nothing
 -- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
 --expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]

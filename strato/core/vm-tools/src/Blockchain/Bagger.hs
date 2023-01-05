@@ -18,7 +18,6 @@ import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Class          (lift)
-import qualified Data.ByteString.Short              as BSS
 import qualified Data.DList                         as DL
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
@@ -134,7 +133,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
           DD.TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message
-                               , transactionResultResponse         = BSS.empty
+                               , transactionResultResponse         = ""
                                , transactionResultTrace            = "rejected"
                                , transactionResultGasUsed          = 0
                                , transactionResultEtherUsed        = 0
