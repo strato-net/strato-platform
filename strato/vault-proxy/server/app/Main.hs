@@ -35,6 +35,8 @@ import           Servant.Client                         as S
 import           Strato.VaultProxy.DataTypes            as VaultProxy
 import           Strato.VaultProxy.RawOauth             as RO
 import           Strato.VaultProxy.Server.Token
+import           Strato.VaultProxy.GetPing                as GP
+
 
 import           Options
 
@@ -64,6 +66,25 @@ main = do
   inspectVaultUrl flags_VAULT_URL
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
+
+  --Check the version of the foreign shared vault
+  traceM "Checking the version of the foreign vault"
+  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
+  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault)
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
+  vaultVersion <- case foreignVaultPing of
+          Left err -> error $ "Could not reach the foreign vault: " ++ show err
+          --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
+            --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
+          Right val -> do
+            when (show val /= "version 1") $ 
+              error "The vault has breaking changes, I cannot continue." 
+            pure val
+  traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
+  --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
+    --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
+
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
     --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
   vaultLock <- liftIO $ L.new

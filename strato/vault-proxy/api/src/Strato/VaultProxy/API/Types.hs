@@ -12,6 +12,7 @@ module Strato.VaultProxy.API.Types
   , Signature(..) -- TODO: remove, ideally
   , PublicKey(..) --       same
   , SharedKey(..) --       same
+  , RawPing(..)
   ) where
 
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
