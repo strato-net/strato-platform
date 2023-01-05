@@ -20,6 +20,7 @@ import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
 import           GHC.Conc
+import qualified Network.Curl                           as Curl
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
@@ -35,7 +36,7 @@ import           Servant.Client                         as S
 import           Strato.VaultProxy.DataTypes            as VaultProxy
 import           Strato.VaultProxy.RawOauth             as RO
 import           Strato.VaultProxy.Server.Token
-import           Strato.VaultProxy.GetPing                as GP
+-- import           Strato.VaultProxy.GetPing                as GP
 
 
 import           Options
@@ -67,21 +68,6 @@ main = do
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
 
-  --Check the version of the foreign shared vault
-  traceM "Checking the version of the foreign vault"
-  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
-  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault)
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
-  vaultVersion <- case foreignVaultPing of
-          Left err -> error $ "Could not reach the foreign vault: " ++ show err
-          --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
-            --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
-          Right val -> do
-            when (show val /= "version 1") $ 
-              error "The vault has breaking changes, I cannot continue." 
-            pure val
-  traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
     --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
 
@@ -98,6 +84,23 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
+  
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making an intial call to the OAUTH provider"
+  --make an initial call to see if the vault is working
+  initialToken <- getAwesomeToken flags_VAULT_PROXY_DEBUG vaultLock tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
+
+  --Check the version of the foreign shared vault
+  traceM "Checking the version of the foreign vault"
+  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making an intial call to the foreign vault, using curl, if nothing occurs, please wait, it might timeout"
+  let authy = [T.unpack ("Authorization: Bearer " <> accessToken initialToken)]
+  makeHttpCall <- Curl.curlGetString (T.unpack (flags_VAULT_URL <> "/strato/v2.3/_ping")) ([Curl.CurlHttpHeaders authy]) 
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The curl to _ping worked, here is the output"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show makeHttpCall
+  when (snd makeHttpCall /= "version 1") $ error "The vault has breaking changes, I cannot continue." 
+
+
   --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
