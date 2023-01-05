@@ -670,6 +670,9 @@ contract RegisterCert {
               threadDelay 5000000
               ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
               ifor_ ctxs1 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
+              threadDelay 200000
+              postEvent (TimerFire 1) (peers !! 0)
+              threadDelay 200000
               postEvent (TimerFire 2) (peers !! 0)
               threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedRemoveTx

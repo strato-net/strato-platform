@@ -43,7 +43,6 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
 import qualified Numeric                              (readHex)
-import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
@@ -90,7 +89,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as SEC
-import           Blockchain.Strato.Model.Util
+import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 import           BlockApps.X509.Keys
 import           Blockchain.Stream.Action             (Action)
@@ -453,7 +452,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
-setCreator creator contract _ blockNumber = do
+setCreator creator contract _ _ = do
 
   let creatorAddress = _accountAddress creator
   maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
@@ -461,39 +460,22 @@ setCreator creator contract _ blockNumber = do
 
   case maybeCert of
     (Just cert) -> do
-      onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-    Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
+      onTraced $ $logDebugS "setCreator/versioning" . T.pack . C.green $ "Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+    Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
   
-  liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator
+  $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
   let putCreatorField org = do
-        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+        $logDebugS "setCreator/versioning" . T.pack $ "setting the org as " ++ (show org)
         putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
   if _org /= "" then putCreatorField _org else do
-      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
-
-      -- hardcoded delete storage value if on the very bad, no good block
-      when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
-        liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
-        deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
-
--- ADDED AS A HARDCODED FIX TO SYNC WITH THE DEVNET 
--- REMOVE ONCE NOT NEEDED
-computeNetworkID :: Integer
-computeNetworkID =
-  case (flags_network, flags_networkID) of
-    ("", -1) ->
-      if flags_testnet
-      then 0
-      else 1
-    (network, -1) -> bytes2Integer $ map c2w network
-    (_, _) -> toInteger flags_networkID
+      $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty org field"
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> m (String)
 getOrg caller = do
-  liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
+  $logDebugS "getOrg/versioning" . T.pack $ "Getting org for the caller " ++ format caller
   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
 
   case callerCodeHash of
@@ -502,7 +484,7 @@ getOrg caller = do
     -- we will look up their cert in the DB and use it to get the org name for this app
       maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
       let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-      liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
+      $logDebugS "getOrg/versioning" . T.pack $ "They are a user of org " ++ (show org')
       return org'
     x -> do
     -- caller is a contract account, so this app already exists
@@ -511,14 +493,14 @@ getOrg caller = do
       case mAppAccount of
         Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
         Just acct -> do
-          liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct)
+          $logDebugS "getOrg/versioning" . T.pack $ "They are part of app contract " ++ (format acct)
           appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
           case appCreator of
             MS.BString org' -> do
-              liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
+              $logDebugS "getOrg/versioning" . T.pack $ "Its org is " ++ show org'
               return $ BC.unpack org'
             _ -> do
-              liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string"
+              $logDebugS "getOrg/versioning" . T.pack $ "Its org is unset. Returning empty string"
               return ""
 
 
@@ -530,8 +512,8 @@ getCodeAndCollection address' = do
           (current':_) -> Just $ currentAccount current'
           _ -> Nothing
 
-  onTraced $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  onTraced $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
+  onTraced $ $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  onTraced $ $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
     c' <- getCurrentContract
