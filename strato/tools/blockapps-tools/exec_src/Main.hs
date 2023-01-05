@@ -34,15 +34,12 @@ import           Raw
 import           RawMP
 import           Redis
 import           RLP
-import           RSVP
 import           State
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import qualified LabeledError
@@ -73,7 +70,6 @@ data Options = State{root::String, db::String}
              | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}  
              | PushBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}
              | AskForTxs
-             | RSVP {chainId :: Word256, memberId :: String, address::Address}
              | Redis { key :: String }
              | RedisMatch { pattern :: String }
              | Migrate { tables :: String }
@@ -259,14 +255,6 @@ pushOptions =
 txOptions :: Annotate Ann
 txOptions = record AskForTxs []
 
-
-rsvpOptions :: Annotate Ann
-rsvpOptions = record RSVP { chainId = error "unused chain id", memberId = error "unused member", address = error "unused address"}
-            [ chainId := error "--chain-id required" += typ "NUMBER" += explicit += name "chain-id"
-            , memberId := error "--member required" += typ "MEMBER ID" += explicit += name "member"
-            , address := error "--address required" += typ "ADDRESS" += explicit += name "address"
-            ]
-
 redisOptions :: Annotate Ann
 redisOptions = record Redis {key = error "unused key"}
              [ key := error "redis <KEY>" += typ "KEY" += argPos 0
@@ -381,7 +369,6 @@ options = modes_ [blockGoOptions
                 , askOptions
                 , pushOptions
                 , txOptions
-                , rsvpOptions
                 , redisOptions
                 , redisMatchOptions
                 , migrateOptions
@@ -443,7 +430,6 @@ run AskForTxs                  = insertP2P . P2pGetTx
                                            . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "queryStrato/run")
                                            . filter (not . B.null)
                                            . BC.split '\n' =<< B.getContents
-run RSVP{..}                   = rsvp chainId memberId address
 run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
 run Migrate{..}                = migrate tables

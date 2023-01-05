@@ -169,6 +169,7 @@ LogDB
     deriving Eq Read Show Generic
 
 EventDB
+    blockHash Keccak256
     contractAddress Account
     chainId Word256 Maybe
     name String

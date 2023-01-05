@@ -43,7 +43,6 @@ module Blockchain.Sequencer.Monad
   , createNewTimer
   , drainTMChan
   , drainTimeouts
-  , drainVotes
   , fuseChannels
   , createWaitTimer
   , dependentBlockDB
@@ -93,7 +92,6 @@ import qualified Database.LevelDB                          as LDB
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Privacy
@@ -154,7 +152,6 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible (TMChan RoundNumber) m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
-                           , Mod.Accessible (TQueue VoteResult) m
                            , (Address `A.Alters` X509CertInfoState) m
                            , (Address `A.Selectable` X509CertInfoState) m
                            , HasVault m
@@ -170,8 +167,6 @@ data SequencerConfig = SequencerConfig
   , syncWrites              :: Bool
   , blockstanbulBlockPeriod :: BlockPeriod
   , blockstanbulRoundPeriod :: RoundPeriod
-  , blockstanbulBeneficiary :: TQueue CandidateReceived
-  , blockstanbulVoteResps   :: TQueue VoteResult
   , blockstanbulTimeouts    :: TMChan RoundNumber
   , cablePackage            :: CablePackage
   , maxEventsPerIter        :: Int
@@ -416,12 +411,6 @@ instance Mod.Accessible BlockPeriod SequencerM where
 instance Mod.Accessible RoundPeriod SequencerM where
   access _ = asks blockstanbulRoundPeriod
 
-instance Mod.Accessible (TQueue CandidateReceived) SequencerM where
-  access _ = asks blockstanbulBeneficiary
-
-instance Mod.Accessible (TQueue VoteResult) SequencerM where
-  access _ = asks blockstanbulVoteResps
-
 instance Mod.Accessible View SequencerM where
   access _ = currentView
 
@@ -555,9 +544,6 @@ drainTMChan ch = do
 drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 
-drainVotes :: SequencerM [CandidateReceived]
-drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
-
 clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
 clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
 
@@ -577,13 +563,11 @@ addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps
 fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
-  votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift) <$> mergeSources
                [ sourceTBQueue unseq .| mapC UnseqEvent
-               , sourceTQueue votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]
                4096 -- 🙏

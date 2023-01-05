@@ -58,7 +58,6 @@ import           BlockApps.X509.Certificate            as X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction  as U
@@ -69,6 +68,7 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Data.DataDefs              as DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction           (getSigVals)
@@ -82,6 +82,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 
 import qualified "vm-runner" Blockchain.Event          as VMEvent
+import           Blockchain.Generation
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
 import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
 import           Blockchain.Privacy
@@ -188,8 +189,6 @@ data TestContext = TestContext
   , _sequencerContext      :: SequencerContext
   , _blockPeriod           :: BlockPeriod
   , _roundPeriod           :: RoundPeriod
-  , _candidatesReceived    :: TQueue CandidateReceived
-  , _voteResults           :: TQueue VoteResult
   , _timeoutChan           :: TMChan RoundNumber
   , _vmContext             :: MemContext
   , _apiChainInfoMap       :: Map Word256 ChainInfo
@@ -528,12 +527,6 @@ instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
 instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
   access _ = use roundPeriod
 
-instance MonadIO m => Mod.Accessible (TQueue CandidateReceived) (MonadTest m) where
-  access _ = use candidatesReceived
-
-instance MonadIO m => Mod.Accessible (TQueue VoteResult) (MonadTest m) where
-  access _ = use voteResults
-
 instance MonadIO m => Mod.Accessible View (MonadTest m) where
   access _ = currentView
 
@@ -566,6 +559,11 @@ instance HasVault m => HasVault (MonadP2PTest m) where
 
 instance HasVault IO where
   sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
+
+instance HasVault (ReaderT PrivateKey IO) where
+  sign bs = ask >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
@@ -824,7 +822,9 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ (P2P OutputBlock{..}) = canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
+  insert _ k (P2P v@OutputBlock{..}) = do
+    canonicalBlockDataMap . at (DataDefs.blockDataNumber obBlockData) ?= Canonical obBlockData
+    genericTestInsert (sequencerContext . blockHashRegistry) (A.Proxy @OutputBlock) k v
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _          = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
@@ -839,6 +839,11 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
+
+instance MonadIO m => (ChainMemberParsedSet `A.Alters` P2P (A.Proxy ChainMemberParsedSet)) (MonadTest m) where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
 
 instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
   output ies = unseqEvents %= (++ies)
@@ -1137,13 +1142,11 @@ newSequencerContext bc = do
 -- Kafka, postgres, redis, or ethconf.
 testContext :: PrivateKey
             -> [IPAsText]
-            -> TQueue CandidateReceived
-            -> TQueue VoteResult
             -> TMChan RoundNumber
             -> SequencerContext
             -> MemContext
             -> TestContext
-testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
+testContext prv bootNodes rNum seqCtx vmCtx = TestContext
   { _blocks                = []
   , _connectionTimeout     = ConnectionTimeout 60
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
@@ -1170,8 +1173,6 @@ testContext prv bootNodes candRecv vRes rNum seqCtx vmCtx = TestContext
   , _sequencerContext      = seqCtx
   , _blockPeriod           = BlockPeriod 1
   , _roundPeriod           = RoundPeriod 10
-  , _candidatesReceived    = candRecv
-  , _voteResults           = vRes
   , _timeoutChan           = rNum
   , _vmContext             = vmCtx
   , _apiChainInfoMap       = M.empty
@@ -1248,6 +1249,7 @@ addValidatorsToCertMap vals m =
 createPeer :: PrivateKey
            -> ChainMemberParsedSet
            -> [(Address, ChainMemberParsedSet)]
+           -> [X509Certificate]
            -> TVar Internet
            -> Text
            -> IPAsText
@@ -1255,15 +1257,13 @@ createPeer :: PrivateKey
            -> UDPPort
            -> [IPAsText]
            -> IO P2PPeer
-createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
+createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   txrIndexerSource <- newTQueueIO
-  chr <- atomically newTQueue
-  chv <- atomically newTQueue
   cht <- atomically newTMChan
   tcpVSock <- newTQueueIO
   udpVSock <- newTQueueIO
@@ -1274,14 +1274,66 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
   let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
       initialValidators = fst <$> initialValidators'
   cache  <- TRC.new 64
-  let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
+  let vals = snd <$> initialValidators'
+      gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+      (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do
           sr <- State.gets fst
           let key = addressAsNibbleString addr
-              val = rlpEncode . rlpSerialize . rlpEncode $ blankAddressState{addressStateBalance = 1000000000000000000000000}
+              val = rlpEncode . rlpSerialize . rlpEncode $
+                blankAddressState { addressStateBalance = 1000000000000000000000000
+                                  }
           sr' <- MP.putKeyVal sr key val
           State.modify' $ \(_,b) -> (sr',b)
+        for_ (genesisInfoAccountInfo gi) $ \case
+          NonContract address balance' -> do
+            sr <- State.gets fst
+            let key = addressAsNibbleString address
+                val = rlpEncode . rlpSerialize . rlpEncode $ blankAddressState{addressStateBalance = balance'}
+            sr' <- MP.putKeyVal sr key val
+            State.modify' $ \(_,b) -> (sr',b)
+          ContractNoStorage address balance' codeHash' -> do
+            sr <- State.gets fst
+            let key = addressAsNibbleString address
+                val = rlpEncode . rlpSerialize . rlpEncode $
+                  blankAddressState { addressStateBalance = balance'
+                                    , addressStateCodeHash = codeHash'
+                                    }
+            sr' <- MP.putKeyVal sr key val
+            State.modify' $ \(_,b) -> (sr',b)
+          ContractWithStorage address balance' codeHash' slots -> do
+            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
+                  MP.initializeBlank
+                  for_ slots $ \(key, val) -> do
+                    sr <- State.gets fst
+                    sr' <- MP.putKeyVal sr (N.EvenNibbleString $ word256ToBytes key) (rlpEncode . rlpSerialize $ rlpEncode val)
+                    State.modify' $ \(_,b) -> (sr',b)
+            sr <- State.gets fst
+            let key = addressAsNibbleString address
+                val = rlpEncode . rlpSerialize . rlpEncode $
+                  blankAddressState { addressStateBalance = balance'
+                                    , addressStateCodeHash = codeHash'
+                                    , addressStateContractRoot = contractRoot'
+                                    }
+            sr' <- MP.putKeyVal sr key val
+            State.modify' $ \(_,b) -> (sr',b <> storageMap)
+          SolidVMContractWithStorage address balance' codeHash' slots -> do
+            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
+                  MP.initializeBlank
+                  for_ slots $ \(key, val) -> do
+                    sr <- State.gets fst
+                    sr' <- MP.putKeyVal sr (N.EvenNibbleString key) (rlpEncode val)
+                    State.modify' $ \(_,b) -> (sr',b)
+            sr <- State.gets fst
+            let key = addressAsNibbleString address
+                val = rlpEncode . rlpSerialize . rlpEncode $
+                  blankAddressState { addressStateBalance = balance'
+                                    , addressStateCodeHash = codeHash'
+                                    , addressStateContractRoot = contractRoot'
+                                    }
+            sr' <- MP.putKeyVal sr key val
+            State.modify' $ \(_,b) -> (sr',b <> storageMap)
   let cstate = def & txRunResultsCache .~ cache
       vmCtx = MemContext def cstate
       genesisBlock = DataDefs.BlockData
@@ -1308,11 +1360,15 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
         , obReceiptTransactions = []
         , obBlockUncles         = []
         }
-  testContextTVar <- newTVarIO $ testContext privKey bootNodes chr chv cht seqCtx vmCtx
+  testContextTVar <- newTVarIO $ testContext privKey bootNodes cht seqCtx vmCtx
   let seqTimerSource = runConduit $ sourceTMChan cht .| mapC ((:[]) . TimerFire) .| sinkTQueue unseqSource
   let sequencer = do
         DBDB.bootstrapGenesisBlock genHash 1
         A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
+        for_ extraCerts $ \c -> do
+          let cis = x509CertToCertInfoState c
+              ua = userAddress cis
+          A.insert (A.Proxy @X509CertInfoState) ua cis
         atomically $ writeTQueue seqVmSource [VmCreateBlockCommand]
         createFirstTimer
         runConduit $ sourceTQueue unseqSource
@@ -1336,6 +1392,7 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
         setStateDBStateRoot Nothing stateRoot
         writeBlockSummary genesisOutputBlock
         for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
+        for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
         putContextBestBlockInfo $ ContextBestBlockInfo (genHash, genesisBlock, 0, 0, 0)
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
@@ -1365,7 +1422,7 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
                                     $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
-                                    AddOrgName (Right (chainId, cm)) -> do
+                                    AddOrgName chainId cm -> do
                                       let org = ChainMembers $ Set.singleton cm
                                           newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
                                       chainMembersMap . at chainId %= \case
@@ -1376,8 +1433,12 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
                                           Just (TrueOrgNameChains s) -> M.insert org (TrueOrgNameChains $ Set.insert chainId s) m
                                         )
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
-                                    RemoveOrgName _ -> pure () --(Right (cid, (n, u)))
-                                    RegisterCertificate (Right (_, addr, certState@(X509CertInfoState _ _ _ _ o u c))) -> do
+                                    RemoveOrgName _ _ -> pure () --(Right (cid, (n, u)))
+                                    ValidatorAdded bHash cm -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded bHash cm
+                                    ValidatorRemoved bHash cm -> do
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorRemoved bHash cm
+                                    RegisterCertificate addr certState@(X509CertInfoState _ _ _ _ o u c) -> do
                                       let setOrg = Org (T.pack o) True
                                           setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
                                           setCommonName = CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
@@ -1552,15 +1613,17 @@ makeLenses ''ThreadPool
 data NetworkManager = NetworkManager
   { _threads :: TVar ThreadPool
   , _network :: TVar Network
+  , _initialCerts :: [X509Certificate]
   , _initialValidators :: [(Address, ChainMemberParsedSet)]
   }
 makeLenses ''NetworkManager
 
 createNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> TVar Internet -> ReaderT NetworkManager IO P2PPeer
 createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do 
+  certs <- asks _initialCerts
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
-  liftIO $ createPeer pKey identity vals inet nodeLabel ipAddr tcpPort udpPort bootNodes
+  liftIO $ createPeer pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes
 
 addNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
 addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
@@ -1620,29 +1683,42 @@ removeConnection serverLabel clientLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
+selfSignCert :: PrivateKey -> ChainMemberParsedSet -> IO X509Certificate
+selfSignCert pk (CommonName o u c True) = flip runReaderT pk $ do 
+  let iss = Issuer (T.unpack c) (T.unpack o) (Just $ T.unpack u) Nothing
+      sub = Subject (T.unpack c) (T.unpack o) (Just $ T.unpack u) Nothing (derivePublicKey pk)
+  makeSignedCert Nothing Nothing iss sub
+selfSignCert _ i = error $ "selfSignCert: could not sign cert for identity: " ++ show i
+
 runNetwork :: [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
 runNetwork nodesList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
   let identities = (\(_,(c,_,_,_)) -> c) <$> nodesList
-      validators' = makeValidators $ validatorsFilter $ zip privKeys identities
+      privAndIds = zip privKeys identities
+      validatorsPrivKeys = validatorsFilter privAndIds
+      validators' = makeValidators validatorsPrivKeys
+  certs <- traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
   let bootNodes = (\(_, (_,i,_,_)) -> i) <$> nodesList
-  peers <- traverse (\(p,(n,(c,i,t,u))) -> createPeer p c validators' inet n i t u bootNodes) $ zip privKeys nodesList
+  peers <- traverse (\(p,(n,(c,i,t,u))) -> createPeer p c validators' certs inet n i t u bootNodes) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
   nodeThreads' <- for nodesMap $ async . runNode
   let threadPool = ThreadPool nodeThreads' M.empty
   networkTVar <- newTVarIO network'
   threadsTVar <- newTVarIO threadPool
-  pure $ NetworkManager threadsTVar networkTVar validators'
+  pure $ NetworkManager threadsTVar networkTVar certs validators'
 
 runNetworkWithStaticConnections :: [(Text, IPAsText, ChainMemberParsedSet)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
   let identities = (\(_,_,c) -> c) <$> nodesList
-      validators' = makeValidators . validatorsFilter $ zip privKeys identities
+      privAndIds = zip privKeys identities
+      validatorsPrivKeys = validatorsFilter privAndIds
+      validators' = makeValidators validatorsPrivKeys
+  certs <- traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
-  peers <- traverse (\(p,(n,i,c)) -> createPeer p c validators' inet n i (TCPPort 30303) (UDPPort 30303) []) $ zip privKeys nodesList
+  peers <- traverse (\(p,(n,i,c)) -> createPeer p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) []) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip ((\(a,_,_) -> a) <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
@@ -1656,7 +1732,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
     let threadPool = ThreadPool nodeThreads' connectionThreads'
     networkTVar <- newTVarIO network'
     threadsTVar <- newTVarIO threadPool
-    pure $ NetworkManager threadsTVar networkTVar validators'
+    pure $ NetworkManager threadsTVar networkTVar certs validators'
 
 runNetworkOld :: [P2PPeer] -> [P2PConnection] -> IO ()
 runNetworkOld nodes' connections' =

@@ -42,7 +42,7 @@ data BlockDBNamespace = Headers
                       | PrivateTransactions
                       | PrivateTxsInBlocks
                       | PrivateOrgNameChains
-                      -- | Validators
+                      | Validators
                       | PrivateTrueOrgNameChains
                       | PrivateFalseOrgNameChains
                       | X509Certificates
@@ -141,6 +141,9 @@ instance RedisDBValuable RedisOrgNameChains where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
+instance RedisDBKeyable RedisValidator where
+    toKey   = rlpSerialize . rlpEncode
+
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
@@ -172,7 +175,7 @@ newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
 newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
---newtype RedisValidators = RedisValidators (S.Set Word256) deriving (Eq, Show)
+newtype RedisValidator = RedisValidator ChainMemberParsedSet deriving (Eq, Show)
 
     -- instance RLPSerializable RedisChainMemberRSet where
     --   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
@@ -197,6 +200,10 @@ instance RLPSerializable RedisOrgUnits where
 instance RLPSerializable RedisOrgUnitMembers where
   rlpEncode (RedisOrgUnitMembers s) = rlpEncode $ s
   rlpDecode = RedisOrgUnitMembers . rlpDecode
+
+instance RLPSerializable RedisValidator where
+  rlpEncode (RedisValidator s) = rlpEncode s
+  rlpDecode = RedisValidator . rlpDecode
 
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
@@ -226,7 +233,7 @@ displayForNamespace ns input = case ns of
     PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     PrivateTrueOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-    --Validators           -> format (fromValue input :: [Address])
+    Validators           -> format (fromValue input :: S8.ByteString)
     X509Certificates     -> format (fromValue input :: Address)
     ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
     ParsedSetToX509 ->  format input

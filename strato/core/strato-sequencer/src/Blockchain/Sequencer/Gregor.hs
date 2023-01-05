@@ -161,10 +161,10 @@ runTheGregor cfg = race_ (runGregorM cfg unseqReader)
 
 -- When a checkpoint already exists, the arguments are ignored. They might
 -- be stale if the validator pool has expanded.
-initializeCheckpoint :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GregorM Checkpoint
-initializeCheckpoint vals admins = do
+initializeCheckpoint :: [ChainMemberParsedSet] -> GregorM Checkpoint
+initializeCheckpoint vals = do
   meta <- snd <$> getNextOffsetAndMetadata
-  let overrideVals c = c{checkpointValidators=vals, checkpointAdmins=admins}
+  let overrideVals c = c{checkpointValidators=vals}
   $logDebugLS "initializeCheckpoint" meta
   case (meta, decodeMeta meta) of
     ("", _) -> do

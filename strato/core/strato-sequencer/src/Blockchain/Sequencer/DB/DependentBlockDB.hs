@@ -13,9 +13,11 @@ import           Control.Monad.IO.Class
 import           Data.Binary
 
 import qualified Data.ByteString.Lazy         as B
+import qualified Data.Text                    as T
 import qualified Database.LevelDB             as LDB
 import qualified GHC.Generics                 as GHCG
 import           Prelude                      hiding (lookup)
+import           Text.Format
 
 import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
@@ -27,6 +29,8 @@ type DependentBlockDB = LDB.DB
 -- totalDifficulty always includes the difficulty of the block currently being operated on
 data DependentBlockEntry = DependentBlocks { blocks :: [SequencedBlock] }
                          | Emitted { emittedTotalDifficulty :: Integer }
+                         | ChildFailedConsensus { emittedTotalDifficulty :: Integer
+                                                , blocks :: [SequencedBlock] }
                          deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Binary DependentBlockEntry where
@@ -71,15 +75,13 @@ genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
 bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> Integer -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
 
-appendDependentBlock :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
-appendDependentBlock b = --do
+appendChildFailure :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
+appendChildFailure b = --do
   let parentHash = blockDataParentHash $ sbBlockData b
-   in lookup Proxy parentHash >>= \case
-        Just (Emitted _) -> return ()
-        Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return ()
-        Nothing -> insert Proxy parentHash $ DependentBlocks [b]
-        Just (DependentBlocks existingDeps) ->
-          insert Proxy parentHash $ DependentBlocks (b : existingDeps)
+   in repsert_ Proxy parentHash $ \case
+        Just (Emitted t) -> pure $ ChildFailedConsensus t [b]
+        Just (ChildFailedConsensus t bs) -> pure $ ChildFailedConsensus t (b:bs)
+        _ -> error "appendChildFailure: Parent hasn't been emitted yet. This should never happen"
 
 existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
 existingParent = lookup Proxy . blockDataParentHash . sbBlockData
@@ -89,6 +91,7 @@ readyToEmit b = do
   ep <- existingParent b
   case ep of
     Just (Emitted _) -> return True
+    Just (ChildFailedConsensus _ existingDeps) | not (b `elem` existingDeps) -> return True
     _ -> return False
 
 enqueueIfParentNotEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
@@ -99,6 +102,9 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
   Just (DependentBlocks existingDeps) -> do
     insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks (b:existingDeps)
     return NotReadyToEmit
+  Just (ChildFailedConsensus _ existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
+  Just (ChildFailedConsensus totalDifficulty' _) ->
+      return $ ReadyToEmit totalDifficulty'
   Nothing -> do
     insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
     return NotReadyToEmit
@@ -108,22 +114,63 @@ insertEmitted b = existingParent b >>= \case
   Just (Emitted t) -> do
     insert Proxy (sbHash b) . Emitted $ totalDifficulty' t
     return . Just $ theBlock t
+  Just (ChildFailedConsensus t existingDeps) | not (b `elem` existingDeps) -> do
+    insert Proxy (sbHash b) . Emitted $ totalDifficulty' t
+    return . Just $ theBlock t
   _ -> return Nothing
   where totalDifficulty' t = t + sequencedBlockDifficulty b
         theBlock t = sequencedBlockToOutputBlock b $ totalDifficulty' t
 
-buildEmissionChain :: (Keccak256 `Alters` DependentBlockEntry) m
+buildEmissionChain :: ((Keccak256 `Alters` DependentBlockEntry) m
+                      , MonadLogger m
+                      )
                    => SequencedBlock
                    -> Integer
                    -> m [OutputBlock]
-buildEmissionChain b lastTotalDifficulty = lookup Proxy (sbHash b) >>= \case
+buildEmissionChain = buildEmissionChain' False
+
+buildEmissionChain' :: ((Keccak256 `Alters` DependentBlockEntry) m
+                       , MonadLogger m
+                       )
+                    => Bool
+                    -> SequencedBlock
+                    -> Integer
+                    -> m [OutputBlock]
+buildEmissionChain' retryFailed b lastTotalDifficulty = lookup Proxy (sbHash b) >>= \case
   Nothing -> do
+    $logDebugS "buildEmissionChain'" . T.pack $ "Got Nothing for " <> format (sbHash b)
     insert Proxy (sbHash b) $ Emitted totalDifficulty'
-    return [theBlock]
-  Just (Emitted _) -> return []
+    return [theBlock totalDifficulty']
+  Just (Emitted _) -> do
+    $logDebugS "buildEmissionChain'" . T.pack $ "Got Emitted for " <> format (sbHash b)
+    if retryFailed
+      then return [theBlock totalDifficulty']
+      else return []
   Just (DependentBlocks blocks') -> do
+    $logDebugS "buildEmissionChain'" . T.pack $ "Got DependentBlocks for " <> format (sbHash b)
     insert Proxy (sbHash b) $ Emitted totalDifficulty'
-    subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
-    return $ theBlock : join subChains
+    subChains <- sequence $ flip (buildEmissionChain' retryFailed) totalDifficulty' <$> blocks'
+    return $ theBlock totalDifficulty' : join subChains
+  Just (ChildFailedConsensus t blocks') -> do
+    $logDebugS "buildEmissionChain'" . T.pack $ "Got ChildFailedConsensus for " <> format (sbHash b)
+    $logDebugS "buildEmissionChain'" . T.pack $ "retryFailed is " <> show retryFailed
+    if retryFailed
+      then do
+        insert Proxy (sbHash b) $ Emitted t
+        subChains <- sequence $ flip (buildEmissionChain' retryFailed) t <$> blocks'
+        return $ theBlock t : join subChains
+      else return []
   where totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
-        theBlock = sequencedBlockToOutputBlock b totalDifficulty'
+        theBlock t' = sequencedBlockToOutputBlock b t'
+
+retryFailedChildren :: ((Keccak256 `Alters` DependentBlockEntry) m
+                       , MonadLogger m
+                       )
+                    => Keccak256
+                    -> m [OutputBlock]
+retryFailedChildren h = lookup Proxy h >>= \case
+  Just (ChildFailedConsensus t blocks') -> do
+    $logInfoS "retryFailedChildren" . T.pack $ "Block " <> format h <> " has " <> show (length blocks') <> " failed children."
+    insert Proxy h $ Emitted t
+    fmap join . sequence $ flip (buildEmissionChain' True) t <$> blocks'
+  _ -> return []

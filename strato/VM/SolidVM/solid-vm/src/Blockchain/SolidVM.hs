@@ -83,6 +83,7 @@ import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
@@ -1231,7 +1232,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdde
               " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
               " of org " ++ show org
 
-        addEvent $ Event org parentName (labelToString $ CC._contractName curCnct) account eventName pairs
+        bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
+        addEvent $ Event bHash org parentName (labelToString $ CC._contractName curCnct) account eventName pairs
         return Nothing
 
 runStatement (CC.UncheckedStatement code pos) = do
@@ -1681,15 +1683,17 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) = do --TODO- generalize all of these Bi
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  acct <- getCurrentAccount
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ valEquals ctract val1 val2
+  return . Constant . SBool . not $ valEquals (acct ^. accountChainId) ctract val1 val2
 
 expToVar' (CC.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  acct <- getCurrentAccount
   logVals val1 val2
-  return . Constant . SBool $ valEquals ctract val1 val2
+  return . Constant . SBool $ valEquals (acct ^. accountChainId) ctract val1 val2
 
 expToVar' (CC.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1

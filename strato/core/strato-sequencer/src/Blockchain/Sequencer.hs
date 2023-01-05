@@ -24,9 +24,6 @@ import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
-
-import           Control.Monad.State
-import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
 import           Data.Maybe
@@ -40,8 +37,6 @@ import           Text.Printf
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.StateMachine (validators)
-import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -62,12 +57,9 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
 import           Blockchain.Partitioner
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
-
-import qualified LabeledError
 
 import qualified Text.Colors                               as CL
 import           Text.Format
@@ -210,30 +202,8 @@ runSequencerBatch :: MonadSequencer m
                   -> m BatchSeqEvent
 runSequencerBatch events = runBatch $ do
   let BatchSeqLoopEvent{..} = batchSeqLoopEvents events
-  checkForVotes _votesMade
   checkForTimeouts _timerFires
   checkForUnseq _ingestEvents
-
-checkForVotes :: ( MonadLogger m
-                 , MonadMonitor m
-                 , MonadBlockstanbul m
-                 , HasFullPrivacy m
-                 , (Keccak256 `A.Alters` DependentBlockEntry) m
-                 )
-              => [CandidateReceived]
-              -> ConduitT a SeqEvent m ()
-checkForVotes crs = do
-  withLabel seqLoopEvents "vote" (flip unsafeAddCounter . fromIntegral . length $ crs)
-  blockstanbulSend . map translate $ crs
-  where translate :: CandidateReceived -> InEvent
-        translate br =
-          let extsign = RL.rlpDecode
-                      . RL.rlpDeserialize
-                      . LabeledError.b16Decode "checkForVotes"
-                      . pack
-                      . API.signature $ br
-              bauth = MsgAuth { sender = API.sender br, signature = extsign}
-          in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 
 checkForTimeouts :: ( MonadLogger m
                     , MonadMonitor m
@@ -258,10 +228,6 @@ checkForUnseq inEvents = do
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
-  seqCtx <- get
-  traverse_ 
-    (\x -> writeSeqVmEvents [VmValidatorList [] (S.toList . unChainMembers $ x ^. validators)])
-    (_blockstanbulContext  seqCtx) -- add first validator to validators DB
   createFirstTimer
 
 blockstanbulSend :: ( MonadLogger m
@@ -294,18 +260,12 @@ blockstanbulSend' msg = do
         -- should be feedback here
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
-  mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  rch <- Mod.access (Mod.Proxy @(TQueue VoteResult))
-  atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
+  for_ resp $ \case
+    ResetTimer rn -> createNewTimer rn
+    FailedHistoric blk ->
+      for_ (ingestBlockToSequencedBlock $ blockToIngestBlock TO.Blockstanbul blk) appendChildFailure
+    _ -> pure ()
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks) 
-
-  -- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
-  -- blockToIngestBlock  :: TO.TXOrigin -> BDB.Block -> IngestBlock
-
-  -- TXOrigin
-  -- getSequencedBlock ::  BDB.Block -> IngestBlock -> Maybe SequencedBlock
-
-  --  traverse (a -> f b) -> t a -> f (t b)
 
   let getSequencedBlock = ingestBlockToSequencedBlock 
                         . blockToIngestBlock TO.Blockstanbul
@@ -317,11 +277,6 @@ blockstanbulSend' msg = do
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
            ++ vms
-
-
-  -- let getSequencedBlock = ingestBlockToSequencedBlock 
-  --                       . blockToIngestBlock TO.Blockstanbul
-
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -342,8 +297,6 @@ blockstanbulSend' msg = do
     vmEvenP2pCheckptFilterHelper (x:xs) = do
       let (vms, p2ps, ctxs) = vmEvenP2pCheckptFilterHelper xs
       case x of 
-         ListOfValidators toDrop toAdd -> (VmValidatorList toDrop toAdd : vms, p2ps, ctxs)
-         PendingVote r d s             -> (VmVoteToMake r d s : vms, p2ps, ctxs)
          OMsg  a m                     -> (vms,  P2pBlockstanbul (WireMessage a m) : p2ps, ctxs)
          GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
          LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
@@ -356,13 +309,6 @@ privateWitnessableHash tHash cHash =
   hash
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
-
-
-
-
--- wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
-
-
 
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
@@ -666,9 +612,24 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETNewCertRegistered -> do
       record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
       traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
+    IETCertRevoked -> do
+      record "inevent_type_cert_revoked" "IngestCertRevoked"
+      traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
     IETNewChainOrgName -> do
       record "inevent_type_new_org_name" "IngestNewChainOrgName"
       yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
+    IETValidatorAdded  -> do
+      record "inevent_type_validator_added" "ValidatorChange"
+      let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
+      blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc True) bs
+      retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+      blockstanbulSend retries
+    IETValidatorRemoved  -> do
+      record "inevent_type_validator_removed" "ValidatorChange"
+      let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
+      blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc False) bs
+      retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+      blockstanbulSend retries
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events

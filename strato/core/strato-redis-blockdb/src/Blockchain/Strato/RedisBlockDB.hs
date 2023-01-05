@@ -15,6 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
     , getSHAsByNumber
     , getChainInfo, putChainInfo
+    , addValidators, removeValidators
     , getChainMembers, putChainMembers
     , addChainMember -- , removeChainMember
     , registerCertificate
@@ -53,7 +54,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
-import           Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.ChainMember   as CM
 
 import           Control.Arrow                         ((&&&), (***), second)
@@ -111,7 +111,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions  -> "pt:"
             PrivateTxsInBlocks   -> "pb:"
             PrivateOrgNameChains -> "pnc:"
-            -- Validators           -> "v:"
+            Validators           -> "v:"
             PrivateTrueOrgNameChains -> "pnct:"
             PrivateFalseOrgNameChains -> "pncf:"
             X509Certificates     -> "x509:"
@@ -127,7 +127,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
-  -- "v" -> Validators
+  "v" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
@@ -159,17 +159,25 @@ putChainInfo cId cInfo = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
--- putValidator :: Word256
---           -> ValidatorRef
---           -> Redis (Either Reply Status)
--- putChainInfo cId cInfo = do --validator
---     let rChain    = RedisValidatorRef validator
+addValidators :: [CM.ChainMemberParsedSet]
+              -> Redis (Either Reply Status)
+addValidators [] = pure $ Right Ok
+addValidators vals = do
+    res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue ("true" :: S8.ByteString))) <$> vals
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addValidators - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addValidators - Error" ++ e)
 
---     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
---     case res of
---         TxSuccess _ -> pure $ Right Ok
---         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
---         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
+removeValidators :: [CM.ChainMemberParsedSet]
+                 -> Redis (Either Reply Status)
+removeValidators [] = pure $ Right Ok
+removeValidators vals = do
+    res <- multiExec . del $ inNamespace Validators <$> vals
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Error" ++ e)
 
 getChainMembers :: Word256
                 -> Redis CM.ChainMemberRSet
@@ -225,18 +233,17 @@ addChainMember cId newMem = do
 --         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
 --         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
-registerCertificate :: Account -> Address -> X509CertInfoState -> Redis (Either Reply Status)
-registerCertificate contractAddress userAddr x509CertInfoState = do
+registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
+registerCertificate userAddr x509CertInfoState = do
     parent <- (\ma -> maybe (pure Nothing) getCertificate ma) (getParentUserAddress $ certificate x509CertInfoState)
 
     -- The certificate registry will always be initialized at 0x509 on the main chain
     let parentIsValid = maybe False isValid parent
-        rightContract = contractAddress == Account 0x509 Nothing
 
     case parent of
         -- The CertificateRegistry is initialized, this event it emitted from the right contract,
         -- and the parent certificate is valid
-        Just p  | rightContract && parentIsValid -> do
+        Just p  | parentIsValid -> do
             res1 <- modifyParsedSetFromCert x509CertInfoState
             res2 <- addParsedSet x509CertInfoState
             res3 <- fmap txToEither . multiExec $ updateParent p >> insertNewX509
@@ -255,24 +262,21 @@ registerCertificate contractAddress userAddr x509CertInfoState = do
             TxAborted -> Left . SingleLine $ "registerCertificate - Aborted registering cert"
             TxError e -> Left . SingleLine $ "registerCertificate - Error registering cert " <> S8.pack e
 
-revokeCertificate :: Account -> Address -> Redis (Either Reply Status)
-revokeCertificate contractAddress userAddress = do
-    if contractAddress == Account 0x509 Nothing   -- default value for Certificate Registry
-        then do
-            mCertInfoState <- getCertificate userAddress
-            case mCertInfoState of
-                Nothing ->  pure . Left $ SingleLine (S8.pack "revokeCertificate - userAddress invalid")
-                Just certInfoState -> do
-                    let newInfoState = certInfoState{isValid  = False}
-                    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
-                    case res of
-                        TxSuccess _ -> do
-                                res2 <- mapM (revokeCertificate contractAddress) (children certInfoState)
-                                _ <- removeCertFromParsedSet certInfoState
-                                pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
-                        TxAborted -> pure . Left $ SingleLine (S8.pack "revokeCertificate - Aborted revoking cert")
-                        TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertificate - Error revoking cert" <> e)
-        else pure . Left $ SingleLine (S8.pack "revokeCertificate - invalid contractAddress, contract is not CertificateRegistry")
+revokeCertificate :: Address -> Redis (Either Reply Status)
+revokeCertificate userAddress = do
+  mCertInfoState <- getCertificate userAddress
+  case mCertInfoState of
+    Nothing ->  pure . Left $ SingleLine (S8.pack "revokeCertificate - userAddress invalid")
+    Just certInfoState -> do
+      let newInfoState = certInfoState{isValid  = False}
+      res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
+      case res of
+        TxSuccess _ -> do
+          res2 <- mapM revokeCertificate (children certInfoState)
+          _ <- removeCertFromParsedSet certInfoState
+          pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
+        TxAborted -> pure . Left $ SingleLine (S8.pack "revokeCertificate - Aborted revoking cert")
+        TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertificate - Error revoking cert" <> e)
 
 getCertificate :: Address -> Redis (Maybe X509CertInfoState)
 getCertificate userAddress = getInNamespace X509Certificates (toKey userAddress) >>= \case

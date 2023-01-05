@@ -38,7 +38,6 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
 import           Blockchain.Blockstanbul.EventLoop
-import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Data.Block
@@ -105,9 +104,6 @@ runTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB False gb m
 
-testWebserverPort :: Int
-testWebserverPort = 8050
-
 runPBFTTestM :: SequencerM a -> IO ()
 runPBFTTestM m = do
   gb <- makeGenesisBlock
@@ -129,8 +125,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     pkg <- atomically newCablePackage
-    vch <- atomically newTQueue
-    rch <- atomically newTQueue
     tch <- atomically newTMChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
@@ -139,8 +133,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , syncWrites            = False
                                , blockstanbulBlockPeriod = BlockPeriod 0
                                , blockstanbulRoundPeriod = RoundPeriod 10000000
-                               , blockstanbulBeneficiary = vch
-                               , blockstanbulVoteResps = rch
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
@@ -150,8 +142,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True
         vals = [myCM]
-        auSenders = [myCM]
-        ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) myCM
+        ctx = newContext (Checkpoint (View 0 0) vals) myCM
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
@@ -161,14 +152,9 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @X509CertInfoState) myAddr $ cmpsToXcis myAddr myCM
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
-    fromLeft (error "webserver completed") <$>
-      race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
-           ( run testWebserverPort
-               . logStdoutDev
-               . prometheus def
-               $ API.createWebServer vch rch)
-        `finally`
-        (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
+    runNoLoggingT (runSequencerM cfg mCtx (boot >> m))
+      `finally`
+      (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
 feedBackOutputsToInput :: [VmEvent] -> [IngestEvent]
 feedBackOutputsToInput = map rebox
@@ -295,60 +281,16 @@ spec = do
         filter (==30) out `shouldBe` [30]
         filter (==45) out `shouldContain` [45, 45]
 
-      it "checks for votes" $ runPBFTTestM $ do
-        bc <- getBlockstanbulContext
-        case bc of
-          Nothing ->
-            expectationFailure "BlockstanbulContext required"
-          Just bct -> do
-            let addr = CommonName "BlockApps" "Engineering" "Admin" True
-                testAddr = CommonName "Microsoft" "Research" "Simon Peyton-Jones" True
-            esign <- signBenfInfo (testAddr, True, 1)
-            let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
-                vote = API.CandidateReceived{API.sender=addr
-                                           , API.signature=esignStr
-                                           , API.recipient=testAddr
-                                           , API.votingdir=True
-                                           , API.nonce = 1}
-            -- Simulate a successful response from blockstanbul by violating causality
-            -- This is pretty fragile to implementation details
-            rch <- asks blockstanbulVoteResps
-            atomically $ writeTQueue rch API.Enqueued
-            let url = BaseUrl Http "localhost" testWebserverPort ""
-            liftIO $ API.uploadVote url vote `shouldReturn` Right ()
-            voteList <- drainVotes
-            voteList `shouldMatchList` [vote]
-            b1 <- runBatch $ checkForVotes voteList
-            _toVm b1 `shouldContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
-            esign' <- signBenfInfo (testAddr, False, 1)
-            let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
-                vote' = API.CandidateReceived{API.sender=addr
-                                            , API.signature=esignStr'
-                                            , API.recipient=testAddr
-                                            , API.votingdir=False
-                                            , API.nonce = 1}
-            liftIO $ API.uploadVote url vote' `shouldReturn` Right ()
-            voteList' <- drainVotes
-            voteList' `shouldMatchList` [vote']
-            b2 <- runBatch $ checkForVotes voteList'
-            _toVm b2 `shouldNotContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
-            bctn <- getBlockstanbulContext
-            let unwrapbct' = fromMaybe bct bctn
-            _authSenders unwrapbct' `shouldBe` M.singleton addr 1
-
     describe "fuseChannels" $ do
-      it "should multiplex event types" $ withMaxSuccess 5 $ property $ \vote rn iev -> runTestM $ do
+      it "should multiplex event types" $ withMaxSuccess 5 $ property $ \rn iev -> runTestM $ do
         tch <- asks blockstanbulTimeouts
         atomically . writeTMChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTBQueue uch $ iev
-        vch <- asks blockstanbulBeneficiary
-        atomically . writeTQueue vch $ vote
         src0 <- sealConduitT <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
-        (src2, ev2) <- src1 $$++ headC
-        (_, ev3) <- src2 $$++ headC
-        [ev1, ev2, ev3] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev, Just $ VoteMade vote]
+        (_, ev2) <- src1 $$++ headC
+        [ev1, ev2] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev]
 
     describe "sequencer" $ do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
