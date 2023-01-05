@@ -18,6 +18,7 @@ library:
   dependencies:
   - aeson
   - base16-bytestring
+  - base64
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs

@@ -37,5 +37,6 @@ defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodeke
 defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize - deprecated, except for upgraded networks (pre-6.0)"
 
 defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
+defineFlag "genesisCerts" ("[]" :: String) "Extra certs passed into the genesis block"
 
 $(return [])
