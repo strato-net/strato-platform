@@ -1,8 +1,7 @@
 module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
-    RawOauth(..),
-    RawPing(..)
+    RawOauth(..)
 ) where
 
 -- import           Control.Lens
@@ -115,19 +114,3 @@ instance FromJSON RawOauth where
         _          -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
     return $ RawOauth authend tokend 
   parseJSON wat = typeMismatch "Spec" wat
-
-instance FromJSON RawPing where
-  parseJSON (Object o) = do
-    ver  <- o .: T.pack "version"
-
-    vers <- case ver of
-        (String s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
-
-    return $ RawPing $ T.unpack vers
-  parseJSON wat = typeMismatch "Spec" wat
-
-data RawPing = RawPing {
-    ping :: String
-} deriving (Show, Eq)

@@ -98,7 +98,10 @@ main = do
   makeHttpCall <- Curl.curlGetString (T.unpack (flags_VAULT_URL <> "/strato/v2.3/_ping")) ([Curl.CurlHttpHeaders authy]) 
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The curl to _ping worked, here is the output"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show makeHttpCall
-  when (snd makeHttpCall /= "version 1") $ error "The vault has breaking changes, I cannot continue." 
+  let version = "\"pingDetail\""
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "The correct version should be: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG version
+  when (snd makeHttpCall /= version) $ error "The vault has breaking changes, I cannot continue." 
 
 
   --Setup the vault connection
