@@ -63,9 +63,9 @@ main = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
   inspectVaultUrl flags_VAULT_URL
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
-  mgr <- HCLI.newManager HCON.tlsManagerSettings
+  mgr <- newManager defaultManagerSettings
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
-    --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
+  --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
   vaultLock <- liftIO $ L.new
   --Initialize the token cache
   tokenCash <- atomically $ Cache.newCacheSTM Nothing
