@@ -113,7 +113,7 @@ app vc rev = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Changing the request to the foreign vault."
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the modified request: "
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show modReq
-  pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
+  pure . WPRModifiedRequestSecure modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
 
 checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
