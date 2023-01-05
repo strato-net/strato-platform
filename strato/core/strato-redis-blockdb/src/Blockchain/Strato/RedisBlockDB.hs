@@ -15,7 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
     , getSHAsByNumber
     , getChainInfo, putChainInfo
-    , addValidators, removeValidators
+    , isValidator, addValidators, removeValidators
     , getChainMembers, putChainMembers
     , addChainMember -- , removeChainMember
     , registerCertificate
@@ -159,11 +159,17 @@ putChainInfo cId cInfo = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
+isValidator :: CM.ChainMemberParsedSet
+            -> Redis Bool
+isValidator val = getInNamespace Validators val >>= \case
+    Right (Just v) -> pure $ fromValue v
+    _ -> pure False
+
 addValidators :: [CM.ChainMemberParsedSet]
               -> Redis (Either Reply Status)
 addValidators [] = pure $ Right Ok
 addValidators vals = do
-    res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue ("true" :: S8.ByteString))) <$> vals
+    res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue True)) <$> vals
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addValidators - Aborted")

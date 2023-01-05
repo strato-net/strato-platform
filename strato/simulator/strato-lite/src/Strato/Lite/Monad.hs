@@ -126,6 +126,9 @@ import           Executable.StratoP2P
 import           Network.Socket
 import           UnliftIO
 
+loggingFunc :: LoggingT m a -> m a
+loggingFunc = runNoLoggingT
+
 data VSocket = VSocket
   { _inbound :: TQueue B.ByteString
   , _outbound :: TQueue B.ByteString
@@ -178,6 +181,7 @@ data TestContext = TestContext
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
   , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
+  , _p2pValidators         :: Set.Set ChainMemberParsedSet
   , _x509certMap           :: Map Address X509CertInfoState
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
@@ -496,9 +500,15 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
 instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . x509certInfoState
-  insert = genericTestInsert $ sequencerContext . x509certInfoState
-  delete = genericTestDelete $ sequencerContext . x509certInfoState
+  lookup p k = genericTestLookup (sequencerContext . x509certInfoState) p k >>= \case
+    Just x -> pure $ Just x
+    Nothing -> use $ x509certMap . at k
+  insert p k v = do
+    genericTestInsert (sequencerContext . x509certInfoState) p k v
+    x509certMap . at k ?= v
+  delete p k = do
+    genericTestDelete (sequencerContext . x509certInfoState) p k
+    x509certMap . at k .= Nothing
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select = A.lookup
@@ -1058,6 +1068,12 @@ instance MonadIO m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet
 instance (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadP2PTest m) where
   select p cm = lift $ A.select p cm
 
+instance MonadIO m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadTest m) where
+  select _ cm = Just . IsValidator . Set.member cm <$> use p2pValidators
+
+instance (ChainMemberParsedSet `A.Selectable` IsValidator) m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadP2PTest m) where
+  select p cm = lift $ A.select p cm
+
 instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadTest m) where
   select _ cm = M.lookup cm <$> use parsedSetToX509Map 
 
@@ -1162,6 +1178,7 @@ testContext prv bootNodes rNum seqCtx vmCtx = TestContext
   , _chainInfoMap          = M.empty
   , _trueOrgNameChainsMap  = M.empty
   , _falseOrgNameChainsMap = M.empty
+  , _p2pValidators         = Set.empty
   , _x509certMap           = M.empty
   , _privateTxMap          = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash
@@ -1207,13 +1224,13 @@ makeLenses ''P2PPeer
 runNodeWithoutP2P :: P2PPeer -> IO ()
 runNodeWithoutP2P p = do
   concurrently_
-    (concurrently_ (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
-                                  (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
-                   (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
+    (concurrently_ (concurrently_ (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
+                                  (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
+                   (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
     (concurrently_ 
-      (concurrently_ (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
-                     (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
-      (runLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
+      (concurrently_ (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
+                     (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
+      (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
 
 runNode :: P2PPeer -> IO ()
 runNode p = do
@@ -1223,8 +1240,8 @@ runNode p = do
   concurrently_
     (runNodeWithoutP2P p)
     (concurrently_
-      (stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
-      (runLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
+      (loggingFunc $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
+      (loggingFunc $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1360,7 +1377,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         , obReceiptTransactions = []
         , obBlockUncles         = []
         }
-  testContextTVar <- newTVarIO $ testContext privKey bootNodes cht seqCtx vmCtx
+  testContextTVar <- newTVarIO $ testContext privKey bootNodes cht seqCtx vmCtx & p2pValidators .~ Set.fromList vals
   let seqTimerSource = runConduit $ sourceTMChan cht .| mapC ((:[]) . TimerFire) .| sinkTQueue unseqSource
   let sequencer = do
         DBDB.bootstrapGenesisBlock genHash 1
@@ -1435,8 +1452,10 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
                                     RemoveOrgName _ _ -> pure () --(Right (cid, (n, u)))
                                     ValidatorAdded bHash cm -> do
+                                      p2pValidators %= Set.insert cm
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded bHash cm
                                     ValidatorRemoved bHash cm -> do
+                                      p2pValidators %= Set.delete cm
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorRemoved bHash cm
                                     RegisterCertificate addr certState@(X509CertInfoState _ _ _ _ o u c) -> do
                                       let setOrg = Org (T.pack o) True
@@ -1590,10 +1609,10 @@ runConnection :: P2PConnection
               -> IO ()
 runConnection connection = do
   let rServer = do
-        mEx <- runLoggingT . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
+        mEx <- loggingFunc . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
         atomically $ writeTVar (connection ^. serverException) mEx
       rClient = do
-        mEx <- runLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
+        mEx <- loggingFunc . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
         atomically $ writeTVar (connection ^. clientException) mEx
   concurrently_ rServer rClient
 

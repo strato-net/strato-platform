@@ -113,9 +113,9 @@ spec = do
                        , CommonName "Meta" "Metaverse" "Zark Muckerberg" True
                        , CommonName "Google" "Search" "Larry PageRank" True
                        ]
-          validatorsPrivKeys' = take 2 privKeys
+          validatorsPrivKeys' = privKeys
           validatorAddresses = fromPrivateKey <$> validatorsPrivKeys'
-          validatorInfos = take 2 identities
+          validatorInfos = identities
           zippedValidators = zip validatorAddresses validatorInfos
       certs <- traverse (uncurry selfSignCert) $ zip privKeys identities
       peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators certs n i) $ zip (zip privKeys identities)
@@ -127,7 +127,7 @@ spec = do
         , ("node6", "21.22.23.24")
         , ("node7", "25.26.27.28")
         ]
-      let validators' = take 2 peers
+      let validators' = peers
       connections' <- traverse (uncurry createConnection)
         [ (peers !! 0, peers !! 1)
         , (peers !! 0, peers !! 2)
@@ -198,7 +198,8 @@ spec = do
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       atomically $ modifyTVar' ((peers !! 0) ^. p2pTestContext)
                                ((sequencerContext . blockstanbulContext . _Just . validators .~ ChainMembers (Set.fromList validatorInfos))
-                               . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators))
+                               . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators)
+                               . (p2pValidators .~ Set.fromList validatorInfos))
       runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
@@ -669,6 +670,11 @@ contract RegisterCert {
               threadDelay 5000000
               ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
               ifor_ ctxs1 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
+              threadDelay 200000
+              postEvent (TimerFire 1) (peers !! 0)
+              threadDelay 200000
+              postEvent (TimerFire 2) (peers !! 0)
+              threadDelay 200000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedRemoveTx
 
         void . timeout 10000000 $ concurrently_ (runNetworkOld peers connections') routine1
