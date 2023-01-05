@@ -26,7 +26,6 @@ import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BC
-import qualified Data.ByteString.Short                 as BSS
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
@@ -265,7 +264,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
                                        , transactionResultTransactionHash  = tHash
                                        , transactionResultMessage          = "Success!"
                                        , transactionResultResponse         = case kind of
-                                                                               EVM -> BSS.empty
+                                                                               EVM -> ""
                                                                                SolidVM -> "()"
                                        , transactionResultTrace            = unlines $ unlines . reverse . erTrace <$> mExecResults
                                        , transactionResultGasUsed          = 0
@@ -291,7 +290,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
                                        , transactionResultTransactionHash  = tHash
                                        , transactionResultMessage          = fmt
                                        , transactionResultResponse         = case kind of
-                                                                               EVM -> BSS.empty
+                                                                               EVM -> ""
                                                                                SolidVM -> "()"
                                        , transactionResultTrace            = unlines $ unlines . reverse . erTrace <$> mExecResults
                                        , transactionResultGasUsed          = 0

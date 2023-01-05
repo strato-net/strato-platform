@@ -425,7 +425,7 @@ runArgs = runArgsWithSender sender
 runArgsBeef :: T.Text -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
+runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -516,7 +516,7 @@ runCall' funcName callArgs bs = do
     newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
-  return $ (BC.unpack <$> SB.fromShort <$> erReturnVal er2)
+  return $ erReturnVal er2
   -- lastN' 32
 
 
@@ -524,7 +524,7 @@ lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
 
-call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe SB.ShortByteString)
+call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
