@@ -2036,9 +2036,9 @@ contract qq is BaseContainer {
 }|]
 -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the decprecated function runCall
     runCall' "contains" "(10)" ctract `shouldReturn`
-        Just  "(0)"
+        Just  "(false)"
     runCall' "contains" "(4)" ctract `shouldReturn`
-        Just  "(1)"
+        Just  "(true)"
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall' "value" "()" [r|
@@ -5133,7 +5133,7 @@ contract qq {
     d.flags[1] = true;
     return d.flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5144,7 +5144,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5155,7 +5155,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall' "a" "()" [r|
@@ -5703,7 +5703,7 @@ contract qq {
         return (0, false);
     }
   }
-}|] `shouldReturn` (Just "(12,0)")
+}|] `shouldReturn` (Just "(12,false)")
 
     getFields ["errCount", "theError"] `shouldReturn` [BInteger 1, BInteger 12] 
 
