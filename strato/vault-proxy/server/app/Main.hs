@@ -65,8 +65,8 @@ main = do
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
   inspectVaultUrl flags_VAULT_URL
-  --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
-  mgr <- HCLI.newManager HCON.tlsManagerSettings
+  --Initialize a new connection manager
+  mgr <- newManager HCLI.defaultManagerSettings
 
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
     --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
@@ -87,7 +87,7 @@ main = do
   
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making an intial call to the OAUTH provider"
   --make an initial call to see if the vault is working
-  initialToken <- getAwesomeToken flags_VAULT_PROXY_DEBUG vaultLock tokenCash flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_RESERVE_SECONDS noErrorOauth
+  initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
 
   --Check the version of the foreign shared vault
   traceM "Checking the version of the foreign vault"
