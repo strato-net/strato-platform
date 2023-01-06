@@ -290,17 +290,20 @@ contract Certificate {
     }
     
     function addChild(address _child) public {
-
+        require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
+        
         children.push(_child);
     }
     
     function revoke() public returns (int){
+        require(msg.sender == owner,"You don't have permission to CALL revoke!");
 
         isValid = false;
         return children.length;
     }
     
     function getChild(int index) public returns (address){
+        require(msg.sender == owner,"You don't have permission to get children!");
         
         return children[index];
     }
