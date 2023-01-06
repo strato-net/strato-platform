@@ -1759,7 +1759,7 @@ contract qq {
            , [Field "x"]
            ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
 
-  fit "can accept remote arrays" . runTest $ do
+  it "can accept remote arrays" . runTest $ do
     runCall "addHead" "([10, 17])" [r|
 contract qq {
   uint x;
