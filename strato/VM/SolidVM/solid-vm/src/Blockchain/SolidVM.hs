@@ -770,12 +770,12 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                           Just ci -> if fromChain == toChain then readOnly ci else True
                 let f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
                 return (f', args')
-          --- Delegatecall code
+          --- Delegatecall logic
           Just theFunction | (isDelegateCall == True) -> do
                 let mtheFunction' = do -- find the func that matches the arguements the user gave, if not found return Nothing and then call fallback
                       let filterFuncsWithSameArgLength = filter (\thyFunc -> (length argsParsed )  == (length $ CC._funcArgs thyFunc)) ( [theFunction] ++  (CC._funcOverload  theFunction) )
                       let finalFuncFind = filter (\xxx -> all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs xxx)) (filterFuncsWithSameArgLength)
-                      if length finalFuncFind /= 0 then Just $ (head finalFuncFind) else Nothing -- Nothing means function
+                      if length finalFuncFind /= 0 then Just $ (head finalFuncFind) else Nothing 
                 case mtheFunction' of
                       Just theFunction' | (length argsParsed) == (length argExps) -> do
                                 args' <- argsToVals contract' theFunction' argExps
@@ -787,7 +787,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                 return (f', args')
                       _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
                                   Just fallbackFunc -> do 
-                                                args' <- argsToVals contract' fallbackFunc argExps -- What exactly is argsToVals doing?
+                                                args' <- argsToVals contract' fallbackFunc argExps
                                                 mCallInfo <- getCurrentCallInfoIfExists  
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
@@ -809,7 +809,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                 if isDelegateCall
                   then (case M.lookup "fallback" functionsIncludingConstructor of
                                   Just fallbackFunc -> do 
-                                                args' <- argsToVals contract' fallbackFunc argExps -- What exactly is argsToVals doing?
+                                                args' <- argsToVals contract' fallbackFunc argExps
                                                 mCallInfo <- getCurrentCallInfoIfExists  
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
@@ -828,7 +828,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                 val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
                 popCallInfo
                 return (pure val, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-} 
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
               
   when isRCC (do
                 addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
@@ -1873,7 +1873,7 @@ expToVar' (CC.FunctionCall _ e args) = do
           res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args' 
           case res of
               Just a -> return $ Constant  a
-              Nothing -> return $ Constant SNULL --TODO
+              Nothing -> return $ Constant SNULL
         (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
