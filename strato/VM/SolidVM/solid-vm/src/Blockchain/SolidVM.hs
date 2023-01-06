@@ -713,9 +713,8 @@ callWrapper :: MonadSM m => Account -> Account ->  Maybe Account -> Maybe SolidS
 callWrapper from to mLogicAddress mContract functionName isRCC argExps  = snd <$> callWrapper' from to mLogicAddress  mContract functionName isRCC argExps
 
 callWrapper' :: MonadSM m => Account -> Account -> Maybe Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
-callWrapper' from storageAddress mLogicAddress mContract functionName isRCC argExps  = do
-  let (to, isDelegateCall, ccToGet)  = case mLogicAddress of Nothing -> (storageAddress, False, storageAddress); Just logicAddress -> (from, True, logicAddress);
-  
+callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
+  let (to, isDelegateCall, ccToGet)  = case mLogicAddress of Nothing -> (to', False, to'); Just logicAddress -> (from, True, logicAddress);
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
