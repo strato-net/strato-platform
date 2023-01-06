@@ -39,6 +39,8 @@ import           Strato.VaultProxy.GetPing                as GP
 import           Strato.VaultProxy.Server.Token
 import           Strato.Strato23.API.Types
 
+import           Text.Regex
+
 import           Options
 
 main :: IO ()
@@ -192,11 +194,14 @@ inspectVaultUrl :: T.Text -> IO ()
 inspectVaultUrl url = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
   purl <- S.parseBaseUrl $ T.unpack url
-  allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the "
-
-  dockerIps <- matchRegexAll (mkRegex allowedIPAddressRegex) $ S.baseUrlHost purl
-  if | (dockerIps \= Nothing) -> do
+  let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+  
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the URL using this regex: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG allowedIPAddressRegex
+  let dockerIps = matchRegexAll (mkRegex allowedIPAddressRegex) $ S.baseUrlHost purl
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG "This is the result of the regex search on the VAULT_URL: "
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show dockerIps
+  if | (dockerIps /= Nothing) -> do
         traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
         pure ()
      | (S.baseUrlHost purl == "docker.for.mac.localhost") -> do
