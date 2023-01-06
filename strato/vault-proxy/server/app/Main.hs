@@ -64,15 +64,11 @@ main = do
   -- $logInfoS "Vault-Proxy is Starting"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
-  inspectVaultUrl flags_VAULT_URL
-  --Initialize a new connection manager
-  mgr <- newManager HCLI.defaultManagerSettings
-
+  -- inspectVaultUrl flags_VAULT_URL
+  --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
+  mgr <- HCLI.newManager HCON.tlsManagerSettings
   --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
-    --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
-
-  --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
-    --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
+  --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
   vaultLock <- liftIO $ L.new
   --Initialize the token cache
   tokenCash <- atomically $ Cache.newCacheSTM Nothing
@@ -134,13 +130,19 @@ app vc rev = do
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)
   let fport = baseUrlPort foreignVault
       furl = baseUrlHost foreignVault
+      httpsMaybe = S.baseUrlScheme foreignVault
   --Check and review the headers that were added
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the request contains the X-USER-ACCESS-TOKEN header"
   modReq <- checkHeaders rev vc
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Changing the request to the foreign vault."
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the modified request: "
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show modReq
-  pure . WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
+  pure $ secureWai httpsMaybe modReq furl fport
+
+secureWai :: S.Scheme -> Request -> String -> Int -> WaiProxyResponse
+secureWai S.Https modReq furl fport = WPRModifiedRequestSecure modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
+secureWai _ modReq furl fport  = WPRModifiedRequest modReq $ ProxyDest (TE.encodeUtf8 $ T.pack furl) fport
+
 
 checkHeaders :: W.Request -> VaultConnection -> IO Request
 checkHeaders rev vc = do
@@ -191,12 +193,12 @@ checkXuat rev vc = do
 bearerBS :: ByteString
 bearerBS = TE.encodeUtf8 "Bearer "
 
-inspectVaultUrl :: T.Text -> IO ()
-inspectVaultUrl url = do
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
-  purl <- S.parseBaseUrl $ T.unpack url
-  if | (S.baseUrlHost purl == "172.17.0.1") -> do
-        traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
-        pure ()
-     | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
-     | otherwise -> pure ()
+-- inspectVaultUrl :: T.Text -> IO ()
+-- inspectVaultUrl url = do
+--   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Inspecting the vault url"
+--   purl <- S.parseBaseUrl $ T.unpack url
+--   if | (S.baseUrlHost purl == "172.17.0.1") -> do
+--         traceM ("There was a special url provided (" ++ showBaseUrl purl ++ "),  I will allow any types of connections to this url.")
+--         pure ()
+--      | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
+--      | otherwise -> pure ()

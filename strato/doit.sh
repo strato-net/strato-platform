@@ -465,17 +465,18 @@ if [[ -z ${VAULT_URL} ]] ; then
   exit 1
 fi
 
-# This will check if the link provided is valid format, and if it is HTTPS
-if [[ "$VAULT_URL" == "https"* ]]; then
-    echo "VAULT_URL provided is using secure https connection."
-else
-    if [[ "$VAULT_URL" == *"172.17.0.1"* ]]; then
-        echo "VAULT_URL provided is http with local docker ip for debugging."
-    else 
-        echo "VAULT_URL provided is not valid, expected the value starting with 'https://' or 'http://172.17.0.1'"
-        exit 3
-    fi
-fi
+# TODO: the check is temporarily disabled until issues with urls are resolved
+## This will check if the link provided is valid format, and if it is HTTPS
+#if [[ "$VAULT_URL" == "https"* ]]; then
+#    echo "VAULT_URL provided is using secure https connection."
+#else
+#    if [[ "$VAULT_URL" == *"172.17.0.1"* ]]; then
+#        echo "VAULT_URL provided is http with local docker ip for debugging."
+#    else 
+#        echo "VAULT_URL provided is not valid, expected the value starting with 'https://' or 'http://172.17.0.1'"
+#        exit 3
+#    fi
+#fi
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
