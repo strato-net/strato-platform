@@ -15,7 +15,7 @@ defineFlag "u:pguser" (""  ::  String) "Postgres user"
 defineFlag "P:pghost" (""  ::  String) "Postgres hostname"
 defineFlag "p:password" (""  ::  String) "Postgres password"
 defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
-defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "Vault-Wrapper URL"
+defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "Vault-Wrapper URL"
 defineFlag "z:zkhost" ("localhost"  ::  String) "Zookeeper hostname"
 defineFlag "z:lazyblocks" (False  ::  Bool) "Don't mine empty blocks"
 defineFlag "network" ("" :: String) "The network that strato will join"
@@ -37,5 +37,7 @@ defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodeke
 defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize - deprecated, except for upgraded networks (pre-6.0)"
 
 defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
+defineFlag "validators" ("[]" :: String) "JSON encoded addresses of Blockstanbul validators"
+defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of network admins. Admins can, for instance, nominate a new validator"
 
 $(return [])

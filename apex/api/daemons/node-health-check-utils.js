@@ -14,7 +14,7 @@ const neededJobs = {
   "strato_p2p": "strato-p2p",
   "vm_main": "vm-runner",
   "seq_main": "strato-sequencer",
-  "blockapps-vault-wrapper-server": "vault-wrapper",
+  // TODO: add vault-proxy in prometheus
   "core-api": "core-api"
 }
 
@@ -51,12 +51,12 @@ function queryHealthStatus() {
 }
 
 function getPrometheusMetrics() {
-  if (!process.env['prometheusHost']) {
-    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  if (!process.env['PROMETHEUS_HOST']) {
+    throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
   }
   const options = {
     method: 'GET',
-    url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=health_check`,
+    url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=health_check`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
@@ -67,7 +67,7 @@ function getPrometheusMetrics() {
 async function checkIfGlobalPasswordSet() {
   const options = {
     method: 'GET',
-    url: `${process.env['vaultWrapperHttpHost']}/strato/v2.3/verify-password`,
+    url: `${process.env.vaultProxyUrl}/strato/v2.3/verify-password`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,

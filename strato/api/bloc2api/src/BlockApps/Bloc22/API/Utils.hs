@@ -62,40 +62,40 @@ instance ToSchema ContractName where
 
 --------------------------------------------------------------------------------
 
-newtype UserName = UserName {getUserName :: Text} deriving (Eq,Show,Generic)
+newtype JwtToken = JwtToken {getJwtToken :: Text} deriving (Eq,Show,Generic)
 
-instance IsString UserName where
-  fromString = UserName . Text.pack
+instance IsString JwtToken where
+  fromString = JwtToken . Text.pack
 
-instance ToHttpApiData UserName where
-  toUrlPiece = getUserName
+instance ToHttpApiData JwtToken where
+  toUrlPiece = getJwtToken
 
-instance FromHttpApiData UserName where
-  parseUrlPiece = Right . UserName
+instance FromHttpApiData JwtToken where
+  parseUrlPiece = Right . JwtToken
 
-instance ToJSON UserName where
-  toJSON = toJSON . getUserName
+instance ToJSON JwtToken where
+  toJSON = toJSON . getJwtToken
 
-instance FromJSON UserName where
-  parseJSON = fmap UserName . parseJSON
+instance FromJSON JwtToken where
+  parseJSON = fmap JwtToken . parseJSON
 
-instance ToSample UserName where
+instance ToSample JwtToken where
   toSamples _ = samples
-    [ UserName uname | uname <- ["samrit", "dustin", "yunfan", "daniel"]]
+    [ JwtToken jwt | jwt <- ["samrit", "dustin", "yunfan", "daniel", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"]]
 
-instance ToCapture (Capture "user" UserName) where
-  toCapture _ = DocCapture "user" "a user name"
+instance ToCapture (Capture "user" JwtToken) where
+  toCapture _ = DocCapture "user" "a jwt string token"
 
-instance Arbitrary UserName where arbitrary = GR.genericArbitrary GR.uniform
+instance Arbitrary JwtToken where arbitrary = GR.genericArbitrary GR.uniform
 
 
-instance ToParamSchema UserName
+instance ToParamSchema JwtToken
 
-instance ToSchema UserName where
-  declareNamedSchema _ = return $ NamedSchema (Just "User Name")
+instance ToSchema JwtToken where
+  declareNamedSchema _ = return $ NamedSchema (Just "R5cCI6IkpXVCJ9.eyJzdFAKESTUFFF.asd123nKJF")
       ( mempty
         & type_ ?~ SwaggerString
-        & example ?~ toJSON (UserName "Nikita")
+        & example ?~ toJSON (JwtToken "Nikita")
         & description ?~ "User Name" )
 
 --------------------------------------------------------------------------------

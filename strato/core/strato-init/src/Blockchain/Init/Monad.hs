@@ -87,10 +87,10 @@ waitOnVault action = do
 instance HasVault SetupDBM where
   getPub = do
     vc <- asks vaultDB
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vc
   sign bs = do
     vc <- asks vaultDB
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc  
+    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) vc  
   getShared _ = error "should not be calling getShared in strato-init"
     
 instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where

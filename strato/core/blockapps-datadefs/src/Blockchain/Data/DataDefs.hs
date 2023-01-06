@@ -35,7 +35,6 @@ import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
-import qualified Data.ByteString.Short                   as BSS
 import           Data.Data
 import           Data.Swagger                            hiding (Format, format)
 import           Data.Text                               (Text)

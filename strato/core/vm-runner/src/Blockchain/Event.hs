@@ -24,7 +24,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
@@ -36,30 +35,26 @@ import           Data.Map                           (Map)
 type VmInEvent = VmEvent
 
 data VmInEventBatch = InBatch
-  { votesToMake        :: [(ChainMemberParsedSet, Bool, ChainMemberParsedSet)]
-  , rpcCommands        :: [JsonRpcCommand]
+  { rpcCommands        :: [JsonRpcCommand]
   , txPairs            :: [(Timestamp, OutputTx)]
   , tLen               :: {-# UNPACK #-} !Int
   , blocksAndNewChains :: [Either OutputGenesis OutputBlock]
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
   , privateTxs         :: [OutputTx]
-  , validators         :: ([ChainMemberParsedSet], [ChainMemberParsedSet])
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] [] 0 [] 0 False [] ([], [])
+newInBatch = InBatch [] [] 0 [] 0 False []
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
   VmGenesis og -> b{ blocksAndNewChains = (Left og):blocksAndNewChains b}
-  VmVoteToMake r d s -> b{ votesToMake = (r,d,s):votesToMake b}
   VmJsonRpcCommand j -> b{ rpcCommands = j:rpcCommands b}
   VmTx ts t -> b{ txPairs = (ts,t):txPairs b, tLen = tLen b + 1}
   VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
   VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
-  VmValidatorList  d a -> b{ validators = (d, a) } 
 
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
@@ -71,7 +66,6 @@ data VmOutEvent = OutAction Action
                 | OutTXR TransactionResult
                 | OutASM (Map Account AddressStateModification)
                 | OutJSONRPC String B.ByteString
-                | OutValidators [ChainMemberParsedSet] [ChainMemberParsedSet]
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
@@ -85,12 +79,10 @@ data VmOutEventBatch = OutBatch
   , outTXRs         :: DL.DList TransactionResult
   , outASMs         :: DL.DList (Map Account AddressStateModification)
   , outJSONRPCs     :: DL.DList (String, B.ByteString)
-  , vals            :: DL.DList IndexEvent
   }
 
 newOutBatch :: VmOutEventBatch
 newOutBatch = OutBatch DL.empty
-                       DL.empty
                        DL.empty
                        DL.empty
                        DL.empty
@@ -114,4 +106,3 @@ insertOutBatch e b = case e of
   OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
   OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
   OutJSONRPC x y       -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
-  OutValidators d add  -> b{ vals = vals b `DL.snoc` (ValidatorsG (d, add)) }        
