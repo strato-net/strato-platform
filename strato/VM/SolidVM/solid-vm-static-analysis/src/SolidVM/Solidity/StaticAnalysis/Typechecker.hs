@@ -1436,8 +1436,7 @@ tcExpr (FunctionCall x (Variable _ "type") args) =
 tcExpr (FunctionCall x (MemberAccess _ _ "delegatecall" )  args ) = do
   case args of
     (OrderedArgs []) ->  pure $ bottom $ "Delegatecall needs arguements" <$ x
-    (OrderedArgs ((SVMType.String  _): _ )) ->   pure $ (topType' x)
-    (OrderedArgs ( _: _ ) ) ->   pure $ bottom $ "First arguement of Delegatecall must be a string" <$ x
+    (OrderedArgs (a: _ )) ->   (stringType' x)  ~> tcExpr a !>  (pure $ topType' x)
     _ -> pure $ bottom $ "DelegateCall does not take named arguements" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr

@@ -714,8 +714,8 @@ callWrapper from to mLogicAddress mContract functionName isRCC argExps  = snd <$
 
 callWrapper' :: MonadSM m => Account -> Account -> Maybe Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
 callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
-  let (to, isDelegateCall, ccToGet)  = case mLogicAddress of Nothing -> (to', False, to'); Just logicAddress -> (from, True, logicAddress);
   let fromChain = from ^. accountChainId
+      (to, isDelegateCall, ccToGet)  = case mLogicAddress of Nothing -> (to', False, to'); Just logicAddress -> (from, True, logicAddress);
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
@@ -780,20 +780,39 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
   
   (f, args) <-
         case M.lookup functionName' functionsIncludingConstructor of
-          Just theFunction -> do
-            let theFunction' = if isDelegateCall 
-                  then do --Before merge or pull request improve this
-                      let findFunc = filter (\xxx -> (length argsParsed )  == (length $ CC._funcArgs xxx)) ( [theFunction] ++  (CC._funcOverload  theFunction) )
-                      let finalFuncFind = filter (\xxx -> all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs xxx)) (findFunc)
-                      if length finalFuncFind /= 0 then  (head finalFuncFind) else theFunction -- Maybe throw an error here?
-                  else theFunction
-            args' <- argsToVals contract' theFunction' argExps
-            mCallInfo <- getCurrentCallInfoIfExists
-            let ro = case mCallInfo of
-                       Nothing -> False
-                       Just ci -> if fromChain == toChain then readOnly ci else True
-            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
-            return (f', args')
+          Just theFunction | isDelegateCall == False -> do
+                args' <- argsToVals contract' theFunction argExps
+                mCallInfo <- getCurrentCallInfoIfExists                
+                let ro = case mCallInfo of
+                          Nothing -> False
+                          Just ci -> if fromChain == toChain then readOnly ci else True
+                let f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
+                return (f', args')
+          --- Delegatecall code
+          Just theFunction | (isDelegateCall == True) -> do
+                let mtheFunction' = do -- find the func that matches the arguements the user gave, if not found return Nothing and then call fallback
+                      let filterFuncsWithSameArgLength = filter (\thyFunc -> (length argsParsed )  == (length $ CC._funcArgs thyFunc)) ( [theFunction] ++  (CC._funcOverload  theFunction) )
+                      let finalFuncFind = filter (\xxx -> all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs xxx)) (filterFuncsWithSameArgLength)
+                      if length finalFuncFind /= 0 then Just $ (head finalFuncFind) else Nothing -- Nothing means function
+                case mtheFunction' of
+                      Just theFunction' | (length argsParsed) == (length argExps) -> do
+                                args' <- argsToVals contract' theFunction' argExps
+                                mCallInfo <- getCurrentCallInfoIfExists
+                                let ro = case mCallInfo of
+                                          Nothing -> False
+                                          Just ci -> if fromChain == toChain then readOnly ci else True
+                                let f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                                return (f', args')
+                      _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
+                                  Just fallbackFunc -> do 
+                                                args' <- argsToVals contract' fallbackFunc argExps -- What exactly is argsToVals doing?
+                                                mCallInfo <- getCurrentCallInfoIfExists  
+                                                let ro = case mCallInfo of
+                                                              Nothing -> False
+                                                              Just ci -> if fromChain == toChain then readOnly ci else True
+                                                let f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                                                return (f', args')
+                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.CC.storageDefs of
               Just _ -> do 
@@ -806,17 +825,16 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                   return (pure val, OrderedVals []) 
               Nothing -> 
                 if isDelegateCall
-                  then do 
-                        case M.lookup "fallback" functionsIncludingConstructor of
-                          Just theFunction -> do 
-                            args' <- argsToVals contract' theFunction argExps -- What exactly is argsToVals doing?
-                            mCallInfo <- getCurrentCallInfoIfExists  
-                            let ro = case mCallInfo of
-                                          Nothing -> False
-                                          Just ci -> if fromChain == toChain then readOnly ci else True
-                            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro False
-                            return (f', args')
-                          _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-- Maybe return a false then error out       
+                  then (case M.lookup "fallback" functionsIncludingConstructor of
+                                  Just fallbackFunc -> do 
+                                                args' <- argsToVals contract' fallbackFunc argExps -- What exactly is argsToVals doing?
+                                                mCallInfo <- getCurrentCallInfoIfExists  
+                                                let ro = case mCallInfo of
+                                                              Nothing -> False
+                                                              Just ci -> if fromChain == toChain then readOnly ci else True
+                                                let f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                                                return (f', args')
+                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))       
                   else unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
               {-
