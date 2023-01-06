@@ -54,7 +54,7 @@ pipeline {
             until curl --silent --output /dev/null --fail --insecure --location "http://localhost:8088/_ping"; do sleep 0.5; done
             echo 'Vault is available'
             set -x
-            PASSWORD=123 ./strato --set-vault-password
+            docker exec -i vault_vault-wrapper_1 curl -s -H "Content-Type: application/json" -d @- localhost:8000/strato/v2.3/password <<< \"123\"
             
             export NODE_HOST=$(</host)
             export BLOC_DEBUG=true
