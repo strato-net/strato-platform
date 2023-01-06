@@ -46,13 +46,14 @@ import Blockchain.GenesisBlock
 import Blockchain.Init.Monad
 import Blockchain.Init.Protocol
 import Blockchain.MilenaTools
+import Blockchain.Strato.Model.ChainMember
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka as K
 import Network.Kafka.Protocol as K
 import qualified Text.Colors as CL
 
-runWorker :: K.KafkaAddress -> LoggingT IO ()
-runWorker kaddr = do
+runWorker :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> K.KafkaAddress -> LoggingT IO ()
+runWorker validators admins kaddr = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
     workerKafka kaddr $ do
       firstOffset' <- start
@@ -67,7 +68,7 @@ runWorker kaddr = do
       $logInfoS "runWorker" "Adding empty code"
       void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
       $logInfoS "runWorker" "Processing genesis block"
-      initializeGenesisBlock tf []
+      initializeGenesisBlock tf [] validators admins
     $logInfoS "runWorker" "done."
 
 makeReadOnly :: FilePath -> IO ()

@@ -21,7 +21,6 @@ import           Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Short as BSS
 import           Data.Maybe (fromMaybe, maybeToList)
 import           Data.Source
 import qualified Data.Map.Strict as M
@@ -53,10 +52,6 @@ propertyPrefix = "property_"
 
 success :: Applicative f => SourceAnnotation a -> f FuzzerResult
 success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
-
-trueVal :: BSS.ShortByteString
-trueVal = BSS.toShort . word256ToBytes . fromIntegral $ fromEnum True
-{-# NOINLINE trueVal #-}
 
 runFuzzer :: Maybe DebugSettings
           -> (SourceMap -> Either [SourceAnnotation T.Text] CodeCollection)
@@ -166,9 +161,9 @@ runFuzzerOnce ctx = do
       callResults <- lift $ call txArgs'
       let failure' = failure [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
           exception' = exception [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
-      $logInfoS "runFuzzerOnce/callResults" (T.pack $ show $ erReturnVal callResults)
+      $logInfoS "runFuzzerOnce/callResults" (maybe "No return value" T.pack $ erReturnVal callResults)
       case erException callResults of
         Nothing -> case erReturnVal callResults of
-          Just bss | bss == trueVal -> success ctx
+          Just "(true)" -> success ctx
           _ -> failure' $ "Test " <> labelToText _fuzzerArgsFuncName <> " failed with arguments " <> _fuzzerArgsCallArgs
         Just e -> exception' e

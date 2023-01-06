@@ -41,12 +41,13 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals)
+import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
@@ -61,6 +62,7 @@ import qualified LabeledError
 import           SQLM
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
+import           Text.Format
 
 import           UnliftIO
 
@@ -159,7 +161,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
                            metaData
         )
       msgHash = keccak256ToByteString $ rlpHash unsigned
-  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  sig <- blocVaultWrapper $ postSignature (Just userName) (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
       chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
@@ -193,18 +195,22 @@ postChainInfo :: ( MonadIO m
                  , HasVault m
                  )
               => Maybe Text -> ChainInput -> m ChainId
-postChainInfo mUserName chainInput = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
-  Just userName -> withLastBlockHash $ \bHash -> do
+postChainInfo mJwtToken chainInput = case mJwtToken of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+  Just jwtToken -> withLastBlockHash $ \bHash -> do
     evmCompatibleOn <- fmap evmCompatible getBlocEnv
     if evmCompatibleOn
         then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
     else do
-        chainInfo' <- createChainInfo userName bHash chainInput
+        chainInfo' <- createChainInfo jwtToken bHash chainInput
         chainId <- CORE.postChain chainInfo'
         let isAsync = fromMaybe False $ chaininputAsync chainInput
-        unless isAsync $ waitForChainInfo chainId
-        return chainId
+        unless isAsync $ do
+          info <- waitForChainInfo chainId
+          let status = transactionResultStatus $ fst info
+          when (status /= Just Success) . throwIO . UserError . Text.pack $
+            "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
+        pure chainId
 
 postChainInfos :: ( MonadIO m
                   , A.Selectable Account AddressState m
@@ -216,30 +222,35 @@ postChainInfos :: ( MonadIO m
                   , HasVault m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]
-postChainInfos mUserName chainInputs = case mUserName of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+postChainInfos mJwtToken chainInputs = case mJwtToken of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     chainIds <- postChains chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
         asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-    unless (null asyncChains) $ waitForChainInfos asyncChains
-    return chainIds
+    unless (null asyncChains) $ do
+      infos <- zip asyncChains <$> waitForChainInfos asyncChains
+      let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
+      unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
+        \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
+    pure chainIds
 
-waitForChainInfo :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
+
+waitForChainInfo :: (MonadLogger m,
                      HasSQL m) =>
-                    ChainId -> m ()
-waitForChainInfo chainId = waitForChainInfos [chainId]
+                    ChainId -> m (TransactionResult, Maybe ChainInfo)
+waitForChainInfo chainId = head <$> waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m,
+waitForChainInfos :: (MonadLogger m,
                       HasSQL m) =>
-                     [ChainId] -> m ()
+                     [ChainId] -> m [(TransactionResult, Maybe ChainInfo)]
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
   where go = do
-          infos <- getChainInfo chainIds Nothing Nothing
+          infos <- catMaybes <$> maybeChainBatchResult chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
           $logDebugLS "waitForChainInfo/resp" infos
-          return $ length infos == length chainIds
+          return (length infos == length chainIds, infos)
 
 getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) => 
                 ChainId -> m ChainIdChainOutput

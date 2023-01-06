@@ -10,7 +10,8 @@ const moment = require('moment');
 
 async function cleanOnce() {
   const mDateHealth = moment().subtract(config.healthCheck.retentionHours, "hours");
-  const mDateApiCallCounter = moment().subtract(config.statistics.apiCallCounterRetentionHours, "hours");
+  // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
+  // const mDateApiCallCounter = moment().subtract(config.statistics.apiCallCounterRetentionHours, "hours");
 
   winston.info('Cleaning the historical DB Data (HealthStats, StallStats, ApiCallCounts...');
   
@@ -40,17 +41,18 @@ async function cleanOnce() {
   } catch(err) {
     winston.error('Cleanup - StallStats: Failed with error: ' + err.message);
   }
-
-  try {
-    const destroyedCount = await models.ApiCallCount.destroy({
-      where: {
-        createdAt: {
-          $lt: mDateApiCallCounter
-        }
-      }
-    })
-    winston.info(`Cleanup - ApiCallCounts: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
-  } catch(err) {
-    winston.error('Cleanup - ApiCallCounts: Failed with error: ' + err.message);
-  }
+  
+  // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
+  // try {
+  //   const destroyedCount = await models.ApiCallCount.destroy({
+  //     where: {
+  //       createdAt: {
+  //         $lt: mDateApiCallCounter
+  //       }
+  //     }
+  //   })
+  //   winston.info(`Cleanup - ApiCallCounts: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+  // } catch(err) {
+  //   winston.error('Cleanup - ApiCallCounts: Failed with error: ' + err.message);
+  // }
 }

@@ -30,6 +30,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Bits
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import qualified Data.ByteString.Short              as BSS
 import           Data.Char
@@ -1089,7 +1090,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
       return ExecResults
         { erRemainingTxGas     = fromIntegral remainingGas
         , erRefund             = 0
-        , erReturnVal          = BSS.toShort <$> retVal
+        , erReturnVal          = BC.unpack . B16.encode <$> retVal
         , erTrace              = theTrace vmState
         , erLogs               = []
         , erEvents             = []
@@ -1100,6 +1101,8 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         , erKind               = EVM
         -- , erNewX509Certs       = M.empty
         , erPragmas            = []
+        , erOrgName            = ""
+        , erAppName            = ""
         }
     Right _ -> do
       vmState'@VMState{..} <- readIORef vmStateRef
@@ -1445,13 +1448,15 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
             $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (erRemainingTxGas execResults)
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           addToRefund $ fromIntegral $ erRefund execResults
-          return (1, erReturnVal execResults)
+          let shortRet = BSS.toShort . either (const "") id . B16.decode . BC.pack <$> erReturnVal execResults
+          return (1, shortRet)
         Just (Right (RevertException _ _)) -> do
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           when flags_debug $
             $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (erReturnVal execResults)
           addToRefund $ fromIntegral $ erRefund execResults
-          return (0, erReturnVal execResults)
+          let shortRet = BSS.toShort . either (const "") id . B16.decode . BC.pack <$> erReturnVal execResults
+          return (0, shortRet)
         Just (Right e)  -> do
           when flags_debug $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
@@ -1470,7 +1475,7 @@ vmStateToExecResults vmState = do
       erRemainingTxGas       = gr
       , erRefund             = ref
       -- For errors, ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
-      , erReturnVal          = BSS.toShort <$> returnVal vmState
+      , erReturnVal          = BC.unpack . B16.encode <$> returnVal vmState
       , erTrace              = theTrace vmState
       , erLogs               = logs vmState
       , erEvents             = []
@@ -1482,6 +1487,8 @@ vmStateToExecResults vmState = do
       , erKind               = EVM
       -- , erNewX509Certs       = M.empty
       , erPragmas            =[]
+      , erOrgName            = ""
+      , erAppName            = ""
       }
 
 getEVMCode' :: HasCodeDB m => CodePtr -> m BC.ByteString

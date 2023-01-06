@@ -14,7 +14,7 @@ import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Base16  as B16
-import qualified Data.ByteString.Short   as BSS
+import qualified Data.ByteString.Char8   as BC
 import           Data.Maybe
 import qualified Data.Set                as S
 
@@ -121,12 +121,12 @@ spec = do
       B16.encode "ec630643" `shouldBe` "6563363330363433" -- I have no idea why this is tested
       case erReturnVal execResults of
         Nothing -> liftIO $ putStrLn "No return value"
-        Just short -> do
-          let code = BSS.fromShort short
-          code `shouldBe` mconcat [ B.replicate 31 0x0, B.singleton 0x20
-                                  , B.replicate 31 0x0, B.singleton 0x2f
-                                  , "contract Lottery {\n\n\tfunction Lottery() {\n\t}\n\n}", B.replicate 17 0x0
-                                  ]
+        Just retVal -> do
+          let code = B16.decode $ BC.pack retVal
+          code `shouldBe` Right (mconcat [ B.replicate 31 0x0, B.singleton 0x20
+                                         , B.replicate 31 0x0, B.singleton 0x2f
+                                         , "contract Lottery {\n\n\tfunction Lottery() {\n\t}\n\n}", B.replicate 17 0x0
+                                         ])
 
   describe "BatchedDiffs" $ do
     let toRoot = MP.StateRoot . word256ToBytes

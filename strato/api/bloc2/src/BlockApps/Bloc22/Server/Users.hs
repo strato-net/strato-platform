@@ -43,7 +43,7 @@ postUsersFill :: ( HasCoreAPI m
                  , HasSQL m
                  , HasBlocEnv m
                  )
-              => UserName  -> Address -> Bool -> m BlocTransactionResult
+              => JwtToken  -> Address -> Bool -> m BlocTransactionResult
 postUsersFill _ addr resolve = do
   shouldPost <- fmap gasOn getBlocEnv
   if shouldPost
@@ -65,11 +65,11 @@ postUsersFill _ addr resolve = do
 
 waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
 waitForBalance addr = waitFor "no user account found" go
-  where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m Bool
+  where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m (Bool, ())
         go = do
           let params = accountsFilterParams & qaAddress ?~ addr & qaMinBalance ?~ 1
           accts <- blocStrato $ getAccountsFilter params
           $logInfoLS "waitForBalance/req" params
           $logInfoLS "waitForBalance/resp" accts
-          return . not $ null accts
+          return (not $ null accts, ())
 

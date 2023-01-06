@@ -12,6 +12,7 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2P
 import           BlockApps.Init
+import           BlockApps.Logging
 import           Data.IORef
 import           Data.Set.Ordered (empty)
 
@@ -27,4 +28,4 @@ main = do
       runner f = runContextM cfg $ f sSource
   race_
     (run 10248 $ prometheus def p2pApp)
-    (stratoP2P runner)
+    (runLoggingT $ stratoP2P runner)

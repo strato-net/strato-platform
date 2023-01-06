@@ -1,4 +1,5 @@
-/* jshint esnext: true */
+/* Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
+slash-asterisk jshint esnext: true asterisk-slash
 const assert = require('chai').assert;
 const nock = require('nock');
 const { posix } = require('path');
@@ -220,3 +221,4 @@ describe('Tests - Usage statistics', async function () {
     //todo validate that request body has stats=>[LAST_IN_ARRAY]=>contractCountsByType is a non-empty object (has as least one prop)
   })
 })
+*/

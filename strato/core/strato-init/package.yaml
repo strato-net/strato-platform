@@ -33,6 +33,7 @@ library:
   - entropy
   - ethereum-discovery
   - ethereum-rlp
+  - extra
   - file-embed
   - filepath
   - format
@@ -99,9 +100,15 @@ executables:
     source-dirs: exec_src/
     main: InitWorker.hs
     dependencies:
+      - aeson
+      - base64
+      - bytestring
       - common-log
+      - extra
       - hflags
       - strato-init
+      - strato-model
+      - strato-networks
     other-modules: []
 
 tests:
