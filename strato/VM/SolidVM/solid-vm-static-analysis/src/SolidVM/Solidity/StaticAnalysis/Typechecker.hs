@@ -608,6 +608,24 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 
 -- Function: argType, returnType, contextType
 -- Static: argType, ContextType
+--Not sure about this?
+typecheckMember (Static (SVMType.Address _) x) "delegatecall" = -- Change these to tops
+  pure . Sum $ (Static (SVMType.String Nothing) x)
+            :| [Function (Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ])
+                         (Static (SVMType.String Nothing) x)
+                         x
+                         []
+                         []
+               ]
+
+typecheckMember (Static (SVMType.Account _) x) "delegatecall" = 
+  pure . Sum $ (Static (SVMType.String Nothing) x)
+            :| [Function (Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ])
+                         (Static (SVMType.String Nothing) x)
+                         x
+                         []
+                         []
+               ]
 typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x [] []
 typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x [] []
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -1415,6 +1433,10 @@ tcExpr (FunctionCall x (Variable _ "type") args) =
   pure $ case args  of 
     (OrderedArgs _) ->  Static (SVMType.UnknownLabel "type" Nothing) x
     _ -> bottom $ "Improper use of type function" <$ x
+tcExpr (FunctionCall x (MemberAccess _ _ "delegatecall" )  args ) = do
+  case args of
+    (OrderedArgs _) ->  pure $ (topType' x)
+    _ -> pure $ bottom $ "DelegateCall does not take namedArgs" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of

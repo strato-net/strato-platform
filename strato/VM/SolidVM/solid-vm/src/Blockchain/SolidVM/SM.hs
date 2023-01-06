@@ -445,7 +445,7 @@ getVariableOfName name = do
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256", "ripemd160", "payable"
-                                                  , "require", "revert", "assert", "sha3"
+                                                  , "require", "revert", "assert", "sha3"  --, "delegatecall"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
                                                   , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $

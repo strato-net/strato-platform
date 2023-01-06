@@ -427,7 +427,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     ((orgName, appName), returnVal) <- traverse (fmap Just . maybe (return "()") encodeForReturn)
-                                   =<< callWrapper' sender' codeAddress Nothing funcName isRCC args
+                                   =<< callWrapper' sender' codeAddress Nothing Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -708,19 +708,21 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
-callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-callWrapper from to mContract functionName isRCC argExps  = snd <$> callWrapper' from to mContract functionName isRCC argExps
 
-callWrapper' :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
-callWrapper' from to mContract functionName isRCC argExps  = do
+callWrapper :: MonadSM m => Account -> Account ->  Maybe Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper from to mLogicAddress mContract functionName isRCC argExps  = snd <$> callWrapper' from to mLogicAddress  mContract functionName isRCC argExps
+
+callWrapper' :: MonadSM m => Account -> Account -> Maybe Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m ((SolidString, SolidString), Maybe Value)
+callWrapper' from storageAddress mLogicAddress mContract functionName isRCC argExps  = do
+  let (to, isDelegateCall, ccToGet)  = case mLogicAddress of Nothing -> (storageAddress, False, storageAddress); Just logicAddress -> (from, True, logicAddress);
+  
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
-
-  (contract', hsh, cc) <- getCodeAndCollection to
+  (contract', hsh, cc) <- getCodeAndCollection ccToGet
   parentName <- fromMaybeM (return "") $ runMaybeT
-     $   pure to                                                -- Contract's address
+     $   pure ccToGet                                                -- Contract's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)              -- Address's state
      >>= pure  .  addressStateCodeHash                          -- state's codehash/CodePtr
      >>= MaybeT . resolveCodePtrParent toChain                  -- CodePtr's parent
@@ -732,6 +734,13 @@ callWrapper' from to mContract functionName isRCC argExps  = do
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
+-- grab the org for this codeAddress
+  when (not isRCC) $ do
+    org <- getOrg to
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
 --  grab the org from the senders account and set it to the codeAddress
   org <- getOrg to
@@ -763,16 +772,28 @@ callWrapper' from to mContract functionName isRCC argExps  = do
                 },
               _sourceAnnotationAnnotation = ()
             }
-
+  
+  let (functionName', argsParsed) = if isDelegateCall
+          then (case runParser parseDelegateCallArgs (ParserState "" "" M.empty) "" functionName of 
+                      Right (funcTocall, typesArr) -> (funcTocall, typesArr)
+                      _ -> (functionName, []) ;)
+          else (functionName, [])
+  
   (f, args) <-
-        case M.lookup functionName functionsIncludingConstructor of
+        case M.lookup functionName' functionsIncludingConstructor of
           Just theFunction -> do
-            args' <- argsToVals contract' theFunction argExps
+            let theFunction' = if isDelegateCall 
+                  then do --Before merge or pull request improve this
+                      let findFunc = filter (\xxx -> (length argsParsed )  == (length $ CC._funcArgs xxx)) ( [theFunction] ++  (CC._funcOverload  theFunction) )
+                      let finalFuncFind = filter (\xxx -> all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs xxx)) (findFunc)
+                      if length finalFuncFind /= 0 then  (head finalFuncFind) else theFunction -- Maybe throw an error here?
+                  else theFunction
+            args' <- argsToVals contract' theFunction' argExps
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
                        Nothing -> False
                        Just ci -> if fromChain == toChain then readOnly ci else True
-            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro False
+            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
             return (f', args')
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.CC.storageDefs of
@@ -784,7 +805,20 @@ callWrapper' from to mContract functionName isRCC argExps  = do
                   val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName 
                   popCallInfo
                   return (pure val, OrderedVals []) 
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
+              Nothing -> 
+                if isDelegateCall
+                  then do 
+                        case M.lookup "fallback" functionsIncludingConstructor of
+                          Just theFunction -> do 
+                            args' <- argsToVals contract' theFunction argExps -- What exactly is argsToVals doing?
+                            mCallInfo <- getCurrentCallInfoIfExists  
+                            let ro = case mCallInfo of
+                                          Nothing -> False
+                                          Just ci -> if fromChain == toChain then readOnly ci else True
+                            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro False
+                            return (f', args')
+                          _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-- Maybe return a false then error out       
+                  else unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
               {-
               Just _ -> do
@@ -795,7 +829,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
                 val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
                 popCallInfo
                 return (pure val, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-} 
               
   when isRCC (do
                 addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
@@ -1827,6 +1861,17 @@ expToVar' (CC.FunctionCall _ e args) = do
       var1 <- expToVar expr
       val1 <- getVar var1
       case (val1, name) of
+        (SAccount addr _, "delegatecall") -> do 
+          let  (funcName, args') = (case args of 
+                (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
+                (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first arguement to be a string" args
+                (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
+          fromAddress <- getCurrentAccount
+          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr 
+          res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args' 
+          case res of
+              Just a -> return $ Constant  a
+              Nothing -> return $ Constant SNULL --TODO
         (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
@@ -1850,7 +1895,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               (SContract _ toAddress', MS.Field funcName) -> do
                 fromAddress <- getCurrentAccount
                 let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args 
+                res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args 
                 case res of
                   Just v -> return $ Constant $ v
                   Nothing -> return $ Constant SNULL
@@ -1858,7 +1903,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               (SAccount toAddress' _, MS.Field funcName) -> do
                 fromAddress <- getCurrentAccount
                 let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args 
+                res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args 
                 case res of
                   Just v -> return $ Constant $ v
                   Nothing -> return $ Constant SNULL
@@ -2090,13 +2135,13 @@ expToVar' (CC.FunctionCall _ e args) = do
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address Nothing itemName False args 
+            result <- callWrapper from address Nothing Nothing itemName False args 
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SContractFunction name address' functionName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address name functionName False args 
+            result <- callWrapper from address Nothing name functionName False args 
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SEnum enumName) -> do
@@ -2283,7 +2328,7 @@ evaluateAccountMember a True funcName = return $ Constant $ SContractFunction No
 evaluateAccountMember a False itemName = do --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
   let address = namedAccountToAccount (from ^. accountChainId) a
-  result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
+  result <- callWrapper from address Nothing Nothing itemName False (CC.OrderedArgs [])  
   return . Constant . fromMaybe SNULL $ result
 
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable

@@ -37,7 +37,7 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
-
+--import      Debug.Trace
 import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 
@@ -402,7 +402,7 @@ errorDeclaration = do
 functionDeclaration :: Bool -> SolidityParser (String, Declaration)
 functionDeclaration free = do
   ~(a, (functionName, xabi')) <- withPosition $ do
-    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
+    functionName <- (reserved "function" >> fromMaybe "fallback" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName) <|>
