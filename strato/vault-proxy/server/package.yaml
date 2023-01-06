@@ -20,6 +20,7 @@ dependencies:
 - bytestring
 - common-log
 - concurrent-extra
+- json
 - curl
 - lens
 - postgresql-simple

@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Main where
 
@@ -40,6 +41,7 @@ import           Strato.VaultProxy.Server.Token
 
 
 import           Options
+import           Text.JSON.Generic
 
 main :: IO ()
 main = do
@@ -85,6 +87,8 @@ main = do
   --make an initial call to see if the vault is working
   initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
 
+  let minimumVersion :: Int
+      minimumVersion = 1
   --Check the version of the foreign shared vault
   traceM "Checking the version of the foreign vault"
   pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
@@ -94,12 +98,23 @@ main = do
   makeHttpCall <- Curl.curlGetString (T.unpack (flags_VAULT_URL <> "/strato/v2.3/_ping")) ([Curl.CurlHttpHeaders authy]) 
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The curl to _ping worked, here is the output"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show makeHttpCall
-  let version = "\"pingDetail\""
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "The correct version should be: "
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG version
-  when (snd makeHttpCall /= version) $ error "The vault has breaking changes, I cannot continue." 
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Version " <> show minimumVersion
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Trying to decode the version number from the foreign server."
+  let versionRaw = decode (snd makeHttpCall) :: Result Version
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Checking if the foreign vault is set up correctly."
+  versionish <- case resultToEither versionRaw of
+    Left a -> error $ "Detected an incorrect message from the vault, it should have come back with an integer, it came back with: " <> show a
+    Right b -> do 
+      vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Vault proxy got the correct type back from the server: " <> show b
+      pure b
+  let versionNum :: Int
+      versionNum = version versionish
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "This is the version running on the server: " <> show versionNum
+  --The version number here is the minimum version of the foreign vault that should be accepted    
+  when (1 < versionNum) $ error "The vault has breaking changes, I cannot continue." 
 
-
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Setting up persistence in the vault-proxy"
   --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,

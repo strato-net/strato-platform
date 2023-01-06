@@ -1,17 +1,21 @@
 module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
-    RawOauth(..)
+    RawOauth(..),
+    Version(..)
 ) where
 
 -- import           Control.Lens
 import           Control.Concurrent.Lock as L
+import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
+import           Text.JSON          as JSON
+
 
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
@@ -93,6 +97,22 @@ data VaultConnection = VaultConnection {
     superLock :: L.Lock,
     debuggingOn :: Bool
 }
+
+(!) :: (JSON a) => JSObject JSValue -> String -> JSON.Result a
+(!) = flip valFromObj
+
+data Version = Version {
+    version :: Int
+} deriving (Show)
+
+instance JSON Version where
+    showJSON = undefined
+
+    readJSON (JSObject obj) = 
+        Version <$> 
+        obj ! "version"
+    
+    readJSON _ = mzero
 
 data RawOauth = RawOauth {
     authorization_endpoint :: T.Text,
