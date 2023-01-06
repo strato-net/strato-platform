@@ -29,6 +29,7 @@ dependencies:
 - http-conduit
 - HTTP
 - monad-logger
+- regex-compat
 - servant-client
 - servant-client-core
 - servant-subscriber
