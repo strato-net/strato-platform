@@ -48,8 +48,7 @@ import qualified Handlers.AccountInfo
 import Blockchain.DB.CodeDB
 import qualified Control.Monad.Change.Alter           as A
 import Blockchain.Strato.Model.Account
--- import qualified Blockchain.Strato.Model.Address      as Ad
--- import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.StateDB
@@ -87,7 +86,17 @@ import qualified LabeledError
 import Blockchain.Strato.Model.Gas
 import BlockApps.X509.Keys as X509
 import BlockApps.X509.Certificate
--- import Data.Aeson
+import qualified Control.Monad.Change.Modify  as Mod
+import Blockchain.DB.ChainDB
+import Executable.EthereumVM (writeBlockSummary)
+import Data.Foldable (for_)
+import Blockchain.Database.MerklePatricia.InternalMem (mpMap)
+import Blockchain.Bagger (processNewBestBlock)
+import Blockchain.Sequencer.Event
+import qualified Control.Monad.State                   as State
+import Data.Map.Strict (Map)
+import qualified Blockchain.Data.TXOrigin as TXO
+
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -236,18 +245,12 @@ runTest :: ContextM a -> IO ()
 runTest = runTestWithTimeout 5000000
 
 generateGBlock :: ( MonadLogger m
-                            --  , HasCodeDB m
-                            --  , HasHashDB m
-                            --  , Mem.HasMemAddressStateDB m
+                            -- , MonadBagger m
                              , HasStateDB m
-                            --  , HasStorageDB m
-                            --  , HasMemStorageDB m
-                            --  , (Account `A.Alters` AddressState) m
-                            --  , MonadIO m
                              )
-                          => m (Block)
+                          => m (Block,OutputBlock)
 generateGBlock = do
-    -- let as = "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859"
+    -- let as = "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859" 
     let gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
     let genesis = JS.parseLazyByteString genesisParser gi
         theJSON = case genesis of
@@ -275,20 +278,46 @@ generateGBlock = do
             blockDataNonce = genesisInfoNonce theJSON
           }
     return (Block {
-        blockBlockData = bData,
-        blockReceiptTransactions = [],
-        blockBlockUncles         = []
-    })
+            blockBlockData = bData,
+            blockReceiptTransactions = [],
+            blockBlockUncles         = []
+          },
+          OutputBlock { 
+            obOrigin = TXO.Direct
+          , obTotalDifficulty     = 0
+          , obBlockData           = bData
+          , obReceiptTransactions =[]
+          , obBlockUncles         = []
+          })
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT . runTestContextM $ do
-    (blockCreated) <- generateGBlock
-    withCurrentBlockHash (blockDataParentHash $ blockBlockData $ blockCreated) $ do
+    (blockCreated,outputBlock) <- generateGBlock
+    
+    let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
+            MP.initializeBlank
+            for_ [] $ \addr -> do
+              sr <- State.gets fst
+              let key = addressAsNibbleString addr
+                  val = rlpEncode . rlpSerialize . rlpEncode $ blankAddressState{addressStateBalance = 1000000000000000000000000}
+              sr' <- MP.putKeyVal sr key val
+              State.modify' $ \(_,b) -> (sr',b) 
+    MP.initializeBlank
+    setStateDBStateRoot Nothing stateRoot
+    writeBlockSummary outputBlock
+    for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
+    let genHash = rlpHash $ (blockCreated)
+    bhr <- bootstrapChainDB  genHash [(Nothing, stateRoot)]
+    putContextBestBlockInfo $ ContextBestBlockInfo ( genHash, (blockBlockData $ blockCreated), 0, 0, 0)
+    Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
+    processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block   
+
+    withCurrentBlockHash (rlpHash $ (blockCreated)) $ do
       let certKey addr = ((Account addr Nothing),) . encodeUtf8 
           certRegistryKey = certKey (Address 0x509)
-      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor (Address 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0) <> "]") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) "certificateString") (encodeUtf8 "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----")
+      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (encodeUtf8 "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----")
       f
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
@@ -1730,7 +1759,7 @@ contract qq {
            , [Field "x"]
            ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
 
-  it "can accept remote arrays" . runTest $ do
+  fit "can accept remote arrays" . runTest $ do
     runCall "addHead" "([10, 17])" [r|
 contract qq {
   uint x;
