@@ -78,7 +78,8 @@ export function* getOrCreateOauthUser() {
     const user = yield call(getOrCreateOauthUserApi);
     const updated_user = {
       ...user[0],
-      username: user[0].commonName
+      username: user[0].commonName,
+      address: user[0].userAddress
     }
     if (user.error) {
       // We only get the non-401 errors here (401 is handled inside of getOrCreateOauthUserApi)
