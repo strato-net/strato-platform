@@ -313,7 +313,7 @@ contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    mapping(address => Certificate) addressToCertMap;
+    mapping(address => address) addressToCertMap;
     address public owner;
 
     event CertificateRegistered(string certificate);
@@ -327,7 +327,7 @@ contract CertificateRegistry {
     function registerCertificate(string newCertificateString) returns (int) {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
-        Certificate parentContract = addressToCertMap[account(parentUserAddress)];
+        Certificate parentContract = Certificate(addressToCertMap[account(parentUserAddress)]);
         
         if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
             // Create the new Certificate record
@@ -337,7 +337,7 @@ contract CertificateRegistry {
                 parentContract.addChild(c.userAddress());    
             }
 
-            addressToCertMap[c.userAddress()] = c;
+            addressToCertMap[c.userAddress()] = address(c);
             emit CertificateRegistered(newCertificateString);
             return 200; // 200 = HTTP Status OK
         }
@@ -345,19 +345,19 @@ contract CertificateRegistry {
     }
 
     function getUserCert(address _address) returns (Certificate) {
-        return addressToCertMap[account(_address)];
+        return Certificate(addressToCertMap[account(_address)]);
     }
     
     function getCertByAddress(address _address) returns (Certificate) {
-        return getCertByAccount(account(_address));
+        return Certificate(getCertByAccount(account(_address)));
     }
     
     function getCertByAccount(address _account) returns (Certificate) {
-        return addressToCertMap[account(_account)];
+        return Certificate(addressToCertMap[account(_account)]);
     }
     
     function revokeCert(address userAddress){
-        Certificate myCert = addressToCertMap[account(userAddress)];
+        Certificate myCert = Certificate(addressToCertMap[account(userAddress)]);
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
 
         int childrenLength = myCert.revoke();
@@ -369,9 +369,9 @@ contract CertificateRegistry {
     }
     
     function isChild(string pCert, address certUserAddress) returns (bool) {
-        Certificate myCert = addressToCertMap[account(certUserAddress)];
+        Certificate myCert = Certificate(addressToCertMap[account(certUserAddress)]);
         address parentUserAddress = myCert.parent();
-        if(myCert.parent() != address(0x0) && pCert ==  addressToCertMap[account(parentUserAddress)].certificateString()){
+        if(myCert.parent() != address(0x0) && pCert ==  Certificate(addressToCertMap[account(parentUserAddress)]).certificateString()){
             return true;
         }
         
