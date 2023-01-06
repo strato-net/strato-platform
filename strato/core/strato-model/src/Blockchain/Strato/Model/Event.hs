@@ -18,10 +18,12 @@ import           Test.QuickCheck.Instances()
 
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Keccak256
 import           Text.Format
 
 data Event =
   Event {
+    evBlockHash            :: Keccak256,
     evContractOrganization :: String,
     evContractApplication  :: String,
     evContractName    :: String,
@@ -32,6 +34,7 @@ data Event =
 
 instance Format Event where
   format Event{..} =
+    "evBlockHash: " ++ format evBlockHash ++ "\n" ++
     "evContractOrganization: " ++ evContractOrganization ++ "\n" ++
     "evContractApplication: " ++ evContractApplication ++ "\n" ++
     "evContractName: " ++ evContractName ++ "\n" ++
@@ -42,7 +45,8 @@ instance Format Event where
 
 instance ToJSON Event where
   toJSON Event{..} = object
-    [ "eventContractOrganization" .= evContractOrganization
+    [ "eventBlockHash" .= evBlockHash
+    , "eventContractOrganization" .= evContractOrganization
     , "eventContractApplication" .= evContractApplication
     , "eventContractName" .= evContractName
     , "eventContractAccount" .= evContractAccount
@@ -52,7 +56,8 @@ instance ToJSON Event where
 
 instance FromJSON Event where
   parseJSON (Object o) = Event
-    <$> (o .: "eventContractOrganization")
+    <$> (o .: "eventBlockHash")
+    <*> (o .: "eventContractOrganization")
     <*> (o .: "eventContractApplication")
     <*> (o .: "eventContractName")
     <*> (o .: "eventContractAccount")

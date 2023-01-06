@@ -19,13 +19,12 @@ vault-wrapper:
 "
 
 echo 'Waiting for postgres to be available...'
-while true; do
-    curl ${postgres_host}:${postgres_port} > /dev/null 2>&1 || EXIT_CODE=$? && true
-    if [ ${EXIT_CODE} = 52 ]; then
-        break
-    fi
-    sleep 0.5
+until pg_isready -h ${postgres_host} -p ${postgres_port}
+do
+    echo "Check at $(date)"
+    sleep 1
 done
+echo 'postgres is available'
 
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 # Check if this container was initialized before

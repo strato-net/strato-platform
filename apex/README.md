@@ -5,19 +5,18 @@
 1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres (15433:5432)
     2. prometheus (9090:9090)
-    3. strato (3333:3000)
-    4. vault-wrapper (8484:8000)
+    3. strato (3333:3000; 8484:8000) // TODO: Replace VaultProxy port 8000 with the actual one that the VaultProxy is served on in the strato container
 2. cd `apex/api`
 
 ### Run Apex server locally (development mode):
 (have prep steps 1 and 2 done)
 3. ```
     postgres_port=15433 \
-        prometheusHost=localhost:9090 \
-        stratoRoot=http://localhost:3333/eth/v1.2 \
-        vaultWrapperHttpHost=http://localhost:8484 \
+        PROMETHEUS_HOST=localhost:9090 \
+        stratoRoot=http://localhost:3333/eth/v1.2 \  # note the stratoRoot, not STRATO_HOST \
+        vaultProxyUrl=http://localhost:8484 \
         NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
-        STRATO_VERSION=6.0.3 \
+        STRATO_VERSION=8.0.0 \
         npm run start:dev
    ```
     (this is the list of vars passed to apex docker container in docker-compose.yml + some vars are added with set-aux-env-vars.sh in prod / tests)
@@ -28,11 +27,13 @@
 5. ```
     NODE_ENV=development \
         postgres_port=15433 \
-        prometheusHost=localhost:9090 \
-        stratoHost=localhost:3333 \
-        vaultWrapperHost=localhost:8484 \
+        PROMETHEUS_HOST=localhost:9090 \
+        STRATO_HOSTNAME=localhost \ # note the STRATO_HOST, not stratoRoot, because we run the set-aux-env-vars.sh as part of ./run-tests.sh \
+        STRATO_PORT_API=3333 \
+        STRATO_PORT_VAULT_PROXY=8484 \
+        VAULT_PROXY_HOST=http://localhost:8484 \
         NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
-        STRATO_VERSION=7.5.0 \
+        STRATO_VERSION=8.0.0 \
         ./run-tests.sh`
    ```
    (this is the list of vars passed to apex docker container in docker-compose.yml)

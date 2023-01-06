@@ -324,11 +324,7 @@ contract CertificateRegistry {
     function registerCertificate(string newCertificateString) returns (int) {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
-<<<<<<< HEAD
         Certificate parentContract = Certificate(addressToCertMap[account(parentUserAddress)]);
-=======
-        Certificate parentContract = addressToCertMap[address(parentUserAddress)];
->>>>>>> f7ab355f5b652ed08df5770f5aaa6f5066116aca
         
         if (address(parentContract) != address(0) && parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())) {
             // Create the new Certificate record

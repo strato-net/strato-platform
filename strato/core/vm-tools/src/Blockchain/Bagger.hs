@@ -18,7 +18,6 @@ import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Class          (lift)
-import qualified Data.ByteString.Short              as BSS
 import qualified Data.DList                         as DL
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
@@ -134,7 +133,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
           DD.TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message
-                               , transactionResultResponse         = BSS.empty
+                               , transactionResultResponse         = ""
                                , transactionResultTrace            = "rejected"
                                , transactionResultGasUsed          = 0
                                , transactionResultEtherUsed        = 0
@@ -147,6 +146,8 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
                                , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
                                , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
                                , transactionResultKind             = Nothing
+                               , transactionResultOrgName          = ""
+                               , transactionResultAppName          = ""
                                }
 
 -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
@@ -271,7 +272,8 @@ makeNewBlock mineTransactions = do
             else do
                 $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                 isPBFT <- isBlockstanbul
-                (coinbaseAddr, nonce) <- peekPendingVote
+                let coinbaseAddr    = emptyChainMember
+                let nonce           = 0
                 let lastSR          = B.lastExecutedStateRoot cache
                 let lastSHA         = B.bestBlockSHA cache
                 let lastHead        = B.bestBlockHeader cache
@@ -369,10 +371,10 @@ addToQueued stage t@OutputTx{otSigner = signer} =
                 $logDebugS "Bagger.addToQueued/Left" . T.pack $ "rejection :: " ++ show rejection
                 txsDroppedCallback [rejection] txShas
             Right _ -> do
-                --  $logDebugS "Bagger.addToQueued/Right" "non-rejection "
+                $logDebugS "Bagger.addToQueued/Right" "non-rejection "
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
-                --  $logDebugS "Bagger.addToQueued/Right" . T.pack $show newState
+                $logDebugS "Bagger.addToQueued/Right" . T.pack $ show newState
                 forM_ toDiscard $ \d -> do
                     removeFromSeen d
                     logDiscard' "addToQueued" signer d
@@ -529,7 +531,8 @@ buildFromMiningCache = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     state <- getBaggerState
     isPBFT <- isBlockstanbul
-    (coinbaseAddr, nonce) <- peekPendingVote
+    let coinbaseAddr = emptyChainMember
+    let nonce        = 0
     let cache        = B.miningCache state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
@@ -570,7 +573,6 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
         --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
-                        -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
                         , DD.blockDataCoinbase         = coinbaseAddr -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)

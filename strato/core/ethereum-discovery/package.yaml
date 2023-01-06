@@ -26,7 +26,7 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-api #Will need to be changed
     - blockapps-vault-wrapper-client
     - bytestring
     - common-log

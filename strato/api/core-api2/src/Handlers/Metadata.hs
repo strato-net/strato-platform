@@ -23,8 +23,6 @@ module Handlers.Metadata
 
 import           Control.Lens
 import           Data.Aeson                     hiding (Success)
-
-import qualified Data.Text                      as T
 import           Data.Aeson.Casing.Internal     (camelCase, dropFPrefix)
 import           Data.Maybe                     (fromJust, fromMaybe)
 import           Data.Swagger                   hiding (url)
@@ -63,11 +61,9 @@ data MetadataResponse = MetadataResponse
   , isVaultPasswordSet    ::  Bool
   } deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
-type API = "metadata"
-  :> Servant.Header "X-USER-UNIQUE-NAME" T.Text
-  :> Get '[JSON] MetadataResponse
+type API = "metadata" :> Get '[JSON] MetadataResponse
 
-getMetaDataClient :: Maybe T.Text -> ClientM MetadataResponse
+getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
 server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
@@ -108,13 +104,12 @@ getMetaData :: (  MonadIO m
                 , HasVault m
                 , Accessible [ChainMemberParsedSet] m
                 , HasSQL m )
-                =>   Maybe T.Text  
-                ->   m MetadataResponse
-getMetaData token = 
+                =>   m MetadataResponse
+getMetaData  = 
   do
   validators <- access (Proxy @[ChainMemberParsedSet])
   isSynced <- checkIsSynced
-  V.AddressAndKey a k <- getPubKey token
+  V.AddressAndKey a k <- getPubKeyAndAddress
   pure $ MetadataResponse k a validators isSynced True
 
 blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
@@ -126,11 +121,8 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKey ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => Maybe T.Text -> m V.AddressAndKey
-getPubKey mAccessToken =
-  case mAccessToken of
-    Nothing -> throwIO $ InvalidArgs $ "Did not find X-USER-UNIQUE-NAME in the header" -- This may not be needed
-    Just _  -> blocVaultWrapper $ getKey  "nodekey" Nothing
+getPubKeyAndAddress ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
+getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

@@ -65,9 +65,6 @@ module Blockchain.VMContext
     , purgeStorageMap
     , getContextBestBlockInfo
     , putContextBestBlockInfo
-    , queuePendingVote
-    , peekPendingVote
-    , clearPendingVote
     , compactContextM
     , lookupX509AddrFromCBHash
     ) where
@@ -106,7 +103,6 @@ import           BlockApps.X509.Certificate
 import           BlockApps.Init()
 import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
-import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
@@ -688,51 +684,6 @@ getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy
 
 putContextBestBlockInfo :: Mod.Modifiable ContextState m => ContextBestBlockInfo -> m ()
 putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlockInfo new
-
-queuePendingVote :: ( MonadLogger m
-                    , Mod.Modifiable ContextState m
-                    )
-                 => ChainMemberParsedSet -> Bool -> ChainMemberParsedSet -> m ()
-queuePendingVote a r s = do
-  let voteDir = case r of
-        True -> maxBound
-        False -> 0
-      newVote = ((a, voteDir), s)
-  $logInfoLS "queuePendingVote" newVote
-  Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ coinbaseQueue %= (newVote Q.<|)
-
--- (Coinbase, Vote Direction) to be applied on a constructed block
--- When no pending votes are available, supplies the default coinbase (0x0)
-peekPendingVote :: ( MonadLogger m
-                   , Mod.Accessible ContextState m
-                   )
-                => m (ChainMemberParsedSet, Word64)
-peekPendingVote = do
-  ctx <- Mod.access (Mod.Proxy @ContextState)
-  case Q.viewl $ _coinbaseQueue ctx of
-    Q.EmptyL -> return (Everyone False,0)
-    ( v Q.:< _) -> do
-      $logInfoLS "peekPendingVote" v
-      return $ fst v
-
--- If the Block was sent out by us and contains our vote,
--- mark the vote as committed and remove it from the queue.
-clearPendingVote :: ( MonadLogger m
-                    , Mod.Modifiable ContextState m
-                    , A.Selectable Address X509Certificate m
-                    )
-                 => Block -> m ()
-clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
-  let bd = blockBlockData b
-      currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
-      senderAddr = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
-  sender <- lift $ maybe emptyChainMember (getChainMemberFromX509 . x509CertToCertInfoState) <$> A.select (A.Proxy @X509Certificate) senderAddr
-  ctxCoinbaseQ <- use coinbaseQueue
-  let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
-        Just i -> Q.deleteAt i ctxCoinbaseQ
-        Nothing -> ctxCoinbaseQ
-  $logInfoLS "clearPendingVote" currentBlockData
-  assign coinbaseQueue newCoinbaseQ
 
 compactContextM :: ContextM ()
 compactContextM = modify' force
