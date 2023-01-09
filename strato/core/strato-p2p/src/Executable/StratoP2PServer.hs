@@ -22,6 +22,7 @@ import           Control.Lens                          ((^.))
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
+import           Data.Either.Combinators
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
 import           Data.Time.Clock
@@ -78,17 +79,23 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
               _ <- case err of
                 e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable p
                 e' | Just WrongGenesisBlock <- fromException e' -> do
-                 _ <- disableUDPPeerForSeconds p 86400
+                 udpErr <- disableUDPPeerForSeconds p 86400
+                 whenLeft udpErr $ \theUDPErr -> do
+                  $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                  lengthenPeerDisable p
                 e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable p
                 e' | Just NetworkIDMismatch <- fromException e' -> do
-                 _ <- disableUDPPeerForSeconds p 86400
+                 udpErr <- disableUDPPeerForSeconds p 86400
+                 whenLeft udpErr $ \theUDPErr -> do
+                  $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                  lengthenPeerDisable p
                 e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable p
                 e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                  case ioErrType of
                    NoSuchThing -> do
-                     _ <- disableUDPPeerForSeconds p 86400
+                     udpErr <- disableUDPPeerForSeconds p 86400
+                     whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                      lengthenPeerDisable p
                    _ -> return $ Right ()
                 _  -> return $ Right ()

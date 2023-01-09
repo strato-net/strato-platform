@@ -177,17 +177,23 @@ stratoP2PClient runner = runner $ \_ -> do
           eErr <- case e of
                    e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just WrongGenesisBlock <- fromException e' -> do
-                    _ <- disableUDPPeerForSeconds thePeer 86400
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                     lengthenPeerDisable thePeer
                    e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just NetworkIDMismatch <- fromException e' -> do
-                    _ <- disableUDPPeerForSeconds thePeer 86400
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                     lengthenPeerDisable thePeer
                    e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do
-                        _ <- disableUDPPeerForSeconds thePeer 86400
+                        udpErr <- disableUDPPeerForSeconds thePeer 86400
+                        whenLeft udpErr $ \theUDPErr -> do
+                          $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                         lengthenPeerDisable thePeer
                       _ -> return $ Right ()
                    _  -> return $ Right ()
