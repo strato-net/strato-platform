@@ -191,7 +191,7 @@ insertContracts slotss name src code start gi =
 
 -- | Inserts a Certificate Registry contract into the genesis block with the BlockApps root cert as owner
 -- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root
-insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo -- remove Monad
+insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertCertRegistryContract certs gi =
     gi {genesisInfoAccountInfo = initialAccounts ++ registryAcct:rootAcct:certAccts,
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]}
