@@ -6,7 +6,6 @@ import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
-import           BlockApps.Logging
 import           Blockchain.Context
 import           Blockchain.Options
 import           Blockchain.Participation (p2pApp, setParticipationMode)
