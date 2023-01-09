@@ -448,29 +448,19 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
 instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
   select _ (k,t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
-    $logInfoS "Address,Text Selectable X509Cert" $ T.pack $ "k: " ++ show k ++ " t: " ++ show t
     mCertAddress <- lookupX509AddrFromCBHash k
-    $logInfoS "Address,Text Selectable X509Cert mCertAddress" $ T.pack . show $ mCertAddress
     fmap join . for mCertAddress $ \certAddress -> do
-      $logInfoS "Address,Text Selectable X509Cert --certAddress" $ T.pack . show $ certAddress 
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) ContextM where
   select _ k = do
-      $logInfoS "Address Selectable X509" $ T.pack $ "k: " ++ show k
       let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
       mCertAddress <- lookupX509AddrFromCBHash k
-      $logInfoS "Address Selectable X509 mCertAddress" $ T.pack . show $ mCertAddress
       fmap join . for mCertAddress $ \certAddress -> do
-        $logInfoS "Address Selectable X509 --certAddress" $ T.pack . show $ certAddress
         mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
         case mBString of
-            Just (BString bs) -> do 
-               $logInfoS "Address Selectable X509 case mBString of  bs" $ T.pack . show $ bs 
-               pure . eitherToMaybe $ bsToCert bs
-            _ -> do
-               $logInfoS "Address Selectable X509 case mBString of" $ T.pack "Nothing"
-               pure Nothing
+            Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+            _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::(
                       MonadLogger m,
@@ -481,11 +471,9 @@ lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
     mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
-    $logInfoS "lookupX509AddrFromCBHash" $ T.pack . show $ mAccount
+    $logInfoS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
     case mAccount of
-        Just (BAccount a) -> do
-          $logInfoS "lookupX509AddrFromCBHash" $ T.pack . show $ a
-          pure . Just $ a ^. namedAccountAddress
+        Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
         _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where

@@ -131,7 +131,6 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
                       _ -> error $ "invalid genesis: " ++ show genesis
         faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
         faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-    $logInfoS "flag_genesisCerts" $ T.pack . show $ flags_genesisCerts
     let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
         genesisCerts = case (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_genesisCerts) of
           Right a -> a

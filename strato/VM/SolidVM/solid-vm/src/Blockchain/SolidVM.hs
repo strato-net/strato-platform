@@ -224,10 +224,7 @@ solidVMBreakpoint ann = do
 
 requireOriginCert :: MonadSM m => Account -> m ()
 requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
-  originHasCert <- do
-    c <- A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress
-    liftIO . putStrLn $ C.green "requireOriginCert from account address: " ++ show c
-    return $ isJust c
+  originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress)
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
 create :: SolidVMBase m
