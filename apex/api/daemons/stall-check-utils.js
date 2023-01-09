@@ -63,13 +63,13 @@ function queryHealthStatus() {
 }
 
 async function getVmBlocksValid() {
-    if (!process.env['prometheusHost']) {
-      throw Error('prometheusHost env var is not set - unable to get prometheus data');
+    if (!process.env['PROMETHEUS_HOST']) {
+      throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
   
     const options = {
         method: 'GET',
-        url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=vm_blocks_valid`,
+        url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_blocks_valid`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
@@ -92,13 +92,13 @@ async function getVmBlocksValid() {
 }
 
 async function getBaggerPending() {
-    if (!process.env['prometheusHost']) {
-      throw Error('prometheusHost env var is not set - unable to get prometheus data');
+    if (!process.env['PROMETHEUS_HOST']) {
+      throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
     
     const options = {
         method: 'GET',
-        url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=vm_bagger_txs`,
+        url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_bagger_txs`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
@@ -142,7 +142,7 @@ async function updateNodeStallStatus(overallStat){
                 isBlocksValidInc: overallStat[1],
                 lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime,
                 isLastPending: overallStat[2]
-            }, 
+            },
             {
                 where: {processName: 'StallStat'}
             }

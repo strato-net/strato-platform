@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
-import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
+import           ClassyPrelude (atomically, newTMChan, fromMaybe)
 import qualified Control.Monad.Change.Alter as A
 import qualified Data.ByteString.Char8 as C8
 import           Data.Foldable (for_)
@@ -61,12 +61,10 @@ bootstrapSequencer extraCerts Block{blockBlockData = bd,
   initLevelDB :: CablePackage -> IO ()
   initLevelDB pkg = do
       tch <- atomically newTMChan
-      vch <- atomically newTQueue
-      rch <- atomically newTQueue
       
       -- initialize vault client, TODO: make this URL a cl arg
       mgr <- newManager defaultManagerSettings
-      vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+      vaultWrapperUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
       let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
           dummySequencerCfg = SequencerConfig
@@ -76,8 +74,6 @@ bootstrapSequencer extraCerts Block{blockBlockData = bd,
             , syncWrites            = False
             , blockstanbulBlockPeriod = BlockPeriod 0
             , blockstanbulRoundPeriod = RoundPeriod 0
-            , blockstanbulBeneficiary = vch
-            , blockstanbulVoteResps = rch
             , blockstanbulTimeouts = tch
             , cablePackage = pkg
             , maxEventsPerIter = 65

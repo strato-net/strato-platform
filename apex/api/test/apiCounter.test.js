@@ -1,4 +1,6 @@
-/* jshint esnext: true */
+/* Unused code notice. Api counter disabled, to be deprecated  #api-counter-deprecation
+
+slash-astrisk jshint esnext: true asterisk-slash
 const assert = require('chai').assert;
 const models = require('../models');
 const { ApiCallCounter } = require('../controllers/apiCounter');
@@ -82,3 +84,4 @@ describe('Tests - Api Calls Counter', async function () {
   })
   
 })
+*/

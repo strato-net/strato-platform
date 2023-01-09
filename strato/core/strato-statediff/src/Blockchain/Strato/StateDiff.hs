@@ -49,8 +49,6 @@ import qualified Data.Text                                   as T
 import           GHC.Generics
 import           Text.Format
 
-import           Debug.Trace
-
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.
 data StateDiff =
@@ -236,7 +234,7 @@ accountEnd :: ( MonadLogger m
 accountEnd chainId k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
-  $logInfoS "accountEnd" . T.pack $ "End account state: " ++ show addrState
+  $logDebugS "accountEnd" . T.pack $ "End account state: " ++ show addrState
   accountDiff <- eventualAccountState addrState
   return (Account address chainId, accountDiff)
 
@@ -251,8 +249,8 @@ accountUpdate chainId k vOld vNew = do
   address <- lookupAddress k
   let oldAddrState = retrieveMPDBValue vOld
       newAddrState = retrieveMPDBValue vNew
-  $logInfoS "accountUpdate" . T.pack $ "Old account state: " ++ show oldAddrState
-  $logInfoS "accountUpdate" . T.pack $ "New account state: " ++ show newAddrState 
+  $logDebugS "accountUpdate" . T.pack $ "Old account state: " ++ show oldAddrState
+  $logDebugS "accountUpdate" . T.pack $ "New account state: " ++ show newAddrState 
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (Account address chainId, accountDiff)
 
@@ -346,12 +344,12 @@ incrementalStorage kind oldRoot newRoot = do
       let
         oldValue = decodeMPDBValue vOld
         newValue = decodeMPDBValue vNew
-      $logInfoS "incrementalStorage" . T.pack $ "OLD decoded MPDB Value: " ++ show oldValue
-      $logInfoS "incrementalStorage" . T.pack $ "NEW decoded MPDB Value: " ++ show newValue
+      $logDebugS "incrementalStorage" . T.pack $ "OLD decoded MPDB Value: " ++ show oldValue
+      $logDebugS "incrementalStorage" . T.pack $ "NEW decoded MPDB Value: " ++ show newValue
       return (key, Update{oldValue, newValue})
 
 retrieveMPDBValue :: RLPSerializable a => Val -> a
-retrieveMPDBValue =  rlpDecode . traceShowId . rlpDeserialize . rlpDecode
+retrieveMPDBValue =  rlpDecode . rlpDeserialize . rlpDecode
 
 decodeStorageKV :: ( MonadLogger m
                    , HasHashDB m

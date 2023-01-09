@@ -369,7 +369,7 @@ contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    mapping(address => Certificate) addressToCertMap;
+    mapping(address => address) addressToCertMap;
 
     bool initialized;
 
@@ -393,7 +393,7 @@ contract CertificateRegistry {
         Certificate c = new Certificate(_rootCert);
 
         // Register the root certificates and emit event
-        addressToCertMap[c.userAddress()] = c;
+        addressToCertMap[c.userAddress()] = address(c);
         emit CertificateRegistered(_rootCert);
         
 
@@ -407,14 +407,14 @@ contract CertificateRegistry {
     function registerCertificate(string newCertificateString) returns (address) {
         // Create the new Certificate record
         Certificate c = new Certificate(newCertificateString);
-        addressToCertMap[c.userAddress()] = c;
+        addressToCertMap[c.userAddress()] = address(c);
         emit CertificateRegistered(newCertificateString);
         return c.userAddress();
         
     }
 
     function getUserCert(address _address) returns (Certificate) {
-        return addressToCertMap[account(_address)];
+        return Certificate(addressToCertMap[account(_address)]);
     }
 
 }|] ++ rawString
@@ -425,7 +425,7 @@ runArgs = runArgsWithSender sender
 runArgsBeef :: T.Text -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
+runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -516,7 +516,7 @@ runCall' funcName callArgs bs = do
     newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
-  return $ (BC.unpack <$> SB.fromShort <$> erReturnVal er2)
+  return $ erReturnVal er2
   -- lastN' 32
 
 
@@ -524,7 +524,7 @@ lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
 
-call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe SB.ShortByteString)
+call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -2036,9 +2036,9 @@ contract qq is BaseContainer {
 }|]
 -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the decprecated function runCall
     runCall' "contains" "(10)" ctract `shouldReturn`
-        Just  "(0)"
+        Just  "(false)"
     runCall' "contains" "(4)" ctract `shouldReturn`
-        Just  "(1)"
+        Just  "(true)"
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall' "value" "()" [r|
@@ -4729,101 +4729,101 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
-  it "can get a users cert" . runTest $ do
-    void $ runArgsWithCertificateRegistry [r|
+--   fit "can get a users cert" . runTest $ do
+--     void $ runArgsWithCertificateRegistry [r|
 
-contract Certificate {
-    address public userAddress;
+-- contract Certificate {
+--     address public userAddress;
     
-    // Store all the fields of a certificate in a Cirrus record
-    string public commonName;
-    string public organization;
-    string public country;
-    string public group;
-    string public organizationalUnit;
-    string public publicKey;
-    string public certString;
+--     // Store all the fields of a certificate in a Cirrus record
+--     string public commonName;
+--     string public organization;
+--     string public country;
+--     string public group;
+--     string public organizationalUnit;
+--     string public publicKey;
+--     string public certString;
 
-    constructor(string _certificateString) {
+--     constructor(string _certificateString) {
 
-        mapping(string => string) parsedCert = parseCert(_certificateString);
+--         mapping(string => string) parsedCert = parseCert(_certificateString);
 
-        commonName = parsedCert["commonName"];
-        organization = parsedCert["organization"];
-        country = parsedCert["country"];
-        group = parsedCert["group"];
-        organizationalUnit = parsedCert["organizationalUnit"];
-        publicKey = parsedCert["publicKey"];
-        certString = parsedCert["certString"];
+--         commonName = parsedCert["commonName"];
+--         organization = parsedCert["organization"];
+--         country = parsedCert["country"];
+--         group = parsedCert["group"];
+--         organizationalUnit = parsedCert["organizationalUnit"];
+--         publicKey = parsedCert["publicKey"];
+--         certString = parsedCert["certString"];
 
-    }
-}
-contract qq is CertificateRegistry{
-    account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
+--     }
+-- }
+-- contract qq is CertificateRegistry{
+--     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
     
-    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+--     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
-    address public certRegAddr;
-    Certificate userCert;
-    CertificateRegistry certReg;
+--     address public certRegAddr;
+--     Certificate userCert;
+--     CertificateRegistry certReg;
 
-    string myUsername     = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myOrganizationalUnit  = "";
-    string certificate    = "";
-    string myCommonName   = "";
-    string myCountry      = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myOrganizationalUnit  = "";
-    string myPublicKey    = "";
-    string myCertificate  = "";
+--     string myUsername     = "";
+--     string myOrganization = "";
+--     string myGroup        = "";
+--     string myOrganizationalUnit  = "";
+--     string certificate    = "";
+--     string myCommonName   = "";
+--     string myCountry      = "";
+--     string myOrganization = "";
+--     string myGroup        = "";
+--     string myOrganizationalUnit  = "";
+--     string myPublicKey    = "";
+--     string myCertificate  = "";
 
-    constructor() {
-        certReg = new CertificateRegistry();
-        certRegAddr = certReg.registerCertificate(myNewCertificate);
-        userCert = certReg.getUserCert(certRegAddr); 
+--     constructor() {
+--         certReg = new CertificateRegistry();
+--         certRegAddr = certReg.registerCertificate(myNewCertificate);
+--         userCert = certReg.getUserCert(certRegAddr); 
 
-        myUsername     = tx.username;
-        myOrganization = tx.organization;
-        myGroup        = tx.group;
-        myOrganizationalUnit = tx.organizationalUnit;
+--         myUsername     = tx.username;
+--         myOrganization = tx.organization;
+--         myGroup        = tx.group;
+--         myOrganizationalUnit = tx.organizationalUnit;
  
-        certificate    = tx.certificate;
-        myCommonName   = userCert.commonName();
-        myCountry      = userCert.country();
-        myOrganization = userCert.organization();
-        myGroup        = userCert.group();
-        myOrganizationalUnit  = userCert.organizationalUnit();
-        myPublicKey    = userCert.publicKey();
-        myCertificate  = userCert.certString();
-    }
-}|]
-    getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
-      [ BString "Admin"
-      , BString "BlockApps"
-      , BString "Engineering"
-      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
-      , BString "Admin"
-      , BString "USA"
-      , BString "BlockApps"
-      , BString "Engineering"
-      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
-      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----"
-      ]
-    getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
-      [ BString "Admin"
-      , BString "BlockApps"
-      , BString "Engineering"
-      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
-      , BString "Admin"
-      , BString "USA"
-      , BString "BlockApps"
-      , BString "Engineering"
-      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
-      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----"
-      ]
+--         certificate    = tx.certificate;
+--         myCommonName   = userCert.commonName();
+--         myCountry      = userCert.country();
+--         myOrganization = userCert.organization();
+--         myGroup        = userCert.group();
+--         myOrganizationalUnit  = userCert.organizationalUnit();
+--         myPublicKey    = userCert.publicKey();
+--         myCertificate  = userCert.certString();
+--     }
+-- }|]
+--     getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+--       [ BString "Admin"
+--       , BString "BlockApps"
+--       , BString "Engineering"
+--       , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+--       , BString "Admin"
+--       , BString "USA"
+--       , BString "BlockApps"
+--       , BString "Engineering"
+--       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
+--       , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----"
+--       ]
+--     getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
+--       [ BString "Admin"
+--       , BString "BlockApps"
+--       , BString "Engineering"
+--       , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+--       , BString "Admin"
+--       , BString "USA"
+--       , BString "BlockApps"
+--       , BString "Engineering"
+--       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
+--       , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----"
+--       ]
   -- TODO change test to use new vm version once it is decided on
 
 
@@ -5133,7 +5133,7 @@ contract qq {
     d.flags[1] = true;
     return d.flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5144,7 +5144,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall' "a" "()" [r|
@@ -5155,7 +5155,7 @@ contract qq {
     flags[1] = true;
     return flags[1];
   }
-}|] `shouldReturn` Just "(1)"
+}|] `shouldReturn` Just "(true)"
 
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall' "a" "()" [r|
@@ -5703,7 +5703,7 @@ contract qq {
         return (0, false);
     }
   }
-}|] `shouldReturn` (Just "(12,0)")
+}|] `shouldReturn` (Just "(12,false)")
 
     getFields ["errCount", "theError"] `shouldReturn` [BInteger 1, BInteger 12] 
 

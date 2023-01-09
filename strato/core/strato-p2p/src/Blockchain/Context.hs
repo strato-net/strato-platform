@@ -25,6 +25,7 @@ module Blockchain.Context
     , TcpPortNumber(..)
     , Inbound(..)
     , Outbound(..)
+    , IsValidator(..)
     , Context(..)
     , Config(..)
     , ContextM
@@ -163,6 +164,8 @@ newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
 newtype Inbound a = Inbound { unInbound :: a }
 newtype Outbound a = Outbound { unOutbound :: a }
+
+newtype IsValidator = IsValidator { unIsValidator :: Bool }
 
 data Config = Config
   { configSQLDB              :: SQLDB
@@ -339,6 +342,9 @@ instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (R
 instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainMembersFromSet 
 
+instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
+  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
+
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
   lookup _  k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
@@ -461,14 +467,14 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
   sign bs = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) vc
   
   getPub = asks configPubKey
   
   getShared pub = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing pub) vc
 
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
@@ -545,6 +551,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Point, PPeer)
                        , '(ChainMemberParsedSet, X509CertInfoState)
                        , '(ChainMemberParsedSet, [ChainMemberParsedSet])
+                       , '(ChainMemberParsedSet, IsValidator)
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)

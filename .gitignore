@@ -7,6 +7,13 @@ docker-compose.push.yml
 docker-compose.push.ecr.yml
 docker-compose.yml
 docker-compose.ecr.yml
+docker-compose.vault.push.yml
+docker-compose.vault.push.ecr.yml
+docker-compose.vault.yml
+docker-compose.vault.ecr.yml
+eks-deployment.yaml
+eks-strato-deployment.yaml
+eks-vault-deployment.yaml
 stack.yaml.lock
 configurationCache.log
 dryrun.log

@@ -1,0 +1,70 @@
+#vault-version:<VERSION>
+#strato-getting-started-min-version:4.0
+version: "3"
+volumes:
+  vaultpgdata:
+    driver: local
+  idpconfig:
+      driver: local
+services:
+  vault-wrapper:
+    depends_on:
+    - postgres
+    environment:
+    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgres_vault_wrapper_db=oauth
+    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
+    build: .
+    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  postgres:
+    environment:
+      - POSTGRES_PASSWORD=${postgres_password:-api}
+    image: postgres:9.6
+    volumes:
+      - vaultpgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=300"
+      - "-c"
+      - "shared_buffers=512MB"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - vault-wrapper
+    environment:
+    - INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL}
+    - INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER}
+    - INITIAL_OAUTH_JWT_USER_ID_CLAIM=${INITIAL_OAUTH_JWT_USER_ID_CLAIM}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
+    build: .
+    image: ${VAULTNGINX_IMAGE:-<REPO_URL>vault-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-8090}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-8093}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    - idpconfig:/config
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
