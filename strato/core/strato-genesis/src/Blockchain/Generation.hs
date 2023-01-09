@@ -191,7 +191,7 @@ insertContracts slotss name src code start gi =
 
 -- | Inserts a Certificate Registry contract into the genesis block with the BlockApps root cert as owner
 -- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root
-insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo -- remove Monad
+insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertCertRegistryContract certs gi =
     gi {genesisInfoAccountInfo = initialAccounts ++ registryAcct:rootAcct:certAccts,
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]}
@@ -203,7 +203,7 @@ insertCertRegistryContract certs gi =
         encodedRegistry = encodeUtf8 certificateRegistryContract
 
         rootAddress'    = fromPublicKey rootPubKey
-        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
         rootSub         = fromJust $ getCertSubject rootCert
 
         certSub' crt =
@@ -214,8 +214,8 @@ insertCertRegistryContract certs gi =
         certUserAddress = fromPublicKey . subPub . certSub'
         rootAcct = SolidVMContractWithStorage 0x1337 1337
             (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") MainChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) MainChain)),
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
                 (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
                 (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
@@ -224,13 +224,12 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
                 (".certificateString", rlpWrap . BString $ certToBytes rootCert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ rootCert),
-                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) MainChain))
+                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
             ]
 
         -- Reversing the cert user address to create a placeholder Certificate contract address
         reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
-        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
         registryAcct = SolidVMContractWithStorage 0x509 509
             (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) $
             [
@@ -241,8 +240,8 @@ insertCertRegistryContract certs gi =
         certAccts = map (\cert -> do
             let certSub = certSub' cert
             SolidVMContractWithStorage (reverseAddr cert) 0 (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount (Address 0x509) MainChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) MainChain)),
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
                 (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
                 (".organization", rlpWrap . BString . BC.pack . subOrg $ certSub),
@@ -251,8 +250,7 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
                 (".certificateString", rlpWrap . BString $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
-                (".expirationDate", rlpWrap . BInteger . fst . fromJust . BC.readInteger . BC.pack . dateTimeToString . snd . getCertValidity $ cert),
-                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))]
+                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))]
             ) certs
 
 certificateRegistryContract :: Text
@@ -274,7 +272,6 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
-    uint expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -290,14 +287,13 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
-        // expirationDate = uint(parsedCert["expirationDate"],10);
         parent = address(parsedCert["parent"]);
         children = [];
     }
     
     function addChild(address _child) public {
         require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
-
+        
         children.push(_child);
     }
     
@@ -319,7 +315,7 @@ contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    mapping(address => Certificate) addressToCertMap;
+    mapping(address => address) addressToCertMap;
     address public owner;
 
     event CertificateRegistered(string certificate);
@@ -328,7 +324,7 @@ contract CertificateRegistry {
     function registerCertificate(string newCertificateString) returns (int) {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
-        Certificate parentContract = addressToCertMap[address(parentUserAddress)];
+        Certificate parentContract = Certificate(addressToCertMap[account(parentUserAddress)]);
         
         if (address(parentContract) != address(0) && parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())) {
             // Create the new Certificate record
@@ -338,7 +334,7 @@ contract CertificateRegistry {
                 parentContract.addChild(c.userAddress());    
             }
 
-            addressToCertMap[c.userAddress()] = c;
+            addressToCertMap[c.userAddress()] = address(c);
             emit CertificateRegistered(newCertificateString);
             return 200; // 200 = HTTP Status OK
         }
@@ -346,19 +342,19 @@ contract CertificateRegistry {
     }
 
     function getUserCert(address _address) returns (Certificate) {
-        return addressToCertMap[account(_address)];
+        return Certificate(addressToCertMap[account(_address)]);
     }
     
     function getCertByAddress(address _address) returns (Certificate) {
-        return getCertByAccount(account(_address));
+        return Certificate(getCertByAccount(account(_address)));
     }
     
     function getCertByAccount(address _account) returns (Certificate) {
-        return addressToCertMap[account(_account)];
+        return Certificate(addressToCertMap[account(_account)]);
     }
     
     function revokeCert(address userAddress){
-        Certificate myCert = addressToCertMap[account(userAddress)];
+        Certificate myCert = Certificate(addressToCertMap[account(userAddress)]);
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
 
         int childrenLength = myCert.revoke();
@@ -370,9 +366,9 @@ contract CertificateRegistry {
     }
     
     function isChild(string pCert, address certUserAddress) returns (bool) {
-        Certificate myCert = addressToCertMap[account(certUserAddress)];
+        Certificate myCert = Certificate(addressToCertMap[account(certUserAddress)]);
         address parentUserAddress = myCert.parent();
-        if(myCert.parent() != address(0x0) && pCert ==  addressToCertMap[account(parentUserAddress)].certificateString()){
+        if(myCert.parent() != address(0x0) && pCert ==  Certificate(addressToCertMap[account(parentUserAddress)]).certificateString()){
             return true;
         }
         

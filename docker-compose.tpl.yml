@@ -99,6 +99,7 @@ services:
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - genesisBlockTestCert=${genesisBlockTestCert:-false}
+    - genesisCerts=${genesisCerts}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - kafkaPort=9092

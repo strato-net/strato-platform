@@ -54,7 +54,7 @@ import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
-import qualified Data.Vector as V     
+import qualified Data.Vector as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
@@ -247,7 +247,7 @@ create :: SolidVMBase m
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
-  
+
   let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
@@ -257,7 +257,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       }
   let gasInfo' = GasInfo {
         _gasLeft = availableGas,
-        _gasInitalAllotment = availableGas, 
+        _gasInitalAllotment = availableGas,
         _gasMetadata = ""
       }
 
@@ -268,7 +268,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
-    -- requireOriginCert origin'
+    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -328,7 +328,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
   -- popcallinfo to remove info from stack
   popCallInfo
-  
+
   org <- getOrg creator
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
@@ -411,7 +411,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
   let gasInfo' = GasInfo {
       _gasLeft = availableGas,
-      _gasInitalAllotment = availableGas, 
+      _gasInitalAllotment = availableGas,
       _gasMetadata = ""
     }
 
@@ -563,7 +563,7 @@ logFunctionCall args address contract functionName f = do
 
 
 argsToValsModifiers :: MonadSM m => CC.Contract -> CC.Modifier -> CC.ArgList -> m ValList
-argsToValsModifiers ctract md args = 
+argsToValsModifiers ctract md args =
   case args of
     CC.OrderedArgs xs -> do
       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
@@ -587,7 +587,7 @@ argsToValsModifiers ctract md args =
             CC.NumberLiteral _ n (Just nu) -> case nu of
                                                 CC.Wei -> return . coerceType ctract t $ SInteger n
                                                 CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
-                                                CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+                                                CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer)))
                                                 CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
@@ -613,7 +613,7 @@ argsToValsModifiers ctract md args =
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
                                 let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
-                                case maybeExp of 
+                                case maybeExp of
                                   Right ex -> do
                                     k' <- eval32 keyType ex
                                     v' <- eval32 valueType v
@@ -646,7 +646,7 @@ argsToVals ctract fn args = case args of
             CC.NumberLiteral _ n (Just nu) -> case nu of
                                                   CC.Wei -> return . coerceType ctract t $ SInteger n
                                                   CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
-                                                  CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+                                                  CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer)))
                                                   CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
@@ -672,7 +672,7 @@ argsToVals ctract fn args = case args of
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
                                 let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
-                                case maybeExp of 
+                                case maybeExp of
                                   Right ex -> do
                                     k' <- eval32 keyType ex
                                     v' <- eval32 valueType v
@@ -712,7 +712,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-  
+
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
 --  grab the org from the senders account and set it to the codeAddress
@@ -758,14 +758,14 @@ callWrapper' from to mContract functionName isRCC argExps  = do
             return (f', args')
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.CC.storageDefs of
-              Just _ -> do 
-                  liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName) 
+              Just _ -> do
+                  liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName)
                   addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
-                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName 
+                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                   popCallInfo
-                  return (pure val, OrderedVals []) 
+                  return (pure val, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
               {-
@@ -778,7 +778,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
                 popCallInfo
                 return (pure val, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
-              
+
   when isRCC (do
                 addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
                 forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
@@ -800,11 +800,11 @@ runStatements' (s:rest) = do
     when False printFullStackTrace -- Too verbose, only turn on by hand when needed
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
-  ret <- runStatement s 
+  ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
     _ -> modifierError "you cannot return a value as part of a modifier" (s)
-    
+
 
 runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements [] = return Nothing
@@ -864,19 +864,19 @@ runStatement (CC.RevertStatement mString theArgs _) = do
           let listOfVals = case argVals of
                 OrderedVals ov -> map (\x -> toBasic x) ov
                 NamedVals nv -> map (\(_, y) -> toBasic y) nv
-              
+
           return $ customError "Reverting based on  Error Method:" name listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
       pure $ err
-    
+
     Nothing -> do
           argVals <- case theArgs of
             CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
             CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
           let listOfVals = case argVals of
                 OrderedVals ov -> map (\x -> toBasic x) ov
-                NamedVals nv -> map (\(_, y) -> toBasic y) nv    
-          return $ revertError "REVERT" listOfVals    
+                NamedVals nv -> map (\(_, y) -> toBasic y) nv
+          return $ revertError "REVERT" listOfVals
 
 -- Assignment to an index into an array or mapping
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
@@ -914,7 +914,7 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       dstVar <- expToVar dst
       setVar dstVar srcVal
       return Nothing
-  
+
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _)) pos) = do
   solidVMBreakpoint pos
   missingField "index value cannot be empty" (unparseStatement st)
@@ -1059,13 +1059,13 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
                 then typeError "try/catch statement expected a tuple of the same length as the returns statement" (tryExpression, aRealVal)
                 else do
                   forM_ (zip vars xs) $ \(var, (name, ty)) -> do
-                    val <- getVar var 
+                    val <- getVar var
                     addLocalVariable ty name val
                   sfsRes' <- runStatements statementsForSuccess
                   return sfsRes'
             _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
 
-runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do 
+runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do
   solidVMBreakpoint pos
   mRes <- EUnsafe.try $ do
     val <- runStatements tryBlock
@@ -1155,7 +1155,7 @@ runStatement (CC.Throw expr pos) = do
   solidVMBreakpoint pos
   (name, args) <- do
     case expr of
-      CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
+      CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a)
       _ -> invalidArguments "Invalid argument for throw." expr
   argVals <- case args of
     CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
@@ -1191,26 +1191,26 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdde
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ CC._eventLogs ev) then 
+      if (length exptups) /= (length $ CC._eventLogs ev) then
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
         org <- getOrg account
-         
-        parentName <- fromMaybeM (return "") $ runMaybeT 
+
+        parentName <- fromMaybeM (return "") $ runMaybeT
             $   pure account
             >>= MaybeT . A.lookup (A.Proxy @AddressState)
             >>= pure  .  addressStateCodeHash
             >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
-            >>= (\case     
+            >>= (\case
                     SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
                     _                                                    -> pure "")
 
         -- pair up field names with values one-by-one (no type checking tho, lol)
         let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
-        
-        liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
-              " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
+
+        liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++
+              " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++
               " of org " ++ show org
 
         bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
@@ -1356,7 +1356,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
   case nu of
     CC.Wei -> return . Constant $ SInteger v
     CC.Szabo -> return . Constant $ SInteger (v * (10 ^ (12 :: Integer)))
-    CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer))) 
+    CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
@@ -1432,7 +1432,7 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "b32") = do --TODO- remove t
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") = do
-  return $ Constant $ SStringConcat 
+  return $ Constant $ SStringConcat
 
 expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
@@ -1456,7 +1456,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             return $ Constant $ SEnumVal enumName name num
 
 
-        
+
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do
         contract' <- getCurrentContract
@@ -1474,7 +1474,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
             argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
             calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
-        return . Constant . SString $ take 8 $ keccak256ToHex calldataHash 
+        return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do
         env' <- getEnv
@@ -1511,7 +1511,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just contractName') addr constName
           else case constName `M.lookup` CC._constants cont of
-                  Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of 
+                  Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
                     Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
                     Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
@@ -1524,14 +1524,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SBuiltinVariable "block", "coinbase") ->
         pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
-        
 
-      (SBuiltinVariable "block", "difficulty") -> 
+
+      (SBuiltinVariable "block", "difficulty") ->
         (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
 
-      (SBuiltinVariable "block", "gaslimit") -> 
+      (SBuiltinVariable "block", "gaslimit") ->
         (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
-        
+
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
@@ -1541,7 +1541,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-  
+
       (SAccount a _, n) -> evaluateAccountMember a False n
       (SContractItem a _, n) -> evaluateAccountMember a False n
       (SContract _ a, n) -> evaluateAccountMember a True n
@@ -1639,7 +1639,7 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
 expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do 
+expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
   rhs <- getInt =<< expToVar expr2
   case rhs of
     0 -> divideByZero $ unparseExpression ex
@@ -1815,9 +1815,9 @@ expToVar' (CC.FunctionCall _ e args) = do
         (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
-    where 
+    where
       regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
-      regularFunctionCall mSCI = do 
+      regularFunctionCall mSCI = do
         var <- case mSCI of
           Just sci -> sci
           Nothing  -> expToVar' e
@@ -1835,7 +1835,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               (SContract _ toAddress', MS.Field funcName) -> do
                 fromAddress <- getCurrentAccount
                 let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args 
+                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args
                 case res of
                   Just v -> return $ Constant $ v
                   Nothing -> return $ Constant SNULL
@@ -1843,7 +1843,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               (SAccount toAddress' _, MS.Field funcName) -> do
                 fromAddress <- getCurrentAccount
                 let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args 
+                res <- callWrapper fromAddress toAddress Nothing (stringToLabel $ BC.unpack funcName) False args
                 case res of
                   Just v -> return $ Constant $ v
                   Nothing -> return $ Constant SNULL
@@ -1892,11 +1892,11 @@ expToVar' (CC.FunctionCall _ e args) = do
               testMatch tf = do
                 let argMapping = mapArgs tf
                 doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
+                pure $ ((length argMapping) == (length $ CC._funcArgs tf))
                        && ((length argMapping) == (argCount))
                        && (all (== True) doArgsMatch)
               testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-              testNameAndTypes (_, (t, v)) = 
+              testNameAndTypes (_, (t, v)) =
                 -- These cases might not be all inclusive of all valid combinations.
                 case (v, t) of
                   (SInteger _, SVMType.Int _ _) -> pure $ True
@@ -1912,15 +1912,15 @@ expToVar' (CC.FunctionCall _ e args) = do
                     refType <- getXabiValueType addressedPath
                     if (refType == t)
                       then pure $ True
-                      else 
+                      else
                         case (refType, t) of
                           (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
                           _ -> pure $ False
                   _ -> pure $ False
               mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
               mapArgs theFunc = case argVals of
-                OrderedVals vs -> let argMeta = 
+                OrderedVals vs -> let argMeta =
                                         map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                         $ CC._funcArgs theFunc
                                   in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
@@ -1938,7 +1938,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
-            case M.lookup structName $ contract'^.CC.structs of 
+            case M.lookup structName $ contract'^.CC.structs of
               Just vals -> do
                 return . Constant . SStruct structName . fmap Constant . M.fromList $
                   case argVals of
@@ -1946,7 +1946,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     NamedVals ns -> ns
               Nothing -> do
                 cc <- getCurrentCodeCollection
-                let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs        
+                let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
                 return . Constant . SStruct structName . fmap Constant . M.fromList $
                   case argVals of
                     OrderedVals as -> zip (map (\(a,_,_) -> a) vals') as
@@ -1956,7 +1956,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             case argVals of
               OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
                 return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-              OrderedVals [SAccount address _] -> 
+              OrderedVals [SAccount address _] ->
                 return $ Constant $ SContract contractName' address
               OrderedVals [SContract _ addr] ->
                 return $ Constant $ SContract contractName' $ addr
@@ -1985,7 +1985,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
                 res <- pay "built-in send function" from address amount
-                case res of 
+                case res of
                   True -> return True
                   _ -> return False
               _ -> return False
@@ -1997,7 +1997,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
             --If address' chainId is unset then we set to the current chainId
               -- Get the code at the address
-            cid <- case (address' ^. namedAccountChainId) of 
+            cid <- case (address' ^. namedAccountChainId) of
               UnspecifiedChain -> do
                 --Assume that the chainId is the same as the from chainId when it is unset 
                 cid1 <- view accountChainId <$> getCurrentAccount
@@ -2017,57 +2017,57 @@ expToVar' (CC.FunctionCall _ e args) = do
                 -- Throw an error if too many arguments are passed
                 OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
                 --If nothing was given or something else, then just return the entire code
-                _ -> pure $ Nothing    
+                _ -> pure $ Nothing
             --get only the contract containing the sweet succulent ContractF definition
             (contract, _, _) <- getCodeAndCollection toAccount
             let codeSnippets :: [String]
-                codeSnippets = 
-                  case (fromMaybe "" searchTerms) of 
+                codeSnippets =
+                  case (fromMaybe "" searchTerms) of
                     --Unparse just the contract
                     "" -> [unparseContract contract]
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
-                      let contrString = 
+                      let contrString =
                             case ((contract ^. CC.contractName) == term) of
                               True -> Just $ unparseContract contract
                               False -> Nothing
 
-                          constString =   
-                            case ((contract ^. CC.constants) M.!? term) of 
+                          constString =
+                            case ((contract ^. CC.constants) M.!? term) of
                               Just constF -> Just $ unparseConstant (term, constF)
-                              Nothing -> Nothing                          
-
-                          storjString = 
-                            case ((contract ^. CC.storageDefs) M.!? term) of
-                              Just storjF -> Just $ unparseVar (term, storjF)
-                              Nothing -> Nothing                           
-
-                          enumString = 
-                            case ((contract ^. CC.enums) M.!? term) of
-                              Just enumF -> Just $ unparseEnum (term, fst enumF)
-                              Nothing -> Nothing                             
-
-                          structString = 
-                            case ((contract ^. CC.structs) M.!? term) of
-                              Just structF -> Just $ unparseStruct (term, structF) 
                               Nothing -> Nothing
 
-                          eventString = 
-                            case ((contract ^. CC.events) M.!? term) of 
-                              Just eventF -> Just $ unparseEvent (term, eventF)
-                              Nothing -> Nothing                             
+                          storjString =
+                            case ((contract ^. CC.storageDefs) M.!? term) of
+                              Just storjF -> Just $ unparseVar (term, storjF)
+                              Nothing -> Nothing
 
-                          funcString = 
-                            case ((contract ^. CC.functions) M.!? term) of 
+                          enumString =
+                            case ((contract ^. CC.enums) M.!? term) of
+                              Just enumF -> Just $ unparseEnum (term, fst enumF)
+                              Nothing -> Nothing
+
+                          structString =
+                            case ((contract ^. CC.structs) M.!? term) of
+                              Just structF -> Just $ unparseStruct (term, structF)
+                              Nothing -> Nothing
+
+                          eventString =
+                            case ((contract ^. CC.events) M.!? term) of
+                              Just eventF -> Just $ unparseEvent (term, eventF)
+                              Nothing -> Nothing
+
+                          funcString =
+                            case ((contract ^. CC.functions) M.!? term) of
                               Just funcF -> Just $ unparseFunc (term, funcF)
                               Nothing -> Nothing
 
-                          modString = 
+                          modString =
                             case ((contract ^. CC.modifiers) M.!? term) of
                               Just modF -> Just $ unparseModifier (term, modF)
                               Nothing -> Nothing
-                          
+
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
             pure . Constant $ SString ( unlines codeSnippets)
@@ -2075,26 +2075,26 @@ expToVar' (CC.FunctionCall _ e args) = do
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address Nothing itemName False args 
+            result <- callWrapper from address Nothing itemName False args
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SContractFunction name address' functionName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address name functionName False args 
+            result <- callWrapper from address name functionName False args
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SEnum enumName) -> do
             case argVals of
               OrderedVals [SInteger i] -> do
                 c <- getCurrentContract
-                case M.lookup enumName $ c^.CC.enums  of 
+                case M.lookup enumName $ c^.CC.enums  of
                   Just theEnum -> do
                     case fst theEnum !? fromInteger i of
                       Nothing -> typeError "enum val out of range" argVals
                       Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
                   Nothing -> do
-                    (_, cc) <- getCurrentCodeCollection                            
+                    (_, cc) <- getCurrentCodeCollection
                     let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
                                 $ M.lookup enumName $ cc ^.CC.flEnums
                     case fst theEnum' !? fromInteger i of
@@ -2163,7 +2163,7 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       dstVar <- expToVar dst
       setVar dstVar srcVal
       return $ Constant srcVal
-  
+
 expToVar' ep@(CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _) = do
   missingField "index value cannot be empty" (unparseExpression ep)
 
@@ -2174,7 +2174,7 @@ expToVar' (CC.Binary _ "=" dst src) = do
   dstVar <- expToVar dst
 
   setVar dstVar srcVal
-  
+
   return $ Constant srcVal
 
 
@@ -2189,7 +2189,7 @@ evaluateAccountMember :: MonadSM m
                       -> m Variable
 evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
-  cid <- case (a ^. namedAccountChainId) of 
+  cid <- case (a ^. namedAccountChainId) of
     UnspecifiedChain -> do
       cid1 <- view accountChainId <$> getCurrentAccount
       case cid1 of
@@ -2206,9 +2206,9 @@ evaluateAccountMember a _ "codehash" = do
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
 --Get the whole code collection when nothing is supplied to the code function
-evaluateAccountMember a _ "code" = do 
+evaluateAccountMember a _ "code" = do
   -- Get the code at the address
-  cid <- case (a ^. namedAccountChainId) of 
+  cid <- case (a ^. namedAccountChainId) of
     UnspecifiedChain -> do
       cid1 <- view accountChainId <$> getCurrentAccount
       case cid1 of
@@ -2221,7 +2221,7 @@ evaluateAccountMember a _ "code" = do
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
   resolvedCodeHash <- resolveCodePtr cid codeHash'
   let ch' = case resolvedCodeHash of
-              Just (SolidVMCode _ ch1') -> ch1' 
+              Just (SolidVMCode _ ch1') -> ch1'
               Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
               Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
   -- Find the code using the codehash
@@ -2232,8 +2232,8 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
-evaluateAccountMember a _ "balance" = do 
-  cid <- case (a ^. namedAccountChainId) of 
+evaluateAccountMember a _ "balance" = do
+  cid <- case (a ^. namedAccountChainId) of
     UnspecifiedChain -> do
       cid1 <- view accountChainId <$> getCurrentAccount
       case cid1 of
@@ -2245,30 +2245,30 @@ evaluateAccountMember a _ "balance" = do
   bal <- A.lookup (A.Proxy @AddressState) realAccount
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
-    _ -> return $ Constant $ SInteger 0 
-evaluateAccountMember a _ "chainId" = do 
+    _ -> return $ Constant $ SInteger 0
+evaluateAccountMember a _ "chainId" = do
   case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do 
+    UnspecifiedChain -> do
       curCid <- view accountChainId <$> getCurrentAccount
       case curCid of
-        Nothing -> return $ Constant $ SInteger 0 
+        Nothing -> return $ Constant $ SInteger 0
         Just cid -> return $ Constant $ SInteger $ fromIntegral cid
-    MainChain ->  return $ Constant $ SInteger 0 
+    MainChain ->  return $ Constant $ SInteger 0
     ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
-evaluateAccountMember a _ "chainIdString" = do 
+evaluateAccountMember a _ "chainIdString" = do
   case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do 
+    UnspecifiedChain -> do
       curCid <- view accountChainId <$> getCurrentAccount
       case curCid of
         Nothing -> return $ Constant $ SString $ replicate 64 '0'
         Just cid -> return $ Constant $ SString $ format cid
-    MainChain ->  return $ Constant $ SString $ replicate 64 '0' 
+    MainChain ->  return $ Constant $ SString $ replicate 64 '0'
     ExplicitChain cid -> return $ Constant $ SString $ format cid
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
   let address = namedAccountToAccount (from ^. accountChainId) a
-  result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
+  result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])
   return . Constant . fromMaybe SNULL $ result
 
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
@@ -2312,7 +2312,7 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
-intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16 
+intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
 intBuiltin args = typeError "numeric cast - invalid args" args
@@ -2322,7 +2322,7 @@ integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
 
 parseBaseInt :: String -> Integer -> Either String Integer
-parseBaseInt s n = 
+parseBaseInt s n =
   case n of
     10 -> readEither s
     16 -> case B16.decode (BC.pack s) of
@@ -2354,14 +2354,14 @@ callBuiltin "string" [SAccount a _] _ = return . SString $ show a
 callBuiltin "string" [SInteger i] _ = return . SString $ show i
 callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
-callBuiltin "address" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a 
+callBuiltin "address" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [a@SAccount{}] _ = return a
 callBuiltin "address" [SContract _ a] _ = return $ SAccount a False
 callBuiltin "address" [ss@(SString s)] _ = maybe (typeError "address cast" ss)
-                                                 (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain)) 
+                                                 (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain))
                                                  $ readMaybe s
 callBuiltin "address" vs _ = typeError "address cast" vs
-callBuiltin "account" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a 
+callBuiltin "account" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
 callBuiltin "account" [a@SAccount{}] _ = return a
 callBuiltin "account" [SContract _ a] _ = return $ SAccount a False
 callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
@@ -2381,7 +2381,7 @@ callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = do
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
 callBuiltin "account" [SInteger a, SString name] _ = unspecifiedChain (fromIntegral a) `castToAncestor` name
-callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a 
+callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [(SAccount a _), SString "main"] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
 callBuiltin "account" [(SAccount a _), SString "self"] _ = do
   cInfo <- Mod.get (Mod.Proxy @[CallInfo])
@@ -2389,14 +2389,14 @@ callBuiltin "account" [(SAccount a _), SString "self"] _ = do
   pure . ((flip SAccount) False) $ case currentChainId of
     Nothing -> (namedAccountChainId .~ MainChain) a
     Just cid -> (namedAccountChainId .~ ExplicitChain cid) a
-callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a 
+callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
-    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
+    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
 callBuiltin "account" [(SAccount a _), SString name] _ = a `castToAncestor` name
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
-  
+
 callBuiltin ("blockhash") [SInteger blockNum] _ = do
   when (blockNum<0) (invalidArguments "Does not Exist" [blockNum])
   env' <- getEnv
@@ -2407,7 +2407,7 @@ callBuiltin ("blockhash") [SInteger blockNum] _ = do
 
 callBuiltin ("selfdestruct") [SAccount a _] _ = do
   contract' <- getCurrentAccount
-  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract' 
+  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
     pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
@@ -2499,12 +2499,12 @@ callBuiltin "getCertField" [(SAccount a _), (SString certField)] _ = do --Add ot
 callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
   let ex509Cert = bsToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
-  case (ex509Cert, ePublicKey) of 
+  case (ex509Cert, ePublicKey) of
     (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
     (_, Left r) -> malformedData "Could not parse public key" r
     (Right x509Cert, Right publicKey) -> do
       let isValid = verifyCert publicKey x509Cert
-      onTraced $ liftIO $ putStrLn $ (if isValid then 
+      onTraced $ liftIO $ putStrLn $ (if isValid then
               C.green "The certificate is valid."
               else C.red "The certificate is invalid")
       return $ SBool isValid
@@ -2517,12 +2517,12 @@ callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
 callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] _ = do
   let ex509Cert = bsToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
-  case (ex509Cert, ePublicKey) of 
+  case (ex509Cert, ePublicKey) of
     (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
     (_, Left r) -> malformedData "Could not parse public key" r
     (Right x509Cert, Right publicKey) -> do
       let isValid = verifyCertSignedBy publicKey x509Cert
-      onTraced $ liftIO $ putStrLn $ (if isValid then 
+      onTraced $ liftIO $ putStrLn $ (if isValid then
               C.green "The certificate is valid."
               else C.red "The certificate is invalid")
       return $ SBool isValid
@@ -2532,24 +2532,24 @@ callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] _ = do
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] _ = do
-  let eMesgBs = B16.decode $ BC.pack msg 
-  case eMesgBs of 
+  let eMesgBs = B16.decode $ BC.pack msg
+  case eMesgBs of
     Right mesgBs -> do
       if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
       else do
         let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
         let ePublicKey = bsToPub $ BC.pack pubkey
-        case (mSignature, ePublicKey) of 
+        case (mSignature, ePublicKey) of
           (Nothing, _) -> malformedData "Could not parse EC Signature " signature
           (_, Left pk) -> malformedData "Could not parse public key" pk
           (Just sig, Right publicKey) -> do
             let isValid = SEC.verifySig publicKey sig mesgBs
-            onTraced $ liftIO $ putStrLn $ (if isValid then 
+            onTraced $ liftIO $ putStrLn $ (if isValid then
               C.green "The signature is valid."
               else C.red "The signature is invalid")
             return $ SBool isValid
     Left err -> malformedData "Could not decode hex string" err
-  
+
 callBuiltin "parseCert" [SString cert] _ = do
   curContract <- getCurrentContract
   return $ certificateMap (Just cert) curContract
@@ -2559,7 +2559,7 @@ callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
 certificateMap :: Maybe String -> CC.Contract -> Value
-certificateMap maybeCert _ = 
+certificateMap maybeCert _ =
     case maybeCert of
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
@@ -2583,12 +2583,12 @@ certificateMap maybeCert _ =
                                    , (SString "certString", Constant . SString $ "")
                                    , (SString "parent", Constant . SString $ "")
                                    ]
-          certMap cert sub  = let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub) 
-                                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert ) 
+          certMap cert sub  = let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert )
                                                               ]
                                in M.union fieldsToUpdate $ nonEmptyFields cert sub
-          emptyCertMap = let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ "") 
-                                                         , (SString "expirationDate", Constant . SString $ "") 
+          emptyCertMap = let fieldsToUpdate = M.fromList [ (SString "organizationalUnit", Constant . SString $ "")
+                                                         , (SString "expirationDate", Constant . SString $ "")
                                                          ]
                           in M.union fieldsToUpdate $ emptyFields
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
@@ -2672,7 +2672,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
               M.fromList
               $ map (\(k, v) -> (fromMaybe "" $ k, v))
               $ maybe einval CC._funcArgs $ contract' ^. CC.constructor
-              
+
             typeAndVal =
               M.merge
                 (M.mapMissing (curry $ invalidArguments "missing argument"))
@@ -2680,7 +2680,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                 (M.zipWithMatched $ \_k t v -> (t, v))
                 argTypes
                 (M.fromList ns)
-                         
+
         forM (M.toList typeAndVal) $ \(n, (CC.IndexedType _ t, v)) -> do
           let correctedVal = coerceType contract' t v
           var <- createVar correctedVal
@@ -2699,7 +2699,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       SVMType.Array _ _-> return ()
       SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
-  
+
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
              . fromMaybe []
@@ -2709,7 +2709,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   case contract'^.CC.constructor of
     Just theFunction -> do
-      let theModifierNames =  map fst $ (CC._funcModifiers theFunction) 
+      let theModifierNames =  map fst $ (CC._funcModifiers theFunction)
       !theModifiers' <- forM theModifierNames $ \name -> do
         case M.lookup name (contract'^.CC.modifiers) of
           Just theModifier -> do
@@ -2769,7 +2769,7 @@ runTheCall :: MonadSM m
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
-      theModifierNames = map fst $ (CC._funcModifiers theFunction) 
+      theModifierNames = map fst $ (CC._funcModifiers theFunction)
 
   theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract'^.CC.modifiers) of
@@ -2779,7 +2779,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   let !theModifiers = catMaybes theModifiers'
 
   let args = case argVals of
-        OrderedVals vs -> let argMeta = 
+        OrderedVals vs -> let argMeta =
                                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                 $ CC._funcArgs theFunction
                           in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
@@ -2803,9 +2803,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       return (n, (t, newVar))
 
   addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
-  
+
   matchedArgvals <- forM theModifiers $ \modi -> do
-    let margList = CC.OrderedArgs 
+    let margList = CC.OrderedArgs
             . fromMaybe []
             $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
     margVals <- argsToValsModifiers contract' modi margList
@@ -2895,13 +2895,13 @@ logVals val1 val2 = onTraced . liftIO $ printf
 --TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 -- change the return type from ByteSTring to String
 encodeForReturn ::  MonadSM m => Value -> m String
-encodeForReturn v = 
+encodeForReturn v =
   case  v of
     STuple{} ->  encodeForReturn' v
     _ ->  do
       v' <- encodeForReturn' v
-      return $ "(" <> v' <> ")" 
-    
+      return $ "(" <> v' <> ")"
+
 
 encodeForReturn' :: MonadSM m => Value -> m String
 encodeForReturn' (SInteger i) = return $ show i
@@ -2939,7 +2939,7 @@ encodeForReturn' (SArray _ items) = do
 encodeForReturn' (STuple items)   = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
-  return $ "(" ++ ( intercalate "," encodedItems ) ++ ")" 
+  return $ "(" ++ ( intercalate "," encodedItems ) ++ ")"
 
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
@@ -2951,13 +2951,13 @@ solidityExceptionHandler catchBlockMap ex = do
   let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
         case M.lookup "Panic" cbm of
           Nothing -> do
-            case M.lookup "Nill" cbm of 
+            case M.lookup "Nill" cbm of
               Nothing -> errFunc s1 s2
               Just (_, stmts) -> do
                 res' <-  runStatements stmts
                 return res'
           Just (mVar, block) -> do
-            case mVar of 
+            case mVar of
               Nothing -> do
                 res' <-  runStatements block
                 return res'
@@ -2965,7 +2965,7 @@ solidityExceptionHandler catchBlockMap ex = do
                 addLocalVariable varType varName (SInteger errCode)
                 res <- runStatements block
                 return res
-                
+
   case ex of
     (InternalError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 1 internalError
@@ -2994,13 +2994,13 @@ solidityExceptionHandler catchBlockMap ex = do
     (ArityMismatch s1 i1 i2) -> do
       case M.lookup "Panic" catchBlockMap of
         Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
+          case M.lookup "Nill" catchBlockMap of
             Nothing -> arityMismatch s1 i1 i2
             Just (_, stmts) -> do
               res' <-  runStatements stmts
               return res'
         Just (mVar, block) -> do
-          case mVar of 
+          case mVar of
             Nothing -> do
               res' <-  runStatements block
               return res'
@@ -3017,13 +3017,13 @@ solidityExceptionHandler catchBlockMap ex = do
     (DivideByZero s1) -> do
       case M.lookup "Panic" catchBlockMap of
         Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
+          case M.lookup "Nill" catchBlockMap of
             Nothing -> divideByZero s1
             Just (_, stmts) -> do
               res' <-  runStatements stmts
               return res'
         Just (mVar, block) -> do
-          case mVar of 
+          case mVar of
             Nothing -> do
               res' <-  runStatements block
               return res'
@@ -3034,7 +3034,7 @@ solidityExceptionHandler catchBlockMap ex = do
     (Require s1) -> do
       case M.lookup "Error" catchBlockMap of
         Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
+          case M.lookup "Nill" catchBlockMap of
             Nothing -> do
               _ <- require False s1
               return Nothing
@@ -3042,7 +3042,7 @@ solidityExceptionHandler catchBlockMap ex = do
               res' <-  runStatements stmts
               return res'
         Just (mVar, block) -> do
-          case mVar of 
+          case mVar of
             Nothing -> do
               res' <-  runStatements block
               return res'
@@ -3053,7 +3053,7 @@ solidityExceptionHandler catchBlockMap ex = do
     (Assert) -> do
       case M.lookup "Error" catchBlockMap of
         Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
+          case M.lookup "Nill" catchBlockMap of
             Nothing -> do
               _ <- assert False
               return Nothing
@@ -3061,7 +3061,7 @@ solidityExceptionHandler catchBlockMap ex = do
               res' <-  runStatements stmts
               return res'
         Just (mVar, block) -> do
-          case mVar of 
+          case mVar of
             Nothing -> do
               res' <-  runStatements block
               return res'
@@ -3145,32 +3145,32 @@ solidVMExceptionHandler :: (MonadSM m) => (M.Map String (Maybe [String], [CC.Sta
 solidVMExceptionHandler catchBlockMap ex = case ex of
     (InternalError s1 s2) -> do
       case M.lookup "InternalError" catchBlockMap of
-        Nothing -> solidVMExceptionHelper catchBlockMap $ internalError s1 s2 
+        Nothing -> solidVMExceptionHelper catchBlockMap $ internalError s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (InvalidArguments s1 s2) -> 
+    (InvalidArguments s1 s2) ->
       case M.lookup "InvalidArguments" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidArguments s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (IndexOutOfBounds s1 s2) -> 
+    (IndexOutOfBounds s1 s2) ->
       case M.lookup "IndexOutOfBounds" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ indexOutOfBounds s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (ParseError s1 s2) -> 
+    (ParseError s1 s2) ->
       case M.lookup "ParseError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ parseError s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (Require s1) -> 
+    (Require s1) ->
       case M.lookup "Require" catchBlockMap of
         Nothing -> do
-          case M.lookup "" catchBlockMap of 
+          case M.lookup "" catchBlockMap of
             Nothing -> do
               _ <- require False s1
               return Nothing
@@ -3180,10 +3180,10 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (Assert) -> 
+    (Assert) ->
       case M.lookup "Assert" catchBlockMap of
         Nothing -> do
-          case M.lookup "" catchBlockMap of 
+          case M.lookup "" catchBlockMap of
             Nothing -> do
               _ <- assert False
               return Nothing
@@ -3193,67 +3193,67 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (UnknownFunction s1 s2) -> 
+    (UnknownFunction s1 s2) ->
       case M.lookup "UnknownFunction" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownFunction s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (UnknownConstant s1 s2) -> 
+    (UnknownConstant s1 s2) ->
       case M.lookup "UnknownConstant" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownConstant s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (UnknownVariable s1 s2) -> 
+    (UnknownVariable s1 s2) ->
       case M.lookup "UnknownVariable" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownVariable s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (UnknownStatement s1 s2) -> 
+    (UnknownStatement s1 s2) ->
       case M.lookup "UnknownStatement" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownStatement s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (DivideByZero s1) -> 
+    (DivideByZero s1) ->
       case M.lookup "DivideByZero" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ divideByZero s1
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (MissingCodeCollection s1 s2) -> 
+    (MissingCodeCollection s1 s2) ->
       case M.lookup "MissingCodeCollection" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ missingCodeCollection s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (InaccessibleChain s1 s2) -> 
+    (InaccessibleChain s1 s2) ->
       case M.lookup "InaccessibleChain" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ inaccessibleChain s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (InvalidWrite s1 s2) -> 
+    (InvalidWrite s1 s2) ->
       case M.lookup "InvalidWrite" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidWrite s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (InvalidCertificate s1 s2) -> 
+    (InvalidCertificate s1 s2) ->
       case M.lookup "InvalidCertificate" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidCertificate s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (MalformedData s1 s2) -> 
+    (MalformedData s1 s2) ->
       case M.lookup "MalformedData" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ malformedData s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (TooMuchGas s1 s2) -> 
+    (TooMuchGas s1 s2) ->
       case M.lookup "TooMuchGas" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ tooMuchGas s1 s2
         Just (_, block) -> do
@@ -3265,7 +3265,7 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (TooManyResultsError s1 s2) -> 
+    (TooManyResultsError s1 s2) ->
       case M.lookup "TooManyResultsError" catchBlockMap of
         Nothing -> tooManyResultsError s1 s2
         Just (_, block) -> do
@@ -3298,9 +3298,9 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
           (_, cc) <- getCurrentCodeCollection
           let basicToVals = map (\x -> fromBasic x) vals
               zipped = case M.lookup name $ CC._errors ctract of
-                        Just e -> zip e basicToVals 
+                        Just e -> zip e basicToVals
                         Nothing -> case M.lookup name $ CC._flErrors cc of
-                          Just e -> zip e basicToVals 
+                          Just e -> zip e basicToVals
                           Nothing -> invalidArguments "Invalid error type." name
               argsToSolidString = case args of
                 Just a -> map stringToLabel a
@@ -3310,7 +3310,7 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
                 else pure $ [()]
           res <- runStatements block
           return res
-      
+
     _ -> error "unhandled solid exception" (show ex)
 
 -- --If given a list, apply a given function to only the first element of the list.
@@ -3377,4 +3377,4 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
 --       start,
 --       end
 --     }
-  
+
