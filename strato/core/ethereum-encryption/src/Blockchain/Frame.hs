@@ -78,7 +78,7 @@ ethEncrypt ethCryptState = do
           (mac', headMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
 
       yield headCipher
-      $logInfoS "headCipher!!" $ T.pack $ ": "++ (show (headCipher)) 
+      $logDebugS "headCipher!!" $ T.pack $ ": "++ (show (headCipher)) 
       yield headMAC
 
       let (aesState'', frameCipher) = AES.encrypt aesState' (bytes `B.append` B.replicate frameBuffSize 0)
@@ -104,7 +104,7 @@ ethDecrypt :: MonadLogger m
            -> ConduitM B.ByteString B.ByteString m ()
 ethDecrypt ethCryptState = do
   headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
-  $logInfoS "headCipher" . T.pack $ ": " ++ show headCipher
+  $logDebugS "headCipher" . T.pack $ ": " ++ show headCipher
   headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16
   let (mac', expectedHeadMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
   when (expectedHeadMAC /= headMAC) $ throw HeadMacIncorrect

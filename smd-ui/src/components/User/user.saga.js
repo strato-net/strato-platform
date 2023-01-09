@@ -17,7 +17,7 @@ import { env } from '../../env';
 const oauthUserUrl = env.APEX_URL + "/user";
 
 function getOrCreateOauthUserApi() {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?address=eq.";
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
   return fetch(
     oauthUserUrl,
     {
@@ -29,9 +29,9 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
+    .then(r => { return r.json() })
     .then(function (res) {
-      const user = res.json();
-      const url = cirrusUrl + user.address;
+      const url = cirrusUrl + res.address;
       return fetch(
         url,
         {
@@ -74,12 +74,20 @@ function fetchUserPubKeyRequest() {
 
 export function* getOrCreateOauthUser() {
   try {
-    const user = yield call(getOrCreateOauthUserApi);
-    if (user.error) {
+    const user_query = yield call(getOrCreateOauthUserApi);
+    if (user_query.error) {
       // We only get the non-401 errors here (401 is handled inside of getOrCreateOauthUserApi)
-      console.error('Failed to create account for OAuth user. Error:', user.error)
+      console.error('Failed to create account for OAuth user. Error:', user_query.error)
       // Admin: refer to strato nginx and apex logs for details
     } else {
+      const user = {
+        commonName: user_query[0].commonName,
+        organization: user_query[0].organization,
+        organizationalUnit: user_query[0].organizationalUnit,
+        country: user_query[0].country,
+        address: user_query[0].userAddress,
+      }
+
       localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));
     }

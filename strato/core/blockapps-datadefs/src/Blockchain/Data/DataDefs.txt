@@ -98,7 +98,7 @@ TransactionResult json
     blockHash Keccak256
     transactionHash Keccak256
     message String
-    response BSS.ShortByteString
+    response String
     trace String
     gasUsed Word256
     etherUsed Word256
@@ -169,6 +169,7 @@ LogDB
     deriving Eq Read Show Generic
 
 EventDB
+    blockHash Keccak256
     contractAddress Account
     chainId Word256 Maybe
     name String

@@ -15,6 +15,8 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C
+import           Data.ByteString.Base64
+import           Data.Either.Extra
 import           Data.FileEmbed
 import qualified Data.Map                           as Map
 import           Data.Maybe
@@ -42,6 +44,7 @@ import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
 import qualified Blockchain.Network                 as Net
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
@@ -187,9 +190,24 @@ oneTimeSetup genesisBlockName = do
 
 
      {- create directory and dbs -}
+      maybeNetworkParams <- Net.getParams flags_network
+      --  Allow these flags to accept base64-encoded JSONs optionally
+      let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
+          eValidators = (Ae.eitherDecodeStrict . b64decode) (C.pack flags_validators) :: Either String [ChainMemberParsedSet]
+          !validators' =
+            case (maybeNetworkParams, eValidators) of
+              (Just networkParams, Right []) -> map Net.identity networkParams
+              (_, Right v) -> v
+              (_, Left e) -> error $ "invalid validators: " ++ e
+          eAdmins = (Ae.eitherDecodeStrict . b64decode) (C.pack flags_blockstanbul_admins) :: Either String [ChainMemberParsedSet]
+          !admins' =
+            case (maybeNetworkParams, eAdmins) of
+              (Just networkParams, Right []) -> map Net.identity networkParams
+              (_, Right v) -> v
+              (_, Left e) -> error $ "invalid validators: " ++ e
 
       void . runLoggingT . runResourceT . runSetupDBM $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
          void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
          liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-         initializeGenesisBlock genesisBlockName decodedFaucets
+         initializeGenesisBlock genesisBlockName decodedFaucets validators' admins'

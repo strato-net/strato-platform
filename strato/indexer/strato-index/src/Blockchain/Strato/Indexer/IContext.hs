@@ -158,6 +158,18 @@ instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
 --                . unChainMembers
 --                . unP2P
 
+instance (ChainMemberParsedSet `A.Alters` P2P (A.Proxy ChainMemberParsedSet)) IContextM where
+  insertMany _ m = void
+                 . RBDB.withRedisBlockDB
+                 . RBDB.addValidators
+                 $ M.keys m
+  deleteMany _ = void
+               . RBDB.withRedisBlockDB
+               . RBDB.removeValidators
+  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "ChainMemberParsedSet" "Proxy ChainMemberParsedSet"
+  insert p k v = A.insertMany p $ M.singleton k v
+  delete p k   = A.deleteMany p [k]
+
 pgPoolSize :: Int
 pgPoolSize = 20
 

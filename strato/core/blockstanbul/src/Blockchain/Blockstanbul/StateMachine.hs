@@ -68,13 +68,11 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map RoundNumber (S.Set ChainMemberParsedSet)
-  , _voted :: M.Map ChainMemberParsedSet (M.Map ChainMemberParsedSet Bool)
-  -- The address of this node
+  -- The identity of this node
   , _selfAddr :: ChainMemberParsedSet
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe ChainMemberParsedSet
-  , _authSenders :: M.Map ChainMemberParsedSet Int
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
   , _lastParent :: Maybe Keccak256
@@ -99,10 +97,9 @@ debugShowCtx = do
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
-  debugLog "showctx/admins" authSenders show
 
 newContext :: Checkpoint -> ChainMemberParsedSet -> BlockstanbulContext
-newContext (Checkpoint v pendingVotes as senderlist) chainm =
+newContext (Checkpoint v as) chainm =
   let valSet = S.fromList as
       prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
   in BlockstanbulContext
@@ -118,11 +115,9 @@ newContext (Checkpoint v pendingVotes as senderlist) chainm =
      , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
-     , _voted = pendingVotes
      , _selfAddr = chainm
      , _blockLock = Nothing
      , _lockSender = Nothing
-     , _authSenders = generateNonceMap senderlist
      , _lastParent = Nothing
      , _validatorBehavior = True
      }

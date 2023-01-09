@@ -25,6 +25,7 @@ module Blockchain.Context
     , TcpPortNumber(..)
     , Inbound(..)
     , Outbound(..)
+    , IsValidator(..)
     , Context(..)
     , Config(..)
     , ContextM
@@ -163,6 +164,8 @@ newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
 newtype Inbound a = Inbound { unInbound :: a }
 newtype Outbound a = Outbound { unOutbound :: a }
+
+newtype IsValidator = IsValidator { unIsValidator :: Bool }
 
 data Config = Config
   { configSQLDB              :: SQLDB
@@ -337,6 +340,9 @@ instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (R
 
 instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainMembersFromSet 
+
+instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
+  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
 
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
   lookup _  k = do
@@ -547,6 +553,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Point, PPeer)
                        , '(ChainMemberParsedSet, X509CertInfoState)
                        , '(ChainMemberParsedSet, [ChainMemberParsedSet])
+                       , '(ChainMemberParsedSet, IsValidator)
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)

@@ -34,8 +34,6 @@ defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between b
 defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
-defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of admins. Admins can, for instance, nominate a new validator"
-defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node's address as an admin account"
 defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
@@ -66,8 +64,6 @@ exportFlagsAsMetrics = do
   set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "blockstanbul_port" $ show flags_blockstanbul_port
-  set "blockstanbul_admins" flags_blockstanbul_admins
-  set "isAdmin" $ show flags_isAdmin
   set "isRootNode" $ show flags_isRootNode
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
   set "validatorBehavior" $ show flags_validatorBehavior 
