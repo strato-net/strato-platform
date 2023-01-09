@@ -244,22 +244,15 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest = runTestWithTimeout 5000000
 
-generateGBlock :: ( MonadLogger m
-                            -- , MonadBagger m
-                             , HasStateDB m
-                             )
-                          => m (Block,OutputBlock)
+generateGBlock :: ( MonadLogger m, HasStateDB m) => m (Block,OutputBlock)
 generateGBlock = do
-    -- let as = "e1fd0d4a52b75a694de8b55528ad48e2e2cf7859" 
     let gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
     let genesis = JS.parseLazyByteString genesisParser gi
         theJSON = case genesis of
                       [x] -> x
                       _ -> error $ "invalid genesis: " ++ show genesis    
-    -- let codes = genesisInfoCodeInfo theJSON
-    -- let accounts = genesisInfoAccountInfo theJSON
+
     sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
-    -- let sourceInfo = zipSourceInfo (accounts ++ as) codes
     let bData = BlockData {
             blockDataParentHash = genesisInfoParentHash theJSON,
             blockDataUnclesHash = genesisInfoUnclesHash theJSON,
@@ -294,26 +287,15 @@ runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT . runTestContextM $ do
     (blockCreated,outputBlock) <- generateGBlock
-    
-    let (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
-            MP.initializeBlank
-            for_ [] $ \addr -> do
-              sr <- State.gets fst
-              let key = addressAsNibbleString addr
-                  val = rlpEncode . rlpSerialize . rlpEncode $ blankAddressState{addressStateBalance = 1000000000000000000000000}
-              sr' <- MP.putKeyVal sr key val
-              State.modify' $ \(_,b) -> (sr',b) 
     MP.initializeBlank
-    setStateDBStateRoot Nothing stateRoot
+    setStateDBStateRoot Nothing $ blockDataStateRoot $ blockBlockData $ blockCreated
     writeBlockSummary outputBlock
-    for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
     let genHash = rlpHash $ (blockCreated)
-    bhr <- bootstrapChainDB  genHash [(Nothing, stateRoot)]
+    bhr <- bootstrapChainDB  genHash [(Nothing, (blockDataStateRoot $ blockBlockData $ blockCreated))]
     putContextBestBlockInfo $ ContextBestBlockInfo ( genHash, (blockBlockData $ blockCreated), 0, 0, 0)
     Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
     processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block   
-
-    withCurrentBlockHash (rlpHash $ (blockCreated)) $ do
+    withCurrentBlockHash genHash $ do
       let certKey addr = ((Account addr Nothing),) . encodeUtf8 
           certRegistryKey = certKey (Address 0x509)
       insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
