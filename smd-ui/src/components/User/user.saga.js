@@ -81,7 +81,7 @@ export function* getOrCreateOauthUser() {
       // Admin: refer to strato nginx and apex logs for details
     } else {
       const user = {
-        username: user_query[0].commonName,
+        commonName: user_query[0].commonName,
         organization: user_query[0].organization,
         organizationalUnit: user_query[0].organizationalUnit,
         country: user_query[0].country,
