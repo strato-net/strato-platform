@@ -34,7 +34,9 @@ class MenuBar extends Component {
         {isOauthEnabled() && <span><span className="pt-navbar-divider" />
           { (this.props.oauthUser && this.props.oauthUser.commonName) 
             ? <small className="pt-text-muted welcome-user"> {this.props.oauthUser.commonName} </small>
-            : <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}> Get Certified </button>
+            : <a href='https://support.blockapps.net ' target="_black" rel="noopener noreferrer">
+                <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("contact_blockapps_certification_click") }}> Get Certified </button>
+              </a>
           }
           <span className="pt-navbar-divider" />
           <a target="_blank" rel="noopener noreferrer">
