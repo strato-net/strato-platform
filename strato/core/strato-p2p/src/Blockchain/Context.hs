@@ -609,7 +609,7 @@ initConfig wireMessagesRef maxHeaders = do
     return $ mkClientEnv mgr url
   nodePubKey <- do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (Just $ T.pack "nodekey") Nothing) vaultClient
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing (Just $ T.pack "nodekey")) vaultClient
 
   initState <- newIORef initContext
   return $ Config
