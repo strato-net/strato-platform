@@ -48,8 +48,8 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-      
-          def runVaultCommand = """#!/bin/bash
+          
+          writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
               HTTPS_PORT=8093 \\
@@ -59,13 +59,12 @@ pipeline {
               PASSWORD=123 \\
               ./vault
           """
-          writeFile file:"run-vault.sh", text: """${runVaultCommand}"""
           sh 'chmod +x run-vault.sh'
       
           sh './run-vault.sh'
-          
+  
           // TODO: run node on https
-          def runStratoCommand = """#!/bin/bash
+          writeFile file: "run.sh", text: """#!/bin/bash
             sudo \\
               NODE_HOST=\$(</host) \\
               BLOC_DEBUG=true \\
@@ -81,7 +80,6 @@ pipeline {
               validators='[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}]' \\
               ./strato --single
           """
-          writeFile file:"run.sh", text: """${runStratoCommand}"""
           sh 'chmod +x run.sh'
       
           sh './run.sh'
