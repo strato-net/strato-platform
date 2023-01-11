@@ -38,6 +38,26 @@ class OauthAccounts extends Component {
     const users = this.props.oauthAccounts;
     const rows = [];
 
+    console.log(this);
+
+    // const cards = contractNames.length === 0 ? [] : contractNames
+    //   .filter(function (contract) {
+    //     if (!filter) {
+    //       return true;
+    //     }
+    //     return contract.toLowerCase().indexOf(filter) > -1;
+    //   })
+    //   .map((value, i) => {
+    //     return (
+    //       <div className="row pt-dark" key={'contract-card-' + i}>
+    //         <div className="col-sm-12">
+    //           {value && <ContractCard contract={{ name: value, contract: contracts[value] }} />}
+    //           <br />
+    //         </div>
+    //       </div>
+    //     );
+    //   });
+
     users.filter(user => {
       if (!filter) {
         return true;
@@ -46,8 +66,7 @@ class OauthAccounts extends Component {
     })
       .forEach(function (user, index) {
         const position = index + 1;
-
-        if (user.commonName) {
+        if (user) {
           let userClasseName = '';
           if (this.state.selected === position) {
             userClasseName = ' selected';
