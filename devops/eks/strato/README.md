@@ -42,7 +42,7 @@ kubectl apply -f zookeeper-pvc.yaml
 kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
-kubectl apply -f deployment.yaml
+kubectl apply -f eks-strato-deployment.tpl.yaml
 
 # Create nginx Service
 kubectl apply -f nginx-service.yaml
