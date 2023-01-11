@@ -87,6 +87,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
+import Blockchain.Data.ValidatorRef
+
 import           Text.Format
 
 readSupplementaryAccounts :: String -> IO [AccountInfo]
@@ -198,6 +200,8 @@ initializeGenesisBlock genesisBlockName extraFaucets validators admins = do
     void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
+
+    void $ addRemoveValidator ([], validators)
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
     $logInfoS "initgen" "Beginning to write to redis"
