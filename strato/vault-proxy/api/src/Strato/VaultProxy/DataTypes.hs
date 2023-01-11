@@ -147,8 +147,8 @@ instance FromJSON RawPing where
 
     vers <- case ver of
         (Number ver1) -> pure ver1
-        (Object _) -> error $ "Expected a JSON Number under the key \"version\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+        (Object _) -> error $ "Expected a JSON Number under the key \"ping\", but got something different."
+        _          -> error $ "Expected a JSON Number under the key \"ping\", but got something different."
 
     return $ RawPing $ Version $ Scientific.base10Exponent vers
   parseJSON wat = typeMismatch "Spec" wat
