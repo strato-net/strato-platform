@@ -1,8 +1,12 @@
+{-# LANGUAGE OverloadedStrings,TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
     RawOauth(..),
-    RawPing(..)
+    RawPing(..),
+    Version(..)
 ) where
 
 -- import           Control.Lens
@@ -10,11 +14,10 @@ import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Cache
-import           Data.Scientific
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
-import           Strato.Strato23.API.Types (Version(..))
+import           GHC.Generics
 
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
@@ -118,18 +121,34 @@ instance FromJSON RawOauth where
     return $ RawOauth authend tokend 
   parseJSON wat = typeMismatch "Spec" wat
 
-instance FromJSON RawPing where
+data Version = Version {
+    version :: Int
+} deriving (Show, Eq, Generic)
+
+instance FromJSON Version where
   parseJSON (Object o) = do
     ver  <- o .: T.pack "version"
 
     vers <- case ver of
-        (Number s) -> pure s
-        (Object _) -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
-        _          -> error $ "Expected a JSON String under the key \"_ping\", but got something different."
+        (Number ver1) -> pure ver1
+        (Object _) -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+        _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
 
-    return $ RawPing $ Version (base10Exponent vers)
+    return $ Version $ Scientific.base10Exponent vers
   parseJSON wat = typeMismatch "Spec" wat
 
 data RawPing = RawPing {
     ping :: Version
-} deriving (Show, Eq)
+} deriving (Show, Eq, Generic)
+
+instance FromJSON RawPing where
+  parseJSON (Object o) = do
+    ver  <- o .: T.pack "ping"
+
+    vers <- case ver of
+        (Number ver1) -> pure ver1
+        (Object _) -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+        _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+
+    return $ RawPing $ Version $ Scientific.base10Exponent vers
+  parseJSON wat = typeMismatch "Spec" wat

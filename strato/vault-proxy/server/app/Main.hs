@@ -9,6 +9,7 @@
 
 module Main where
 
+-- import           Control.Applicative
 import           Control.Concurrent.Lock                as L
 -- import           Control.Lens
 import           Control.Monad
@@ -20,12 +21,14 @@ import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
 import           GHC.Conc
+-- import qualified Network.Curl                           as Curl
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
 import           Network.HTTP.Types.Header              as TH
 import           Network.Wai.Handler.Warp               (run)
 import           Network.Wai                            as W
+import           Servant.Client.Core                    (addHeader)
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
@@ -37,9 +40,11 @@ import           Strato.VaultProxy.RawOauth               as RO
 import           Strato.VaultProxy.GetPing                as GP
 
 import           Strato.VaultProxy.Server.Token
-import           Strato.Strato23.API.Types
+-- import           Strato.Strato23.API.Types
 
 import           Text.Regex
+-- import           Text.JSON
+-- import           Text.JSON.Generic
 
 import           Options
 
@@ -65,30 +70,9 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
-  -- inspectVaultUrl flags_VAULT_URL
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
 
-  --Check the version of the foreign shared vault
-  traceM "Checking the version of the foreign vault"
-  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
-  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault)
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
-  vaultVersion <- case foreignVaultPing of
-          Left err -> error $ "Could not reach the foreign vault: " ++ show err
-          --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
-            --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
-          Right val -> do
-            when ((version (ping val)) > 1) $ 
-              error "The vault is too new, breaking changes involved, please update your strato node to the latest version" 
-            pure val
-  traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
-  --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
-  --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
-  vaultLock <- liftIO $ L.new
-  --Initialize the token cache
-  tokenCash <- atomically $ Cache.newCacheSTM Nothing
   traceM "Trying to parse the oauth url"
   --Parse the shared vault url
   ourl <- parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL 
@@ -97,6 +81,41 @@ main = do
   noErrorOauth <- case rawOauthInfo of
           Left err -> error $ "Error connecting to the OAUTH server: " ++ show err
           Right val -> return val
+
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making an intial call to the OAUTH provider, please note that there will be two calls to the oauth provider."
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "First call is used to see if everything is alive, then if everything is working it will store it in cache."
+  --make an initial call to see if the vault is working
+  initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
+
+  let minimumVersion :: Int
+      minimumVersion = 1
+
+    --Check the version of the foreign shared vault
+  traceM "Checking the version of the foreign vault"
+  pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL <> "/strato/v2.3/_ping"
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making the initial request to the shared vault with the authorization header."
+  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault) {makeClientRequest = const $ defaultMakeClientRequest pvault . addHeader ("Authorization") ("Basic " ++ T.unpack (accessToken initialToken))}
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
+  vaultVersion <- case foreignVaultPing of
+          Left err -> error $ "Could not reach the foreign vault: " ++ show err
+          --Error out and quit compilation if the version is too old, "0.1.0.0" is the current version of the shared vault
+            --This value is retrieved from blockapps-vault-wrapper-server package.yaml file when making a ping to the foreign vault
+          Right val -> do
+            when ((VaultProxy.version (ping val)) < minimumVersion) $ error "The foreign vault is too old, please update it to the latest version" 
+            pure val
+  traceM $ "The version of the foreign vault provided is :" <> show vaultVersion
+
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Setting up persistence in the vault-proxy"
+
+  traceM  "Setting up the locking mechanism"
+  --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
+  --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
+  vaultLock <- liftIO $ L.new
+  --Initialize the token cache
+  traceM "Setting up the caching service"
+  tokenCash <- atomically $ Cache.newCacheSTM Nothing
+
   --Setup the vault connection
   let vaultConnection = VaultConnection {
       vaultUrl = flags_VAULT_URL,
@@ -209,3 +228,4 @@ inspectVaultUrl url = do
         pure () 
      | (S.baseUrlScheme purl /= S.Https) -> error $ "The provided url (" ++ show purl ++ ") is http, please use https, I will not change it for you, I am quitting. 🙎"
      | otherwise -> pure ()
+
