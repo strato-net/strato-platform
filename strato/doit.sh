@@ -63,18 +63,10 @@ function newnode {
   echo "Checking if the reserve seconds are provided"
   [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
 
-  runBackgroundProcess blockapps-vault-proxy-server \
+  checkThenRunBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
-
-  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
-  set +x
-  until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
-    sleep 0.1
-  done
-  set -x
-  echo 'vault-proxy is available'
 
   # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
@@ -393,6 +385,37 @@ function runBackgroundProcess {
   MONITORED_PIDS[${proc_pid}]=$@
   echo "process pid:: $proc_pid (command: $@)"
   disown %
+}
+
+function checkThenRunBackgroundProcess{
+  $@ &
+  if ["$?" -eq 0]; then
+    proc_pid=$!
+    MONITORED_PIDS[${proc_pid}]=$@
+    echo "process pid:: $proc_pid (command: $@)"
+    #if strato exits with code 13, then there was a timeout problem with the vault-proxy
+    disown %
+  else 
+    echo 'There was an error starting the vault-proxy, it could not start, please check logs of strato and vault-proxy'
+    exit 13
+  fi
+  
+  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
+  set +x
+  j=0
+  until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
+    #Make a timeout 
+    i=0.1
+    if [$j -gt 120] then
+      echo "It took longer than 2 minutes for the vault-proxy to start, please look at the strato logs and the vault-proxy logs "
+      exit 13
+    else 
+      j=j+i
+      sleep i
+    fi
+  done
+  set -x
+  echo 'vault-proxy is available'
 }
 
 # If variable with name <arg 1> does not have non-empty value, set it to <arg 2>
