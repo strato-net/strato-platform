@@ -175,6 +175,7 @@ data Config = Config
   , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
   , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
+  , configPubKey             :: PublicKey
   }
 
 newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
@@ -468,10 +469,7 @@ instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) wher
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"
     waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) vc
   
-  getPub = do
-    vc <- asks configVaultClient 
-    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vc
+  getPub = asks configPubKey
   
   getShared pub = do
     vc <- asks configVaultClient 
@@ -557,6 +555,7 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   , All2 '[A.Replaceable]
                       '[ '(PPeer, TcpEnableTime)
+                       , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
                        ] m
                   , All2 '[A.Alters]
@@ -600,7 +599,7 @@ runContextM :: MonadUnliftIO m
             -> m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: MonadUnliftIO m => IORef (S.OSet Keccak256) -> Int -> m Config
+initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
 initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
@@ -608,6 +607,9 @@ initConfig wireMessagesRef maxHeaders = do
     mgr <- liftIO $ newManager defaultManagerSettings
     url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
     return $ mkClientEnv mgr url
+  nodePubKey <- do
+    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
   initState <- newIORef initContext
   return $ Config
@@ -618,6 +620,7 @@ initConfig wireMessagesRef maxHeaders = do
     , configVaultClient = vaultClient
     , configContext = initState
     , configBlockstanbulWireMessages = wireMessagesRef
+    , configPubKey = nodePubKey
     }
 
 initContext :: Context
