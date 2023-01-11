@@ -53,7 +53,7 @@ handleEvents :: ( MonadP2P m
              -> PeerRunner m (LoggingT IO) () 
              -> m ()
 handleEvents ev sSource runner = do
-  $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack $ show ev
+  $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack $ show ev
   case ev of
     P2pNewOrgName cId org -> do
       peers <- getPeersByParsedSets org
@@ -115,5 +115,5 @@ handleEvents ev sSource runner = do
                       Just err -> $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show(err)
                 else $logInfoS "stratoP2PClientDirect/handleEvents" "Peer is not a member of the chain."
             Nothing -> $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "Peer/Peers doesn't exist."
-    _ -> $logInfoS "stratoP2PClientDirect/handleEvents" "Skipping non-relevant events."
+    _ -> $logDebugS "stratoP2PClientDirect/handleEvents" "Skipping non-relevant events."
 
