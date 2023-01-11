@@ -267,7 +267,7 @@ instance ( (Address `A.Selectable` X509Certificate) m
       let certKey addr = ((Account addr Nothing),) . encodeUtf8 
       mCertAddress <- lookupX509AddrFromCBHash k
       fmap join . for mCertAddress $ \certAddress ->
-        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
 
 instance ( ((Address,T.Text) `A.Selectable` X509CertificateField) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m

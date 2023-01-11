@@ -135,6 +135,7 @@ import           Blockchain.VM.SolidException
 import           Blockchain.VMOptions
 
 import           SolidVM.Model.Value
+import           SolidVM.Model.Storable
 
 import           Executable.EVMFlags
 
@@ -448,24 +449,32 @@ instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
   select _ (k,t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
     mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress ->
+    fmap join . for mCertAddress $ \certAddress -> do
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) ContextM where
   select _ k = do
       let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
       mCertAddress <- lookupX509AddrFromCBHash k
-      fmap join . for mCertAddress $ \certAddress ->
-        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+      fmap join . for mCertAddress $ \certAddress -> do
+        mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+        case mBString of
+            Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+            _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::(
+                      MonadLogger m,
                      (A.Alters (Account, B.ByteString) B.ByteString) m
                       )
       => Address -> m (Maybe Address)
 lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
-    maybe Nothing (stringAddress . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor k <> "]")
+    mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+    $logInfoS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
+    case mAccount of
+        Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
+        _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB

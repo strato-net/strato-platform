@@ -334,7 +334,7 @@ function doInit {
         --addBootnodes=$addBootnodes $stratoBootnode \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
         --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag} \
-        ${vsFlag} ${baFlag} --genesisBlockTestCert=$genesisBlockTestCert"
+        ${vsFlag} ${baFlag} --genesisBlockTestCert=$genesisBlockTestCert --genesisCerts=$genesisCerts"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -347,7 +347,7 @@ function doInit {
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert ${vsFlag} ${baFlag} 2>&1 | tee --append logs/strato-setup
+    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert ${vsFlag} ${baFlag} --genesisCerts=$genesisCerts 2>&1 | tee --append logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -428,6 +428,7 @@ fi
 setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv genesisBlockTestCert false
+setEnv genesisCerts "[]"
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000
 

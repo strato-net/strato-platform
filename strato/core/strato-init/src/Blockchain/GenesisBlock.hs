@@ -11,6 +11,9 @@ module Blockchain.GenesisBlock (
 ) where
 
 
+import qualified Data.Aeson                 as Ae
+import           Data.ByteString.Base64
+
 import           Control.Monad
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
@@ -19,7 +22,7 @@ import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
 import qualified Data.ByteString.Lazy.Char8                   as BLC
-import           Data.Either                                  (isLeft)
+import           Data.Either                                  (isLeft, fromRight)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
@@ -50,7 +53,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Generation                       (insertCertRegistryContract, insertMercataGovernanceContract)
-import           Blockchain.Init.Options                     (flags_genesisBlockTestCert)
+import           Blockchain.Init.Options                     (flags_genesisBlockTestCert, flags_genesisCerts)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
 import           Blockchain.Strato.Model.Secp256k1
@@ -128,7 +131,12 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
                       _ -> error $ "invalid genesis: " ++ show genesis
         faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
         faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-    extraCerts <-
+    let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
+        genesisCerts = case (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_genesisCerts) of
+          Right a -> a
+          Left _ -> error "invalid cert format"
+    $logInfoS "flag_genesisCerts" $ T.pack . show $ genesisCerts
+    extraCerts' <-
       if flags_genesisBlockTestCert 
         then do
           nodePubkey <- getPub
@@ -136,7 +144,8 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let theJSON' = insertMercataGovernanceContract validators admins
+    let extraCerts = genesisCerts ++ extraCerts'
+        theJSON' = insertMercataGovernanceContract validators admins
                  . insertCertRegistryContract extraCerts
                  $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName

@@ -39,5 +39,6 @@ defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets t
 defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of Blockstanbul validators"
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of network admins. Admins can, for instance, nominate a new validator"
+defineFlag "genesisCerts" ("[]" :: String) "Extra certs passed into the genesis block"
 
 $(return [])

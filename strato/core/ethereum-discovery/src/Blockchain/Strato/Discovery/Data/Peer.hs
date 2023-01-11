@@ -170,11 +170,13 @@ instance A.Replaceable PPeer PeerDisable IO where
     let selector = thisPeer peer
     flip runSqlPool sqldb $ case d of
       ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-        SQL.updateWhere selector [PPeerEnableTime SQL.=. enableTime
+        SQL.updateWhere selector [ PPeerEnableTime SQL.=. enableTime
+                                 , PPeerUdpEnableTime SQL.=. enableTime
                                  , PPeerNextDisableWindowSeconds SQL.*=. nextDisableWindowFactor
                                  ]
       SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
         SQL.updateWhere selector [ PPeerEnableTime SQL.=. enableTime
+                                 , PPeerUdpEnableTime SQL.=. enableTime
                                  , PPeerNextDisableWindowSeconds SQL.=. nextDisableWindow
                                  , PPeerDisableExpiration SQL.=. disableExpiration
                                  ]
@@ -273,8 +275,11 @@ disableUDPPeerForSeconds :: (MonadUnliftIO m, A.Replaceable PPeer UdpEnableTime 
                          => PPeer -> Int -> m (Either SomeException ())
 disableUDPPeerForSeconds peer seconds = try $ do
   currentTime <- liftIO getCurrentTime
-  let enableTime = UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime
-  A.replace (A.Proxy @UdpEnableTime) peer enableTime
+  if (currentTime < pPeerUdpEnableTime peer)
+    then return ()
+    else 
+      let enableTime = UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime
+      in A.replace (A.Proxy @UdpEnableTime) peer enableTime
 
 resetPeers :: IO ()
 resetPeers = withGlobalSQLPool $ runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
