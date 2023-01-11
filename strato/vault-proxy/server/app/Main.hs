@@ -70,6 +70,7 @@ main = do
   _ <- $initHFlags "Setup Vault Proxy flags"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
+    
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
   mgr <- HCLI.newManager HCON.tlsManagerSettings
 
