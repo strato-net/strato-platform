@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE Strict            #-}
 
 module Strato.VaultProxy.Server.Token where
 
