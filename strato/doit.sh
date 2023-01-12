@@ -272,14 +272,14 @@ function newnode {
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
-    echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
+    echo -e "${Green}Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy...${NC}"
     while sleep ${MONITORING_TIMER}; do
       # check status for every monitored process
       for monitored_pid in "${!MONITORED_PIDS[@]}"; do
         # if process with pid does not exist
         if ! (ps -p ${monitored_pid} > /dev/null); then
           DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
-          echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+          echo -e "${Red}Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running...${NC}"
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
@@ -303,14 +303,14 @@ function newnode {
           echo "+tail -n 20 ${FILE_NAME}"
           tail -n 20 $FILE_NAME
           echo "End of logs."
-          echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
+          echo -e "${Red}STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container${NC}"
           # Keep container running idle
           tail -f /dev/null
         fi
       done
     done
   else
-    echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs"
+    echo -e "${BYellow}Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs${NC}"
     tail -f /dev/null
   fi
 }
