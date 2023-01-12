@@ -96,7 +96,7 @@ main = do
   pvault <- parseBaseUrl $ T.unpack flags_VAULT_URL <> "/strato/v2.3/_ping"
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "The foreign vault url is: " <> show pvault
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making the initial request to the shared vault with the authorization header."
-  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault) {makeClientRequest = const $ defaultMakeClientRequest pvault . addHeader ("Authorization") ("Basic " ++ T.unpack (accessToken initialToken))}
+  foreignVaultPing <- runClientM GP.connectGetPing (mkClientEnv mgr pvault) {makeClientRequest = const $ defaultMakeClientRequest pvault . addHeader ("Authorization") ("Bearer " ++ T.unpack (accessToken initialToken))}
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Calling the _ping endpoint on the foreign vault results in this: " <> show foreignVaultPing
   vaultVersion <- case foreignVaultPing of
           Left err -> error $ "Could not reach the foreign vault: " ++ show err
