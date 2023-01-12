@@ -5,7 +5,6 @@ module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
     RawOauth(..),
-    RawPing(..),
     Version(..)
 ) where
 
@@ -135,20 +134,4 @@ instance FromJSON Version where
         _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
 
     return $ Version $ Scientific.base10Exponent vers
-  parseJSON wat = typeMismatch "Spec" wat
-
-data RawPing = RawPing {
-    ping :: Version
-} deriving (Show, Eq, Generic)
-
-instance FromJSON RawPing where
-  parseJSON (Object o) = do
-    ver  <- o .: T.pack "ping"
-
-    vers <- case ver of
-        (Number ver1) -> pure ver1
-        (Object _) -> error $ "Expected a JSON Number under the key \"ping\", but got something different."
-        _          -> error $ "Expected a JSON Number under the key \"ping\", but got something different."
-
-    return $ RawPing $ Version $ Scientific.base10Exponent vers
   parseJSON wat = typeMismatch "Spec" wat

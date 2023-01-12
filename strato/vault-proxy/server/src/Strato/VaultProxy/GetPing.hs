@@ -15,13 +15,13 @@ import           Servant.Client
 
 import Strato.VaultProxy.DataTypes
 
-type InitialPingCall = Get '[SA.JSON] RawPing
+type InitialPingCall = Get '[SA.JSON] Version
 
 rawPingAPI :: Proxy InitialPingCall
 rawPingAPI = Proxy
 
-getRawPing :: ClientM RawPing
+getRawPing :: ClientM Version
 getRawPing = client rawPingAPI
 
-connectGetPing :: ClientM RawPing
+connectGetPing :: ClientM Version
 connectGetPing = getRawPing
