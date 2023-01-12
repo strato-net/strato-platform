@@ -298,8 +298,8 @@ runTestWithTimeout timeout f = do
     withCurrentBlockHash genHash $ do
       let certKey addr = ((Account addr Nothing),) . encodeUtf8 
           certRegistryKey = certKey (Address 0x509)
-      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (encodeUtf8 "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----")
+      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x8341) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (encodeUtf8 "0000000000000000000000000000000000008341")
       f
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
