@@ -29,7 +29,6 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
-    .then(r => { return r.json() })
     .then(function (res) {
       return res.json();
     })
@@ -59,7 +58,7 @@ function getOrCreateOauthUserApi() {
 }
 
 function fetchUserPubKeyRequest() {
-  const pubkeyURL = `${env.STRATO_URL_V23}/key?username=nodekey`
+  const pubkeyURL = `${env.STRATO_URL_V23}/key`
   return fetch(
     pubkeyURL,
     {
