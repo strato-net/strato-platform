@@ -3,6 +3,12 @@
 set -e
 set -x
 
+Green='\033[0;32m'
+Red='\033[0;31m'
+Yellow='\033[0;33m'
+BYellow='\033[1;33m'
+NC='\033[0m'
+
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
@@ -68,15 +74,22 @@ function newnode {
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
 
-  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
   set +x
-  until curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013 ; do
+  echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
+  started=$(date +%s)
+  timeout=30
+  while ! curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013; do
+    if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
+      echo -e "\n tail -n40 logs/vault-proxy"
+      tail -n40 logs/vault-proxy
+      echo -e "\n${Red}vault-proxy takes too long to start. It most probably failed. Check the tail of the vault-proxy log above. Sleeping now.${NC}"
+      sleep 60
+    fi
     sleep 0.3
   done
-  set -x
   echo 'vault-proxy is available'
+  set -x
 
-  # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
