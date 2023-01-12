@@ -124,6 +124,8 @@ data Version = Version {
     version :: Int
 } deriving (Show, Eq, Generic)
 
+instance ToJSON Version
+
 instance FromJSON Version where
   parseJSON (Object o) = do
     ver  <- o .: T.pack "version"
