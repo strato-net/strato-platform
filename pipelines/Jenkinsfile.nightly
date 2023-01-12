@@ -63,7 +63,7 @@ pipeline {
       
           sh './run-vault.sh'
   
-          // TODO: run node on https
+          // TODO: run node on https (also update check_availability function)
           writeFile file: "run.sh", text: """#!/bin/bash
             sudo \\
               NODE_HOST=\$(</host) \\
@@ -90,7 +90,7 @@ pipeline {
           sh '''#!/bin/bash -le
             check_availability() {
               counter=0
-              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
+              until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."
