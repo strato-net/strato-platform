@@ -70,8 +70,8 @@ function newnode {
 
   echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
   set +x
-  until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
-    sleep 0.1
+  until curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013 ; do
+    sleep 0.3
   done
   set -x
   echo 'vault-proxy is available'
