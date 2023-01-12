@@ -78,6 +78,14 @@ tests:
     source-dirs: tests/
     main: Main.hs
     dependencies:
+      - json-stream
+      - vm-runner
+      - seqevents
+      - mtl
+      - crypto-api
+      - blockapps-data
+      - core-api2
+      - strato-genesis
       - async
       - base16-bytestring
       - blockapps-datadefs
