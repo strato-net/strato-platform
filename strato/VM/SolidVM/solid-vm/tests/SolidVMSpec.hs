@@ -299,7 +299,7 @@ runTestWithTimeout timeout f = do
       let certKey addr = ((Account addr Nothing),) . encodeUtf8 
           certRegistryKey = certKey (Address 0x509)
       insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x8341) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (encodeUtf8 "0000000000000000000000000000000000008341")
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") (encodeUtf8 "0000000000000000000000000000000000008341")
       f
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
