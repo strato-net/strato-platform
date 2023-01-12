@@ -35,10 +35,6 @@ class OauthAccounts extends Component {
 
   render() {
     const filter = this.props.filter;
-    const users = this.props.oauthAccounts;
-    const rows = [];
-
-    console.log(this);
 
     // const cards = contractNames.length === 0 ? [] : contractNames
     //   .filter(function (contract) {
@@ -58,13 +54,13 @@ class OauthAccounts extends Component {
     //     );
     //   });
 
-    users.filter(user => {
+    const rows = this.props.oauthAccounts.filter(user => {
       if (!filter) {
         return true;
       }
       return user.commonName.toLowerCase().indexOf(filter) > -1
     })
-      .forEach(function (user, index) {
+      .map(function (user, index) {
         const position = index + 1;
         if (user) {
           let userClasseName = '';
@@ -72,7 +68,7 @@ class OauthAccounts extends Component {
             userClasseName = ' selected';
           }
           // change this
-          rows.push(
+          return (
             <div className="smd-margin-8" key={user.commonName}>
               <div className="row">
                 <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
