@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TemplateHaskell      #-}
@@ -27,8 +26,6 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 
-import           BlockApps.X509.Certificate
-
 import qualified LabeledError
 
 data GenesisInfo =
@@ -48,10 +45,7 @@ data GenesisInfo =
     genesisInfoTimestamp        :: UTCTime,
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: Keccak256,
-    genesisInfoNonce            :: Word64,
-    genesisInfoValidators       :: [ChainMemberParsedSet],
-    genesisInfoBlockstanbulAdmins :: [ChainMemberParsedSet],
-    genesisInfoCertificates     :: [X509Certificate]
+    genesisInfoNonce            :: Word64
 } deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
@@ -76,10 +70,7 @@ defaultGenesisInfo =
     genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC"  ::  UTCTime,
     genesisInfoExtraData = 0,
     genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-    genesisInfoNonce = 42,
-    genesisInfoValidators = [],
-    genesisInfoBlockstanbulAdmins = [],
-    genesisInfoCertificates = []
+    genesisInfoNonce = 42
 }
 
 instance FromJSON GenesisInfo where
@@ -100,10 +91,7 @@ instance FromJSON GenesisInfo where
     o .: "timestamp" <*>
     o .: "extraData" <*>
     o .: "mixHash" <*>
-    o .: "nonce" <*>
-    o .: "validators" .!= [] <*>
-    o .: "blockstanbulAdmins" .!= [] <*>
-    o .: "certificates" .!=[]
+    o .: "nonce"
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
@@ -128,8 +116,5 @@ genesisParser = GenesisInfo
             <*> "extraData" JS..: JS.value
             <*> "mixHash" JS..: JS.value
             <*> "nonce" JS..: JS.value
-            <*> ("validators" JS..: JS.value JS..| [])
-            <*> ("blockstanbulAdmins" JS..: JS.value JS..| [])
-            <*> ("certificates" JS..: JS.value JS..| [])
 
 

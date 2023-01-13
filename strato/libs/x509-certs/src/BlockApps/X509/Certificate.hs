@@ -134,9 +134,6 @@ instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
   get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
-instance Read X509Certificate where
-  readsPrec = error "Read X509Certificate is not supported, sorry"
-
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
 -- as parsing the X509Certificate is non-deterministic.

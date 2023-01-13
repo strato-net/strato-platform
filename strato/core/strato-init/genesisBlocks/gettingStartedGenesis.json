@@ -13,24 +13,5 @@
   "timestamp":"1970-01-01T00:00:00.000Z",
   "coinbase":"00000000000000000000",
   "parentHash":"0000000000000000000000000000000000000000000000000000000000000000",
-  "nonce":42,
-  "validators": [
-    {
-            "orgName": "BlockApps",
-            "orgUnit": "Engineering",
-            "commonName": "Test",
-            "access": true
-    }
-  ],        
-  "blockstanbulAdmins": [
-      {
-              "orgName": "BlockApps",
-              "orgUnit": "Engineering",
-              "commonName": "Test",
-              "access": true
-      }
-  ],
-  "certificates": [
-      "-----BEGIN CERTIFICATE-----\nMIIBjDCCATGgAwIBAgIQV9e8CIDXoadx1ybR1sp9iDAMBggqhkjOPQQDAgUAMEgx\nDjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu\nZ2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjMwMTA5MDM1NTM2WhcNMjQwMTA5\nMDM1NTM2WjBIMQ4wDAYDVQQDDAVub2RlMjESMBAGA1UECgwJQmxvY2tBcHBzMRQw\nEgYDVQQLDAtFbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMFYwEAYHKoZIzj0CAQYF\nK4EEAAoDQgAEsZDZqMA+bRrdoXJ3dd13uSNalJmI/KxWUkOgHEgDuEFxXqprNnN6\npJFUrM1cUrZHNjnilxhKfC0I6IIJSbwSiDAMBggqhkjOPQQDAgUAA0cAMEQCIDd5\nxBwKvjNyGOCD/rhaEl4uEIkomtDLVbZeztuMFgMuAiBghZboZ8Ma8S184TFzUV2y\nI3Y7Rtsh2F3EqkpSSSz+Og==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
-  ]
+  "nonce":42
 }

@@ -106,8 +106,6 @@ executables:
       - common-log
       - extra
       - hflags
-      - json-stream
-      - strato-genesis
       - strato-init
       - strato-model
       - strato-networks
