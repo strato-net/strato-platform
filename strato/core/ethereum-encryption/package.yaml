@@ -1,0 +1,50 @@
+
+name:                ethereum-encryption
+version:             0.1.0.0
+author:              jamshid
+maintainer:          jim
+build-type:          Simple
+
+dependencies:
+  - base
+  - ethereum-rlp
+  - strato-model
+
+library:
+  other-extensions:    OverloadedStrings
+  source-dirs: src
+  ghc-options: -Wall -O2
+  dependencies:
+  - Crypto
+  - base16-bytestring
+  - binary
+  - bytestring
+  - cipher-aes
+  - common-log
+  - conduit
+  - conduit-extra
+  - crypto-pubkey-types
+  - cryptohash
+  - cryptonite
+  - entropy
+  - format
+  - lifted-base
+  - memory
+  - strato-model
+  - text
+  - unix
+
+
+#temporarily removing this test while I decide if it is still needed
+#tests:
+#  encryption-tests:
+#    source-dirs: test/
+#    main: Spec.hs
+#    dependencies:
+#      - base16-bytestring
+#      - bytestring
+#      - crypto-pubkey-types
+#      - ethereum-encryption
+#      - hspec
+#      - strato-model
+#      - QuickCheck

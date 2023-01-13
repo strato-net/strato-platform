@@ -1,0 +1,36 @@
+name:                source-tools
+version:             0.0.1.0
+author:              dustin@blockapps.net
+maintainer:          dustin@blockapps.net
+build-type:          Simple
+
+library:
+  source-dirs: src
+  dependencies:
+    - aeson
+    - base
+    - binary
+    - bytestring
+    - containers
+    - deepseq
+    - ethereum-rlp
+    - hashable
+    - lens
+    - parsec
+    - QuickCheck
+    - quickcheck-instances
+    - swagger2
+    - text
+
+tests:
+  source-tools-test:
+    source-dirs: test/
+    main: Spec.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - base
+      - hspec
+      - QuickCheck
+      - source-tools
+      - text

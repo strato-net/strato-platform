@@ -1,0 +1,110 @@
+name: blockapps-tools
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+description:
+              Tool to query the ethereum databases
+
+dependencies:
+  - base
+
+
+library:
+  source-dirs: src/
+  dependencies:
+    - aeson
+    - ansi-wl-pprint
+    - base16-bytestring
+    - binary
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - blockapps-privacy
+    - blockstanbul
+    - bytestring
+    - common-log
+    - conduit
+    - data-default
+    - ethereum-discovery
+    - ethereum-rlp
+    - filepath
+    - format
+    - hedis
+    - hflags
+    - labeled-error
+    - lens
+    - leveldb-haskell
+    - memory
+    - merkle-patricia-db
+    - milena
+    - milena-tools
+    - monad-alter
+    - monad-loops
+    - nibblestring
+    - persistent
+    - persistent-postgresql
+    - resourcet
+    - seqevents
+    - strato-conf
+    - strato-index
+    - strato-model
+    - strato-p2p
+    - strato-redis-blockdb
+    - strato-sequencer
+    - strato-statediff
+    - text
+    - time
+    - transformers
+    - type-lits
+    - unliftio
+    - vm-tools
+
+executables:
+  queryStrato:
+    source-dirs: exec_src/
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - base16-bytestring
+      - blockapps-tools
+      - bytestring
+      - cmdargs
+      - labeled-error
+      - merkle-patricia-db
+      - seqevents
+      - strato-model
+      - strato-p2p
+
+  b16decode:
+    source-dirs: exec_src/
+    main: B16Decode.hs
+    dependencies:
+      - base
+      - base16-bytestring
+      - bytestring
+      - labeled-error
+    other-modules: []
+
+  modifyDate:
+    source-dirs: exec_src/
+    main: ModifyDate.hs
+    dependencies:
+      - base
+      - hflags
+      - time
+    other-modules: []
+
+tests:
+  blockapps-tools-test:
+    source-dirs: test/
+    main: KafkaSpec.hs
+    dependencies:
+      - QuickCheck
+      - blockapps-tools
+      - bytestring
+      - bytestring-arbitrary
+      - hspec
+      - temporary

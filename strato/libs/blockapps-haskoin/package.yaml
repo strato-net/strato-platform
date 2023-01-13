@@ -1,0 +1,34 @@
+name:                  blockapps-haskoin
+version:               1.0.0.1
+synopsis:              Blockapps fork of the "haskoin" library
+description:           A fork from an outdated commit,
+                       which our infrastructure happens to depend upon.
+                       .
+                       This package needs to be maintained until we remove
+                       the dependencies from it from our codebase.
+stability:             stable
+license:               PublicDomain
+license-file:          UNLICENSE
+author:                Philippe Laprade, Jean-Pierre Rupp
+maintainer:            plaprade+hackage@gmail.com
+category:              Bitcoin, Finance, Network
+build-type:            Simple
+
+ghc-options: -Wall
+
+dependencies:
+  - base
+
+library:
+  source-dirs: ./
+  exposed-modules:
+    - Network.Haskoin.Crypto.BigWord
+  dependencies:
+  - QuickCheck
+  - aeson
+  - base16-bytestring
+  - binary
+  - bytestring
+  - deepseq
+  - hashable
+  - text

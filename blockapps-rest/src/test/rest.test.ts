@@ -80,14 +80,8 @@ describe("rest_7", function () {
         uid,
         constructorArgs
       );
-      // const newContractArgs = await factory.createNewContractFromFile(
-      //   name: 
-      //   filename,
-      //   uid,
-      //   constructorArgs
-      // );
+     
       contract = await rest.createContract(admin, contractArgs, options);
-      //newContract = await rest.createContract(admin, newContractArgs, options);
       assert.equal(contract.name, contractArgs.name, "name");
       assert.isOk(util.isAddress(contract.address), "address");
     });
@@ -445,17 +439,7 @@ describe("search until", function () {
       args
     );
     contract = await rest.createContract(admin, contractArgs, options);
-    
-
-  //   const newContractArgs = {
-  //     name: `BlockApps-${contract.name}`,
-  //     filename,
-  //     uid,
-  //     args
-      
-  //   };
-  //  const newContract = await rest.createContract(admin, newContractArgs, options);
-    
+  
    }
 );
 

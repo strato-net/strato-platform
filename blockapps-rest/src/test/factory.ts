@@ -91,12 +91,6 @@ async function createContractFromFile(filename, uid, constructorArgs = {}) {
   return { name, source, args: util.usc(constructorArgs) }; // TODO flow contractArgs object
 }
 
-async function createNewContractFromFile(filename, uid, constructorArgs = {}) {
-  const name = `BlockApps-TestContract_${uid}`;
-  const source = fsUtil.get(filename).replace("TestContract", name);
-  return { name, source, args: util.usc(constructorArgs) }; // TODO flow contractArgs object
-}
-
 function createSendTxArgs(toAddress, value = 10):SendTx {
   return { value, toAddress };
 }

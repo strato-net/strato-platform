@@ -1,0 +1,20 @@
+name:                strato-conf
+version:             0.1.0.0
+author:              Jamshid
+category:            Web
+build-type:          Simple
+
+library:
+  source-dirs:      src
+  dependencies:
+    - base
+    - bytestring
+    - containers
+    - hedis
+    - hflags
+    - milena
+    - mtl
+    - postgresql-simple
+    - swagger2
+    - transformers
+    - yaml

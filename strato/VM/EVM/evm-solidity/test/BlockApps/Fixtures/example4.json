@@ -1,0 +1,46 @@
+{
+    "funcs": {
+      "increment": {
+        "args": {},
+        "selector": "d09de08a",
+        "vals": {
+          "#0": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32
+          }
+        }
+      }
+    },
+    "constr": {
+        "_comment": "TODO(tim): These values make no sense.",
+        "vals": {},
+        "args": {},
+        "dynamic": true,
+        "type": "String",
+        "index": 0,
+        "name": "_id"
+    },
+    "vars": {
+      "value": {
+        "atBytes": 64,
+        "type": "Int",
+        "bytes": 32
+      },
+      "busyList": {
+        "atBytes": 0,
+        "dynamic": true,
+        "entry": {
+          "typedef": "Busy",
+          "type": "Contract",
+          "bytes": 20
+        },
+        "type": "Array"
+      },
+      "id": {
+        "atBytes": 32,
+        "dynamic": true,
+        "type": "String"
+      }
+    }
+  }

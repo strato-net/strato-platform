@@ -1,0 +1,114 @@
+name: slipstream
+version: 0.1.0.0
+synopsis: Solidity datatypes
+description: Solidity datatypes
+homepage: https://github.com/blockapps/blockapps-haskell/slipstream
+copyright: 2016 BlockApps
+category: Web
+
+
+ghc-options: -Wall -Werror -rtsopts
+
+dependencies:
+  - base
+  - base16-bytestring
+  - bytestring
+  - common-log
+  - hflags
+  - kafka-monad
+  - raw-strings-qq
+  - resourcet
+  - sql-monad
+  - text
+  - transformers
+
+library:
+  source-dirs: src/
+  dependencies: 
+    - aeson
+    - binary
+    - bloc-sql-monad
+    - bloc2
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - bloomfilter
+    - classy-prelude
+    - conduit
+    - containers
+    - core-api-monad
+    - core-api2
+    - cross-monitoring
+    - deepseq
+    - evm-solidity
+    - extra
+    - format
+    - lens
+    - lrucache
+    - milena
+    - milena-tools
+    - monad-alter
+    - mtl
+    - persistent
+    - postgresql-typed
+    - prometheus-client
+    - QuickCheck
+    - solid-vm
+    - solid-vm-model
+    - scientific
+    - source-tools
+    - strato-model
+    - time
+    - unliftio
+    - unliftio-core
+    - unordered-containers
+    - vm-tools
+
+executables:
+  slipstream:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - base
+      - bloc-sql-monad
+      - bloc2
+      - blockapps-init
+      - cache
+      - clock
+      - hflags
+      - milena
+      - persistent-postgresql
+      - postgresql-typed
+      - slipstream
+      - wai-middleware-prometheus
+      - warp
+
+tests:
+  slipstream-test:
+    main: Main.hs
+    source-dirs: tests/
+    dependencies:
+      - base
+      - aeson
+      - aeson-qq
+      - base16-bytestring
+      - bytestring
+      - classy-prelude
+      - conduit
+      - containers
+      - evm-solidity
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - labeled-error
+      - persistent
+      - persistent-sqlite
+      - QuickCheck
+      - slipstream
+      - solid-vm
+      - solid-vm-model
+      - strato-model
+      - text
+      - time
+      - unliftio
+      - vm-tools

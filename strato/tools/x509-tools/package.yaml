@@ -1,0 +1,62 @@
+name: x509-tools
+version: 0.0.1
+build-type: Simple
+author: dpmesko
+maintainer:   daniel@blockapps.net
+synopsis: A toolkit for x509 usage in STRATO
+category:      Data Structures
+description:
+    A toolkit for x509 usage in STRATO
+
+dependencies:
+  - aeson
+  - base >= 4 && < 5
+  - base16-bytestring
+  - bloc2api
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-vault-wrapper-api
+  - blockapps-vault-wrapper-server
+  - bytestring
+  - containers
+  - cryptonite
+  - hourglass
+  - http-client
+  - optparse-applicative
+  - raw-strings-qq
+  - saltine
+  - servant-client
+  - source-tools
+  - strato-model
+  - text
+  - transformers
+  - x509-certs
+
+
+ghc-options: -Wall -Werror
+
+executables:
+  x509-generator:
+    source-dirs: exec_src/
+    main: X509CertGenerator.hs
+    other-modules: []
+
+  x509-keygen:
+    source-dirs: exec_src/
+    main: X509Keygen.hs
+    other-modules: []
+
+  x509-info:
+    source-dirs: exec_src/
+    main: X509CertInfo.hs
+    other-modules: []
+
+  x509-certificate-registry:
+    source-dirs: exec_src/
+    main: X509CertRegistry.hs
+    other-modules: []
+
+  x509-saltine-decrypt:
+    source-dirs: exec_src/
+    main: X509SaltineDecrypt.hs
+    other-modules: []

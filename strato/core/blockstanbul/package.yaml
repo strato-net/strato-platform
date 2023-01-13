@@ -1,0 +1,78 @@
+name: blockstanbul
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+
+
+library:
+  source-dirs: src/
+  dependencies:
+  - QuickCheck
+  - aeson
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - bytestring
+  - common-log
+  - conduit
+  - containers
+  - cross-monitoring
+  - cryptonite
+  - data-default
+  - deepseq
+  - ethereum-rlp
+  - extra
+  - format
+  - generic-arbitrary
+  - http-client
+  - labeled-error
+  - lens
+  - mtl
+  - prometheus-client
+  - servant-client
+  - servant-server
+  - strato-model
+  - text
+  - transformers
+  - unliftio
+  - monad-alter
+  - x509-certs
+
+tests:
+  blockstanbul-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+      - QuickCheck
+      - aeson
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockstanbul
+      - bytestring
+      - common-log
+      - containers
+      - cryptonite
+      - ethereum-rlp
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - labeled-error
+      - lens
+      - monad-alter
+      - mtl
+      - strato-model
+      - time
+      - transformers
+      - x509-certs
+
+
+benchmarks:
+  one-node:
+    source-dirs: bench/
+    main: OneNode.hs
+    dependencies:
+      - blockstanbul
+      - transformers

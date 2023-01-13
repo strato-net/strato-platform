@@ -1,0 +1,40 @@
+name:                blockapps-vault-wrapper-api
+version:             0.1.0.0
+github:              "githubuser/API"
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/API#readme>
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - aeson-casing
+  - base16-bytestring
+  - bytestring
+  - cryptonite
+  - labeled-error
+  - lens
+  - saltine
+  - servant
+  - servant-server
+  - strato-model
+  - swagger2
+  - text
+

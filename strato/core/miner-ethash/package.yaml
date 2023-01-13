@@ -1,0 +1,35 @@
+name:                miner-ethash
+version:             0.1.0.0
+category:            System
+build-type:          Simple
+
+ghc-options: -Wall -O2
+
+dependencies:
+  - base
+  - array
+  - binary
+  - bytestring
+
+library:
+  source-dirs: src/
+  other-modules:
+    - Blockchain.Strato.Mining.Ethash.Util
+  dependencies:
+    - arithmoi
+    - strato-model
+    - time
+
+executables:
+  miner-ethash:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - miner-ethash
+      - mmap
+
+  mkDataset:
+    source-dirs: exec_src/
+    main: mkDataset.hs
+    dependencies:
+      - miner-ethash

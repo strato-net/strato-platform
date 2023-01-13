@@ -1,0 +1,85 @@
+name: ethereum-rlp
+version: 0.1.0
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: Ethereum Recursive Length Prefix Encoding
+category:      Data Structures
+description:
+    RLP, as described in the Ethereum Yellowpaper
+
+default-extensions:
+  - Arrows
+  - BangPatterns
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveTraversable
+  - EmptyDataDecls
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - LiberalTypeSynonyms
+  - MagicHash
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NoMonomorphismRestriction
+  - OverloadedStrings
+  - PatternGuards
+  - ParallelListComp
+  - QuasiQuotes
+  - RankNTypes
+  - RecordWildCards
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TemplateHaskell
+  - TupleSections
+  - TypeFamilies
+  - TypeOperators
+  - UnboxedTuples
+
+dependencies:
+  - base
+  - bytestring
+
+library:
+  source-dirs: library/
+  exposed-modules: Blockchain.Data.RLP
+  dependencies:
+  - ansi-wl-pprint
+  - base16-bytestring
+  - containers
+  - deepseq
+  - text
+
+tests:
+  test:
+    source-dirs: test/
+    main: Main.hs
+    dependencies:
+      - test-framework
+      - test-framework-hunit
+      - HUnit
+      - hspec
+      - ethereum-rlp
+
+benchmarks:
+  rlpserial:
+    source-dirs: bench/
+    main: RLPShootout.hs
+    other-modules: []
+    dependencies:
+      - ethereum-rlp
+  zipbench:
+    source-dirs: bench/
+    main: ZipBench.hs
+    other-modules: []
+    dependencies:
+      - base16-bytestring
+      - ethereum-rlp
+      - zlib

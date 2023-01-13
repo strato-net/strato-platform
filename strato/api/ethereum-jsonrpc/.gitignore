@@ -1,0 +1,6 @@
+
+*~
+dist
+.DS_Store
+.stack-work
+ethereum-jsonrpc.cabal

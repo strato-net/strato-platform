@@ -1,0 +1,22 @@
+name: blockapps-init
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+  dependencies:
+  - common-log
+  - cross-monitoring
+  - prometheus-client
+  - resourcet
+  - text
+  - unix
+
+executables:
+  test-reload:
+    source-dirs: exec_src/
+    main: TestReload.hs
+    other-modules: []
+    dependencies:
+      - blockapps-init

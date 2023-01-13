@@ -1,0 +1,13 @@
+name:                clockwork
+github:              "githubuser/clockwork"
+
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  c-sources:
+    c-source/cclock.c
+
+

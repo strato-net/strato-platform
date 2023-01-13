@@ -1,0 +1,11 @@
+name:                type-lits
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - aeson
+    - bifunctors
+    - comonad
+    - QuickCheck
+    - text

@@ -1,0 +1,5 @@
+
+*~
+dist
+.DS_Store
+miner-ethash.cabal

@@ -1,0 +1,55 @@
+name:                core-api2
+
+dependencies:
+- base
+- persistent-postgresql
+- servant-server
+- strato-conf
+
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - aeson-casing
+  - base64-bytestring
+  - blockapps-data
+  - blockapps-datadefs
+  - bytestring
+  - clock
+  - common-log
+  - conduit
+  - containers
+  - deepseq
+  - directory
+  - esqueleto
+  - ethereum-discovery
+  - extra
+  - filepath
+  - format
+  - http-types
+  - labeled-error
+  - lens
+  - monad-alter
+  - mtl
+  - process
+  - QuickCheck
+  - seqevents
+  - servant-client
+  - servant-multipart
+  - servant-multipart-client  
+#  - servant-swagger-tags
+  - sql-monad
+  - strato-model
+  - swagger2
+  - template-haskell
+  - text
+  - transformers
+  - type-lits
+  - unliftio
+  - unordered-containers
+  - blockapps-vault-wrapper-api
+  - blockapps-vault-wrapper-client
+  - vault-monad
+  - blockapps-vault-wrapper-server
+  - strato-redis-blockdb

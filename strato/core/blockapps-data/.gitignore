@@ -1,0 +1,6 @@
+genesis.json
+*~
+dist
+.DS_Store
+#*#
+blockapps-data.cabal

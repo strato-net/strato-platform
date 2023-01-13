@@ -1,0 +1,10 @@
+
+name: nibblestring
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - ansi-wl-pprint
+    - base16-bytestring
+    - bytestring
