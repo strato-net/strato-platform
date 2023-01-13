@@ -144,8 +144,8 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let extraCerts = genesisCerts ++ extraCerts'
-        theJSON' = insertMercataGovernanceContract validators admins
+    let extraCerts = genesisCerts ++ extraCerts' ++ genesisCertificates theJSON
+        theJSON' = insertMercataGovernanceContract (validators ++ genesisValidators theJSON) (admins ++ genesisAdmins theJSON)
                  . insertCertRegistryContract extraCerts
                  $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
@@ -164,7 +164,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
       pure (ua', c')
       ) extraCerts
 
-    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
+    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators (validators ++ genesisValidators theJSON)
     case insertValidators of 
       Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
       Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
