@@ -214,6 +214,8 @@ pipeline {
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
             '''
 
             // Merge release code to master
