@@ -49,9 +49,9 @@ data GenesisInfo =
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: Keccak256,
     genesisInfoNonce            :: Word64,
-    genesisValidators           :: [ChainMemberParsedSet],
-    genesisAdmins               :: [ChainMemberParsedSet],
-    genesisCertificates         :: [X509Certificate]
+    genesisInfoValidators       :: [ChainMemberParsedSet],
+    genesisInfoBlockstanbulAdmins :: [ChainMemberParsedSet],
+    genesisInfoCertificates     :: [X509Certificate]
 } deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
@@ -77,9 +77,9 @@ defaultGenesisInfo =
     genesisInfoExtraData = 0,
     genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
     genesisInfoNonce = 42,
-    genesisValidators = [],
-    genesisAdmins = [],
-    genesisCertificates = []
+    genesisInfoValidators = [],
+    genesisInfoBlockstanbulAdmins = [],
+    genesisInfoCertificates = []
 }
 
 instance FromJSON GenesisInfo where

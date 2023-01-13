@@ -20,6 +20,9 @@ import Blockchain.Init.Worker
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Data.GenesisInfo
 
+import Data.List (nub)
+
+
 defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
@@ -56,4 +59,4 @@ main = do
           (Just networkParams, Right []) -> map Net.identity networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid admins: " ++ e
-  runLoggingT $ runWorker (validators' ++ genesisValidators theJSON) (genesisAdmins theJSON ++ admins') kaddr
+  runLoggingT $ runWorker (nub $ validators' ++ genesisInfoValidators theJSON) (nub $ genesisInfoBlockstanbulAdmins theJSON ++ admins') kaddr

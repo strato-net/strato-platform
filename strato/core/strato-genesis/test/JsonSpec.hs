@@ -111,9 +111,9 @@ spec = do
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42,
-            genesisValidators = [],
-            genesisAdmins = [],
-            genesisCertificates = []
+            genesisInfoValidators = [],
+            genesisInfoBlockstanbulAdmins = [],
+            genesisInfoCertificates = []
           }
           got = eitherDecode input
        in got `shouldBe` want
@@ -166,9 +166,9 @@ spec = do
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42,
-            genesisValidators = [],
-            genesisAdmins = [],
-            genesisCertificates = []
+            genesisInfoValidators = [],
+            genesisInfoBlockstanbulAdmins = [],
+            genesisInfoCertificates = []
 
           }]
           got = JS.parseLazyByteString genesisParser input
