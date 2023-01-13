@@ -17,7 +17,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-vault-proxy-api
-- blockapps-vault-wrapper-api
 - bytestring
 - common-log
 - concurrent-extra
@@ -86,7 +85,6 @@ executables:
     other-modules: [Options]
     dependencies:
       - blockapps-vault-proxy-server
-      - blockapps-vault-wrapper-server
       - blockapps-init
       - cache
       - clock

@@ -26,7 +26,6 @@ library:
   - aeson
   - aeson-casing
   - base16-bytestring
-  - blockapps-vault-wrapper-api
   - bytestring
   - cache
   - cryptonite
