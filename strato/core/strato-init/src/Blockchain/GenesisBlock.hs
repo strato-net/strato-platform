@@ -23,7 +23,6 @@ import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
 import qualified Data.ByteString.Lazy.Char8                   as BLC
 import           Data.Either                                  (isLeft, fromRight)
-import           Data.List                                    (nub)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
@@ -147,8 +146,8 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let extraCerts = nub $ genesisCerts ++ extraCerts' ++ genesisInfoCertificates theJSON
-        theJSON' = insertMercataGovernanceContract (nub $ validators ++ genesisInfoValidators theJSON) (nub $ admins ++ genesisInfoBlockstanbulAdmins theJSON)
+    let extraCerts = genesisCerts ++ extraCerts'
+        theJSON' = insertMercataGovernanceContract validators admins
                  . insertCertRegistryContract extraCerts
                  $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
@@ -167,7 +166,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
       pure (ua', c')
       ) extraCerts
 
-    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators (nub $ validators ++ genesisInfoValidators theJSON)
+    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
     case insertValidators of 
       Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
       Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
