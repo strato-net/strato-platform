@@ -16,7 +16,8 @@ import { env } from '../../env.js'
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
-const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString:chainid';
+
+const cirrusUrl = env.CIRRUS_URL +  ':contractName?:queryString:chainid';
 
 export function queryCirrusRequest(name, queryString, chainId) {
   let chain;
