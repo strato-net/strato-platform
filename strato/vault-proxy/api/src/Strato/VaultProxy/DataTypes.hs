@@ -132,9 +132,16 @@ instance FromJSON Version where
     ver  <- o .: T.pack "version"
 
     vers <- case ver of
-        (Number ver1) -> pure ver1
+        (Number ver1) -> do 
+            ver2 <- if isInteger ver1 then 
+                case toBoundedInteger ver1 of 
+                    Nothing -> error "The Integer returned by the server was outside of expect/normal bounds. Will stop talking to server to prevent system crash."
+                    Just i -> pure (fromIntegral (i :: Int))
+            else 
+                error $ "Expected an Integer for the version number, got a float instead"
+            pure ver2
         (Object _) -> error $ "Expected a JSON Number under the key \"version\", but got something different."
         _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
-
-    return $ Version $ Scientific.base10Exponent vers
+    
+    return $ Version vers
   parseJSON wat = typeMismatch "Spec" wat
