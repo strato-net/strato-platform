@@ -9,9 +9,7 @@
 
 module Main where
 
--- import           Control.Applicative
 import           Control.Concurrent.Lock                as L
--- import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.ByteString                        as B hiding (putStrLn, map, filter)
@@ -21,7 +19,6 @@ import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
 import           GHC.Conc
--- import qualified Network.Curl                           as Curl
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
@@ -40,11 +37,8 @@ import           Strato.VaultProxy.RawOauth               as RO
 import           Strato.VaultProxy.GetPing                as GP
 
 import           Strato.VaultProxy.Server.Token
--- import           Strato.Strato23.API.Types
 
 import           Text.Regex
--- import           Text.JSON
--- import           Text.JSON.Generic
 
 import           Options
 
@@ -141,7 +135,7 @@ main = do
 app :: VaultConnection -> W.Request -> IO WaiProxyResponse
 app vc rev = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Here is the original request incoming to the vault-proxy:" 
-  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show rev ---Can remove in production
+  vaultProxyDebug flags_VAULT_PROXY_DEBUG $ show rev
 
   --get the foreign vault information
   foreignVault <- (parseBaseUrl $ T.unpack $ vaultUrl vc)

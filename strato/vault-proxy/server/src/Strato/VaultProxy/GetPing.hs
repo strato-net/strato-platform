@@ -1,8 +1,4 @@
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeOperators     #-}
 
 ---This file gets all of the Oauth information from the OpenId Connect server
 module Strato.VaultProxy.GetPing (

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings,TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Strato.VaultProxy.DataTypes (

@@ -15,7 +15,6 @@ copyright:           "2018 Author name here"
 description:         Please see the README on GitHub at <https://github.com/githubuser/server#readme>
 
 dependencies:
-- ascii
 - base
 - blockapps-vault-proxy-api
 - blockapps-vault-wrapper-api
