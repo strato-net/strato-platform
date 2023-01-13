@@ -24,6 +24,7 @@ class Chain extends Component {
               <td>{member.orgUnit}</td>
               <td>{member.commonName}</td>
               <td>{member.access.toString()}</td>
+              <td>{member.access.toString()}</td>
             </tr>
           )
         })
