@@ -124,7 +124,8 @@ data Version = Version {
     version :: Int
 } deriving (Show, Eq, Generic)
 
-instance ToJSON Version
+instance ToJSON Version where
+  toJSON = genericToJSON defaultOptions
 
 instance FromJSON Version where
   parseJSON (Object o) = do
