@@ -396,13 +396,13 @@ class CreateChain extends Component {
           this.props.openCreateChainOverlay();
         }} className="pt-intent-primary pt-icon-add"
           id="chains-create-chain-button"
-          text="Create Chain" />
+          text="Create Shard" />
 
         <Dialog
           iconName="flows"
           isOpen={this.props.isOpen}
           onClose={this.props.closeCreateChainOverlay}
-          title="Create New Chain"
+          title="Create New Shard"
           className="pt-dark"
         >
           <form>
@@ -411,7 +411,7 @@ class CreateChain extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Chain Name
+                    Shard Name
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
@@ -419,7 +419,7 @@ class CreateChain extends Component {
                     name="chainName"
                     component="input"
                     type="text"
-                    placeholder="Chain Name"
+                    placeholder="Shard Name"
                     className="pt-input form-width"
                     tabIndex="1"
                     required
@@ -631,7 +631,7 @@ class CreateChain extends Component {
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
-                    Chain Members
+                    Shard Members
                   </label>
                   {this.showMembers(this.state.members)}
                   <span className="error-text">{this.errorMessageFor('members')}</span>
@@ -665,7 +665,7 @@ class CreateChain extends Component {
                   intent={Intent.PRIMARY}
                   disabled={this.props.isSpinning}
                   onClick={this.props.handleSubmit(this.submit)}
-                  text="Create Chain"
+                  text="Create Shard"
                 />
               </div>
             </div>
