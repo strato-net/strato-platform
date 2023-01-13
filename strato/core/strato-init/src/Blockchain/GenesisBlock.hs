@@ -23,6 +23,7 @@ import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
 import qualified Data.ByteString.Lazy.Char8                   as BLC
 import           Data.Either                                  (isLeft, fromRight)
+import           Data.List                                    (nub)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
@@ -87,6 +88,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
+import Blockchain.Data.ValidatorRef
+
 import           Text.Format
 
 readSupplementaryAccounts :: String -> IO [AccountInfo]
@@ -144,8 +147,8 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
           cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
           return [cert]
         else return []
-    let extraCerts = genesisCerts ++ extraCerts'
-        theJSON' = insertMercataGovernanceContract validators admins
+    let extraCerts = nub $ genesisCerts ++ extraCerts' ++ genesisInfoCertificates theJSON
+        theJSON' = insertMercataGovernanceContract (nub $ validators ++ genesisInfoValidators theJSON) (nub $ admins ++ genesisInfoBlockstanbulAdmins theJSON)
                  . insertCertRegistryContract extraCerts
                  $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
@@ -164,7 +167,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
       pure (ua', c')
       ) extraCerts
 
-    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
+    insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators (nub $ validators ++ genesisInfoValidators theJSON)
     case insertValidators of 
       Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
       Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -198,6 +201,8 @@ initializeGenesisBlock genesisBlockName extraFaucets validators admins = do
     void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
+
+    void $ addRemoveValidator ([], validators)
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
     $logInfoS "initgen" "Beginning to write to redis"

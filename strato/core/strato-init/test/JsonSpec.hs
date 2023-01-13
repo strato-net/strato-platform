@@ -110,7 +110,10 @@ spec = do
             genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-            genesisInfoNonce = 42
+            genesisInfoNonce = 42,
+            genesisInfoValidators = [],
+            genesisInfoBlockstanbulAdmins = [],
+            genesisInfoCertificates = []
           }
           got = eitherDecode input
        in got `shouldBe` want
@@ -162,7 +165,11 @@ spec = do
             genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-            genesisInfoNonce = 42
+            genesisInfoNonce = 42,
+            genesisInfoValidators = [],
+            genesisInfoBlockstanbulAdmins = [],
+            genesisInfoCertificates = []
+
           }]
           got = JS.parseLazyByteString genesisParser input
        in got `shouldBe` want
