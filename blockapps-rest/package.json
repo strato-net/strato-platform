@@ -7,8 +7,8 @@
     "build": "node_modules/.bin/gulp",
     "build:docs": "node_modules/.bin/gulp generateDocs",
     "test": "yarn test:lib && yarn test:util",
-    "test:lib": "mocha --require=@babel/register lib/test/*.test.js -b",
-    "test:util": "mocha --require=@babel/register lib/util/test/*.test.js -b",
+    "test:lib": "mocha --require=@babel/register lib/test/*.test.js",
+    "test:util": "mocha --require=@babel/register lib/util/test/*.test.js",
     "token-getter": "ts-node --require=@babel/register src/util/oauth.client.ts"
   },
   "keywords": [
