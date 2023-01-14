@@ -461,9 +461,12 @@ describe("search until", function () {
   it("searchUntil - timeout error", async () => {
     // predicate is created: to wait until response is available otherwise throws the error
     function predicate() { }
-
+    const newContract = {
+      ...contract,
+      name: `BlockApps-${contract.name}`
+   }
     try {
-      await rest.searchUntil(admin, contract, predicate, options);
+      await rest.searchUntil(admin, newContract, predicate, options);
     } catch (err) {
       assert.equal(
         err.message,
