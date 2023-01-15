@@ -440,11 +440,11 @@ describe("search until", function () {
       args
     );
     contract = await rest.createContract(admin, contractArgs, options);
-     = {
+    newContract = {
       ...contract,
       name: `${orgName}${contract.name}`
-   }
-  });newContract
+   };
+  });
 
   it("searchUntil - get response on first call", async () => {
     
@@ -520,7 +520,7 @@ describe("search query", function () {
     const newContract = {
       ...contracts[0],
       name: `${orgName}${contracts[0].name}`
-   }
+   };
     const results = await rest.searchUntil(
       admin,
       newContract,
@@ -552,7 +552,7 @@ describe("search query", function () {
     const newContract = {
       ...contracts[0],
       name: `${orgName}${contracts[0].name}`
-   }
+   };
     const results = await rest.searchWithContentRangeUntil(
       admin,
       newContract,
@@ -592,7 +592,7 @@ describe("search query", function () {
     const newContract = {
       ...contracts[0],
       name: `${orgName}${contracts[0].name}`
-   }
+   };
     const results = await rest.searchWithContentRangeUntil(
       admin,
       newContract,
@@ -623,7 +623,7 @@ describe("search query", function () {
     const newContract = {
       ...contracts[0],
       name: `${orgName}${contracts[0].name}`
-   }
+   };
     await rest.searchUntil(admin, newContract, predicate, options);
 
     // search by address
@@ -632,7 +632,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const result = await rest.waitForAddress(admin, newContract, options);
       assert.isDefined(result, "Result should be defined");
       assert.isDefined(result.address, "Result.address should be defined");
@@ -646,7 +646,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const query = {
         intValue: `eq.${intValue(uid, i)}`
       };
@@ -663,7 +663,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const query = {
         stringValue: `eq.${stringValue(uid, i)}`
       };
@@ -680,7 +680,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const query = {
         intValue: `eq.${intValue(uid, i)}`,
         stringValue: `eq.${stringValue(uid, i)}`,
@@ -699,7 +699,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const query = {
         intValue: `eq.666`,
         address: `eq.${contract.address}`
@@ -741,7 +741,7 @@ describe("search query", function () {
     const newContract = {
       ...contracts[0],
       name: `${orgName}${contracts[0].name}`
-   }
+   };
     await rest.searchUntil(admin, newContract, predicate, options);
 
     // search by address
@@ -750,7 +750,7 @@ describe("search query", function () {
       const newContract = {
         ...contract,
         name: `${orgName}${contract.name}`
-     }
+     };
       const query = {
         stringValue: `eq.${stringValue(uid, i) + specialCharacters}`
       };
