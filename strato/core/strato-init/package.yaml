@@ -111,6 +111,17 @@ executables:
       - strato-networks
     other-modules: []
 
+  genesis-builder:
+    source-dirs: exec_src/
+    main: GenesisBuilder.hs
+    dependencies:
+      - aeson
+      - bytestring
+      - strato-genesis
+      - strato-init
+      - strato-model
+    other-modules: []
+
 tests:
   strato-init-test:
     source-dirs: test/

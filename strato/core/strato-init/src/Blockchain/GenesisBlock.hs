@@ -8,6 +8,7 @@
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
+  buildGenesisInfo
 ) where
 
 
@@ -108,6 +109,14 @@ readSupplementaryAccounts genesisBlockName = do
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
+buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
+buildGenesisInfo extraFaucets extraCerts validators admins gi =
+  let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
+      faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
+   in insertMercataGovernanceContract validators admins
+      . insertCertRegistryContract extraCerts
+      $ gi{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
+
 getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , MonadLogger m
                                         , HasCodeDB m
@@ -131,8 +140,6 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
         theJSON = case genesis of
                       [x] -> x
                       _ -> error $ "invalid genesis: " ++ show genesis
-        faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
-        faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
     let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
         genesisCerts = case (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_genesisCerts) of
           Right a -> a
@@ -147,9 +154,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
           return [cert]
         else return []
     let extraCerts = genesisCerts ++ extraCerts'
-        theJSON' = insertMercataGovernanceContract validators admins
-                 . insertCertRegistryContract extraCerts
-                 $ theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
+        theJSON' = buildGenesisInfo extraFaucets extraCerts validators admins theJSON
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
     -- Need to insert the X509 certificates INTO Redis
