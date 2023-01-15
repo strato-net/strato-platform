@@ -440,11 +440,11 @@ describe("search until", function () {
       args
     );
     contract = await rest.createContract(admin, contractArgs, options);
-    newContract = {
+     = {
       ...contract,
       name: `${orgName}${contract.name}`
    }
-  });
+  });newContract
 
   it("searchUntil - get response on first call", async () => {
     
