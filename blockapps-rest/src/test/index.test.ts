@@ -398,7 +398,7 @@ describe("history", function() {
     const result = await rest.call(admin, callArgs, options);
     console.log(result);
 
-    const orgName='BlockApps-' //orgName should be obtained dynamically from an api call or as a test parameter
+    const orgName='BlockApps-'; //orgName should be obtained dynamically from an api call or as a test parameter
     const contractHistory = await rest.searchUntil(
       admin,
       { name: `history@${orgName}TestHistory` },
