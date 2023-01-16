@@ -4,6 +4,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Main where
 
+import Control.Monad.IO.Class
 import           Control.Monad
 import           Control.Concurrent         (threadDelay)
 import           Control.Concurrent.Async             as Async
@@ -11,6 +12,9 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
+import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.JsonStream.Parser as JS
+import           Data.List                  (nub)
 import           Data.ByteString.Base64
 import           Data.Either.Extra
 import           HFlags
@@ -19,6 +23,7 @@ import           Safe
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
+import           Blockchain.Data.GenesisInfo
 import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.EthConf         as EC
 import qualified Blockchain.Network         as Net
@@ -57,6 +62,7 @@ main = do
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
+  putStrLn $ "strato-sequencer genesisBlockTestCert: " ++ show flags_genesisBlockTestCert
 
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -77,12 +83,21 @@ main = do
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
   maybeNetworkParams <- Net.getParams flags_network
+  theJSONString <- liftIO . BLC.readFile $ flags_genesisBlockName
+  let genesis = JS.parseLazyByteString genesisParser theJSONString
+      theJSON = case genesis of
+                      [x] -> x
+                      _ -> error $ "invalid genesis: " ++ show genesis
+      gvalidators = genesisInfoValidators theJSON
   --  Allow these flags to accept base64-encoded JSONs optionally
-  let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
+      b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
       eValidators = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
-      !validators' =
+      !validators' = nub $ gvalidators ++
         case (maybeNetworkParams, eValidators) of
-          (Just networkParams, Right []) -> map Net.identity networkParams
+          (Just networkParams, Right []) -> 
+            if flags_genesisBlockTestCert 
+              then []
+              else map Net.identity networkParams
           (_, Right v) -> v
           (_, Left e) -> error $ "invalid validators: " ++ e
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet

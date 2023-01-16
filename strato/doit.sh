@@ -201,7 +201,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${scFlag}" "${vbFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" "${ciFlag}" \
+    "${networkFlag}" "${ciFlag}" --genesisBlockTestCert=$genesisBlockTestCert \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"

@@ -24,7 +24,7 @@ import Data.List (nub)
 
 defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
-defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for asin"
+defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for a single node"
 defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of Blockstanbul validators"
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of network admins. Admins can, for instance, nominate a new validator"
@@ -44,7 +44,6 @@ main = do
       theJSON = case genesis of
                       [x] -> x
                       _ -> error $ "invalid genesis: " ++ show genesis
-  --  Allow these flags to accept base64-encoded JSONs optionally
   let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
       eValidators = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
       !validators' =

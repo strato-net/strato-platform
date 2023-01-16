@@ -30,6 +30,8 @@ defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
 defineFlag "rootCerts" ("{}" :: String) "JSON encoded addresses to X509CertInfoState map"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
+defineFlag "genesisBlockName" ("gettingStartedGenesis.json" :: String) "The genesis block to initialize"
+defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for a single node"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
