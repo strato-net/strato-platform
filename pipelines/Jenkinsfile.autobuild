@@ -113,7 +113,7 @@ pipeline {
               --issuer=x509-generator/rootCert.pem \\
               --subject=x509-generator/subject.json \\
               --key=x509-generator/rootPriv.pem
-            myCert=$(cat OutputCert.pem | perl -pe 's/\n/\\n/g')
+            myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
             echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
             stack run genesis-builder -- \\
               --input=genesis-builder/genesis-block.tpl.json \\
