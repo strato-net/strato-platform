@@ -11,10 +11,6 @@ module Blockchain.GenesisBlock (
   buildGenesisInfo
 ) where
 
-
-import qualified Data.Aeson                 as Ae
-import           Data.ByteString.Base64
-
 import           Control.Monad
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
@@ -22,11 +18,9 @@ import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Char8                        as BC
-import qualified Data.ByteString.Lazy.Char8                   as BLC
-import           Data.Either                                  (isLeft, fromRight)
+import           Data.Either                                  (isLeft)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
-import qualified Data.JsonStream.Parser                       as JS
 import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
 import qualified Data.Sequence                                as S
@@ -53,11 +47,13 @@ import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.Generation                       (insertCertRegistryContract, insertMercataGovernanceContract)
-import           Blockchain.Init.Options                     (flags_genesisBlockTestCert, flags_genesisCerts)
+import           Blockchain.Generation                       ( insertCertRegistryContract
+                                                             , insertMercataGovernanceContract
+                                                             , readCertsFromGenesisInfo
+                                                             , readValidatorsFromGenesisInfo
+                                                             )
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
-import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
@@ -121,7 +117,6 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , MonadLogger m
                                         , HasCodeDB m
                                         , HasHashDB m
-                                        , HasVault m
                                         , Mem.HasMemAddressStateDB m
                                         , HasStateDB m
                                         , HasStorageDB m
@@ -130,31 +125,11 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , Accessible RBDB.RedisConnection m
                                         )
                                      => String
-                                     -> [Ad.Address]
-                                     -> [ChainMemberParsedSet]
-                                     -> [ChainMemberParsedSet]
-                                     -> m ([(Ad.Address, X509CertInfoState)], ([(AccountInfo, CodeInfo)], Block))
-getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators admins = do
-    theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let genesis = JS.parseLazyByteString genesisParser theJSONString
-        theJSON = case genesis of
-                      [x] -> x
-                      _ -> error $ "invalid genesis: " ++ show genesis
-    let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
-        genesisCerts = case (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_genesisCerts) of
-          Right a -> a
-          Left _ -> error "invalid cert format"
-    $logInfoS "flag_genesisCerts" $ T.pack . show $ genesisCerts
-    extraCerts' <-
-      if flags_genesisBlockTestCert 
-        then do
-          nodePubkey <- getPub
-          let testCertSubject = Subject "Test" "BlockApps" (Just "Engineering") (Just "USA") nodePubkey
-          cert <- makeSignedCert Nothing (Just rootCert) (fromJust . getCertIssuer $ rootCert) testCertSubject
-          return [cert]
-        else return []
-    let extraCerts = genesisCerts ++ extraCerts'
-        theJSON' = buildGenesisInfo extraFaucets extraCerts validators admins theJSON
+                                     -> m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
+getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
+    genesisInfo <- getGenesisInfoFromFile genesisBlockName
+    let certs = readCertsFromGenesisInfo genesisInfo
+        validators = readValidatorsFromGenesisInfo genesisInfo
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
     -- Need to insert the X509 certificates INTO Redis
@@ -169,14 +144,14 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
         Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
         Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
       pure (ua', c')
-      ) extraCerts
+      ) certs
 
     insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
     case insertValidators of 
       Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
       Left  e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
 
-    (extraCertInfoStates,) <$> genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
+    (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName extraAccounts
 
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
@@ -186,18 +161,14 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasStateDB m
                           , HasStorageDB m
                           , HasMemStorageDB m
-                          , HasVault m
                           , MonadLogger m
                           , (Ac.Account `Alters` AddressState) m
                           )
                        => String
-                       -> [Ad.Address]
-                       -> [ChainMemberParsedSet]
-                       -> [ChainMemberParsedSet]
                        -> m ()
-initializeGenesisBlock genesisBlockName extraFaucets validators admins = do
+initializeGenesisBlock genesisBlockName = do
     $logInfoS "initgen" "Begin of initgen"
-    (extraCertInfoStates, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators admins
+    (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
     _ <- produceVMOutputs [ChainBlock genesisBlock]
     obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
     putGenesisHash $ blockHash genesisBlock

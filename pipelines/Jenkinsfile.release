@@ -74,8 +74,6 @@ pipeline {
             export PASSWORD=123
             export requireCerts=false
             export certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}'
-            export genesisBlockTestCert=true
-            export validators='[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}]'
             ./strato --single
             docker ps
             # Few quick tests

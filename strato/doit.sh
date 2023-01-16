@@ -181,9 +181,6 @@ function newnode {
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
   fi
-  if [ -n "${validators}" ]; then
-    vsFlag="--validators=${validators}"
-  fi
   if [ -n "${seqMaxEventsPerIter}" ]; then
     evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
   fi
@@ -195,13 +192,12 @@ function newnode {
   fi
 
   vbFlag="--validatorBehavior=${validatorBehavior}"
-  rtFlag="--isRootNode=${isRootNode}"
 
 
   runBackgroundProcess strato-sequencer \
-    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
-    "${scFlag}" "${vbFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" "${ciFlag}" \
+    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    "${vbFlag}" --minLogLevel=$seqMinLogLevel \
+    "${networkFlag}" "${ciFlag}"  --genesisBlockName=$genesis \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -334,20 +330,13 @@ function doInit {
   if [ -n "${network}" ]; then
     networkFlag="--network=${network}"
   fi
-  if [ -n "${validators}" ]; then
-    vsFlag="--validators=${validators}"
-  fi
-  if [ -n "${blockstanbulAdmins}" ]; then
-    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
-  fi
 
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag} \
-        ${vsFlag} ${baFlag} --genesisBlockTestCert=$genesisBlockTestCert --genesisCerts=$genesisCerts"
+        --generateKey=$generateKey ${networkFlag}"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -360,7 +349,7 @@ function doInit {
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost --genesisBlockTestCert=$genesisBlockTestCert ${vsFlag} ${baFlag} --genesisCerts=$genesisCerts 2>&1 | tee --append logs/strato-setup
+    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -440,8 +429,6 @@ else
 fi
 setEnv requireCerts true
 setEnv genesisBlock ""
-setEnv genesisBlockTestCert false
-setEnv genesisCerts "[]"
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000
 

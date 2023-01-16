@@ -19,9 +19,10 @@ import           Safe
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul
+import           Blockchain.Data.GenesisInfo
+import           Blockchain.Generation
 import           Blockchain.Strato.Model.ChainMember
 import qualified Blockchain.EthConf         as EC
-import qualified Blockchain.Network         as Net
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
@@ -49,11 +50,11 @@ main :: IO ()
 main = do
   blockappsInit "seq_main"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
+  validators <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
-  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
-  putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
+  putStrLn $ "strato-sequencer validators: " ++ show validators
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
@@ -76,15 +77,8 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
-  maybeNetworkParams <- Net.getParams flags_network
   --  Allow these flags to accept base64-encoded JSONs optionally
   let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
-      eValidators = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_validators) :: Either String [ChainMemberParsedSet]
-      !validators' =
-        case (maybeNetworkParams, eValidators) of
-          (Just networkParams, Right []) -> map Net.identity networkParams
-          (_, Right v) -> v
-          (_, Left e) -> error $ "invalid validators: " ++ e
       eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
       !self = fromRight (error "invalid self cert info") eSelf
 
@@ -92,20 +86,6 @@ main = do
   mCtx <- if not flags_blockstanbul
              then return Nothing
              else do
-               validators <-
-                 if flags_isRootNode then do
-                   when (length validators' == 0) . putStrLn
-                      $ "WARNING: You have given me an empty validators list. \
-                        \ This is a configuration error on your part. \
-                        \ PBFT will almost certainly not function properly."
-                   return validators'
-                 else do
-                   when (length validators' == 0) . putStrLn
-                      $ "WARNING: You have given me an empty validators list, but this node is not the root \
-                        \ node. This is a configuration error on your part. \
-                        \ PBFT will almost certainly not function properly."
-                   return validators'
-
                unless (self `elem` validators) . putStrLn
                     $ "WARNING: NODEKEY does not correspond to a validator identity.\
                       \ This probably means that you are connecting to an existing network,\

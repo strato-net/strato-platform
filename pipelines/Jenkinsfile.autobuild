@@ -74,8 +74,6 @@ pipeline {
               VAULT_PROXY_DEBUG=true \\
               requireCerts=false \\
               certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-              genesisBlockTestCert=true \\
-              validators='[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}]' \\
               ./strato --single
           """
           sh 'chmod +x run.sh'

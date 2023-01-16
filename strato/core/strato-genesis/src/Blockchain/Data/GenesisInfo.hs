@@ -10,12 +10,15 @@ module Blockchain.Data.GenesisInfo (
   GenesisInfo(..),
   defaultGenesisInfo,
   genesisParser,
+  getGenesisInfoFromFile
   ) where
 
 import           GHC.Generics (Generic)
+import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Aeson.Casing (aesonDrop, camelCase)
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Lazy.Char8         as BLC
 import qualified Data.JsonStream.Parser             as JS
 import           Data.Time
 import           Data.Word
@@ -117,4 +120,10 @@ genesisParser = GenesisInfo
             <*> "mixHash" JS..: JS.value
             <*> "nonce" JS..: JS.value
 
-
+getGenesisInfoFromFile :: MonadIO m => String -> m GenesisInfo
+getGenesisInfoFromFile genesisBlockName = do
+  theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
+  let genesis = JS.parseLazyByteString genesisParser theJSONString
+  case genesis of
+    [x] -> pure x
+    _ -> error $ "invalid genesis: " ++ show genesis
