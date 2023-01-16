@@ -93,9 +93,6 @@ instance RedisDBKeyable Keccak256 where
 instance RedisDBKeyable ChainMemberParsedSet where
     toKey = toStrict . encode
 
-instance RedisDBKeyable ChainMembers where
-    toKey = toStrict . encode
-
 instance RedisDBValuable Keccak256 where
     toValue   = S8.pack . keccak256ToHex
     fromValue = keccak256FromHex . S8.unpack

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -14,6 +15,8 @@ module Blockchain.Generation (
   insertContracts,
   insertCertRegistryContract,
   insertMercataGovernanceContract,
+  readCertsFromGenesisInfo,
+  readValidatorsFromGenesisInfo,
   Records(..),
   RecordsHashMap(..),
   Type(..),
@@ -30,6 +33,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HM
+import qualified Data.Map.Strict as M
 import Data.Scientific (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Vector as V
@@ -188,6 +192,34 @@ insertContracts slotss name src code start gi =
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]}
+
+readCertsFromGenesisInfo :: GenesisInfo -> [X509Certificate]
+readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
+  SolidVMContractWithStorage _ _ (SolidVMCode "Certificate" _) storage -> do
+    let storageMap = M.fromList storage
+        rlpUnwrap = rlpDecode . rlpDeserialize
+    certStr <- rlpUnwrap <$> M.lookup ".certificateString" storageMap
+    case certStr of
+      BString certStr' -> either (const Nothing) Just $ bsToCert certStr'
+      _ -> Nothing
+  _ -> Nothing
+
+readValidatorsFromGenesisInfo :: GenesisInfo -> [ChainMemberParsedSet]
+readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
+  SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
+    let storageMap = M.fromList storage
+        rlpUnwrap = rlpDecode . rlpDeserialize
+    o <- rlpUnwrap <$> M.lookup ".org" storageMap
+    u <- rlpUnwrap <$> M.lookup ".orgUnit" storageMap
+    c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
+    case (o,u,c) of
+      (BString o', BString u', BString c') -> do
+        let o'' = decodeUtf8 o'
+            u'' = decodeUtf8 u'
+            c'' = decodeUtf8 c'
+        pure $ CommonName o'' u'' c'' True
+      _ -> Nothing
+  _ -> Nothing
 
 -- | Inserts a Certificate Registry contract into the genesis block with the BlockApps root cert as owner
 -- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root

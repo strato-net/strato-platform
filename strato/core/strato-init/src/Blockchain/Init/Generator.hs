@@ -14,19 +14,15 @@ import Data.FileEmbed
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Map as M
-import Data.Maybe
 import qualified Data.Text.IO as TIO
 import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO
 
-import Blockchain.Data.ChainInfo
-import Blockchain.Data.GenesisInfo
 import Blockchain.Init.Protocol
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
-import Blockchain.Strato.Model.Address
 
 import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError, stateTopicMetadata)
 import Network.Kafka.Protocol (KafkaError(..), TopicMetadata(..))
@@ -66,17 +62,16 @@ mkAll genesisBlockName = do
                          
   addEvent $ PeerList bootnodes
 
-  let decodedFaucets = fromMaybe [] . Ae.decodeStrict . C8.pack $ flags_extraFaucets
-      genesisFileName = genesisBlockName ++ "Genesis.json"
+  let genesisFileName = genesisBlockName ++ "Genesis.json"
       accountInfoFileName = genesisBlockName ++ "AccountInfo"
 
-  sendGenesisJson genesisFileName decodedFaucets
+  sendGenesisJson genesisFileName
   sendAccountInfo accountInfoFileName
 
   addEvent InitComplete
 
-sendGenesisJson :: FilePath -> [Address] -> GenM ()
-sendGenesisJson genesisFilename extraFaucets = do
+sendGenesisJson :: FilePath -> GenM ()
+sendGenesisJson genesisFilename = do
   fsFile <- doesFileExist genesisFilename
   eGenInfo <- if fsFile
                 then liftIO $ Ae.eitherDecodeFileStrict' genesisFilename
@@ -85,12 +80,7 @@ sendGenesisJson genesisFilename extraFaucets = do
                   Ae.eitherDecodeStrict' contents
   case eGenInfo of
     Left err -> liftIO $ die err
-    Right genInfo -> do
-      let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
-          faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-      addEvent $ GenesisBlock genInfo {
-               genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo genInfo)
-             }
+    Right genInfo -> addEvent $ GenesisBlock genInfo
 
 sendAccountInfo :: FilePath -> GenM ()
 sendAccountInfo accountInfoFileName = do

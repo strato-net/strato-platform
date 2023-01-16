@@ -66,8 +66,6 @@ spec:
           value: "true"
         - name: genesis
           value: "gettingStarted"
-        - name: isRootNode
-          value: "false"
         - name: kafkaHost
           value: "localhost"
         - name: kafkaPort

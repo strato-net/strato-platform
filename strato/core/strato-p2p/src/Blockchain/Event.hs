@@ -15,8 +15,7 @@ module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
-  checkPeerIsMember,
-  certOrgTuple,
+  checkPeerIsMember
   ) where
 
 import           Control.Arrow                         ((&&&), second)
@@ -277,7 +276,6 @@ handleEvents peer = awaitForever $ \case
                                  , (Word256 `Selectable` ChainMemberRSet) m
                                  , (Keccak256 `Alters` OutputBlock) m
                                  , (Address `Selectable` X509CertInfoState) m
-                                 , (ChainMembers `Selectable` TrueOrgNameChains) m
                                  )
                               => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
@@ -499,7 +497,8 @@ handleEvents peer = awaitForever $ \case
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
                          , MonadLogger m
-                         , (ChainMembers `Selectable` TrueOrgNameChains) m
+                         , (ChainMemberParsedSet `Selectable` TrueOrgNameChains) m
+                         , (ChainMemberParsedSet `Selectable` FalseOrgNameChains) m
                          , (Word256 `Selectable` ChainMemberRSet) m
                          , (Word256 `Selectable` ChainInfo) m
                          , (Address `Selectable` X509CertInfoState) m
@@ -512,10 +511,13 @@ handleGetChainDetails peer cids' = do
   peerX509 <- lift $ getPeerX509 peer
   cids <- S.toList <$> if S.null cids'
             then do
-              TrueOrgNameChains orgNameChains <- case peerX509 of
+              TrueOrgNameChains trueChains <- case peerX509 of
                 Nothing -> return $ TrueOrgNameChains S.empty
-                cIs -> lift $ selectWithDefault (Proxy @TrueOrgNameChains) (certOrgTuple cIs)
-              return orgNameChains
+                Just cmps -> lift $ selectWithDefault (Proxy @TrueOrgNameChains) (x509CertInfoStateToCMPS cmps)
+              FalseOrgNameChains falseChains <- case peerX509 of
+                Nothing -> return $ FalseOrgNameChains S.empty
+                Just cmps -> lift $ selectWithDefault (Proxy @FalseOrgNameChains) (x509CertInfoStateToCMPS cmps)
+              return $ trueChains S.\\ falseChains
             else return cids'
   lift stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ intercalate "\n" (formatChainId . Just <$> cids)
@@ -578,10 +580,8 @@ checkPeerIsMember pcert mems = case pcert of
     Just (X509CertInfoState _ _ _ _  n Nothing c) -> isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack "") (T.pack c) True)) mems
 
 -- extract the organization name from the cert
-certOrgTuple :: Maybe X509CertInfoState -> ChainMembers  
-certOrgTuple Nothing = ChainMembers $  S.singleton $ (Everyone True)
-certOrgTuple (Just (X509CertInfoState _ _ _ _  n (Nothing) c)) = ChainMembers $ S.fromList [(CommonName (T.pack n) "" (T.pack c) True), (Org (T.pack n) True) ]
-certOrgTuple (Just (X509CertInfoState _ _ _ _  n (Just u) c))  =  ChainMembers $ S.fromList $ [(CommonName (T.pack n) (T.pack u) (T.pack c) True),(OrgUnit (T.pack n) (T.pack u) True), (Org (T.pack n) True)]
+x509CertInfoStateToCMPS :: X509CertInfoState -> ChainMemberParsedSet
+x509CertInfoStateToCMPS (X509CertInfoState _ _ _ _  n u c) = CommonName (T.pack n) (maybe "" T.pack u) (T.pack c) True
 
 {- to reduce redundant computations on dividing block chunks under txsLimit
 splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
