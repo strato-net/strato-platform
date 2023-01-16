@@ -48,7 +48,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-          
+      
           writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
@@ -189,7 +189,7 @@ pipeline {
               set -x
               echo "Running apex unit tests"
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-# TEMPORARY DISABLING APEX TESTS UNTIL HEALTH CHECK IS FIXED
+# TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
           },
