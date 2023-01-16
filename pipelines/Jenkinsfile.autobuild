@@ -108,13 +108,13 @@ pipeline {
           // Build genesis-block.json
           sh '''#!/bin/bash -le
             myPub=$(docker exec -it strato_strato_1 curl http://strato:8013/strato/v2.3/key | jq .pubkey)
-            sed "s/\"<PUBKEY>\"/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
+            sed "s/\\"<PUBKEY>\\"/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
             stack run x509-generator -- \\
               --issuer=x509-generator/rootCert.pem \\
               --subject=x509-generator/subject.json \\
               --key=x509-generator/rootPriv.pem
             myCert=$(cat OutputCert.pem | perl -pe 's/\n/\\n/g')
-            echo "[\"$(echo $myCert)\"]" > genesis-builder/certs.json
+            echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
             stack run genesis-builder -- \\
               --input=genesis-builder/genesis-block.tpl.json \\
               --faucets=genesis-builder/faucets.json \\
