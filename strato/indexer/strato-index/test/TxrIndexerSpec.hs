@@ -66,14 +66,14 @@ spec = do
             let cId   = fromInteger 0x33333
                 event = EventDB zeroHash (Account 0x100 Nothing) (Just cId) "OrgRemoved" ["BlockApps"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, AddOrgName cId (Org (T.pack "BlockApps") False)] 
+                `shouldBe` [PutEventDB event, RemoveOrgName cId (Org (T.pack "BlockApps") False)] 
         it "Index EventDBEntry for OrgUnitRemoved (two arguments)" $
             let cId   = fromInteger 0x11111
                 event = EventDB zeroHash (Account 0x100 Nothing) (Just cId) "OrgUnitRemoved" ["BlockApps", "Sales"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, AddOrgName cId (OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)] 
+                `shouldBe` [PutEventDB event, RemoveOrgName cId (OrgUnit (T.pack "BlockApps") (T.pack "Sales") False)] 
         it "Index EventDBEntry for CommonNameRemoved (three arguments)" $
             let cId   = fromInteger 0x22222
                 event = EventDB zeroHash (Account 0x100 Nothing) (Just cId) "CommonNameRemoved" ["BlockApps", "Sales", "Kieren James-Lubin"]
             in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, AddOrgName cId (CommonName (T.pack "BlockApps") (T.pack "Sales") (T.pack "Kieren James-Lubin") False)] 
+                `shouldBe` [PutEventDB event, RemoveOrgName cId (CommonName (T.pack "BlockApps") (T.pack "Sales") (T.pack "Kieren James-Lubin") False)] 
