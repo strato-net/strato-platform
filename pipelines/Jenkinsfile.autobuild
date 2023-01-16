@@ -45,13 +45,13 @@ pipeline {
 
         dir("strato") {
           // Build genesis-block.json
-          sh 'stack run genesis-builder -- \\
+          sh '''stack run genesis-builder -- \\
                 --input=../strato-getting-started/genesis-block.tpl.json \\
                 --faucets=../strato-getting-started/faucets.json \\
                 --validators=../strato-getting-started/validators.json \\
                 --admins=../strato-getting-started/admins.json \\
                 --certs=../strato-getting-started/certs.json \\
-                --output=../strato-getting-started/genesis-block.json'
+                --output=../strato-getting-started/genesis-block.json'''
         }
 
         dir("strato-getting-started") {
