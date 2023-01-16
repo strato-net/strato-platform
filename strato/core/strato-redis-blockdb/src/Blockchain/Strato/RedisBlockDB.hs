@@ -17,7 +17,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , isValidator, addValidators, removeValidators
     , getChainMembers, putChainMembers
-    , addChainMember -- , removeChainMember
+    , addChainMember, removeChainMember
     , registerCertificate
     , revokeCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
@@ -219,25 +219,19 @@ addChainMember cId newMem = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
--- removeChainMember :: Word256
---                   -> Address
---                   -> Redis (Either Reply Status)
--- removeChainMember cId address = do
---     mems <- getChainMembers cId
---     let mEnode = M.lookup address mems
---         mems' = RedisChainMembers $ M.delete address mems
---     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
---     case res of
---         TxSuccess _ -> case mEnode of
---           Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
---           Just enode -> getCompose $
---             Compose (removeIPChain (ipAddress enode) cId) *>
---             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
---             -- Compose (addressToOrg address >>= \case
---             --             Nothing -> pure $ Right Ok
---             --             Just org -> removeOrgNameChain org cId)
---         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
---         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+removeChainMember :: Word256
+                  -> CM.ChainMembers
+                  -> Redis (Either Reply Status)
+removeChainMember cId newMem = do
+    CM.ChainMemberRSet mems <- getChainMembers cId
+    let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset newMem
+        mems' = CM.ChainMemberRSet $ mems `rSetIntersection` newMemRset
+        rmems = RedisChainMemberRSet mems'
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
+    case res of
+        TxSuccess _ -> removeOrgNameChain newMem cId
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
 registerCertificate userAddr x509CertInfoState = do

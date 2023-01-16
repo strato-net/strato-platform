@@ -51,7 +51,7 @@ import           Data.Swagger                         hiding (get, name, put, ur
 import qualified Data.ByteString.Lazy.Internal        as BSLI
 import           Data.Data
 import qualified Data.Default                         as D
-import           Data.List                            (foldl')
+import           Data.List                            (foldl1')
 import           Data.Maybe                           (fromMaybe)
 import qualified Data.Set                             as S
 import           Data.Text                            (Text)
@@ -79,6 +79,7 @@ data ChainMemberF f = ChainMemberF
   { orgName    :: f T.Text
   , orgUnit    :: f (Maybe T.Text)
   , commonName :: f (Maybe T.Text)
+  , sentinel   :: f ()
   } deriving (Generic)
 
 
@@ -164,40 +165,41 @@ rowToSet ((Just o),Nothing,(Just n),a) = CommonName o "Nothing" n a
 
 chainMemberParsedSetToChainMemberRSet :: ChainMemberParsedSet -> (Bool, ChainMemberRSet)
 chainMemberParsedSetToChainMemberRSet (Everyone True)  = (True, ChainMemberRSet $ makeRangedSet
-  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound (Middle ())) (ChainMemberF UpperBound UpperBound UpperBound (Middle ()))
   ])
 chainMemberParsedSetToChainMemberRSet (Everyone False)  = (False, ChainMemberRSet rSetEmpty)
 chainMemberParsedSetToChainMemberRSet (Org o True) = (True, ChainMemberRSet $  makeRangedSet
-  [ getRangeFromBounds (ChainMemberF (Middle o) LowerBound LowerBound) (ChainMemberF (Middle o) UpperBound UpperBound)
+  [ getRangeFromBounds (ChainMemberF (Middle o) LowerBound LowerBound (Middle ())) (ChainMemberF (Middle o) UpperBound UpperBound (Middle ()))
   ])
 chainMemberParsedSetToChainMemberRSet (Org o False) = (False, ChainMemberRSet $  makeRangedSet
-  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) LowerBound LowerBound)
-  , getRangeFromBounds (ChainMemberF (Middle o) UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) LowerBound LowerBound LowerBound)
+  , getRangeFromBounds (ChainMemberF (Middle o) UpperBound UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
   ])
 chainMemberParsedSetToChainMemberRSet (OrgUnit o u True) = (True, ChainMemberRSet $ makeRangedSet
-  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) UpperBound)
+  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) LowerBound (Middle ())) (ChainMemberF (Middle o) (Middle $ Just u) UpperBound (Middle ()))
   ])
 chainMemberParsedSetToChainMemberRSet (OrgUnit o u False) = (False, ChainMemberRSet $ makeRangedSet
-  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) LowerBound)
-  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) UpperBound) (ChainMemberF UpperBound UpperBound UpperBound)
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) LowerBound LowerBound)
+  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
   ])
 chainMemberParsedSetToChainMemberRSet (CommonName o u c True) = (True, ChainMemberRSet $ makeRangedSet
-  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c)) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c))
+  [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) (Middle ())) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) (Middle ()))
   ])
 chainMemberParsedSetToChainMemberRSet (CommonName o u c False) = (False, ChainMemberRSet $ makeRangedSet
-  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c))
-  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c)) (ChainMemberF UpperBound UpperBound UpperBound)
+  [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) LowerBound)
+  , getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
   ])
 
 
 chainMembersToChainMemberRset :: ChainMembers -> ChainMemberRSet
+chainMembersToChainMemberRset (ChainMembers s) | S.null s = D.def
 chainMembersToChainMemberRset cms =
   let listOfCMPS  = S.toList $ unChainMembers cms
       listOfCMRSetWithBool = map chainMemberParsedSetToChainMemberRSet listOfCMPS
-   in foldl' (\(ChainMemberRSet b) (access, ChainMemberRSet a) -> ChainMemberRSet $
+   in snd $ foldl1' (\(_, ChainMemberRSet b) (access, ChainMemberRSet a) -> (access, ChainMemberRSet $
         if access
           then rSetUnion a b
-          else rSetIntersection a b) D.def listOfCMRSetWithBool
+          else rSetIntersection a b)) listOfCMRSetWithBool
 
 returnBoolOfChainMemberParsedSets :: ChainMemberParsedSet -> Bool
 returnBoolOfChainMemberParsedSets (Everyone a) = a 
@@ -233,14 +235,14 @@ getRangeFromBounds lb ub = (Range (BoundaryBelow lb) (BoundaryAbove ub))
 
 
 getBoundsFromCMBounded :: ChainMemberBounded -> (ChainMemberBounded, ChainMemberBounded)
-getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) (Middle (Just c))) =
-  ((ChainMemberF (Middle n) (Middle $ Just  u) (Middle $ Just c) ), (ChainMemberF (Middle n) (Middle (Just u)) (Middle $ Just c) ))
-getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) _) =
-  ((ChainMemberF (Middle n) (Middle $ Just  u) LowerBound), (ChainMemberF (Middle n) (Middle (Just u)) UpperBound))
-getBoundsFromCMBounded (ChainMemberF (Middle n) _ _ ) = 
-  ((ChainMemberF (Middle n) LowerBound LowerBound ), (ChainMemberF (Middle n) UpperBound UpperBound ))
-getBoundsFromCMBounded (ChainMemberF _ _ _ ) = 
-  ((ChainMemberF LowerBound LowerBound LowerBound ), (ChainMemberF UpperBound UpperBound UpperBound ))
+getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) (Middle (Just c)) _) =
+  ((ChainMemberF (Middle n) (Middle $ Just  u) (Middle $ Just c) LowerBound), (ChainMemberF (Middle n) (Middle (Just u)) (Middle $ Just c) UpperBound))
+getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) _ _) =
+  ((ChainMemberF (Middle n) (Middle $ Just  u) LowerBound LowerBound), (ChainMemberF (Middle n) (Middle (Just u)) UpperBound UpperBound))
+getBoundsFromCMBounded (ChainMemberF (Middle n) _ _ _) = 
+  ((ChainMemberF (Middle n) LowerBound LowerBound LowerBound), (ChainMemberF (Middle n) UpperBound UpperBound UpperBound))
+getBoundsFromCMBounded (ChainMemberF _ _ _ _) = 
+  ((ChainMemberF LowerBound LowerBound LowerBound LowerBound), (ChainMemberF UpperBound UpperBound UpperBound UpperBound))
 
 
 removeChainMember :: ChainMemberRSet -> ChainMemberBounded -> ChainMemberRSet
@@ -279,12 +281,13 @@ instance Ord a => Ord (BoundedData a) where
 
 
 instance Ord (ChainMemberF BoundedData) where
-  compare (ChainMemberF on1 ou1 cm1) (ChainMemberF on2 ou2 cm2) = case (compare on1 on2) of 
-    EQ -> 
-      case (compare ou1 ou2) of
-        EQ -> (compare cm1 cm2)
+  compare (ChainMemberF on1 ou1 cm1 s1) (ChainMemberF on2 ou2 cm2 s2) = case (compare on1 on2) of 
+    EQ -> case (compare ou1 ou2) of
+      EQ -> case (compare cm1 cm2) of
+        EQ -> compare s1 s2
         x -> x 
-    y -> y
+      y -> y
+    z -> z
 
 
 instance (DiscreteOrdered (ChainMemberF BoundedData)) where
@@ -309,14 +312,14 @@ instance NFData ChainMemberParsedSet where
 
 
 instance Eq (ChainMemberF BoundedData) where 
- (==) (ChainMemberF on1 ou1 cm1 ) (ChainMemberF on2 ou2 cm2) = (on1==on2 && ou1==ou2 && cm1==cm2)
+ (==) (ChainMemberF on1 ou1 cm1 s1) (ChainMemberF on2 ou2 cm2 s2) = (on1==on2 && ou1==ou2 && cm1==cm2 && s1==s2)
 
 instance Format ChainMemberParsedSet where
   format = show 
 
 
 instance Show (ChainMemberF BoundedData) where
-  show (ChainMemberF on' ou cm) = (show on') ++ " " ++ (show ou) ++ " " ++ (show cm) 
+  show (ChainMemberF on' ou cm s) = (show on') ++ " " ++ (show ou) ++ " " ++ (show cm) ++ " " ++ show s
 
 
 deriving instance Show (ChainMemberF DFI.Identity)
@@ -399,19 +402,29 @@ instance RLPSerializable (BoundedData (Maybe Text)) where
   rlpDecode (RLPScalar 2) = UpperBound
   rlpDecode _ = error ("Error in rlpDecode for BoundedData: bad RLPObject")
 
+instance RLPSerializable (BoundedData ()) where
+  rlpEncode (LowerBound)= RLPScalar 0
+  rlpEncode (Middle _) = RLPScalar 1
+  rlpEncode (UpperBound)= RLPScalar 2
+  rlpDecode (RLPScalar 0) = LowerBound
+  rlpDecode (RLPScalar 1) = Middle ()
+  rlpDecode (RLPScalar 2) = UpperBound
+  rlpDecode _ = error ("Error in rlpDecode for BoundedData (): bad RLPObject")
 
 instance RLPSerializable ChainMemberBounded where
-  rlpEncode (ChainMemberF on' ou cmn) = RLPArray
+  rlpEncode (ChainMemberF on' ou cmn s) = RLPArray
     [ rlpEncode on'
     , rlpEncode ou
     , rlpEncode cmn
+    , rlpEncode s
     ]
-  rlpDecode (RLPArray [on', ou, cmn]) =
+  rlpDecode (RLPArray [on', ou, cmn, s]) =
     ChainMemberF
       (rlpDecode on')
       (rlpDecode ou)
       (rlpDecode cmn)
-  rlpDecode o = error $ "rlpDecode ChainMember: Expected 3 element RLPArray, got " ++ show o
+      (rlpDecode s)
+  rlpDecode o = error $ "rlpDecode ChainMember: Expected 4 element RLPArray, got " ++ show o
 
 instance RLPSerializable ChainMemberRSet where
   rlpDecode = do
