@@ -87,4 +87,5 @@ tests:
       - text
       - time
       - vector
+      - x509-certs
     ghc-options: -Wall

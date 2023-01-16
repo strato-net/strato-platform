@@ -25,7 +25,7 @@ import Data.List (nub)
 
 defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
-defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
+defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for asin"
 defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of Blockstanbul validators"
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of network admins. Admins can, for instance, nominate a new validator"

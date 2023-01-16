@@ -17,6 +17,8 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 
+import BlockApps.X509.Certificate (rootCert)
+
 import qualified LabeledError
 
 spec :: Spec
@@ -83,7 +85,10 @@ spec = do
 \          \"timestamp\":\"1970-01-01T00:00:00.000Z\",\
 \          \"coinbase\":{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true},\
 \          \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\
-\          \"nonce\":42\
+\          \"nonce\":42,\
+\          \"blockstanbulAdmins\":[{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true}],\
+\          \"validators\":[{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true}],\
+\          \"certificates\": []\
 \       }"
           want = Right $ GenesisInfo {
             genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
@@ -111,8 +116,8 @@ spec = do
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42,
-            genesisInfoValidators = [],
-            genesisInfoBlockstanbulAdmins = [],
+            genesisInfoValidators = [CommonName "BlockApps" "Engineering" "Admin" True],
+            genesisInfoBlockstanbulAdmins = [CommonName "BlockApps" "Engineering" "Admin" True],
             genesisInfoCertificates = []
           }
           got = eitherDecode input
@@ -138,7 +143,10 @@ spec = do
 \          \"timestamp\":\"1970-01-01T00:00:00.000Z\",\
 \          \"coinbase\":{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true},\
 \          \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\
-\          \"nonce\":42\
+\          \"nonce\":42,\
+\          \"blockstanbulAdmins\":[{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true}],\
+\          \"validators\":[{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true}],\
+\          \"certificates\": [\"-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n\"], \
 \       }"
           want = [GenesisInfo {
             genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
@@ -166,10 +174,9 @@ spec = do
             genesisInfoExtraData = 0,
             genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42,
-            genesisInfoValidators = [],
-            genesisInfoBlockstanbulAdmins = [],
-            genesisInfoCertificates = []
-
+            genesisInfoValidators = [CommonName "BlockApps" "Engineering" "Admin" True],
+            genesisInfoBlockstanbulAdmins = [CommonName "BlockApps" "Engineering" "Admin" True],
+            genesisInfoCertificates = [rootCert]
           }]
           got = JS.parseLazyByteString genesisParser input
        in got `shouldBe` want
