@@ -13,7 +13,6 @@ import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
 import           Data.Maybe                         (maybeToList, fromMaybe)
 import qualified Data.Text                          as T
-import qualified Data.Set                           as S
 import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
@@ -52,7 +51,7 @@ doAddOrgName chainId cm = do
        , format cm
        ]
   lift $ addMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId (ChainMembers $ S.singleton cm)
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId cm
   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
 doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
@@ -63,7 +62,7 @@ doRemoveOrgName chainId cm = do
        , format cm
        ]
   lift $ removeMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId (ChainMembers $ S.singleton cm)
+  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId cm
 
 doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate userAddress x509CertInfoState = do

@@ -27,6 +27,7 @@ module Blockchain.Strato.Model.ChainMember (
   encodeChainMemberRSet,
   decodeChainMemberRSet,
   chainMemberParsedSetToString,  -- chainMemberToChainMemberParsedSet,
+  returnBoolOfChainMemberParsedSets,
   getTrueChainMemberParsedSets,
   getFalseChainMemberParsedSets,
   ChainMembers(..),
