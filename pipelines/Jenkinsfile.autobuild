@@ -38,10 +38,22 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv
+          git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv-plus-genesis-builder
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
         '''
+
+        dir("strato") {
+          // Build genesis-block.json
+          sh 'stack run genesis-builder -- \\
+                --input=../strato-getting-started/genesis-block.tpl.json \\
+                --faucets=../strato-getting-started/faucets.json \\
+                --validators=../strato-getting-started/validators.json \\
+                --admins=../strato-getting-started/admins.json \\
+                --certs=../strato-getting-started/certs.json \\
+                --output=../strato-getting-started/genesis-block.json'
+        }
+
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
