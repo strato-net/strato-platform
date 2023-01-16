@@ -3,6 +3,12 @@
 set -e
 set -x
 
+Green='\033[0;32m'
+Red='\033[0;31m'
+Yellow='\033[0;33m'
+BYellow='\033[1;33m'
+NC='\033[0m'
+
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
@@ -68,15 +74,22 @@ function newnode {
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
 
-  echo 'Waiting for vault-proxy to be available on http://localhost:8013...'
   set +x
-  until curl --silent --output /dev/null --fail --max-time 0.1 --location http://localhost:8013 ; do
-    sleep 0.1
+  echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
+  started=$(date +%s)
+  timeout=30
+  while ! curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013; do
+    if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
+      echo -e "\n tail -n40 logs/vault-proxy"
+      tail -n40 logs/vault-proxy
+      echo -e "\n${Red}vault-proxy takes too long to start. It most probably failed. Check the tail of the vault-proxy log above. Sleeping now.${NC}"
+      sleep 60
+    fi
+    sleep 0.3
   done
-  set -x
   echo 'vault-proxy is available'
+  set -x
 
-  # Make sure the vault-proxy is the very very first thing to start, basically everything touches it in some capacity
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
@@ -259,14 +272,14 @@ function newnode {
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
-    echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
+    echo -e "${Green}Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy...${NC}"
     while sleep ${MONITORING_TIMER}; do
       # check status for every monitored process
       for monitored_pid in "${!MONITORED_PIDS[@]}"; do
         # if process with pid does not exist
         if ! (ps -p ${monitored_pid} > /dev/null); then
           DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
-          echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+          echo -e "${Red}Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running...${NC}"
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
@@ -290,14 +303,14 @@ function newnode {
           echo "+tail -n 20 ${FILE_NAME}"
           tail -n 20 $FILE_NAME
           echo "End of logs."
-          echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
+          echo -e "${Red}STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container${NC}"
           # Keep container running idle
           tail -f /dev/null
         fi
       done
     done
   else
-    echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs"
+    echo -e "${BYellow}Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs${NC}"
     tail -f /dev/null
   fi
 }
