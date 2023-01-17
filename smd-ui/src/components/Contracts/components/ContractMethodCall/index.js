@@ -88,12 +88,12 @@ class ContractMethodCall extends Component {
         required
       >
         <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser}
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}
         </option>
         {
           users.map((user, i) => {
             return (
-              <option key={'user' + i} value={user}>{user}</option>
+              <option key={'user' + i} value={user.commonName}>{user.commonName}</option>
             )
           })
         }
@@ -114,12 +114,12 @@ class ContractMethodCall extends Component {
         required
       >
         <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser}
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}
         </option>
         {
           userAddresses.map((address, i) => {
             return (
-              <option key={address} value={address}>{address}</option>
+              <option key={address.address} value={address.address}>{address.address}</option>
             )
           })
         }
@@ -258,7 +258,7 @@ class ContractMethodCall extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
-                    Common Name
+                    Name
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
