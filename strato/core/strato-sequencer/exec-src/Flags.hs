@@ -28,13 +28,11 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
 defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
-defineFlag "rootCerts" ("{}" :: String) "JSON encoded addresses to X509CertInfoState map"
-defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
+defineFlag "genesisBlockName" ("livenet" :: String) "use the alternate stablenet genesis block"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
-defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
@@ -60,11 +58,10 @@ exportFlagsAsMetrics = do
   set "kafkaclientid" $ show flags_kafkaclientid
   set "kafkaaddress" flags_kafkaaddress
   set "blockstanbul" $ show flags_blockstanbul
-  set "validators" flags_validators
+  set "genesisBlockName" flags_genesisBlockName
   set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "blockstanbul_port" $ show flags_blockstanbul_port
-  set "isRootNode" $ show flags_isRootNode
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
   set "validatorBehavior" $ show flags_validatorBehavior 
   set "seq_debug_mode" $ show flags_seq_debug_mode

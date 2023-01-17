@@ -274,18 +274,18 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
 instance MonadIO m => A.Selectable Integer (Canonical BlockData) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance MonadIO m => A.Selectable ChainMembers TrueOrgNameChains (ReaderT Config m) where
+instance MonadIO m => A.Selectable ChainMemberParsedSet TrueOrgNameChains (ReaderT Config m) where
   select p ip = A.selectWithDefault p ip <&> toMaybe def
   selectWithDefault _ = fmap TrueOrgNameChains
                       . RBDB.withRedisBlockDB
-                      . RBDB.getTrueOrgNameChains
+                      . RBDB.getTrueOrgNameChainsFromSuperSets
 
 
-instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (ReaderT Config m) where
+instance MonadIO m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (ReaderT Config m) where
   select p ip = A.selectWithDefault p ip <&> toMaybe def
   selectWithDefault _ = fmap FalseOrgNameChains
                       . RBDB.withRedisBlockDB
-                      . RBDB.getFalseOrgNameChains
+                      . RBDB.getFalseOrgNameChainsFromSuperSets
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
@@ -323,9 +323,6 @@ instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (Read
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
-  
-instance MonadIO m => (ChainMembers `A.Alters` Word256) (ReaderT Config m) where
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain k v
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
@@ -539,8 +536,8 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   , All2 '[A.Selectable]
                       '[ '(Integer, Canonical BlockData)
-                       , '(ChainMembers, TrueOrgNameChains)
-                       , '(ChainMembers, FalseOrgNameChains)
+                       , '(ChainMemberParsedSet, TrueOrgNameChains)
+                       , '(ChainMemberParsedSet, FalseOrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMemberRSet)
                        , '(Word256, ChainInfo)
@@ -561,7 +558,6 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
-                       , '(ChainMembers, Word256)
                        , '(Keccak256, Proxy (Inbound WireMessage))
                        , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        , '((IPAsText, TCPPort), ActivityState)
