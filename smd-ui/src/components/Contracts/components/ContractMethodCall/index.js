@@ -87,8 +87,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth ? this.props.oAuthUser.commonName : null}>
-          {isModeOauth && this.props.oAuthUser.commonName}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}>
+          {isModeOauth && this.props.oAuthUser}
         </option>
         {
           users.map((user, i) => {
@@ -113,8 +113,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth ? this.props.oAuthUser.address : null}>
-          {isModeOauth && this.props.oAuthUser.address}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}>
+          {isModeOauth && this.props.oAuthUser}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -258,10 +258,10 @@ class ContractMethodCall extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
-                    Username
+                    Common Name
                   </label>
                 </div>
-                <div className="col-sm-9">
+                <div className="col-sm-9 smd-pad-4">
                   {this.renderUsername(isModeOauth)}
                 </div>
               </div>

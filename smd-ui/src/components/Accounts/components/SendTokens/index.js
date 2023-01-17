@@ -465,8 +465,8 @@ export function mapStateToProps(state) {
     fromUsername: selector(state, 'from'),
     toUsername: selector(state, 'to'),
     initialValues: {
-      from: state.user.oauthUser ? state.user.oauthUser.commonName : '',
-      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : ''
+      from: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
+      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending'
     },
     balance: state.accounts.currentUserBalance,
     chainLabel: state.chains.listChain,

@@ -546,8 +546,8 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      username: state.user.oauthUser ? state.user.oauthUser.commonName : '',
-      address: state.user.oauthUser ? state.user.oauthUser.address : '',
+      commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
+      address: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
