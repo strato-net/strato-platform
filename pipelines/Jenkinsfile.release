@@ -111,7 +111,6 @@ pipeline {
             check_availability() {
               counter=0
               until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
-              until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."
