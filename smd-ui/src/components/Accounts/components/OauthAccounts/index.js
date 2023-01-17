@@ -36,24 +36,6 @@ class OauthAccounts extends Component {
   render() {
     const filter = this.props.filter;
 
-    // const cards = contractNames.length === 0 ? [] : contractNames
-    //   .filter(function (contract) {
-    //     if (!filter) {
-    //       return true;
-    //     }
-    //     return contract.toLowerCase().indexOf(filter) > -1;
-    //   })
-    //   .map((value, i) => {
-    //     return (
-    //       <div className="row pt-dark" key={'contract-card-' + i}>
-    //         <div className="col-sm-12">
-    //           {value && <ContractCard contract={{ name: value, contract: contracts[value] }} />}
-    //           <br />
-    //         </div>
-    //       </div>
-    //     );
-    //   });
-
     const rows = this.props.oauthAccounts.filter(user => {
       if (!filter) {
         return true;
