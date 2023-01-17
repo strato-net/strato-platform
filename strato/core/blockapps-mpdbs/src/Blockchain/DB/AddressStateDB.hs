@@ -28,6 +28,7 @@ module Blockchain.DB.AddressStateDB (
 ) where
 
 
+
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
@@ -67,6 +68,7 @@ getAddressStateMaybe (Account address chainId) = do
   sr <- getStateRoot chainId
   mState <- MP.getKeyVal sr $ addressAsNibbleString address
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
+
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => Maybe Word256 -> m [(Account, AddressState)]
 getAllAddressStates chainId = getAllAddressStatesFromStateRoot chainId =<< getStateRoot chainId

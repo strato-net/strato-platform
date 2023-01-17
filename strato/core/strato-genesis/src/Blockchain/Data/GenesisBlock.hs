@@ -305,9 +305,13 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       updatedAccounts     = Map.empty
   }
   commitSqlDiffs diff
+  
+  $logInfoS "initializeChainDBs" $ "Initialized chain " <> T.pack (show chainId) <> " with state root " <> T.pack (show sRoot)
 
   forM_ [ (src, name) | CodeInfo{codeInfoSource=src, codeInfoName=name} <- codeInfo] $ \(src, name) ->
     produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) "" "" []]
+
+  $logInfoS "initializeChainDBs" $ "Initialized chain " <> T.pack (show chainId) <> " with code info " <> T.pack (show codeInfo)
 
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci

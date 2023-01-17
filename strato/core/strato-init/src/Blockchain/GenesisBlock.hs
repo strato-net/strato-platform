@@ -134,7 +134,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets validators ad
     let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
         genesisCerts = case (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_genesisCerts) of
           Right a -> a
-          Left _ -> error "invalid cert format"
+          Left b -> error $ "invalid cert format " ++ (show b)
     $logInfoS "flag_genesisCerts" $ T.pack . show $ genesisCerts
     extraCerts' <-
       if flags_genesisBlockTestCert 

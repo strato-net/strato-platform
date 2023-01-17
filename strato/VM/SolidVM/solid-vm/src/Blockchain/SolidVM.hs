@@ -177,7 +177,7 @@ variableSet = do
         (ci:_) -> textSet $ localVariables ci
       locals = M.singleton "Local Variables" varNames
   acct <- getCurrentAccount
-  ~(contract, _, _) <- getCodeAndCollection acct
+  ~(contract, _, _, _) <- getCodeAndCollection acct
   let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
@@ -335,7 +335,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++
+  liftIO $ putStrLn $ "create'/versioning 0 --->  we created " ++ (show contractName') ++
       " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
@@ -503,7 +503,7 @@ getOrg caller = do
               return ""
 
 
-getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection, Bool) -- Bool is for isCotdePtr
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -517,7 +517,7 @@ getCodeAndCollection address' = do
     then do
     c' <- getCurrentContract
     (hsh, cc') <- getCurrentCodeCollection
-    return (c', hsh, cc')
+    return (c', hsh, cc', False)
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
@@ -533,7 +533,7 @@ getCodeAndCollection address' = do
 
     let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.CC.contracts
 
-    return (contract', ch, cc)
+    return (contract', ch, cc, True)
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -700,7 +700,7 @@ callWrapper' from to mContract functionName isRCC argExps  = do
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
-  (contract', hsh, cc) <- getCodeAndCollection to
+  (contract', hsh, cc, isCodePtr) <- getCodeAndCollection to
   parentName <- fromMaybeM (return "") $ runMaybeT
      $   pure to                                                -- Contract's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)              -- Address's state
@@ -715,13 +715,35 @@ callWrapper' from to mContract functionName isRCC argExps  = do
 
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
---  grab the org from the senders account and set it to the codeAddress
-  org <- getOrg to
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
-  when (isRCC) $
-    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
+
+  org <- case (isRCC, isCodePtr) of
+    (True, False) -> getOrg to
+    (True, True) -> getOrg from
+    (False, _) -> getOrg to
+
+
+  when (isRCC && isCodePtr) $ do
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning 1 --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+      " in app " ++ (show parentName) ++ " of org " ++ show org
+
+
+  when (isRCC && not isCodePtr) $ do
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    liftIO $ putStrLn $ "callWrapper/versioning 2 --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+      " in app " ++ (show parentName) ++ " of org " ++ show org
+
+
+  unless isRCC $ do
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    liftIO $ putStrLn $ "callWrapper/versioning 3 --->  we are calling " ++ (labelToString $ CC._contractName contract) ++ 
+          " in app " ++ (show parentName) ++ " of org " ++ show org
 
   let functionsIncludingConstructor =
         case contract^.CC.constructor of
@@ -2019,7 +2041,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing
             --get only the contract containing the sweet succulent ContractF definition
-            (contract, _, _) <- getCodeAndCollection toAccount
+            (contract, _, _, _) <- getCodeAndCollection toAccount
             let codeSnippets :: [String]
                 codeSnippets =
                   case (fromMaybe "" searchTerms) of

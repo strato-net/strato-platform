@@ -274,6 +274,52 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
                                        , transactionResultOrgName          = orgName
                                        , transactionResultAppName          = appName
                                        }
+            
+
+
+              -- data ExecResults =
+              --   ExecResults {
+              --     erRemainingTxGas     :: Integer,
+              --     erRefund             :: Integer,
+              --     erReturnVal          :: Maybe String,
+              --     erTrace              :: [String],
+              --     erLogs               :: [Log],
+              --     erEvents             :: [Event],
+              --     erNewContractAccount :: Maybe Account,
+              --     erSuicideList        :: S.Set Account,
+              --     erAction             :: Maybe Action,
+              --     erException          :: Maybe (Either SolidException VMException),
+              --     erKind               :: CodeKind,
+              --     -- erNewX509Certs       :: M.Map Address X509Certificate,
+              --     erPragmas            :: [(String, String)],
+              --     erOrgName            :: String,
+              --     erAppName            :: String
+              --     } deriving (Eq, Show, Generic)
+
+            
+            -- yield a CodeCollectionAdded VM event:
+
+              -- CodeCollectionAdded {
+              --   ccString :: Text,
+              --   codePtr :: CodePtr,
+              --   organization :: Text,
+              --   application :: Text,
+              --   historyList :: [Text]
+              -- } 
+
+            -- for_ mExecResults $ \ExecResults{..} -> do
+            --   let (orgName, appName) = (erOrgName, erAppName)
+            --   for_ erPragmas $ \(pragma, code) -> do
+            --     let codePtr = CodePtr . Keccak256.unsafeCreateKeccak256FromWord256 . keccak256 . T.pack $ code
+
+            --     yield $ OutEvent $ CodeCollectionAdded {
+            --       ccString = T.pack code,
+            --       codePtr = codePtr,
+            --       organization = T.pack orgName,
+            --       application = T.pack appName,
+            --       historyList = []
+            --     }
+
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x:_ -> do
             let fmt = either show show x
@@ -377,22 +423,27 @@ runChainConstructors cId cInfo = do
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
 
+  $logInfoS "evm/runChainConstructors" $ T.pack $ "runChainConstructors :: " ++ show cId ++ " :: " ++ show cInfo 
+
   let getSrcBS = BC.pack . T.unpack . codeInfoSource
       getCodeHash ci = Keccak256.hash $ getSrcBS ci
       codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
       resolveSrc a ch = do
         mcp <- resolveCodePtr (Just cId) ch
+        $logInfoS "evm/runChainConstructors" $ T.pack $ "resolveSrc1 :: " ++ show a ++ " :: " ++ show ch ++ " :: " ++ show mcp
         msrc <- runMaybeT $ do
           cp <- MaybeT $ pure mcp
           hsh <- MaybeT $ pure $ case cp of
             SolidVMCode _ h -> Just h
             EVMCode h -> Just h
             CodeAtAccount _ _ -> Nothing
+          $logInfoS "evm/runChainConstructors" $ T.pack $ "resolveSrc2 :: " ++ show cp ++ " :: " ++ show hsh
           (MaybeT $ pure $ M.lookup hsh codeHashMap) <|>
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
   curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash )
+
   curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
   (addrs, actions) <- fmap (unzip . catMaybes) . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
@@ -400,6 +451,7 @@ runChainConstructors cId cInfo = do
       ContractNoStorage a _ ch -> resolveSrc a ch
       ContractWithStorage a _ ch _ -> resolveSrc a ch
       SolidVMContractWithStorage a _ ch _ -> resolveSrc a ch
+    $logInfoS "evm/runChainConstructors" $ T.pack $ "addrSrc :: " ++ show addrSrc
     for addrSrc $ \(addr,ms) -> (addr,) <$> SolidVM.call
          False --isRunningTests
          True --isHomestead
@@ -442,6 +494,31 @@ runChainConstructors cId cInfo = do
 
   -- let evs = Action._events <$> actions
   -- $logInfoS "Events" (T.pack $ show evs)
+
+  --create a CodeCollectionAdded action for each transactionResult
+
+  $logInfoS "evm/runChainConstructors" $ T.pack $ "runChainConstructors :: " ++ "cId: " ++ show cId ++ " \n :: " ++ "cInfo: " ++ show cInfo ++ " \n:: " ++ "addrs: " ++ show addrs ++ " \n:: " ++ "actions: " ++ show actions
+  
+
+  -- extract organization name from actions
+
+  -- let orgName = case actions of
+  --       [] -> ""
+  --       (x:_) -> case x of
+  --         Action.Action{Action._actionData = Action.ActionData{Action._actionDataOrganization = y}} -> y
+  --         _ -> ""
+
+  -- let appName = case actions of
+  --       [] -> ""
+  --       (x:_) -> case x of
+  --         Action.Action{Action._actionData = Action.ActionData{Action._actionDataApplication = y}} -> y
+  --         _ -> ""
+
+
+  -- forM_ [ (src, name) | CodeInfo{codeInfoSource=src, codeInfoName=name} <- cInfo] $ \(src, name) ->
+  --   produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) orgName "" []]
+
+
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
@@ -562,8 +639,32 @@ sendOutEvents OutBatch{..} = do
                   Just v -> T.splitOn "," v
           }
         _ -> Nothing
+        -- (Just c, Nothing, first:_) -> Just $ CodeCollectionAdded {
+        --     ccString = c,
+        --     codePtr =
+        --         case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
+        --           Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+        --           Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+        --           Just v -> error $ "Unknown VM: " ++ show v
+        --           Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
+        --     organization = first^._2.Action.actionDataOrganization,
+        --     application = "",
+        --     historyList=
+        --         case join $ fmap (M.lookup "history") (a^.Action.metadata) of
+        --           Nothing -> []
+        --           Just v -> T.splitOn "," v
+        --   }
+
+
+        -- (_ _ _) -> Nothing
   
   for_ outJSONRPCs $ liftIO . uncurry produceResponse
+
+  -- log outToStateDiffs 
+  $logInfoS "sendOutEvents" "outToStateDiffs" 
+  for_ outToStateDiffs $ \(cId, cInfo, bHash) -> do
+    $logInfoS "sendOutEvents" $ "outToStateDiffs: " <> T.pack (show (cId, cInfo, bHash)) 
+
   for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs
@@ -581,7 +682,19 @@ sendOutEvents OutBatch{..} = do
       actionEvents = map (NewAction . filterOutEvents) (toList outActions)
       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
       trEvents = map NewTransactionResult $ toList outTXRs
-          
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show $ length ccEvents) <> " CodeCollectionAdded events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show $ length eventEvents) <> " EventEmitted events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show $ length actionEvents) <> " NewAction events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show $ length trEvents) <> " NewTransactionResult events"
+  
+
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show ccEvents) <> " CodeCollectionAdded events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show eventEvents) <> " EventEmitted events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show actionEvents) <> " NewAction events"
+  $logInfoS "sendOutEvents" $ "outputting " <> T.pack (show trEvents) <> " NewTransactionResult events"
+
+
+
   loopTimeit "produceVMEvents" $ do
     $logInfoS "sendOutEvents" $ "outputting VMEvents"
     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
