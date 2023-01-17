@@ -48,7 +48,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-          
+      
           writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
@@ -105,7 +105,7 @@ pipeline {
           '''
         }
 
-        dir("strato") {
+        dir("strato-worktree/strato") {
           // Build genesis-block.json
           sh '''#!/bin/bash -le
             myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
@@ -189,7 +189,7 @@ pipeline {
               set -x
               echo "Running apex unit tests"
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-# TEMPORARY DISABLING APEX TESTS UNTIL HEALTH CHECK IS FIXED
+# TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
           },
