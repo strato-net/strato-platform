@@ -77,7 +77,6 @@ services:
     - appFetchLimit=${appFetchLimit}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
-    - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
@@ -92,15 +91,10 @@ services:
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
-    - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
     - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
-    - genesisBlock=${genesisBlock}
-    - genesisBlockTestCert=${genesisBlockTestCert:-false}
-    - genesisCerts=${genesisCerts}
-    - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}
@@ -145,7 +139,6 @@ services:
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
-    - validators=${validators}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
@@ -168,6 +161,7 @@ services:
         max-file: "3"
     volumes:
       - stratodata:/var/lib/strato
+      - ./genesis-block.json:/var/lib/strato/${genesis:-gettingStarted}Genesis.json
   postgrest:
     depends_on:
     - postgres

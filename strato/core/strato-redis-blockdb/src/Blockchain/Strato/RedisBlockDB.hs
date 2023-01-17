@@ -17,10 +17,11 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , isValidator, addValidators, removeValidators
     , getChainMembers, putChainMembers
-    , addChainMember -- , removeChainMember
+    , addChainMember, removeChainMember
     , registerCertificate
     , revokeCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
+    , getTrueOrgNameChainsFromSuperSets, getFalseOrgNameChainsFromSuperSets
     , getTrueOrgNameChains, getFalseOrgNameChains, addOrgNameChain, removeOrgNameChain
     , getOrgUnitsForOrg, getMembersInOrgUnit, getChainMembersFromSet, getCertFromParsedSet, modifyParsedSetFromCert, removeCertFromParsedSet
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
@@ -65,6 +66,7 @@ import qualified Data.ByteString.Char8                 as S8
 
 import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
+import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
 import qualified Data.Set                              as S
@@ -193,6 +195,10 @@ getChainMembers cId = getInNamespace PrivateChainMembers cId >>= \case
     Right (Just rmems) -> let RedisChainMemberRSet mems = fromValue rmems
                            in return mems
 
+foldrA :: Applicative f => (a -> f b) -> b -> [a] -> f b
+foldrA _ z0 []     = pure z0
+foldrA f _  [x]    = f x
+foldrA f z0 (x:xs) = f x *> foldrA f z0 xs
 
 putChainMembers :: Word256
                 -> CM.ChainMembers
@@ -201,16 +207,20 @@ putChainMembers cId mems = do
     let rmems = RedisChainMemberRSet $ CM.chainMembersToChainMemberRset mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
-        TxSuccess _ ->  addOrgNameChain mems cId
+        TxSuccess _ -> getCompose $ foldrA addOrRemove Ok (S.toList $ CM.unChainMembers mems)
+          where addOrRemove mem = Compose $
+                  if CM.returnBoolOfChainMemberParsedSets mem
+                    then addOrgNameChain mem cId
+                    else removeOrgNameChain mem cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
         TxError e  -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
 addChainMember :: Word256
-               -> CM.ChainMembers
+               -> CM.ChainMemberParsedSet
                -> Redis (Either Reply Status)
 addChainMember cId newMem = do
     CM.ChainMemberRSet mems <- getChainMembers cId
-    let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset newMem
+    let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset . CM.ChainMembers $ S.singleton newMem
         mems' = CM.ChainMemberRSet $ mems `rSetUnion` newMemRset
         rmems = RedisChainMemberRSet mems'
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
@@ -219,25 +229,19 @@ addChainMember cId newMem = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
--- removeChainMember :: Word256
---                   -> Address
---                   -> Redis (Either Reply Status)
--- removeChainMember cId address = do
---     mems <- getChainMembers cId
---     let mEnode = M.lookup address mems
---         mems' = RedisChainMembers $ M.delete address mems
---     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
---     case res of
---         TxSuccess _ -> case mEnode of
---           Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
---           Just enode -> getCompose $
---             Compose (removeIPChain (ipAddress enode) cId) *>
---             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
---             -- Compose (addressToOrg address >>= \case
---             --             Nothing -> pure $ Right Ok
---             --             Just org -> removeOrgNameChain org cId)
---         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
---         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+removeChainMember :: Word256
+                  -> CM.ChainMemberParsedSet
+                  -> Redis (Either Reply Status)
+removeChainMember cId newMem = do
+    CM.ChainMemberRSet mems <- getChainMembers cId
+    let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset . CM.ChainMembers $ S.singleton newMem
+        mems' = CM.ChainMemberRSet $ mems `rSetIntersection` newMemRset
+        rmems = RedisChainMemberRSet mems'
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
+    case res of
+        TxSuccess _ -> removeOrgNameChain newMem cId
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
 registerCertificate userAddr x509CertInfoState = do
@@ -343,43 +347,81 @@ addChainTxsInBlock bHash cId shas = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
-getTrueOrgNameChains :: CM.ChainMembers
+cleanedCMPS :: CM.ChainMemberParsedSet -> CM.ChainMemberParsedSet
+cleanedCMPS (CM.Everyone _) = CM.Everyone True
+cleanedCMPS (CM.Org o _) = CM.Org o True
+cleanedCMPS (CM.OrgUnit o u _) = CM.OrgUnit o u True
+cleanedCMPS (CM.CommonName o u c _) = CM.CommonName o u c True
+
+getChainMemberSuperSets :: CM.ChainMemberParsedSet -> [CM.ChainMemberParsedSet]
+getChainMemberSuperSets cm@(CM.Everyone _) = [cm]
+getChainMemberSuperSets cm@(CM.Org _ a) = cm:getChainMemberSuperSets (CM.Everyone a)
+getChainMemberSuperSets cm@(CM.OrgUnit o _ a) = cm:getChainMemberSuperSets (CM.Org o a)
+getChainMemberSuperSets cm@(CM.CommonName o u _ a) = cm:getChainMemberSuperSets (CM.OrgUnit o u a)
+
+getTrueOrgNameChainsFromSuperSets :: CM.ChainMemberParsedSet
+                                  -> Redis (S.Set Word256)
+getTrueOrgNameChainsFromSuperSets cm =
+  S.unions <$> traverse getTrueOrgNameChains (getChainMemberSuperSets $ cleanedCMPS cm)
+
+getFalseOrgNameChainsFromSuperSets :: CM.ChainMemberParsedSet
+                                   -> Redis (S.Set Word256)
+getFalseOrgNameChainsFromSuperSets cm =
+  S.unions <$> traverse getFalseOrgNameChains (getChainMemberSuperSets $ cleanedCMPS cm)
+
+getTrueOrgNameChains :: CM.ChainMemberParsedSet
                  -> Redis (S.Set Word256)
-getTrueOrgNameChains org = getInNamespace PrivateTrueOrgNameChains org <&> \case
+getTrueOrgNameChains cm = getInNamespace PrivateTrueOrgNameChains (cleanedCMPS cm) <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-getFalseOrgNameChains :: CM.ChainMembers
+getFalseOrgNameChains :: CM.ChainMemberParsedSet
                  -> Redis (S.Set Word256)
-getFalseOrgNameChains org = getInNamespace PrivateFalseOrgNameChains org <&> \case
+getFalseOrgNameChains cm = getInNamespace PrivateFalseOrgNameChains (cleanedCMPS cm) <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-addOrgNameChain :: CM.ChainMembers
+addOrgNameChain :: CM.ChainMemberParsedSet
                 -> Word256
                 -> Redis (Either Reply Status)
-addOrgNameChain cm cId = do
-    chainsTrue <- getTrueOrgNameChains $ CM.getTrueChainMemberParsedSets cm
-    let chains' = RedisOrgNameChains $ S.insert cId chainsTrue 
-    res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chains')
+addOrgNameChain cm' cId = do
+    let cm = cleanedCMPS cm'
+    chainsTrue <- getTrueOrgNameChains cm
+    chainsFalse <- getFalseOrgNameChains cm
+    let chainsTrue' = RedisOrgNameChains $ S.insert cId chainsTrue
+        chainsFalse' = RedisOrgNameChains $ S.delete cId chainsFalse
+    res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chainsTrue')
     case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
-        TxError e  -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
+      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
+      TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
+      TxSuccess _ -> do
+        res' <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chainsFalse')
+        case res' of
+          TxSuccess _ -> pure $ Right Ok
+          TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
+          TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
 
-removeOrgNameChain :: CM.ChainMembers
+removeOrgNameChain :: CM.ChainMemberParsedSet
                    -> Word256
                    -> Redis (Either Reply Status)
-removeOrgNameChain cm cId = do
-    chainsFalse<- getFalseOrgNameChains $ CM.getFalseChainMemberParsedSets cm
-    let chains' = RedisOrgNameChains $ S.insert cId chainsFalse
-    res <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chains')
+removeOrgNameChain cm' cId = do
+    let cm = cleanedCMPS cm'
+    chainsTrue <- getTrueOrgNameChains cm
+    chainsFalse <- getFalseOrgNameChains cm
+    let chainsTrue' = RedisOrgNameChains $ S.delete cId chainsTrue
+        chainsFalse' = RedisOrgNameChains $ S.insert cId chainsFalse
+    res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chainsTrue')
     case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
+      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
+      TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
+      TxSuccess _ -> do
+        res' <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chainsFalse')
+        case res' of
+          TxSuccess _ -> pure $ Right Ok
+          TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
+          TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
 
 getOrgUnitsForOrg :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
 getOrgUnitsForOrg (CM.Org o _) = getInNamespace ParsedSetWhitePage (CM.Org o True) <&> \case

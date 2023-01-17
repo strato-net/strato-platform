@@ -44,7 +44,7 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "fastSerialize" $ do
+  describe "ChainMemberRSets" $ do
     it "can simplify RSets" $ do
       let ChainMemberRSet ba = snd . chainMemberParsedSetToChainMemberRSet $ Org "BlockApps" True
           ChainMemberRSet baEng = snd . chainMemberParsedSetToChainMemberRSet $ OrgUnit "BlockApps" "Engineering" True
@@ -59,6 +59,13 @@ spec = do
       intersectionLBA `shouldBe` baEng
       intersectionRBA `shouldBe` baEng
       unionBAMS `shouldBe` (ba `rSetUnion` ms)
+    it "can simplify RSets" $ do
+      let ChainMemberRSet ba = snd . chainMemberParsedSetToChainMemberRSet $ CommonName "BlockApps" "Engineering" "Dustin Norwood" True
+          ChainMemberRSet ba' = snd . chainMemberParsedSetToChainMemberRSet $ CommonName "BlockApps" "Engineering" "Dustin Norwood" False
+          ChainMemberRSet ms = snd . chainMemberParsedSetToChainMemberRSet $ Org "Microsoft" True
+          unionLBA = rSetUnion ba ms
+          intersectionLBA = rSetIntersection unionLBA ba'
+      intersectionLBA `shouldBe` ms
   describe "fastSerialize" $ do
     it "works on 0" $ word256ToBytes 0 `shouldBe` B.replicate 32 0
     it "works on ff" $ word256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)
