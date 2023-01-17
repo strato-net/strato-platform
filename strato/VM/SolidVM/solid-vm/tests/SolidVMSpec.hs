@@ -42,7 +42,7 @@ import Text.Printf
 import Text.RawString.QQ
 
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.GenesisBlock
+-- import Blockchain.Data.GenesisBlock
 import  Blockchain.Data.GenesisInfo
 import Blockchain.Data.Block
 import qualified Handlers.AccountInfo 
@@ -90,7 +90,9 @@ import BlockApps.X509.Keys as X509
 import BlockApps.X509.Certificate
 import qualified Control.Monad.Change.Modify  as Mod
 import Blockchain.DB.ChainDB
-import Executable.EthereumVM (writeBlockSummary)
+-- import Executable.EthereumVM (writeBlockSummary)
+import Blockchain.DB.BlockSummaryDB
+import Blockchain.Data.BlockSummary
 import Data.Foldable (for_)
 import Blockchain.Database.MerklePatricia.InternalMem (mpMap)
 import Blockchain.Bagger (processNewBestBlock)
@@ -284,6 +286,16 @@ generateGBlock = do
           , obReceiptTransactions =[]
           , obBlockUncles         = []
           })
+
+
+writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
+writeBlockSummary block =
+    let sha    = outputBlockHash block
+        header = obBlockData block
+        td     = obTotalDifficulty block
+        txCnt  = fromIntegral $ length (obReceiptTransactions block)
+    in
+        putBSum sha (blockHeaderToBSum header td txCnt)
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
