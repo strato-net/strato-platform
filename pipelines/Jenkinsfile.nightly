@@ -122,7 +122,7 @@ pipeline {
               --validators=genesis-builder/validators.json \\
               --admins=genesis-builder/admins.json \\
               --certs=genesis-builder/certs.json \\
-              --output=../strato-getting-started/genesis-block.json'''
+              --output=../../strato-getting-started/genesis-block.json'''
         }
 
         dir("strato-getting-started") {
