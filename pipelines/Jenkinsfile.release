@@ -62,7 +62,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv
+          git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv-plus-genesis-builder
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
         '''
@@ -122,13 +122,61 @@ pipeline {
               done
               echo "STRATO health endpoint is available through nginx - node is running"
             }
-            
+
             check_availability
-            
+          '''
+        }
+
+        dir("strato-worktree/strato") {
+          // Build genesis-block.json
+          sh '''#!/bin/bash -le
+            myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
+            sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
+            stack run x509-generator -- \\
+              --issuer=x509-generator/rootCert.pem \\
+              --subject=x509-generator/subject.json \\
+              --key=x509-generator/rootPriv.pem
+            myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
+            echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
+            stack run genesis-builder -- \\
+              --input=genesis-builder/genesis-block.tpl.json \\
+              --faucets=genesis-builder/faucets.json \\
+              --validators=genesis-builder/validators.json \\
+              --admins=genesis-builder/admins.json \\
+              --certs=genesis-builder/certs.json \\
+              --output=../strato-getting-started/genesis-block.json'''
+        }
+
+        dir("strato-getting-started") {
+          sh './strato --wipe'
+
+          sh './run.sh'
+
+          sh 'docker ps'
+
+          // Few quick tests
+          sh '''#!/bin/bash -le
+            check_availability() {
+              counter=0
+              until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for STRATO health endpoint to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "STRATO health endpoint is available through nginx - node is running"
+            }
+
+            check_availability
+
             echo "Restarting docker containers to simulate computer restart..."
             docker-compose -p strato --log-level ERROR stop
             docker-compose -p strato --log-level ERROR start
-            
+
             check_availability
           '''
         }

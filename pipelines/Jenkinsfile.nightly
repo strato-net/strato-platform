@@ -105,7 +105,7 @@ pipeline {
           '''
         }
 
-        dir("strato") {
+        dir("strato-worktree/strato") {
           // Build genesis-block.json
           sh '''#!/bin/bash -le
             myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
