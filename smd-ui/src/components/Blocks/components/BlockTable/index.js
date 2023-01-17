@@ -77,9 +77,6 @@ class BlockTable extends Component {
                 </small>
               </Text>
             </td>
-            <td width="22.5%">
-              <HexText value={block.blockData.coinbase} classes="small smd-pad-4" />
-            </td>
             <td width="20%">
               <Text ellipsize={true}>
                 <small>
@@ -188,10 +185,9 @@ class BlockTable extends Component {
               <thead>
                 <tr>
                   <th width="10%"><h5>Block Number</h5></th>
-                  <th width="22.5%"><h5>Parent Hash</h5></th>
+                  <th width="45%"><h5>Parent Hash</h5></th>
                   <th width="15%"><h5>Difficulty</h5></th>
                   <th width="10%"><h5>Nonce</h5></th>
-                  <th width="22.5%"><h5>Coinbase</h5></th>
                   <th width="20%"><h5>Timestamp</h5></th>
                 </tr>
               </thead>
