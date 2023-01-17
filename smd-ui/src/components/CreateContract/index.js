@@ -357,7 +357,7 @@ class CreateContract extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Username
+                    Name
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
