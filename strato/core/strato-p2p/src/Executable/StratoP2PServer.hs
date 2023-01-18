@@ -37,7 +37,6 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 
@@ -77,7 +76,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
             Just err -> do
               $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
               _ <- case err of
-                e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable p
                 e' | Just WrongGenesisBlock <- fromException e' -> do
                  udpErr <- disableUDPPeerForSeconds p 86400
                  whenLeft udpErr $ \theUDPErr -> do
