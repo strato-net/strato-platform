@@ -101,10 +101,11 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
       </a>
       <span>
         <span className=\\"pt-navbar-divider\\" />
-        <small className=\\"pt-text-muted welcome-user\\">
-           
-           
-        </small>
+        <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+             Get Certified 
+          </button>
+        </a>
         <span className=\\"pt-navbar-divider\\" />
         <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
           <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: logout]}>

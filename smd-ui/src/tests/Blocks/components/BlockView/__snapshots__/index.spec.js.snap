@@ -146,14 +146,6 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
             </tr>
             <tr>
               <td>
-                Coinbase
-              </td>
-              <td>
-                <HexText value=\\"a1021e62fbb7fe282b7e2bd1ca26325af02bb43e\\" classes=\\"small smd-pad-4\\" />
-              </td>
-            </tr>
-            <tr>
-              <td>
                 State Root
               </td>
               <td>
@@ -281,14 +273,6 @@ exports[`BlockView: index render component with values 1`] = `
                     6
                   </Text>
                 </small>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                Coinbase
-              </td>
-              <td>
-                <HexText value=\\"a1021e62fbb7fe282b7e2bd1ca26325af02bb43e\\" classes=\\"small smd-pad-4\\" />
               </td>
             </tr>
             <tr>
