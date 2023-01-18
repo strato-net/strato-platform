@@ -25,7 +25,7 @@ export const routes =
     <Route exact path="/nodes" component={Nodes} />
     <Route exact path="/blocks" component={Blocks} />
     <Route exact path="/blocks/:block" component={BlockView} />
-    <Route exact path="/chains" component={Chains} />
+    <Route exact path="/shards" component={Chains} />
     <Route exact path="/transactions" component={Transactions} />
     <Route exact path="/transactions/:hash" component={TransactionView} />
     <Route exact path="/contracts" component={Contracts} />
