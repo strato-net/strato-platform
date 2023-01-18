@@ -74,18 +74,18 @@ exports[`CreateChain: index remove members 2`] = `Array []`;
 
 exports[`CreateChain: index render component with empty values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Chain\\" />
-  <Blueprint.Dialog iconName=\\"flows\\" isOpen={false} onClose={[undefined]} title=\\"Create New Chain\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Shard\\" />
+  <Blueprint.Dialog iconName=\\"flows\\" isOpen={false} onClose={[undefined]} title=\\"Create New Shard\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body create-chain-form\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Chain Name
+              Shard Name
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Chain Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Shard Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
             <span className=\\"error-text\\" />
           </div>
         </div>
@@ -186,7 +186,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
         <div className=\\"row\\">
           <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
             <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
-              Chain Members
+              Shard Members
             </label>
             <div className=\\"pt-dialog-header no-member\\">
               <span className=\\"pt-dialog-header-title\\">
@@ -215,7 +215,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Chain\\" />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Shard\\" />
         </div>
       </div>
     </form>
@@ -225,18 +225,18 @@ exports[`CreateChain: index render component with empty values 1`] = `
 
 exports[`CreateChain: index render component with values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Chain\\" />
-  <Blueprint.Dialog iconName=\\"flows\\" isOpen={true} onClose={[undefined]} title=\\"Create New Chain\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Shard\\" />
+  <Blueprint.Dialog iconName=\\"flows\\" isOpen={true} onClose={[undefined]} title=\\"Create New Shard\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body create-chain-form\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Chain Name
+              Shard Name
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Chain Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Shard Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
             <span className=\\"error-text\\" />
           </div>
         </div>
@@ -337,7 +337,7 @@ exports[`CreateChain: index render component with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
             <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
-              Chain Members
+              Shard Members
             </label>
             <div className=\\"pt-dialog-header no-member\\">
               <span className=\\"pt-dialog-header-title\\">
@@ -366,7 +366,7 @@ exports[`CreateChain: index render component with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Chain\\" />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Shard\\" />
         </div>
       </div>
     </form>

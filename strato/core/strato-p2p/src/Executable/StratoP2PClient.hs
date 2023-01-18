@@ -49,7 +49,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -175,7 +174,6 @@ stratoP2PClient runner = runner $ \_ -> do
           $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
           recordException thePeer e
           eErr <- case e of
-                   e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just WrongGenesisBlock <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
