@@ -37,6 +37,9 @@ class OauthAccounts extends Component {
     const filter = this.props.filter;
 
     const rows = this.props.oauthAccounts.filter(user => {
+      if (!user || user === undefined) {
+        return false;
+      }
       if (!filter) {
         return true;
       }
@@ -44,25 +47,23 @@ class OauthAccounts extends Component {
     })
       .map(function (user, index) {
         const position = index + 1;
-        if (user) {
-          let userClasseName = '';
-          if (this.state.selected === position) {
-            userClasseName = ' selected';
-          }
-          // change this
-          return (
-            <div className="smd-margin-8" key={user.commonName}>
-              <div className="row">
-                <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
-                  this.setState({ selected: position });
-                  this.onUserClick(user, position);
-                }}>
-                  {user.commonName}
-                </div>
+        let userClasseName = '';
+        if (this.state.selected === position) {
+          userClasseName = ' selected';
+        }
+        // change this
+        return (
+          <div className="smd-margin-8" key={user.commonName}>
+            <div className="row">
+              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
+                this.setState({ selected: position });
+                this.onUserClick(user, position);
+              }}>
+                {user.commonName}
               </div>
             </div>
-          );
-        }
+          </div>
+        );
       }.bind(this));
 
     return (
