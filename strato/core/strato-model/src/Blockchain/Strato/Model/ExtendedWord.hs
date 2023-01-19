@@ -32,6 +32,7 @@ import qualified Data.Primitive.ByteArray  as PBA
 import           Data.Swagger              hiding (Format, format)
 import           Data.Swagger.Internal.Schema (named)
 import qualified Data.Text                 as T
+import qualified Data.Aeson.Key            as DAK 
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
 import qualified Foreign.Storable          as FS
@@ -160,6 +161,7 @@ fastWord256LSB ws = case (getBigWordInteger ws) of
                                 in W8# (and# w# (int2Word# 0xff#))
                       _ -> error "negative Word256"
 
+
 word512ToBytes :: Word512 -> [Word8]
 word512ToBytes word = map (fromIntegral . (word `shiftR`)) [512-8, 512-16..0]
 
@@ -232,8 +234,8 @@ instance Format Word256 where
   format x = BC.unpack $ B16.encode $ B.pack $ slowWord256ToBytes x
 
 instance Ae.ToJSONKey Word256 where
-  toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
-    where f = T.pack . format
+  toJSONKey = Ae.ToJSONKeyText f (Enc.text . (T.pack . format))
+    where f = DAK.fromString . format
 
 instance Ae.FromJSONKey Word256 where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)

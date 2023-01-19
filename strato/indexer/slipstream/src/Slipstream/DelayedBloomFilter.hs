@@ -22,6 +22,11 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 
+
+instance BF.Hashable ChainId where
+  hashIO32 (ChainId n) = BF.hashIO32 (toInteger n)
+  hashIO64 (ChainId n) = BF.hashIO64 (toInteger n)
+
 -- class Hashable a where
 --     -- | Compute a 32-bit hash of a value.  The salt value perturbs
 --     -- the result.
