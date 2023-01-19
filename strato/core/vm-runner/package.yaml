@@ -56,7 +56,6 @@ library:
   - time
   - transformers
   - unliftio
-  - util
   - vm-tools
   - x509-certs
 

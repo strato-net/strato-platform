@@ -9,8 +9,8 @@ module Handlers.Peers (
 import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Servant                                 hiding (ServerError)
-import           Servant.Swagger.Tags
-
+-- import           Servant.Swagger.Tags
+import           Tags
 import           Blockchain.Strato.Discovery.Data.Peer
 
 import           SQLM

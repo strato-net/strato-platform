@@ -20,7 +20,7 @@ executables:
       - containers
       - http-client
       - http-types
-      - json-rpc-server
+      - json-rpc
       - milena
       - mtl
       - random

@@ -9,6 +9,7 @@
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Blockchain.TypeLits
   ( NamedTuple(..)
@@ -23,15 +24,16 @@ module Blockchain.TypeLits
   , nmap2'
   ) where
 
+
 import           Control.Applicative (liftA2)
 import           Control.Comonad
 import           Data.Aeson
 import           Data.Aeson.Types    (Parser)
+import qualified Data.Aeson.Key      as DAK 
 import           Data.Biapplicative
 import           Data.Bifoldable
 import           Data.Bitraversable
 import           Data.Proxy
-import qualified Data.Text           as Text
 import           GHC.Generics
 import           GHC.TypeLits
 import           Test.QuickCheck     hiding (Success, Failure)
@@ -49,15 +51,15 @@ type NamedMapParser k v a b = Parser (NamedMap k v a b)
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, ToJSON a, ToJSON b) => ToJSON (NamedTuple k v a b) where
   toJSON (NamedTuple (a,b)) =
-    object [ (Text.pack $ symbolVal (Proxy :: Proxy k)) .= toJSON a
-           , (Text.pack $ symbolVal (Proxy :: Proxy v)) .= toJSON b
+    object [ ( DAK.fromString $ symbolVal (Proxy :: Proxy k)) .= toJSON a
+           , ( DAK.fromString $ symbolVal (Proxy :: Proxy v)) .= toJSON b
            ]
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) => FromJSON (NamedTuple k v a b) where
   parseJSON (Object o) = NamedTuple
                      <$> liftA2 (,)
-                         (o .: (Text.pack $ symbolVal (Proxy :: Proxy k)))
-                         (o .: (Text.pack $ symbolVal (Proxy :: Proxy v)))
+                         (o .: (DAK.fromString $ symbolVal (Proxy :: Proxy k)))
+                         (o .: (DAK.fromString $ symbolVal (Proxy :: Proxy v)))
   parseJSON o          = error $ "parseJSON NamedTuple: expected object, got " ++ show o
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k v a b) where
@@ -77,3 +79,4 @@ nmap1' = nmap1 id
 
 nmap2' :: NamedMap k v a b -> [b]
 nmap2' = nmap2 id
+

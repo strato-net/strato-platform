@@ -28,7 +28,6 @@ import qualified Database.Esqueleto.Legacy   as E
 import           Numeric.Natural
 import           Servant
 import           Servant.Client
---import           Servant.Swagger.Tags
 
 
 import           Blockchain.Data.DataDefs
