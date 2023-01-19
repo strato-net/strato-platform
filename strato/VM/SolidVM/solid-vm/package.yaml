@@ -78,6 +78,8 @@ tests:
     source-dirs: tests/
     main: Main.hs
     dependencies:
+      - strato-init
+      - aeson
       - json-stream
       - seqevents
       - mtl

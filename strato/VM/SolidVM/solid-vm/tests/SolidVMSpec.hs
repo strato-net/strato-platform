@@ -10,8 +10,10 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE BangPatterns      #-}
 module SolidVMSpec where
 
+import qualified Data.Aeson                         as Ae
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.DeepSeq
@@ -29,7 +31,8 @@ import Data.Coerce
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
-import qualified Data.Text as T
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text
 import qualified Data.List as L
 import Data.Char
 import Data.Text.Encoding
@@ -42,13 +45,13 @@ import Text.Printf
 import Text.RawString.QQ
 
 import Blockchain.Data.ChainInfo
--- import Blockchain.Data.GenesisBlock
+import Blockchain.Data.GenesisBlock as GB
+import Blockchain.GenesisBlock
 import  Blockchain.Data.GenesisInfo
 import Blockchain.Data.Block
 import qualified Handlers.AccountInfo 
 import Blockchain.DB.CodeDB
 import qualified Control.Monad.Change.Alter           as A
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB      as Mem
@@ -70,7 +73,7 @@ import Blockchain.DB.StateDB
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Address as MA
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -100,6 +103,7 @@ import Blockchain.Sequencer.Event
 import qualified Control.Monad.State                   as State
 import Data.Map.Strict (Map)
 import qualified Blockchain.Data.TXOrigin as TXO
+import Data.Either                     (fromRight)
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -222,8 +226,37 @@ privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 rootAcc :: Account 
 rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
 
+getCert :: X509Certificate
+getCert = fromMaybe (error $ "no idea what's happening" ) $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
+
+myCertString :: String
+myCertString =  unlines
+            [ "-----BEGIN CERTIFICATE-----"
+            , "MIIBmzCCAT+gAwIBAgIRANb5NRwudlj4jP0tr0HzN1MwDAYIKoZIzj0EAwIFADBI"
+            , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+            , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDExODIyMzczMVoXDTI0MDEx"
+            , "ODIyMzczMVowVTEYMBYGA1UEAwwPQmVuamFtaW4gUHJldm9yMRIwEAYDVQQKDAlC"
+            , "bG9ja0FwcHMxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ8wDQYDVQQGDAZCb3NuaWEw"
+            , "VjAQBgcqhkjOPQIBBgUrgQQACgNCAASp0wOm0j7rUI5iND920n8W0Tr+xzvXUQAR"
+            , "awtjibPT2lWg6nXSHSg4U/NZrDJb57BJdlPQFOTlIrzz/T+beXFoMAwGCCqGSM49"
+            , "BAMCBQADSAAwRQIhAMkrvSxLDSBpxh9hQfSQNQOuYDB8kqO6nYJMPOb9XN1LAiAE"
+            , "oWRBt6vwZLbHy5GTLH1+QtzeePss8Mo7w7ed0C08vQ=="
+            , "-----END CERTIFICATE-----"
+            , "-----BEGIN CERTIFICATE-----"
+            , "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+            , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+            , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+            , "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+            , "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+            , "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+            , "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+            , "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+            , "N8txKc8G9R27ZYAUuz15zF0="
+            , "-----END CERTIFICATE-----"
+            ]
+
 origin :: Account
-origin = Account 0x8341 Nothing
+origin = Account (userAddress $ x509CertToCertInfoState getCert) Nothing
 
 uploadAddress :: Account
 uploadAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 0) Nothing
@@ -248,31 +281,25 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest = runTestWithTimeout 5000000
 
-generateGBlock :: ( MonadLogger m, HasStateDB m) => m (Block,OutputBlock)
-generateGBlock = do
-    let gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
-    let genesis = JS.parseLazyByteString genesisParser gi
-        theJSON = case genesis of
-                      [x] -> x
-                      _ -> error $ "invalid genesis: " ++ show genesis    
-
+generateGBlock :: ( MonadLogger m, HasStateDB m) => GenesisInfo -> m (Block,OutputBlock)
+generateGBlock gi = do
     sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
     let bData = BlockData {
-            blockDataParentHash = genesisInfoParentHash theJSON,
-            blockDataUnclesHash = genesisInfoUnclesHash theJSON,
-            blockDataCoinbase = genesisInfoCoinbase theJSON,
+            blockDataParentHash = genesisInfoParentHash gi,
+            blockDataUnclesHash = genesisInfoUnclesHash gi,
+            blockDataCoinbase = genesisInfoCoinbase gi,
             blockDataStateRoot = sr,
-            blockDataTransactionsRoot = genesisInfoTransactionRoot theJSON,
-            blockDataReceiptsRoot = genesisInfoReceiptsRoot theJSON,
-            blockDataLogBloom = genesisInfoLogBloom theJSON,
-            blockDataDifficulty = genesisInfoDifficulty theJSON,
-            blockDataNumber = genesisInfoNumber theJSON,
-            blockDataGasLimit = genesisInfoGasLimit theJSON,
-            blockDataGasUsed = genesisInfoGasUsed theJSON,
-            blockDataTimestamp = genesisInfoTimestamp theJSON,
-            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData theJSON,
-            blockDataMixHash = genesisInfoMixHash theJSON,
-            blockDataNonce = genesisInfoNonce theJSON
+            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
+            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
+            blockDataLogBloom = genesisInfoLogBloom gi,
+            blockDataDifficulty = genesisInfoDifficulty gi,
+            blockDataNumber = genesisInfoNumber gi,
+            blockDataGasLimit = genesisInfoGasLimit gi,
+            blockDataGasUsed = genesisInfoGasUsed gi,
+            blockDataTimestamp = genesisInfoTimestamp gi,
+            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
+            blockDataMixHash = genesisInfoMixHash gi,
+            blockDataNonce = genesisInfoNonce gi
           }
     return (Block {
             blockBlockData = bData,
@@ -295,12 +322,22 @@ writeBlockSummary block =
         td     = obTotalDifficulty block
         txCnt  = fromIntegral $ length (obReceiptTransactions block)
     in
-        putBSum sha (blockHeaderToBSum header td txCnt)
+      putBSum sha (blockHeaderToBSum header td txCnt)
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT . runTestContextM $ do
-    (blockCreated,outputBlock) <- generateGBlock
+    let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [ChainMemberParsedSet]
+        !admins = either error id eAdmins
+        eVals   = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [ChainMemberParsedSet]
+        !vals   = either error id eVals
+        gi      = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
+        eInput  = Ae.eitherDecodeStrict (BC.pack gi)
+        !input  = either error id eInput 
+        cert = getCert
+        gi'  = buildGenesisInfo [] [cert] vals admins input
+    
+    (blockCreated,outputBlock) <- generateGBlock gi'
     MP.initializeBlank
     setStateDBStateRoot Nothing $ blockDataStateRoot $ blockBlockData $ blockCreated
     writeBlockSummary outputBlock
@@ -310,14 +347,28 @@ runTestWithTimeout timeout f = do
     Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
     processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block   
     withCurrentBlockHash genHash $ do
-      let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+      let certKey addr    = ((Account addr Nothing),) . encodeUtf8 
           certRegistryKey = certKey (Address 0x509)
-      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor (Address 0x8341) <> ">") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") (encodeUtf8 "0000000000000000000000000000000000008341")
+          rlpWrap         = rlpSerialize . rlpEncode
+          ua              = userAddress $ x509CertToCertInfoState getCert
+          certsub         = fromJust $ getCertSubject cert
+      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor ua <> ">") ((rlpWrap $ BAccount $ NamedAccount (Address 0xdeadbeef) MainChain)) --(encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (rlpWrap $ BString $ BC.pack myCertString)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") ((rlpWrap $ BAccount $ NamedAccount ua MainChain))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".owner") (rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".commonName") (rlpWrap . BString . BC.pack . subCommonName $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".country") (rlpWrap . BString . BC.pack . fromJust . subCountry $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organization") (rlpWrap . BString . BC.pack . subOrg $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organizationalUnit") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
       f
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
+
 
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (readFile fp)
@@ -2142,7 +2193,7 @@ contract qq is A, B {
     function value() public returns (uint) {
         return super.value();
     }
-}|] `shouldReturn` Just ("("++show (parseHex "b")++")")
+}|] `shouldReturn` Just ("("++show (MA.parseHex "b")++")")
 
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall' "value" "()" [r|
@@ -2156,7 +2207,7 @@ contract qq is A, B {
   function value() public returns (uint) {
     return super.value();
   }
-}|] `shouldReturn` Just ("("++show (parseHex "a")++")")
+}|] `shouldReturn` Just ("("++show (MA.parseHex "a")++")")
 
   it "can determine super instance by function name" . runTest $ do
     runBS [r|
@@ -4815,7 +4866,7 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
---   fit "can get a users cert" . runTest $ do
+--   it "can get a users cert" . runTest $ do
 --     void $ runArgsWithCertificateRegistry [r|
 
 -- contract Certificate {
@@ -7000,7 +7051,7 @@ contract qq {
 |]
     getFields ["funcB", "temp2", "a", "temp"] `shouldReturn` [BInteger 4, BInteger 4, BInteger 3, BInteger 2]
 
-  xit "cant infinite loop" $ (runTestWithTimeout 20000000 $
+  it "cant infinite loop" $ (runTestWithTimeout 20000000 $
     runBS [r|
 
 contract qq {
@@ -7012,7 +7063,7 @@ contract qq {
   }
 }   |]) `shouldThrow` anyTooMuchGasError
 
-  xit "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
+  it "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
     runBS [r|
 
 

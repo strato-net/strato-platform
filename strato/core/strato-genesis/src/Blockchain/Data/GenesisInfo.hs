@@ -22,6 +22,7 @@ import qualified Data.ByteString.Lazy.Char8         as BLC
 import qualified Data.JsonStream.Parser             as JS
 import           Data.Time
 import           Data.Word
+import           Control.Lens
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ArbitraryInstances ()
@@ -50,6 +51,8 @@ data GenesisInfo =
     genesisInfoMixHash          :: Keccak256,
     genesisInfoNonce            :: Word64
 } deriving (Show, Read, Eq, Generic)
+makeLenses ''GenesisInfo
+
 
 nullStateRoot :: StateRoot
 nullStateRoot = StateRoot . LabeledError.b16Decode "nullStateRoot" $
