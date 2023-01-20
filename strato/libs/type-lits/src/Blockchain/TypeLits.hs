@@ -30,6 +30,7 @@ import           Control.Comonad
 import           Data.Aeson
 import           Data.Aeson.Types    (Parser)
 import qualified Data.Aeson.Key      as DAK 
+import qualified Data.Text as Text
 import           Data.Biapplicative
 import           Data.Bifoldable
 import           Data.Bitraversable
@@ -51,15 +52,15 @@ type NamedMapParser k v a b = Parser (NamedMap k v a b)
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, ToJSON a, ToJSON b) => ToJSON (NamedTuple k v a b) where
   toJSON (NamedTuple (a,b)) =
-    object [ ( DAK.fromString $ symbolVal (Proxy :: Proxy k)) .= toJSON a
-           , ( DAK.fromString $ symbolVal (Proxy :: Proxy v)) .= toJSON b
+    object [ ( DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy k)) .= toJSON a
+           , ( DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy v)) .= toJSON b
            ]
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) => FromJSON (NamedTuple k v a b) where
   parseJSON (Object o) = NamedTuple
                      <$> liftA2 (,)
-                         (o .: (DAK.fromString $ symbolVal (Proxy :: Proxy k)))
-                         (o .: (DAK.fromString $ symbolVal (Proxy :: Proxy v)))
+                         (o .: (DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy k)))
+                         (o .: (DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy v)))
   parseJSON o          = error $ "parseJSON NamedTuple: expected object, got " ++ show o
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k v a b) where

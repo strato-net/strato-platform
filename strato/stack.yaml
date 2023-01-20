@@ -139,7 +139,7 @@ allow-different-user: true
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints
 
-
+# -fconstraint-solver-iterations=10
 docker:
   enable: true
   image: "strato-buildbase:lts-20.7"

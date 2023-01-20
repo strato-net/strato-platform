@@ -10,6 +10,7 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 &&
     # mv /etc/apt/sources.list.d/nodesource.list /etc/apt/sources.list.d/nodesource.list.disabled && \
     apt-get update && \
     apt-get -y --allow-unauthenticated install autoconf libtool libblas-dev liblapack-dev libsodium-dev jq vim && \
+    # apt-get -y --allow-unauthenticated install libsodium=1.0.18 && \
     apt-get autoremove && \
     apt-get -y install libpq-dev && \
     apt-get -y install pkg-config && \
