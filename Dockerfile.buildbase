@@ -16,6 +16,8 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 &&
     apt-get -y install pkg-config && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean && \
+    stack clean && \
+    stack purge && \
     git clone https://github.com/blockapps/secp256k1 && \
     cd secp256k1/ && \
     ./autogen.sh && \

@@ -4,7 +4,7 @@ library:
   source-dirs: src
   dependencies:
     - base
-    - aeson >=2
+    - aeson ==2.1.1.0
     - bifunctors
     - comonad
     - QuickCheck

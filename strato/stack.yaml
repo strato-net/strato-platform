@@ -81,6 +81,7 @@ packages:
 - VM/SolidVM/source-tools
 - VM/vrun
 
+
 extra-deps:
 # - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688
 # - bloomfilter-2.0.1.0@sha256:c72063cc0a3458a5ec6e74e4cabe286ce7f04841624343c1c69d9e0d378726c2,1806
@@ -137,9 +138,9 @@ extra-lib-dirs:
 allow-newer: true
 allow-different-user: true
 ghc-options:
-  "$locals": -Wall -Werror -fwarn-redundant-constraints
+  "$locals": -Wall -Werror -fwarn-redundant-constraints -fconstraint-solver-iterations=10
 
-# -fconstraint-solver-iterations=10
+  
 docker:
   enable: true
   image: "strato-buildbase:lts-20.7"
