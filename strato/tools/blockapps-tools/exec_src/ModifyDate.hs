@@ -18,7 +18,6 @@ maybeRemoveBracket input@('[':rest) =
   case findIndex (== ']') rest of
    Nothing -> (Nothing, input)
    Just i ->
-    --  let (first, ']':second) = splitAt i rest
     let (first, second) = case splitAt i rest of 
                             (first', ']':second') -> (first', second')
                             _ -> error "Impossible"

@@ -15,7 +15,6 @@ import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
 import           Data.Aeson.KeyMap            as KeyMap
--- import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe, maybeToList)

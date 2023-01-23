@@ -9,7 +9,6 @@ import           Control.Monad.Reader
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Class              as Saltine
--- import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                  (ByteString)
 import           Data.Maybe                       (fromMaybe, listToMaybe, isJust)
 import           Data.IORef

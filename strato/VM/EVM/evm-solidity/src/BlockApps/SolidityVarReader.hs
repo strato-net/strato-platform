@@ -393,7 +393,6 @@ decodeValue'
 decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Position{..} = \case
   SimpleType TypeBool ->
     let
-      --Just (SimpleValue (ValueInt _ (Just 1) word8)) = 
       word8 = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1) of
             Just (SimpleValue (ValueInt _ (Just 1) word8')) -> word8'
             _ -> error "decodeValue': Expected ValueInt 1" -- ++ show v
@@ -411,7 +410,6 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
                                      $ storage offset
   SimpleType TypeAddress ->
     let
-      -- Just (SimpleValue (ValueInt _ _ addr)) 
       addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
             Just (SimpleValue (ValueInt _ _ addr')) -> addr'
             _ -> error "decodeValue': Expected ValueInt 2" -- ++ show v
@@ -419,7 +417,6 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       Just . SimpleValue . ValueAddress . Address $ fromIntegral addr
   SimpleType TypeAccount ->
     let
-      -- Just (SimpleValue (ValueInt _ _ addr))
       addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
             Just (SimpleValue (ValueInt _ _ addr')) -> addr'
             _ -> error "decodeValue': Expected ValueInt 3" -- ++ show v
@@ -427,7 +424,6 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
   TypeContract _ ->
     let
-      -- Just (SimpleValue (ValueAccount addr)) 
       addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount of
             Just (SimpleValue (ValueAccount addr')) -> addr'
             _ -> error "decodeValue': Expected ValueAccount" -- ++ show v
@@ -448,7 +444,6 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
   SimpleType TypeString ->
     let
-      -- Just (SimpleValue (ValueBytes Nothing bytes))
       bytes = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes of 
             Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'
             _ -> error "decodeValue': Expected ValueBytes Nothing" -- ++ show v

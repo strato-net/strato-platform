@@ -10,7 +10,6 @@ import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap         as KeyMap
--- import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
 import           Data.Text                 (Text)

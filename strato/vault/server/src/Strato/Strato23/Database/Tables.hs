@@ -2,7 +2,6 @@ module Strato.Strato23.Database.Tables where
 
 import           Data.Profunctor.Product
 import           Opaleye
--- import qualified Opaleye as O
 import           Opaleye.Internal.PGTypesExternal
 import           Opaleye.Internal.Table
 

@@ -11,21 +11,7 @@ FROM fpco/stack-build:${STACK_RESOLVER}
 #     mv /etc/apt/sources.list.d/nodesource.list /etc/apt/sources.list.d/nodesource.list.disabled && \
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 && \
     apt-key del 7fa2af80 && apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub && \
-    # mv /etc/apt/sources.list.d/nodesource.list /etc/apt/sources.list.d/nodesource.list.disabled && \
     apt-get update && \
-    # if [ Check to see if libsodium-dev is installed ]; then \
-    #     wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz && \
-    #     tar -xvzf libsodium-1.0.18-stable.tar.gz && \
-    #     cd libsodium-stable && \
-    #     ./configure && \
-    #     make && \
-    #     make check && \
-    #     make install && \
-    #     cd .. && \
-    #     rm -rf libsodium-stable && \
-    #     rm -rf libsodium-1.0.18-stable.tar.gz; \
-    # fi && \
-
     # check if libsodium version 1.0.18 is already installed if it is skip this
     # if not install it
     if [ ! -f /usr/local/lib/libsodium.so.23 ]; then \
