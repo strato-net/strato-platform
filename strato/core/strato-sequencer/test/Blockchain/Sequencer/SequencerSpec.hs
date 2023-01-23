@@ -1,9 +1,10 @@
-{-# OPTIONS -fno-warn-unused-imports #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS -fno-warn-unused-imports              #-}
+{-# LANGUAGE OverloadedStrings                    #-}
+{-# LANGUAGE RecordWildCards                      #-}
+{-# LANGUAGE ScopedTypeVariables                  #-}
+{-# LANGUAGE TemplateHaskell                      #-}
+{-# LANGUAGE TypeApplications                     #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 

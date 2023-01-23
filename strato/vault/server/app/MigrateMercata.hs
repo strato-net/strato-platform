@@ -50,8 +50,11 @@ main = do
   
   
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQueryAll
-  let [(_, _, _), (globaOldSalt, _, _)] = mMsgLst -- make this a case statement that throws an error if not two tripules
-  
+  -- let [(_, _, _), (globaOldSalt, _, _)] = mMsgLst -- make this a case statement that throws an error if not two tripules
+  let globaOldSalt = case mMsgLst of
+        [] -> error "message table is empty, so the password must not be set. Aborting..."
+        [(_, _, _), (globaOldSalt',_,_)] -> globaOldSalt'
+        _ -> error ("Not right number of  rows in message table, something is not right" ++ (show  $ length mMsgLst ))
   pwKey <- case mMsgLst of
     [] -> error "message table is empty, so the password must not be set. Aborting..."
     [(msgSalt, msgNonce, ciphertext), (_,_,_)] -> do

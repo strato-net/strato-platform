@@ -99,7 +99,7 @@ compileSourceNoInheritance initCodeMap = do
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
 
-        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False) sourceUnits
+        let userDefinedFromFile = M.fromList $ map (\case (Alias _ alias typ) -> (alias, typ); _ -> ("", "")) $ filter (\case (Alias _ _ _) -> True; _ -> False;) sourceUnits
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx

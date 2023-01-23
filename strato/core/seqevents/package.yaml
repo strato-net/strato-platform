@@ -9,6 +9,7 @@ dependencies:
 
 library:
   source-dirs: src/
+  ghc-options: -fconstraint-solver-iterations=8
   dependencies:
     - aeson
     - blockstanbul

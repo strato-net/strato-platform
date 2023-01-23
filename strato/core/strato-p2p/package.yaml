@@ -60,8 +60,9 @@ library:
     - hflags
     - http-client
     - iproute
-    - json-rpc
-    # - json-rpc-client
+    # - json-rpc
+    - json-rpc-server
+    - json-rpc-client
     - lens
     - lifted-async
     - lifted-base

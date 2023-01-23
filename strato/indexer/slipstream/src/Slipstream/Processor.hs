@@ -207,8 +207,7 @@ lookupT k = MaybeT . return . Map.lookup k
 
 
 -- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
-getEVMDetailsForRow :: ( MonadIO m
-                       , MonadLogger m
+getEVMDetailsForRow :: ( MonadLogger m
                        , Accessible BlocEnv m
                        , HasBlocSQL m
                        , Selectable Account AddressState m
@@ -390,8 +389,6 @@ getCodeCollection f cp ccString = do
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
 getEVMInserts :: (
-  MonadIO m,
-  MonadUnliftIO m,
   MonadLogger m,
   Accessible BlocEnv m,
   HasBlocSQL m,
@@ -420,7 +417,7 @@ getEVMInserts g row actions acct = do
 getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
 getInsertsIgnoreEVM _ _ _ _ = pure $ Left "EVM code indexing ignored"
 
-processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
+processTheMessages :: (MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
@@ -500,7 +497,10 @@ processTheMessages env sqlEnv conn g messages = do
               lift $ insertContractDetailsQuery (deserializeSourceMap src)
 
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-              (SolidVMCode name _) = actionCodeHash row
+              -- (SolidVMCode name _) = actionCodeHash row
+              name = case actionCodeHash row of
+                SolidVMCode name' _ -> name'
+                _ -> error "internal error: contract should be SolidVM for SolidVM"
               abiid = ABIID {
                 aiName = T.pack name,
                 aiChain = cid

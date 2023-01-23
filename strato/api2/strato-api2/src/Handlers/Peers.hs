@@ -8,6 +8,7 @@ module Handlers.Peers (
 
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import qualified Data.Aeson.Key as DAK
 import           Servant                                 hiding (ServerError)
 -- import           Servant.Swagger.Tags
 import           Tags
@@ -31,4 +32,4 @@ getPeers = do
   eActivePeers <- liftIO getActivePeers
   case eActivePeers of
     Left err -> throwIO . ServerError $ show err
-    Right ps -> return . object . map (\p -> pPeerIp p .= pPeerTcpPort p) $ ps
+    Right ps -> return . object . map (\p -> DAK.fromText (pPeerIp p) .= pPeerTcpPort p) $ ps

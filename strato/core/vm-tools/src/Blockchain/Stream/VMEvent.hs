@@ -91,7 +91,11 @@ produceVMEventsM vmEvents = do
     x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
 
-    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+    -- let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+    let offset = case concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x of 
+          [theOffset] -> theOffset
+          _ -> error "produceVMEventsM: unexpected response from Kafka"
+          
     return offset
 
 -- todo: refactor this to consume produceVMEventsM
@@ -105,7 +109,10 @@ produceVMEvents vmEvents = do
     Right res -> do -- [ProduceResponse]
       liftIO $ mapM_ parseKafkaResponse res
       return offset
-      where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+      -- where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+      where offset = case concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res of 
+              [theOffset] -> theOffset
+              _ -> error "produceVMEvents: unexpected response from Kafka"
             -- parsedResults = map parseKafkaResponse res
 
 

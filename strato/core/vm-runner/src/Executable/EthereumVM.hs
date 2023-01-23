@@ -141,7 +141,7 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+handleVmEvents :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   rpcResps <- lift $ do
@@ -309,7 +309,7 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
 
-processBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+processBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
               -> ConduitT a VmOutEvent m ()
 processBlocks blocks = do
@@ -336,15 +336,13 @@ processBlockSummaries = mapM_ $ \b -> do
     ]
   writeBlockSummary b
 
-processTransactions :: ( MonadLogger m
-                       , Bagger.MonadBagger m
+processTransactions :: ( Bagger.MonadBagger m
                        )
                     => [(Timestamp, OutputTx)]
                     -> m ([VmOutEvent], Int)
 processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
 
-getNumPoolable :: ( MonadLogger m
-                  , Bagger.MonadBagger m
+getNumPoolable :: ( Bagger.MonadBagger m
                   )
                => [(Timestamp, OutputTx)]
                -> m Int

@@ -9,7 +9,6 @@
 module BlockApps.Bloc22.Server where
 
 import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
-import           Control.Monad.IO.Class
 import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
 import           Data.Source.Map
@@ -39,8 +38,7 @@ import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 
-bloc :: ( MonadIO m
-        , MonadLogger m
+bloc :: ( MonadLogger m
         , HasBlocSQL m
         , HasBlocEnv m
         , HasVault m

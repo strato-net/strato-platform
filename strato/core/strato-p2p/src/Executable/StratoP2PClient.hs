@@ -121,9 +121,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
                   .| pSink
 
 
-runPeerInList :: ( MonadIO m
-                 , MonadUnliftIO m
-                 , MonadP2P m
+runPeerInList :: ( MonadP2P m
                  , RunsClient m
                  )
               => PPeer

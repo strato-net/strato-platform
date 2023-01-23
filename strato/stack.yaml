@@ -46,6 +46,8 @@ packages:
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
 - libs/format
+- libs/json-rpc-server
+- libs/json-rpc-client
 - libs/labeled-error
 - libs/logserver
 - libs/kafka/milena

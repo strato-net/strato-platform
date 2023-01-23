@@ -25,7 +25,6 @@ import           Control.Monad.Change.Modify           hiding (get, put, yield, 
 import qualified Control.Monad.Change.Modify           as Mod (get, put)
 import           Control.Monad.IO.Class
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.Default                          (def)
 import           Data.Foldable                         (for_)
@@ -42,7 +41,7 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.These
 import           Data.Time.Clock
-import           MonadUtils
+import           GHC.Utils.Monad
 import           Prelude                               hiding (lookup)
 import           System.Random
 import           Text.Printf
@@ -495,7 +494,6 @@ handleEvents peer = awaitForever $ \case
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
 handleGetChainDetails :: ( MonadIO m
-                         , MonadResource m
                          , MonadLogger m
                          , (ChainMemberParsedSet `Selectable` TrueOrgNameChains) m
                          , (ChainMemberParsedSet `Selectable` FalseOrgNameChains) m

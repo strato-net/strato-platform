@@ -88,7 +88,9 @@ tFormFunc SolidF.Func{..} = EVMXabi.Func {
                           Just SolidF.External    -> Just EVMXabi.External -- Maybe Visibility
   , funcModifiers =  case _funcModifiers of 
                           [] -> Nothing --Not 100% if this is a correct translastion TODO
-                          contents -> Just $ map (\(_, [e])->  SolidUnparse.unparseExpression e  ) contents -- Maybe [String]
+                          contents -> Just $ map (\case 
+                                                    (_, [e]) -> SolidUnparse.unparseExpression e;
+                                                    _ -> error "tFormFunc: funcModifiers: unexpected case";) contents -- Maybe [String]
   }
 
 

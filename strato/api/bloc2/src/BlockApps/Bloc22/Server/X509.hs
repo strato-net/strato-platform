@@ -21,12 +21,11 @@ import           BlockApps.Bloc22.API.X509
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
-import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
 
 createCertificate 
-  :: (MonadIO m, MonadLogger m, HasVault m, HasSQL m) -- HasSQL is included for some sensible error handling
+  :: (MonadIO m, MonadLogger m, HasVault m) -- HasSQL is included for some sensible error handling
   => Text                 -- ^ The user name of the issuer of the new certificate
   -> CreateCertEndpoint   -- ^ The subject of the new certificate and the issuer's certificate
   -> m X509Certificate    -- ^ The new X.509 certificate. N.B. This doesn't register the cert
