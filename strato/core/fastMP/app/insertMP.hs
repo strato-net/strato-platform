@@ -34,7 +34,11 @@ insertKVs sr (x:rest) = do
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ y)) c
+  -- let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ y)) c
+  let input = map (\lst -> if length lst < 2 
+                        then error "input list should contain exactly 2 elements"
+                        else KV (map c2n $ BC.unpack (head lst)) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ (lst !! 1))
+                    ) c
 
   sr'  <- LDB.runResourceT $ do
     ldb <- LDB.open "abcd" LDB.defaultOptions{LDB.createIfMissing=True}

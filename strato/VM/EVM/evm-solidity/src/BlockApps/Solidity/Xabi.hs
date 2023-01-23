@@ -14,7 +14,8 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
-import qualified Data.HashMap.Strict          as Hash
+import           Data.Aeson.KeyMap            as KeyMap
+-- import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe, maybeToList)
@@ -180,16 +181,16 @@ funcConstant _ = True
 instance ToJSON Func where
   toJSON f = case genericToJSON (aesonPrefix camelCase) f of
                  Object o -> Object
-                        . Hash.insert "payable" (Bool . funcPayable $ f)
-                        . Hash.insert "constant" (Bool . funcConstant $ f)
+                        . KeyMap.insert "payable" (Bool . funcPayable $ f)
+                        . KeyMap.insert "constant" (Bool . funcConstant $ f)
                         $ o
                  x -> x
 
 -- constant and payable are a deprecated way of specifying state mutability
 fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
 fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
-    let constant = Hash.lookup "constant" obj
-        payable = Hash.lookup "payable" obj
+    let constant = KeyMap.lookup "constant" obj
+        payable = KeyMap.lookup "payable" obj
     in case (constant, payable) of
            (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
            (Just (Bool True), _) -> pure . Just $ Constant

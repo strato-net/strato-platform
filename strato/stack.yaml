@@ -112,6 +112,13 @@ extra-deps:
 # - servant-swagger-tags-0.1.0.1@sha256:2d743e9ad1cfcca537acc99e0b97e0e4feda3b5c842937dbf5895261e3105bf1,1094
 # - saltine-0.2.0.1@sha256:8b41875d2dcd2b27bf87e1b8b19fc290d07262d7fa0565663db5709fe5c86f50,5221
 - saltine-0.2.0.1@sha256:8b41875d2dcd2b27bf87e1b8b19fc290d07262d7fa0565663db5709fe5c86f50,5221
+- aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
+- generically-0.1
+# - bytestring-0.10.12.1@sha256:82dba4c2de4fdd8b419ed28aec2c14cfe4a3f43d1d6e2263ab26962e7398048e,6254
+# - lens-4.19.2@sha256:d4d704141d7c322bbfb746157b0709f3b966dfec92421f571c34069893af08cc,16062
+# - random-1.1@sha256:7b67624fd76ddf97c206de0801dc7e888097e9d572974be9b9ea6551d76965df,1777
+
+
 # - bloomfilter-2.0.1.0@sha256:c72063cc0a3458a5ec6e74e4cabe286ce7f04841624343c1c69d9e0d378726c2,1806
 
 # - bloomfilter-2.0.1.0@sha256:5b67d765315fb2abc1cde85e3c20ae1badfbe8d1070ed57525b7c428586e2d2f,1728
@@ -125,7 +132,7 @@ flags:
     ecdh: true
     recovery: true
 
-resolver: lts-20.7 #also duplicated in docker section below
+resolver: lts-20.8 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -138,12 +145,20 @@ extra-lib-dirs:
 allow-newer: true
 allow-different-user: true
 ghc-options:
-  "$locals": -Wall -Werror -fwarn-redundant-constraints -fconstraint-solver-iterations=10
+  "$locals": -Wall -Werror -fwarn-redundant-constraints 
 
-  
+  # -fconstraint-solver-iterations=100
+
+# Increase the number of ticks the simplifier is allowed to use by passing the flag -fsimpl-tick-factor=N (where N is a larger number) to GHC when building your project
+# Adjust the -funfolding-case-threshold and -funfolding-case-scaling flags to break any inlining loops
+# Break up large modules into smaller ones
+# Refactor your code to reduce the number of data constructors, type class constraints, or case expressions
+# Use the -ddump-simpl-stats flag to see detailed counts of the simplifier's work, which can help you identify the specific parts of your code that are causing the problem.
+
+
 docker:
   enable: true
-  image: "strato-buildbase:lts-20.7"
+  image: "strato-buildbase:lts-20.8"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
 

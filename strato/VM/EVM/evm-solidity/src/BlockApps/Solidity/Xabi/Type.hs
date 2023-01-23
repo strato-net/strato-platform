@@ -8,7 +8,9 @@ module BlockApps.Solidity.Xabi.Type where
 import           Control.DeepSeq
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
-import qualified Data.HashMap.Lazy         as HashMap
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap         as KeyMap
+-- import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
 import           Data.Text                 (Text)
@@ -18,7 +20,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
 typeAesonOptions::Options
-typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+typeAesonOptions=defaultOptions
 
 
 data Type
@@ -53,17 +55,25 @@ instance FromJSON IndexedType where
   parseJSON =
     withObject "xabi" $ \v -> do
       index <-  v .: "index"
-      theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
+      theType <- parseJSON $ Object $ KeyMap.insertWith (const id) "type" "Contract" v
       return $ IndexedType index theType
 
 instance ToJSON IndexedType where
   toJSON (IndexedType indexedTypeIndex theType) =
     let
-      Object theMap = toJSON theType
+      val = toJSON theType
+      theMap = case val of
+                Object o -> o
+                Aeson.Array _ -> KeyMap.empty
+                Aeson.String _ -> KeyMap.empty
+                Aeson.Number _ -> KeyMap.empty
+                Aeson.Bool _ -> KeyMap.empty
+                Aeson.Null -> KeyMap.empty
     in
      Object $
-     HashMap.insert "index" (toJSON indexedTypeIndex)
+     KeyMap.insert "index" (toJSON indexedTypeIndex)
      theMap
+
 
 instance Arbitrary IndexedType where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -90,19 +100,26 @@ instance FromJSON VarType where
       public <- v .:? "public"
       constant <- v .:? "constant"
       value <- v .:? "initialValue"
-      theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
+      theType <- parseJSON $ Object $ KeyMap.insertWith (const id) "type" "Contract" v
       return $ VarType atBytes public constant value theType
 
 instance ToJSON VarType where
   toJSON (VarType varTypeAtBytes varTypePublic varTypeConstant varTypeInitialValue theType) =
     let
-      Object theMap = toJSON theType
+      val = toJSON theType
+      theMap = case val of
+                Object o -> o
+                Aeson.Array _ -> KeyMap.empty
+                Aeson.String _ -> KeyMap.empty
+                Aeson.Number _ -> KeyMap.empty
+                Aeson.Bool _ -> KeyMap.empty
+                Aeson.Null -> KeyMap.empty
     in
      Object $
-     HashMap.insert "atBytes" (toJSON varTypeAtBytes) $
-     HashMap.insert "public" (toJSON varTypePublic) $
-     HashMap.insert "constant" (toJSON varTypeConstant) $
-     HashMap.insert "initialValue" (toJSON varTypeInitialValue)
+     KeyMap.insert "atBytes" (toJSON varTypeAtBytes) $
+     KeyMap.insert "public" (toJSON varTypePublic) $
+     KeyMap.insert "constant" (toJSON varTypeConstant) $
+     KeyMap.insert "initialValue" (toJSON varTypeInitialValue) $
      theMap
 
 instance ToSchema VarType where
@@ -127,9 +144,16 @@ instance FromJSON FieldType where
 instance ToJSON FieldType where
   toJSON FieldType{..} =
     let
-      Object theMap = toJSON fieldTypeType
+      val = toJSON fieldTypeType
+      theMap = case val of
+                Object o -> o
+                Aeson.Array _ -> KeyMap.empty
+                Aeson.String _ -> KeyMap.empty
+                Aeson.Number _ -> KeyMap.empty
+                Aeson.Bool _ -> KeyMap.empty
+                Aeson.Null -> KeyMap.empty
     in
-      Object $ HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
+      Object $ KeyMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
 
 instance Arbitrary FieldType where arbitrary = GR.genericArbitrary GR.uniform
 

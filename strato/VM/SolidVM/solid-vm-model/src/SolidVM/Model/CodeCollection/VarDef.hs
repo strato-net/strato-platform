@@ -8,7 +8,8 @@ module SolidVM.Model.CodeCollection.VarDef where
 import           Control.Lens              (mapped, (&), (?~))
 import           Control.DeepSeq
 import           Data.Aeson
-import qualified Data.HashMap.Lazy         as HashMap
+-- import qualified Data.Map.Strict as M
+-- import qualified Data.HashMap.Lazy         as HashMap
 import qualified Data.Aeson.KeyMap         as KeyMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -21,11 +22,22 @@ import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.Type
 
 typeAesonOptions::Options
-typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+typeAesonOptions=defaultOptions
 
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
                  deriving (Eq, Show, Generic, NFData)
+
+-- instance ToJSON Person where
+--     -- this generates a Value
+--     toJSON (Person name age) =
+--         object ["name" .= name, "age" .= age]
+
+--     -- this encodes directly to a bytestring Builder
+--     toEncoding (Person name age) =
+--         pairs ("name" .= name <> "age" .= age)
+
+
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -36,12 +48,8 @@ instance FromJSON IndexedType where
 
 instance ToJSON IndexedType where
   toJSON (IndexedType indexedTypeIndex theType) =
-    let
-      Object theMap = toJSON theType
-    in
-     Object $
-     KeyMap.insert "index" (toJSON indexedTypeIndex)
-     theMap
+    object ["index" .= indexedTypeIndex, "type" .= theType]
+
 
 instance Arbitrary IndexedType where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -103,10 +111,8 @@ instance FromJSON FieldType where
 
 instance ToJSON FieldType where
   toJSON FieldType{..} =
-    let
-      Object theMap = toJSON fieldTypeType
-    in
-      Object $ KeyMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
+    object ["atBytes" .= fieldTypeAtBytes, "type" .= fieldTypeType]
+
 
 instance Arbitrary FieldType where arbitrary = GR.genericArbitrary GR.uniform
 

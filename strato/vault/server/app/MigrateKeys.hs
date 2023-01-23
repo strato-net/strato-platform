@@ -15,6 +15,11 @@ import Database.PostgreSQL.Simple hiding (Query)
 import Database.PostgreSQL.Simple.SqlQQ
 import Database.PostgreSQL.Simple.Transaction
 import Opaleye
+import qualified Opaleye as O
+import Opaleye.Internal.QueryArr
+import Opaleye.Internal.PGTypesExternal
+
+
 import System.Environment
 import System.Exit
 import Text.CSV
@@ -31,7 +36,7 @@ import Strato.Strato23.Server.Password
 -- We took out public keys from vault db
 -- This logic below is using private key
 -- If concerned about old usage, you git log to find the orignal status if this needs to be resurrection 
-getUserOldKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
+getUserOldKeyQuery :: T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getUserOldKeyQuery username = proc () -> do
   (_, name,  _, salt, nonce, encSecKey, address) <- selectTable TS.usersTable -< ()
   restrict -< name .== toFields username

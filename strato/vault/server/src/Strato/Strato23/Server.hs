@@ -39,7 +39,7 @@ serverProxy :: Proxy VaultWrapperAPI
 serverProxy = Proxy
 
 vaultWrapperSwagger :: Swagger
-vaultWrapperSwagger = toSwagger (Proxy @ VaultWrapperAPI)
+vaultWrapperSwagger = toSwagger (Proxy @VaultWrapperAPI)
     & info.title   .~ "Vault Wrapper API"
     & info.version .~ "2.3"
     & info.description ?~ "This is the V2.3 API for Vault Wrapper"

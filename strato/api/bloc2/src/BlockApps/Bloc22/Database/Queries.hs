@@ -353,7 +353,7 @@ instance FromField Address where
     theByteString <- fromField f mdata
     return $ Address $ bytesToWord160 $ B.unpack theByteString
 
-instance Default ToFields Address (Column PGBytea) where
+instance Default ToFields Address (Field PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
@@ -366,12 +366,12 @@ instance FromField SecretBox.Nonce where
     theByteString <- fromField f mdata
     return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
 
-instance Default ToFields SecretBox.Nonce (Column PGBytea) where
+instance Default ToFields SecretBox.Nonce (Field PGBytea) where
   def = lmap Saltine.encode def
-instance Default ToFields JwtToken (Column PGText) where
+instance Default ToFields JwtToken (Field PGText) where
   def = lmap getJwtToken def
 
-instance Default ToFields StateMutability (Column PGText) where
+instance Default ToFields StateMutability (Field PGText) where
   def = lmap tShow def
 
 instance DefaultFromField PGText StateMutability where
@@ -390,7 +390,7 @@ instance FromField Keccak256 where
     theByteString <- fromField f mdata
     return $ unsafeCreateKeccak256FromByteString theByteString
 
-instance Default ToFields Keccak256 (Column PGBytea) where
+instance Default ToFields Keccak256 (Field PGBytea) where
   def = lmap keccak256ToByteString def
 
 instance DefaultFromField PGBytea CodePtr where
@@ -401,7 +401,7 @@ instance FromField CodePtr where
     theByteString <- fromField f mdata
     return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
 
-instance Default ToFields CodePtr (Column PGBytea) where
+instance Default ToFields CodePtr (Field PGBytea) where
   def = lmap rlpSerialize def
 
 instance DefaultFromField PGBytea (Maybe ChainId) where
@@ -412,7 +412,7 @@ instance FromField ChainId where
     theByteString <- fromField f mdata
     return $ ChainId $ byteStringToWord256 theByteString
 
-instance Default ToFields (Maybe ChainId) (Column PGBytea) where
+instance Default ToFields (Maybe ChainId) (Field PGBytea) where
   def = lmap fromChainId def
         where fromChainId = \case
                 Nothing -> B.empty

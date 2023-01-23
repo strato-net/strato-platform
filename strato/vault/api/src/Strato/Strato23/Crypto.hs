@@ -9,7 +9,7 @@ module Strato.Strato23.Crypto where
 import           Control.Monad                     ((<=<))
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
-import qualified Crypto.Saltine.Class              as Saltine
+-- import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import           Data.ByteString                   (ByteString)
 import           Data.Text                         (Text)
@@ -30,8 +30,8 @@ passwordText (Password bs) = Text.decodeUtf8 bs
 textPassword :: Text -> Password
 textPassword = Password . Text.encodeUtf8
 
-instance Show SecretBox.Nonce where
-  show = show . Saltine.encode
+-- instance Show SecretBox.Nonce where
+--   show = show . Saltine.encode
  
 data KeyStore = KeyStore
   { keystoreSalt          :: ByteString     -- deprecated, since we use the password salt now
