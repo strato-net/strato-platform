@@ -129,8 +129,8 @@ export function postFaucet(username, address) {
 }
 
 export function getOauthAccountsApi() {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?address=eq.";
-  const responses = [];
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
+
 
   // strato URL add limit and offset if needed
   return fetch(
@@ -145,10 +145,13 @@ export function getOauthAccountsApi() {
   )
     .then(handleErrors)
     .then(function (res) {
-      const users = res.json();
-      for (let user in users) {
-        const url = cirrusUrl + user.address;
-        const certInfoResponse = 
+      return res.json();
+    })
+    .then(function (users) {
+      const fetches = [];
+      for (let x in users) {
+        const url = cirrusUrl + users[x].address;
+        fetches.push(
           fetch (
             url,
             {
@@ -165,10 +168,11 @@ export function getOauthAccountsApi() {
             })
             .catch(function (error) {
               throw error;
-            });
-        responses.push(certInfoResponse);
+            }))
       }
-      return responses;
+      return Promise.all(fetches).then(function (responses) {
+        return responses.map(x => x.length > 0 ? x[0] : null);
+      });
     })
     .catch(function (error) {
       throw error;

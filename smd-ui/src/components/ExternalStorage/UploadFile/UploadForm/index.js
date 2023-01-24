@@ -257,7 +257,7 @@ export function mapStateToProps(state) {
     username: state.uploadFile.username,
     isLoading: state.uploadFile.isLoading,
     initialValues: {
-      username: state.user.oauthUser ? state.user.oauthUser.username : '',
+      username: state.user.oauthUser ? state.user.oauthUser.commonName : '',
       address: state.user.oauthUser ? state.user.oauthUser.address : '',
       provider: 's3'
     }

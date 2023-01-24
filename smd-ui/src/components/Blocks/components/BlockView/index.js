@@ -113,12 +113,6 @@ class BlockView extends Component {
                       </td>
                     </tr>
                     <tr>
-                      <td>Coinbase</td>
-                      <td>
-                        <HexText value={block.blockData.coinbase} classes="small smd-pad-4" />
-                      </td>
-                    </tr>
-                    <tr>
                       <td>State Root</td>
                       <td>
                         <HexText value={block.blockData.stateRoot} classes="small smd-pad-4" />
