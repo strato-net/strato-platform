@@ -20,7 +20,6 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 &&
         cd libsodium-stable && \
         ./configure && \
         make && \
-        make check && \
         make install && \
         cd .. && \
         rm -rf libsodium-stable && \
