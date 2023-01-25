@@ -1,0 +1,3 @@
+[submodule "strato/libs/strato/libs/json-rpc-server"]
+	path = strato/libs/strato/libs/json-rpc-server
+	url = https://github.com/blockapps/json-rpc-server
