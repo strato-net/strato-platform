@@ -23,6 +23,11 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
+        sh 'cd strato/libs/'
+        sh 'git clone https://github.com/blockapps/bloomfilter.git'
+        sh 'git clone https://github.com/blockapps/json-rpc-server.git'
+        sh 'git clone https://github.com/blockapps/json-rpc-client.git'
+        sh 'cd ../..'
         sh 'REPO=private make all'
         sh 'rm -rf .docker-work'
         dir ('blockapps-rest') {
