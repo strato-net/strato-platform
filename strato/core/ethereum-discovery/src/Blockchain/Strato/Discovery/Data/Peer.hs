@@ -67,6 +67,7 @@ PPeer
     activeState Int
     version T.Text
     nextDisableWindowSeconds Int default=5
+    nextUdpDisableWindowSeconds Int default=5
     disableExpiration UTCTime default=now()
     ~enode Enode Maybe
     deriving Show Read Eq
@@ -82,7 +83,7 @@ newtype BondedPeers = BondedPeers { unBondedPeers :: [PPeer] }
 newtype BondedPeersForUDP = BondedPeersForUDP { unBondedPeersForUDP :: [PPeer] }
 newtype UnbondedPeers = UnbondedPeers { unUnbondedPeers :: [PPeer] }
 newtype ClosestPeers = ClosestPeers { unClosestPeers :: [PPeer] }
-newtype UdpEnableTime = UdpEnableTime UTCTime
+newtype UdpEnableTime = UdpEnableTime UTCTime deriving (Eq, Ord)
 newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
@@ -95,6 +96,18 @@ data PeerDisable =
     { spdtTcpEnableTime :: TcpEnableTime
     , spdtNextDisableWindowSeconds :: Int
     , spdtDisableExpiration :: UTCTime
+    }
+  deriving (Eq, Ord)
+
+data PeerUdpDisable =
+  ExtendPeerUdpDisableTime
+    { epdtUdpDisableTime :: UdpEnableTime
+    , epdtNextUdpDisableWindowFactor :: Int
+    }
+  | SetPeerUdpDisableTime
+    { epdtUdpDisableTime :: UdpEnableTime
+    , spdtNextUdpDisableWindowSeconds :: Int
+    , spdtUdpDisableExpiration :: UTCTime
     }
   deriving (Eq, Ord)
 
@@ -181,6 +194,20 @@ instance A.Replaceable PPeer PeerDisable IO where
                                  , PPeerDisableExpiration SQL.=. disableExpiration
                                  ]
 
+instance A.Replaceable PPeer PeerUdpDisable IO where
+  replace _ peer d = withGlobalSQLPool $ \sqldb -> do
+    let selector = thisPeer peer
+    flip runSqlPool sqldb $ case d of
+      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
+        SQL.updateWhere selector [ PPeerUdpEnableTime SQL.=. enableTime
+                                 , PPeerNextUdpDisableWindowSeconds SQL.*=. nextDisableWindowFactor
+                                 ]
+      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        SQL.updateWhere selector [ PPeerUdpEnableTime SQL.=. enableTime
+                                 , PPeerNextUdpDisableWindowSeconds SQL.=. nextDisableWindow
+                                 , PPeerDisableExpiration SQL.=. disableExpiration
+                                 ]
+
 pPeerString :: PPeer -> String
 pPeerString PPeer{..} = T.unpack pPeerIp ++ ":" ++ show pPeerTcpPort
 
@@ -212,6 +239,7 @@ buildPeerPoint (pubkeyMaybe, ip, _) =
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix
         pPeerNextDisableWindowSeconds = 5,
+        pPeerNextUdpDisableWindowSeconds = 5,
         pPeerDisableExpiration = jamshidBirth,
         pPeerEnode = peerToEnode peer
         }
@@ -304,6 +332,21 @@ lengthenPeerDisable peer' = try $ do
                   then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
                   else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerDisable) peer disable
+
+-- A variation of 'lengthenPeerDisable' but for UDP exclusively used for ethereum-discovery.
+-- The first time a peer is disabled, the timeout is five seconds. Every subsequent failure that
+-- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
+-- from building up longer and longer disables, e.g. if it caused an exception once a day
+-- by the end of the month it would be disabled for years.
+lengthenPeerDisable' :: (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m)
+                    => PPeer -> m (Either SomeException ())
+lengthenPeerDisable' peer' = try $ do
+  currentTime <- liftIO getCurrentTime
+  let peer = peer'{pPeerTcpPort=30303}
+      disable = if (currentTime < pPeerDisableExpiration peer)
+                  then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer) `addUTCTime` currentTime) 2
+                  else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
+  A.replace (A.Proxy @PeerUdpDisable) peer disable
 
 -- TODO: Allow an empty public key in the Enode type
 peerToEnode :: PPeer -> Maybe Enode
