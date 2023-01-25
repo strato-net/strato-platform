@@ -32,7 +32,6 @@ import           Data.Conduit
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
-import           Data.Time.Clock
 import           Data.Traversable                      (for)
 import           GHC.IO.Exception                      
 import           UnliftIO
@@ -62,9 +61,6 @@ runPeer peer sSource = do
   void $ register ender
 
   myPublic <- getPub
-
-  curTime <- liftIO getCurrentTime
-  when ((pPeerEnableTime peer) > curTime) $ throwIO PeerDisabled
   
   otherPubKey <- case (pPeerPubkey peer) of
     Nothing -> do

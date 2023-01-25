@@ -25,7 +25,6 @@ import qualified Data.ByteString                       as B
 import           Data.Either.Combinators
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
-import           Data.Time.Clock
 import           GHC.IO.Exception
 import           UnliftIO
 
@@ -61,9 +60,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
-
-      curTime <- liftIO getCurrentTime
-      when ((pPeerEnableTime p) > curTime) $ throwIO PeerDisabled
 
       case pPeerPubkey p of
         Nothing -> do
