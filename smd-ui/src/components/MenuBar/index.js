@@ -6,14 +6,10 @@ import './menubar.css';
 import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
-import { Field, reduxForm } from 'redux-form';
+import { reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
 class MenuBar extends Component {
-
-  // componentDidMount() {
-  //   this.props.fetchChainIds();
-  // }
 
   logout() {
     localStorage.removeItem('user');
@@ -40,42 +36,6 @@ class MenuBar extends Component {
       </div>
     );
   }
-
-  // renderChainDropDown() {
-  //   if (this.props.chainIds.length) {
-  //     return (
-  //       <span>
-  //         <span className="pt-navbar-divider" />
-  //         <small className="pt-text-muted">
-  //           <div className="pt-select">
-  //             <Field
-  //               className="pt-input select-chain"
-  //               component="select"
-  //               name="chainLabel"
-  //               onChange={
-  //                 (e) => {
-  //                   const data = e.target.value === 'Main Chain' ? null : e.target.value;
-  //                   this.props.selectChain(data);
-  //                 }
-  //               }
-  //               required
-  //             >
-  //               <option> Main Chain </option>
-  //               {
-  //                 this.props.chainIds.map((label, i) => {
-  //                   return (
-  //                     <option key={label.id} value={label.id}>{label.label}</option>
-  //                   )
-  //                 })
-  //               }
-  //             </Field>
-  //           </div>
-  //         </small>
-  //         <span className="pt-navbar-divider" />
-  //       </span>
-  //     );
-  //   }
-  // }
 
   render() {
     return (
@@ -106,7 +66,6 @@ class MenuBar extends Component {
 
 export function mapStateToProps(state) {
   return {
-    chainIds: state.chains.chainIds,
     oauthUser: state.user.oauthUser
   };
 }
