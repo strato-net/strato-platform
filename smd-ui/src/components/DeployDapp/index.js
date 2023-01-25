@@ -9,7 +9,6 @@ import {
   resetError
 } from './deployDapp.actions';
 import { Button, Dialog } from '@blueprintjs/core';
-import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
