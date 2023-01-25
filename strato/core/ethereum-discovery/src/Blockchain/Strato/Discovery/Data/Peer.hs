@@ -333,11 +333,7 @@ lengthenPeerDisable peer' = try $ do
                   else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerDisable) peer disable
 
--- A variation of 'lengthenPeerDisable' but for UDP exclusively used for ethereum-discovery.
--- The first time a peer is disabled, the timeout is five seconds. Every subsequent failure that
--- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
--- from building up longer and longer disables, e.g. if it caused an exception once a day
--- by the end of the month it would be disabled for years.
+-- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
 lengthenPeerDisable' :: (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m)
                     => PPeer -> m (Either SomeException ())
 lengthenPeerDisable' peer' = try $ do
