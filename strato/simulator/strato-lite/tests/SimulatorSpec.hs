@@ -20,6 +20,7 @@ import           Conduit
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens                          hiding (Context, view)
 import           Control.Monad.Reader
+import qualified Control.Monad.Change.Alter            as A
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Foldable                         (for_)
 import qualified Data.Map.Strict                       as M
@@ -30,7 +31,7 @@ import           Data.Text.Encoding
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
--- import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction  as U
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
@@ -48,7 +49,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -58,7 +58,12 @@ import qualified Blockchain.Strato.Model.ChainMember as CM
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
 
+
+
+import           Blockchain.Strato.Model.Account
+import           Blockchain.DB.RawStorageDB
 import           Strato.Lite
+import           BlockApps.Logging
 
 
 import           Test.Hspec
@@ -68,11 +73,18 @@ import           Text.RawString.QQ
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
+import  qualified  Blockchain.VMContext  as VMC
+import             Blockchain.DB.SolidStorageDB
+import             SolidVM.Model.Storable
+
+
 createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
 createPeer' pk identity as certs n ip = do
   inet <- newTVarIO preAlGoreInternet
   createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
-                          
+
+
+
 spec :: Spec
 spec = do
   describe "network simulation" $ do
@@ -849,3 +861,145 @@ contract B {
         (ctxs1 !! 2) ^. trueOrgNameChainsMap `shouldBe` M.empty
 
         -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()
+
+  describe "Testing contracts that call other contracts by addresss" $ do
+    --Note to the developer
+    --These contracts are shoved into the txrIndexer
+    --Therefore, they do not go through the parser.
+    --It is your job to make sure your contracts are correct.
+    fit "can call delegatecall function and not change state variables of contract being called" $ do
+        privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..4]
+        let validatorAddresses = fromPrivateKey <$> privKeys
+            validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
+                             , CommonName "Microsoft" "Sales" "Person" True
+                             , CommonName "Amazon" "Product" "Jeff Bezos" True
+                             ]
+            zippedValidators = take 2 $ zip validatorAddresses validatorInfos
+        certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
+        peers <- traverse (\((p,c),(n,i)) -> createPeer' p c zippedValidators certs n i) $ zip (zip privKeys validatorInfos)
+          [ ("node1", "1.2.3.4")
+          , ("node2", "5.6.7.8")
+          , ("node3", "9.10.11.12")
+          ]
+        connections' <- traverse (uncurry createConnection)
+          [ (peers !! 0, peers !! 1)
+          , (peers !! 0, peers !! 2)
+          , (peers !! 1, peers !! 2)
+          ]
+        ts <- liftIO getCurrentMicrotime
+        let toIetx = IETx ts . IngestTx Origin.API
+            args = "(\"Amazon\",\"Product\",\"Jeff Bezos\")"
+            txMd = M.fromList [("funcName", "voteToAddValidator"), ("args", args)]
+            setupTx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 0
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Just $ Address 0x100
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code ""
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
+
+
+            mainChainSrc = [r|
+contract B {
+  uint y;
+  string powPow = "Example of Different States";
+
+  constructor() {
+    y = 47;
+  }
+  function gg() returns(string) {return "Nice I did this";}
+  function gg(int _x) returns(string) { return "Nice I did this taking an int arg";}
+  function gg(int _x, int _b) returns(int) { return _x + _b;}
+  function () external {y +=3; }
+}
+|]
+            mainChainContractName = "B"
+            mainChainArgs = "()"
+            mainChainSrcC = [r|
+contract C {
+  string powPow = "Other Example of different states";
+  string getMoney;
+  int x;
+  uint y = 2;
+  string yes;
+  constructor(address _add) {
+    getMoney = address(_add).delegatecall("gg()");
+    x = address(_add).delegatecall("gg(int, int)", 333333333, 333333333);
+    yes =  _add.delegatecall("gg()");
+    _add.delegatecall("ggg()");
+  }
+}
+|]
+            mainChainContractNameC = "C"
+            mainChainUtx = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 1
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Nothing
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            mainChainUtx2 = U.UnsignedTransaction
+              { U.unsignedTransactionNonce      = Nonce 2
+              , U.unsignedTransactionGasPrice   = Wei 1
+              , U.unsignedTransactionGasLimit   = Gas 1000000000
+              , U.unsignedTransactionTo         = Nothing
+              , U.unsignedTransactionValue      = Wei 0
+              , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrcC
+              , U.unsignedTransactionChainId    = Nothing
+              }
+            mainChainTxMd  = M.fromList [("src", mainChainSrc), ("name", mainChainContractName),  ("args", mainChainArgs)]
+            mkMainChainTx = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce 1}
+                               in mkSignedTx (privKeys !! 1) utx mainChainTxMd
+            
+            mainChainRoutine n = do
+              threadDelay 200000
+              flip postEvent (peers !! 1) . UnseqEvent . toIetx $ mkMainChainTx 
+              let  x = getNewAddress_unsafe (fromPrivateKey ( privKeys !! 1)) 1
+ 
+
+              let args' =  "(0x" <> T.pack (formatAddressWithoutColor x) <> ")"
+              --liftIO $ putStrLn $ "Can I print here" ++ (show args') ++"\n\t" ++ (show  $ Account x Nothing) -- ++ "\n\t" ++ (show  $ xxx) -- Delete this for later
+              let mainChainTxMdC = M.fromList [("src", mainChainSrcC), ("name", mainChainContractNameC), ("args", args')]
+              let mkMainChainTx2 n' = let utx = mainChainUtx2{U.unsignedTransactionNonce = Nonce n'}
+                               in mkSignedTx (privKeys !! 1) utx mainChainTxMdC
+              flip postEvent (peers !! 1) . UnseqEvent . toIetx $ mkMainChainTx2 n
+              
+              mainChainRoutine $ n + 1
+
+            routine = do
+              threadDelay 200000
+              for_ peers $ postEvent (TimerFire 0)
+              threadDelay 1000000
+              flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
+              threadDelay 10000000
+              runNetworkOld (drop 3 peers) (drop 3 connections')
+
+
+        void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
+        
+        bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 1
+        let varsToLookUp =[".powPow", ".getMoney", ".y"]
+        (contractA'sStateVars, contractB'sStateVars) <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
+          let contractALookup = map (( Account  (getNewAddress_unsafe (fromPrivateKey ( privKeys !! 1)) 1) Nothing), ) varsToLookUp :: [(Account, BC.ByteString)]
+          let contractBLookup = map (( Account  (getNewAddress_unsafe (fromPrivateKey ( privKeys !! 1)) 2) Nothing), ) varsToLookUp :: [(Account, BC.ByteString)]
+          valsOfA <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) contractALookup
+          valsOfB <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) contractBLookup
+          let fToPreform = map (\xxx' -> case xxx' of Just xxx -> Just $ fromVal xxx; Nothing -> Nothing;)
+          pure $ (fToPreform valsOfA, fToPreform valsOfB)
+
+
+
+
+        -- contractB'sStateVars <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
+          
+        --   vals <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) varsToLookUp
+        --   pure $ map (\xxx' -> case xxx' of Just xxx -> Just $ fromVal xxx; Nothing -> Nothing;) vals --[val1a, val2a, val3a]
+
+
+        contractA'sStateVars `shouldBe` [Just (BString "Example of Different States"),Nothing, Just (BInteger 47) ]
+        contractB'sStateVars `shouldBe` [Just (BString "Other Example of different states"),Just (BString "Nice I did this"), Just (BInteger 5) ]
