@@ -416,45 +416,45 @@ pipeline {
         //     }
         // }
 
-        /* SINGLE NODE SYNC WITH DEVNET TESTS */
-        stage ('Single Node Sync with Devnet - Clean Node') {
-             // agent { label "multinode101" } // is default
-            steps { 
-                script {
-                    lib.cleanNode()
-                }
-            }
-        }
+        // /* SINGLE NODE SYNC WITH DEVNET TESTS */
+        // stage ('Single Node Sync with Devnet - Clean Node') {
+        //      // agent { label "multinode101" } // is default
+        //     steps { 
+        //         script {
+        //             lib.cleanNode()
+        //         }
+        //     }
+        // }
 
-        stage ('Single Node Sync with Devnet - Deploy Node') {
-            steps {
-                script {
-                    lib.deployStrato(NODE_DATA.NODE1)
-                    sh "docker system prune -fa --volumes"
-                }
-            }
-        }
+        // stage ('Single Node Sync with Devnet - Deploy Node') {
+        //     steps {
+        //         script {
+        //             lib.deployStrato(NODE_DATA.NODE1)
+        //             sh "docker system prune -fa --volumes"
+        //         }
+        //     }
+        // }
 
-        stage('Single Node Sync with Devnet - Deploy Monitor') {
-            steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
-                ]) {
-                    script {
-                        lib.runMonitor(NODE_DATA.NODE1, null)
-                        sh "docker system prune -fa --volumes"
-                    }
-                }
-            }
-        }
+        // stage('Single Node Sync with Devnet - Deploy Monitor') {
+        //     steps {
+        //         withCredentials([
+        //             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+        //         ]) {
+        //             script {
+        //                 lib.runMonitor(NODE_DATA.NODE1, null)
+        //                 sh "docker system prune -fa --volumes"
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Single Node Sync with Devnet - Wait for Healthy Network') {
-            steps {
-                script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
-                }
-            }
-        }
+        // stage('Single Node Sync with Devnet - Wait for Healthy Network') {
+        //     steps {
+        //         script {
+        //             lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
+        //         }
+        //     }
+        // }
 
         /* NETWORK OF NODES SYNC WITH DEVNET TESTS*/
         /* Stability Test - Restart Node */
@@ -516,55 +516,55 @@ pipeline {
             }
         }
 
-        stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
-            agent { label "multinode305" }
-            steps {
-                script {
-                    lib.runMonitor(NODE_DATA.NODE1, 'networkSynctoDevnet')
-                }                
-            }
-        }
+        // stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
+        //     agent { label "multinode305" }
+        //     steps {
+        //         script {
+        //             lib.runMonitor(NODE_DATA.NODE1, 'networkSynctoDevnet')
+        //         }                
+        //     }
+        // }
 
-        stage('Sync Network To Devnet') {
-            parallel {
-                stage('Sync multinode101') {
-                    // agent { label "multinode101" } // is default
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE1)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    } 
-                }
-                stage('Sync multinode102') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE2)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-                stage('Sync multinode103') {
-                    agent { label "multinode103" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE3)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-                stage('Sync multinode104') {
-                    agent { label "multinode104" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE4)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Sync Network To Devnet') {
+        //     parallel {
+        //         stage('Sync multinode101') {
+        //             // agent { label "multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE1)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             } 
+        //         }
+        //         stage('Sync multinode102') {
+        //             agent { label "multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE2)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //         stage('Sync multinode103') {
+        //             agent { label "multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE3)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //         stage('Sync multinode104') {
+        //             agent { label "multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE4)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         // stage('Performance Test - Wait for Network to Sync with Devnet') {
         //     agent { label "multinode305" }
