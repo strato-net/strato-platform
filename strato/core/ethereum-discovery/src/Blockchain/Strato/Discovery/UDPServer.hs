@@ -157,28 +157,43 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
           where mkEndpoint PPeer{..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
                 mkNodeId             = pointToNodeID . fromJust . pPeerPubkey
 
-    Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
-        $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
-        curTime <- liftIO getCurrentTime
-        let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
-                         , pPeerIp = T.pack $ format addr'
-                         , pPeerUdpPort = udpPort
-                         , pPeerTcpPort = tcpPort
-                         , pPeerNumSessions = 0
-                         , pPeerLastTotalDifficulty = 0
-                         , pPeerLastMsg  = T.pack "msg"
-                         , pPeerLastMsgTime = curTime
-                         , pPeerEnableTime = curTime
-                         , pPeerUdpEnableTime = curTime
-                         , pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
-                         , pPeerBondState = 0
-                         , pPeerActiveState = 0
-                         , pPeerVersion = T.pack "61" -- fix
-                         , pPeerNextDisableWindowSeconds=5
-                         , pPeerDisableExpiration=posixSecondsToUTCTime 0
-                         , pPeerEnode = peerToEnode peer
-                         }
-        addPeer peer
+    Neighbors neighbors _ -> do
+      let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _)-> format addr') <$> neighbors)
+          ip = sockAddrToIP addr
+      neighborsExist <- doPeersExist neighborIPs
+      if (neighborsExist == True) 
+        then do
+          $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
+          thePeer <- getPeerByIP' ip
+          case thePeer of
+            Nothing -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Something went wrong, can't find the peer I'm currently connected to. *visibly confused*"
+            Just p -> do
+              eErr <- lengthenPeerDisable' p
+              whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
+      else 
+        forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
+          $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
+          curTime <- liftIO getCurrentTime
+          let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
+                           , pPeerIp = T.pack $ format addr'
+                           , pPeerUdpPort = udpPort
+                           , pPeerTcpPort = tcpPort
+                           , pPeerNumSessions = 0
+                           , pPeerLastTotalDifficulty = 0
+                           , pPeerLastMsg  = T.pack "msg"
+                           , pPeerLastMsgTime = curTime
+                           , pPeerEnableTime = curTime
+                           , pPeerUdpEnableTime = curTime
+                           , pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
+                           , pPeerBondState = 0
+                           , pPeerActiveState = 0
+                           , pPeerVersion = T.pack "61" -- fix
+                           , pPeerNextDisableWindowSeconds=5
+                           , pPeerNextUdpDisableWindowSeconds=5
+                           , pPeerDisableExpiration=posixSecondsToUTCTime 0
+                           , pPeerEnode = peerToEnode peer
+                           }
+          addPeer peer
   where addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
           curTime <- liftIO getCurrentTime
           let ip   = sockAddrToIP addr
@@ -197,6 +212,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix
                           , pPeerNextDisableWindowSeconds=5
+                          , pPeerNextUdpDisableWindowSeconds=5
                           , pPeerDisableExpiration=posixSecondsToUTCTime 0
                           , pPeerEnode = peerToEnode peer
                           }
