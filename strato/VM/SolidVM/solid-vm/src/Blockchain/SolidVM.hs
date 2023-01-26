@@ -773,12 +773,11 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
           --- Delegatecall logic
           Just theFunction | (isDelegateCall == True) -> do
                 let mtheFunction' = do -- find the func that matches the arguements the user gave, if not found return Nothing and then call fallback
-
                       let boolTrueIfArgsSameLength thyFunc = (length argsParsed )  == (length $ CC._funcArgs thyFunc)
                           filteredFuncsWithSameArgLength = filter boolTrueIfArgsSameLength ( [theFunction] ++  (CC._funcOverload  theFunction) )
                           boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
                           finalFuncFind = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
-                      if length finalFuncFind /= 0 then Just $ (head finalFuncFind) else Nothing 
+                      case finalFuncFind of [a] -> Just  a; _ -> Nothing; 
                 case mtheFunction' of
                       Just theFunction' | (length argsParsed) == (length argExps) -> do
                                 args' <- argsToVals contract' theFunction' argExps
