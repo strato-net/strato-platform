@@ -18,7 +18,7 @@ pipeline {
         stage('Prep') {
             steps {
                 sh "sudo rm -rf strato-getting-started"
-                sh "git clone https://github.com/blockapps/strato-getting-started"
+                sh "git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv"
                 dir('strato-getting-started') {
                     script {
                         if (env.STRATO_BUILD == 'latest') {
@@ -32,6 +32,16 @@ pipeline {
                                     projectName: "STRATO_autobuild/develop",
                                     selector: [$class: 'StatusBuildSelector'],
                                     filter: "docker-compose.yml",
+                                    target: '.',
+                                    optional: false
+                            ])
+                            step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/develop",
+                                    selector: [$class: 'StatusBuildSelector'],
+                                    filter: "docker-compose.vault.yml",
                                     target: '.',
                                     optional: false
                             ])
@@ -56,6 +66,16 @@ pipeline {
                                     projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
                                     selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
                                     filter: "docker-compose.yml",
+                                    target: '.',
+                                    optional: false
+                                ])
+                                step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
+                                    selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
+                                    filter: "docker-compose.vault.yml",
                                     target: '.',
                                     optional: false
                                 ])

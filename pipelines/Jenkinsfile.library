@@ -133,34 +133,36 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
       writeFile file: "run-vault.sh", text: """#!/bin/bash
         sudo \\
           ssl=true \\
-          HTTPS_PORT=8093 \\
-          INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \\
-          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \\
+          HTTPS_PORT=8093  \\
+          INITIAL_OAUTH_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}' \\
+          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-mercata-dev' \\
           INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
           PASSWORD=123 \\
           ./vault
       """
       sh 'chmod +x run-vault.sh'
-  
       sh './run-vault.sh'
   
       // TODO: run node on https (also update check_availability function)
       writeFile file: "run.sh", text: """#!/bin/bash
         sudo \\
-          NODE_HOST=\$(</host) \\
+          ssl=true \\
+          sslCertFileType=pem \\
+          NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
+          HTTPS_PORT="${nodeData.PORT}" \\
+          networkID=${nodeData.NETWORK_ID} \\
           BLOC_DEBUG=true \\
           SLIPSTREAM_OPTIONAL=false \\
-          OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-          OAUTH_CLIENT_ID=dev \\
-          OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
-          VAULT_URL=https://\$(</host):8093 \\
+          OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
+          OAUTH_CLIENT_ID=${nodeData.OAUTH_CLIENT_ID} \\
+          OAUTH_CLIENT_SECRET=${nodeData.OAUTH_CLIENT_SECRET} \\
+          VAULT_URL=https://${nodeData.HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
-          certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-          ./strato --single
+          certInfo='${nodeData.CERT_INFO}' \\
+          ./strato 
       """
       sh 'chmod +x run.sh'
-  
       sh './run.sh'
       
     }
@@ -171,7 +173,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     sh '''#!/bin/bash -le
       check_availability() {
         counter=0
-        until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
+        until curl --silent --fail --location https://$(</host):8080/health | jq .healthInfo.isHealthy | grep true
         do
           if [[ "$counter" -gt 120 ]]; then
             echo "STRATO node took longer than 2 minutes to initialize! aborting."
@@ -201,10 +203,15 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     writeFile file: "publicKey", text: "${nodePubKey}"
     
     return nodeAddress
+    
   }
+  
   dir("strato") {
     // Build genesis-block.json
     sh '''#!/bin/bash -le
+      cd ..
+      REPO=local make build_buildbase
+      cd strato
       myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
       sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
       stack run x509-generator -- \\
@@ -220,40 +227,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         --admins=genesis-builder/admins.json \\
         --certs=genesis-builder/certs.json \\
         --output=../strato-getting-started/genesis-block.json'''
-  }
-
-  dir("strato-getting-started") {
-    sh './strato --wipe'
-
-    sh './run.sh'
-
-    sh 'docker ps'
-
-    // Few quick tests
-    sh '''#!/bin/bash -le
-      check_availability() {
-        counter=0
-        until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
-        do
-          if [[ "$counter" -gt 120 ]]; then
-            echo "STRATO node took longer than 2 minutes to initialize! aborting."
-            exit 73
-          fi
-          echo "waiting for STRATO health endpoint to be available through nginx"
-          counter=$((counter+1))
-          sleep 1
-        done
-        echo "STRATO health endpoint is available through nginx - node is running"
-      }
-
-      check_availability
-      
-      echo "Restarting docker containers to simulate computer restart..."
-      docker-compose -p strato --log-level ERROR stop
-      docker-compose -p strato --log-level ERROR start
-      
-      check_availability
-    '''
   }
 }
 
