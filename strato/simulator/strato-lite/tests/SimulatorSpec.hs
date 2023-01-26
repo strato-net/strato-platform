@@ -930,6 +930,7 @@ contract C {
     x = address(_add).delegatecall("gg(int, int)", 333333333, 333333333);
     yes =  _add.delegatecall("gg()");
     _add.delegatecall("ggg()");
+    //1.delegatecall("ggg()"); //This will make error.... because we shouldn't be able to call delegate on anything but an address type 
   }
 }
 |]
