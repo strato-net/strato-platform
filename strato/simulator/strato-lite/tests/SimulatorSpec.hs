@@ -28,6 +28,8 @@ import qualified Data.Set                              as Set
 import qualified Data.Text                             as T
 import           Data.Text.Encoding
 
+import           BlockApps.Logging
+
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
@@ -39,12 +41,15 @@ import           Blockchain.Data.BlockDB()
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
+import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.SolidStorageDB
 import           BlockApps.X509.Certificate           
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
 import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ChainMember
@@ -58,12 +63,12 @@ import qualified Blockchain.Strato.Model.ChainMember as CM
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
 
+import qualified Blockchain.VMContext  as VMC
 
+import           SolidVM.Model.Storable
 
-import           Blockchain.Strato.Model.Account
-import           Blockchain.DB.RawStorageDB
 import           Strato.Lite
-import           BlockApps.Logging
+
 
 
 import           Test.Hspec
@@ -73,9 +78,6 @@ import           Text.RawString.QQ
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
-import  qualified  Blockchain.VMContext  as VMC
-import             Blockchain.DB.SolidStorageDB
-import             SolidVM.Model.Storable
 
 
 createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
