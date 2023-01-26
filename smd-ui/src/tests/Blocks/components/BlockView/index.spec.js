@@ -106,7 +106,7 @@ describe('BlockView: index', () => {
         <BlockView.WrappedComponent {...props} />
       );
 
-      wrapper.find('tr').at(9).simulate('click');
+      wrapper.find('tr').at(8).simulate('click');
       expect(props.history.push).toHaveBeenCalled();
       expect(props.history.push.mock.calls.length).toBe(1);
     });
