@@ -104,6 +104,9 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) wh
 
         where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ipStr ] []
 
+instance MonadIO m => A.Replaceable T.Text PPeer (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (ReaderT ContextLite m) where
   replace p k = liftIO . A.replace p k
 
@@ -189,6 +192,7 @@ type MonadDiscovery m = ( HasVault m
                         , A.Selectable IPAsText ClosestPeers m
                         , A.Selectable String PPeer m
                         , A.Replaceable PPeer PeerUdpDisable m
+                        , A.Replaceable T.Text PPeer m
                         , A.Selectable () (B.ByteString, SockAddr) m
                         , A.Replaceable IPAsText PPeer m
                         , A.Replaceable SockAddr B.ByteString m

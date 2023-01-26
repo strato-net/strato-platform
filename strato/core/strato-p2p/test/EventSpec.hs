@@ -1078,13 +1078,23 @@ instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer Pee
   replace p k = lift . A.replace p k
 
 instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where
-  replace _ peer' d = case d of
-    ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
-      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
-    SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
-      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+  replace _ peer' d = do
+    currentTime <- liftIO getCurrentTime
+    case d of
+      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
+      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+      ResetPeerUdpDisable ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
 
 instance (Monad m, A.Replaceable PPeer PeerUdpDisable m) => A.Replaceable PPeer PeerUdpDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable T.Text PPeer (MonadTest m) where
+  replace _ message peer' = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerLastMsg = message})
+
+instance (Monad m, A.Replaceable T.Text PPeer m) => A.Replaceable T.Text PPeer (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint

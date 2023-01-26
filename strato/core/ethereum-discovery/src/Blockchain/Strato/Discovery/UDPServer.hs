@@ -77,6 +77,7 @@ addPeersIfNeeded minPeers = do
         for_ mPeerAddr $ \peerAddr -> do
           time <- liftIO $ round `fmap` getPOSIXTime
           randomBytes <- liftIO $ getEntropy 64
+          updateLastMessage (T.pack "FindNeighbors") thePeer 
           sendPacket peerAddr $ FindNeighbors (NodeID randomBytes) (time + 50)
           eErr <- disableUDPPeerForSeconds thePeer 10
           whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
@@ -96,13 +97,18 @@ attemptBond = do
       case getHostAddress serverAddr of
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
-          sendPacket peerAddr $
-                Ping 4
-                   (Endpoint hostAddress udpPort tcpPort)
-                   (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
-                             peerUdpPort
-                             (TCPPort . fromIntegral $ pPeerTcpPort p))
-                   (time+50)
+          if (pPeerLastMsg p == T.pack "Ping") then do
+            eErr <- lengthenPeerDisable' p
+            whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
+          else do
+            updateLastMessage (T.pack "Ping") p
+            sendPacket peerAddr $
+                  Ping 4
+                    (Endpoint hostAddress udpPort tcpPort)
+                    (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
+                              peerUdpPort
+                              (TCPPort . fromIntegral $ pPeerTcpPort p))
+                    (time+50)
 
 udpHandshakeServer :: MonadDiscovery m => Int -> m ()
 udpHandshakeServer minPeers = do
@@ -160,17 +166,15 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
     Neighbors neighbors _ -> do
       let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _)-> format addr') <$> neighbors)
           ip = sockAddrToIP addr
+      thePeer <- getPeerByIP' ip
+      updateLastMessage (T.pack "Neighbors") $ fromJust thePeer
       neighborsExist <- doPeersExist neighborIPs
       if (neighborsExist == True) 
         then do
           $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
-          thePeer <- getPeerByIP' ip
-          case thePeer of
-            Nothing -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Something went wrong, can't find the peer I'm currently connected to. *visibly confused*"
-            Just p -> do
-              eErr <- lengthenPeerDisable' p
-              whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
-      else 
+          eErr <- lengthenPeerDisable' $ fromJust thePeer
+          whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
+      else do
         forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
           $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
           curTime <- liftIO getCurrentTime
@@ -194,6 +198,8 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
                            , pPeerEnode = peerToEnode peer
                            }
           addPeer peer
+        eErr <- resetPeerUdp $ fromJust thePeer
+        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
           curTime <- liftIO getCurrentTime
           let ip   = sockAddrToIP addr
