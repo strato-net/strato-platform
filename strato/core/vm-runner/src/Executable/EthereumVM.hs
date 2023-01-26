@@ -102,7 +102,6 @@ import           Text.Format                           (format)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
-    $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint

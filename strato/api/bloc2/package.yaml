@@ -42,7 +42,6 @@ library:
     - extra
     - filepath
     - format
-    - generically ==0.1
     - hashable
     - hflags
     - insert-ordered-containers
