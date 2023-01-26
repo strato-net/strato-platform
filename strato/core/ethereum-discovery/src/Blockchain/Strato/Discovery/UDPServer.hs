@@ -148,8 +148,12 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
         sendPacket addr $ Pong ep 4 (time+50)
 
     Pong{} -> do
-        eErr <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
-        whenLeft eErr $ \ err -> do
+        let ip = sockAddrToIP addr
+        thePeer <- getPeerByIP' ip
+        eErr <- resetPeerUdp $ fromJust thePeer
+        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
+        eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
+        whenLeft eErr' $ \ err -> do
             $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
             throwM err
 
