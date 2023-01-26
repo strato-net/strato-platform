@@ -33,7 +33,7 @@ Object {
   "initialValues": Object {
     "address": "d2263b71c14010ff03d8f786670aba691b22b158",
     "provider": "s3",
-    "username": "Admin_1085_64667",
+    "username": undefined,
   },
   "isLoading": true,
   "username": "Admin_1085_64667",
@@ -46,7 +46,7 @@ Object {
   "initialValues": Object {
     "address": null,
     "provider": "s3",
-    "username": null,
+    "username": undefined,
   },
   "isLoading": false,
   "username": null,

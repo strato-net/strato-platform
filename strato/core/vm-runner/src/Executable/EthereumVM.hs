@@ -305,7 +305,17 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
-  yield $ OutToStateDiff cId cInfo bHash
+  let org = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataOrganization
+      app = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataApplication
+  yield $ OutToStateDiff cId cInfo bHash org app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
 
@@ -562,8 +572,8 @@ sendOutEvents OutBatch{..} = do
         _ -> Nothing
   
   for_ outJSONRPCs $ liftIO . uncurry produceResponse
-  for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
-    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
+  for_ outToStateDiffs $ \(cId, cInfo, bHash, org, app) ->
+    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
   traverse_ commitSqlDiffs outStateDiffs
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $

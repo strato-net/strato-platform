@@ -31,7 +31,7 @@ class Chains extends Component {
     super()
     this.state = {
       selected: null,
-      limit: 2,
+      limit: 10,
       offset: 0,
     }
   }
@@ -128,7 +128,7 @@ class Chains extends Component {
 
         <div className="row">
           <div className="col-sm-4 text-left">
-            <h3>Chains</h3>
+            <h3>Shards</h3>
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
@@ -143,7 +143,7 @@ class Chains extends Component {
               <input
                 className="pt-input"
                 type="search"
-                placeholder="Search chains"
+                placeholder="Search shards"
                 onChange={e => this.updateFilter(e.target.value.toLowerCase())}
                 dir="auto" />
             </div>
@@ -157,7 +157,7 @@ class Chains extends Component {
                   <table>
                     <tbody>
                       <tr>
-                        <td colSpan={3}>No Chains</td>
+                        <td colSpan={3}>No Shards</td>
                       </tr>
                     </tbody>
                   </table>}

@@ -754,7 +754,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -772,13 +772,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -830,14 +823,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -892,14 +877,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -950,14 +927,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -1012,14 +981,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -1070,14 +1031,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -2545,7 +2498,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -2563,13 +2516,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -2621,14 +2567,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -2683,14 +2621,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -2741,14 +2671,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -2803,14 +2725,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -2861,14 +2775,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -2912,7 +2818,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -2930,13 +2836,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -2988,14 +2887,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -3050,14 +2941,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -3108,14 +2991,6 @@ ShallowWrapper {
                         6
                       </small>
                     </Text>
-                  </td>
-                  <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
                   </td>
                   <td
                     width="20%"
@@ -3170,14 +3045,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -3230,14 +3097,6 @@ ShallowWrapper {
                     </Text>
                   </td>
                   <td
-                    width="22.5%"
-                  >
-                    <HexText
-                      classes="small smd-pad-4"
-                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                    />
-                  </td>
-                  <td
                     width="20%"
                   >
                     <Text
@@ -3270,7 +3129,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -3288,13 +3147,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -3346,14 +3198,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -3408,14 +3252,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -3466,14 +3302,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -3528,14 +3356,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -3588,14 +3408,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -3631,7 +3443,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -3649,13 +3461,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -3682,7 +3487,7 @@ ShallowWrapper {
                         </h5>
                       </th>,
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -3700,13 +3505,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>,
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>,
                       <th
@@ -3752,7 +3550,7 @@ ShallowWrapper {
                         "children": <h5>
                           Parent Hash
                         </h5>,
-                        "width": "22.5%",
+                        "width": "45%",
                       },
                       "ref": null,
                       "rendered": Object {
@@ -3812,30 +3610,6 @@ ShallowWrapper {
                         },
                         "ref": null,
                         "rendered": "Nonce",
-                        "type": "h5",
-                      },
-                      "type": "th",
-                    },
-                    Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": <h5>
-                          Coinbase
-                        </h5>,
-                        "width": "22.5%",
-                      },
-                      "ref": null,
-                      "rendered": Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": "Coinbase",
-                        },
-                        "ref": null,
-                        "rendered": "Coinbase",
                         "type": "h5",
                       },
                       "type": "th",
@@ -3916,14 +3690,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -3974,14 +3740,6 @@ ShallowWrapper {
                             6
                           </small>
                         </Text>
-                      </td>
-                      <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
                       </td>
                       <td
                         width="20%"
@@ -4036,14 +3794,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -4096,14 +3846,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -4154,14 +3896,6 @@ ShallowWrapper {
                             6
                           </small>
                         </Text>
-                      </td>
-                      <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
                       </td>
                       <td
                         width="20%"
@@ -4221,14 +3955,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>,
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>,
                         <td
                           width="20%"
@@ -4383,32 +4109,6 @@ ShallowWrapper {
                         "key": undefined,
                         "nodeType": "host",
                         "props": Object {
-                          "children": <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "class",
-                          "props": Object {
-                            "classes": "small smd-pad-4",
-                            "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                          },
-                          "ref": null,
-                          "rendered": null,
-                          "type": [Function],
-                        },
-                        "type": "td",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
                           "children": <Text
                             ellipsize={true}
                           >
@@ -4490,14 +4190,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>,
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>,
                         <td
                           width="20%"
@@ -4652,32 +4344,6 @@ ShallowWrapper {
                         "key": undefined,
                         "nodeType": "host",
                         "props": Object {
-                          "children": <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "class",
-                          "props": Object {
-                            "classes": "small smd-pad-4",
-                            "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                          },
-                          "ref": null,
-                          "rendered": null,
-                          "type": [Function],
-                        },
-                        "type": "td",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
                           "children": <Text
                             ellipsize={true}
                           >
@@ -4759,14 +4425,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>,
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>,
                         <td
                           width="20%"
@@ -4921,32 +4579,6 @@ ShallowWrapper {
                         "key": undefined,
                         "nodeType": "host",
                         "props": Object {
-                          "children": <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "class",
-                          "props": Object {
-                            "classes": "small smd-pad-4",
-                            "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                          },
-                          "ref": null,
-                          "rendered": null,
-                          "type": [Function],
-                        },
-                        "type": "td",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
                           "children": <Text
                             ellipsize={true}
                           >
@@ -5028,14 +4660,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>,
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>,
                         <td
                           width="20%"
@@ -5190,32 +4814,6 @@ ShallowWrapper {
                         "key": undefined,
                         "nodeType": "host",
                         "props": Object {
-                          "children": <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "class",
-                          "props": Object {
-                            "classes": "small smd-pad-4",
-                            "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                          },
-                          "ref": null,
-                          "rendered": null,
-                          "type": [Function],
-                        },
-                        "type": "td",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
                           "children": <Text
                             ellipsize={true}
                           >
@@ -5297,14 +4895,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>,
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>,
                         <td
                           width="20%"
@@ -5450,32 +5040,6 @@ ShallowWrapper {
                             "rendered": 6,
                             "type": "small",
                           },
-                          "type": [Function],
-                        },
-                        "type": "td",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "class",
-                          "props": Object {
-                            "classes": "small smd-pad-4",
-                            "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                          },
-                          "ref": null,
-                          "rendered": null,
                           "type": [Function],
                         },
                         "type": "td",
@@ -5752,7 +5316,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -5770,13 +5334,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -5828,14 +5385,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -5890,14 +5439,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -5948,14 +5489,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -6010,14 +5543,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -6068,14 +5593,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -7543,7 +7060,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -7561,13 +7078,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -7619,14 +7129,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -7681,14 +7183,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -7739,14 +7233,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -7801,14 +7287,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -7859,14 +7337,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -7910,7 +7380,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -7928,13 +7398,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -7986,14 +7449,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -8048,14 +7503,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -8106,14 +7553,6 @@ ShallowWrapper {
                           6
                         </small>
                       </Text>
-                    </td>
-                    <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
                     </td>
                     <td
                       width="20%"
@@ -8168,14 +7607,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -8228,14 +7659,6 @@ ShallowWrapper {
                       </Text>
                     </td>
                     <td
-                      width="22.5%"
-                    >
-                      <HexText
-                        classes="small smd-pad-4"
-                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                      />
-                    </td>
-                    <td
                       width="20%"
                     >
                       <Text
@@ -8268,7 +7691,7 @@ ShallowWrapper {
                         </h5>
                       </th>
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -8286,13 +7709,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>
                       <th
@@ -8344,14 +7760,6 @@ ShallowWrapper {
                             6
                           </small>
                         </Text>
-                      </td>
-                      <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
                       </td>
                       <td
                         width="20%"
@@ -8406,14 +7814,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -8464,14 +7864,6 @@ ShallowWrapper {
                             6
                           </small>
                         </Text>
-                      </td>
-                      <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
                       </td>
                       <td
                         width="20%"
@@ -8526,14 +7918,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -8586,14 +7970,6 @@ ShallowWrapper {
                         </Text>
                       </td>
                       <td
-                        width="22.5%"
-                      >
-                        <HexText
-                          classes="small smd-pad-4"
-                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                        />
-                      </td>
-                      <td
                         width="20%"
                       >
                         <Text
@@ -8629,7 +8005,7 @@ ShallowWrapper {
                         </h5>
                       </th>
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -8647,13 +8023,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>
                       <th
@@ -8680,7 +8049,7 @@ ShallowWrapper {
                           </h5>
                         </th>,
                         <th
-                          width="22.5%"
+                          width="45%"
                         >
                           <h5>
                             Parent Hash
@@ -8698,13 +8067,6 @@ ShallowWrapper {
                         >
                           <h5>
                             Nonce
-                          </h5>
-                        </th>,
-                        <th
-                          width="22.5%"
-                        >
-                          <h5>
-                            Coinbase
                           </h5>
                         </th>,
                         <th
@@ -8750,7 +8112,7 @@ ShallowWrapper {
                           "children": <h5>
                             Parent Hash
                           </h5>,
-                          "width": "22.5%",
+                          "width": "45%",
                         },
                         "ref": null,
                         "rendered": Object {
@@ -8810,30 +8172,6 @@ ShallowWrapper {
                           },
                           "ref": null,
                           "rendered": "Nonce",
-                          "type": "h5",
-                        },
-                        "type": "th",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <h5>
-                            Coinbase
-                          </h5>,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": "Coinbase",
-                          },
-                          "ref": null,
-                          "rendered": "Coinbase",
                           "type": "h5",
                         },
                         "type": "th",
@@ -8914,14 +8252,6 @@ ShallowWrapper {
                           </Text>
                         </td>
                         <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
-                        </td>
-                        <td
                           width="20%"
                         >
                           <Text
@@ -8972,14 +8302,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>
                         <td
                           width="20%"
@@ -9034,14 +8356,6 @@ ShallowWrapper {
                           </Text>
                         </td>
                         <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
-                        </td>
-                        <td
                           width="20%"
                         >
                           <Text
@@ -9094,14 +8408,6 @@ ShallowWrapper {
                           </Text>
                         </td>
                         <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
-                        </td>
-                        <td
                           width="20%"
                         >
                           <Text
@@ -9152,14 +8458,6 @@ ShallowWrapper {
                               6
                             </small>
                           </Text>
-                        </td>
-                        <td
-                          width="22.5%"
-                        >
-                          <HexText
-                            classes="small smd-pad-4"
-                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                          />
                         </td>
                         <td
                           width="20%"
@@ -9219,14 +8517,6 @@ ShallowWrapper {
                                 6
                               </small>
                             </Text>
-                          </td>,
-                          <td
-                            width="22.5%"
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />
                           </td>,
                           <td
                             width="20%"
@@ -9381,32 +8671,6 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "host",
                           "props": Object {
-                            "children": <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />,
-                            "width": "22.5%",
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "class",
-                            "props": Object {
-                              "classes": "small smd-pad-4",
-                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                            },
-                            "ref": null,
-                            "rendered": null,
-                            "type": [Function],
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
                             "children": <Text
                               ellipsize={true}
                             >
@@ -9488,14 +8752,6 @@ ShallowWrapper {
                                 6
                               </small>
                             </Text>
-                          </td>,
-                          <td
-                            width="22.5%"
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />
                           </td>,
                           <td
                             width="20%"
@@ -9650,32 +8906,6 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "host",
                           "props": Object {
-                            "children": <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />,
-                            "width": "22.5%",
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "class",
-                            "props": Object {
-                              "classes": "small smd-pad-4",
-                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                            },
-                            "ref": null,
-                            "rendered": null,
-                            "type": [Function],
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
                             "children": <Text
                               ellipsize={true}
                             >
@@ -9757,14 +8987,6 @@ ShallowWrapper {
                                 6
                               </small>
                             </Text>
-                          </td>,
-                          <td
-                            width="22.5%"
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />
                           </td>,
                           <td
                             width="20%"
@@ -9919,32 +9141,6 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "host",
                           "props": Object {
-                            "children": <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />,
-                            "width": "22.5%",
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "class",
-                            "props": Object {
-                              "classes": "small smd-pad-4",
-                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                            },
-                            "ref": null,
-                            "rendered": null,
-                            "type": [Function],
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
                             "children": <Text
                               ellipsize={true}
                             >
@@ -10026,14 +9222,6 @@ ShallowWrapper {
                                 6
                               </small>
                             </Text>
-                          </td>,
-                          <td
-                            width="22.5%"
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />
                           </td>,
                           <td
                             width="20%"
@@ -10188,32 +9376,6 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "host",
                           "props": Object {
-                            "children": <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />,
-                            "width": "22.5%",
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "class",
-                            "props": Object {
-                              "classes": "small smd-pad-4",
-                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                            },
-                            "ref": null,
-                            "rendered": null,
-                            "type": [Function],
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
                             "children": <Text
                               ellipsize={true}
                             >
@@ -10295,14 +9457,6 @@ ShallowWrapper {
                                 6
                               </small>
                             </Text>
-                          </td>,
-                          <td
-                            width="22.5%"
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />
                           </td>,
                           <td
                             width="20%"
@@ -10448,32 +9602,6 @@ ShallowWrapper {
                               "rendered": 6,
                               "type": "small",
                             },
-                            "type": [Function],
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <HexText
-                              classes="small smd-pad-4"
-                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
-                            />,
-                            "width": "22.5%",
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "class",
-                            "props": Object {
-                              "classes": "small smd-pad-4",
-                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
-                            },
-                            "ref": null,
-                            "rendered": null,
                             "type": [Function],
                           },
                           "type": "td",
@@ -10844,7 +9972,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -10862,13 +9990,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -12279,7 +11400,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -12297,13 +11418,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -12353,7 +11467,7 @@ ShallowWrapper {
                     </h5>
                   </th>
                   <th
-                    width="22.5%"
+                    width="45%"
                   >
                     <h5>
                       Parent Hash
@@ -12371,13 +11485,6 @@ ShallowWrapper {
                   >
                     <h5>
                       Nonce
-                    </h5>
-                  </th>
-                  <th
-                    width="22.5%"
-                  >
-                    <h5>
-                      Coinbase
                     </h5>
                   </th>
                   <th
@@ -12418,7 +11525,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -12436,13 +11543,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -12486,7 +11586,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -12504,13 +11604,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -12537,7 +11630,7 @@ ShallowWrapper {
                         </h5>
                       </th>,
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -12555,13 +11648,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>,
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>,
                       <th
@@ -12607,7 +11693,7 @@ ShallowWrapper {
                         "children": <h5>
                           Parent Hash
                         </h5>,
-                        "width": "22.5%",
+                        "width": "45%",
                       },
                       "ref": null,
                       "rendered": Object {
@@ -12667,30 +11753,6 @@ ShallowWrapper {
                         },
                         "ref": null,
                         "rendered": "Nonce",
-                        "type": "h5",
-                      },
-                      "type": "th",
-                    },
-                    Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": <h5>
-                          Coinbase
-                        </h5>,
-                        "width": "22.5%",
-                      },
-                      "ref": null,
-                      "rendered": Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": "Coinbase",
-                        },
-                        "ref": null,
-                        "rendered": "Coinbase",
                         "type": "h5",
                       },
                       "type": "th",
@@ -12981,7 +12043,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -12999,13 +12061,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -14416,7 +13471,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -14434,13 +13489,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -14490,7 +13538,7 @@ ShallowWrapper {
                       </h5>
                     </th>
                     <th
-                      width="22.5%"
+                      width="45%"
                     >
                       <h5>
                         Parent Hash
@@ -14508,13 +13556,6 @@ ShallowWrapper {
                     >
                       <h5>
                         Nonce
-                      </h5>
-                    </th>
-                    <th
-                      width="22.5%"
-                    >
-                      <h5>
-                        Coinbase
                       </h5>
                     </th>
                     <th
@@ -14555,7 +13596,7 @@ ShallowWrapper {
                         </h5>
                       </th>
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -14573,13 +13614,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>
                       <th
@@ -14623,7 +13657,7 @@ ShallowWrapper {
                         </h5>
                       </th>
                       <th
-                        width="22.5%"
+                        width="45%"
                       >
                         <h5>
                           Parent Hash
@@ -14641,13 +13675,6 @@ ShallowWrapper {
                       >
                         <h5>
                           Nonce
-                        </h5>
-                      </th>
-                      <th
-                        width="22.5%"
-                      >
-                        <h5>
-                          Coinbase
                         </h5>
                       </th>
                       <th
@@ -14674,7 +13701,7 @@ ShallowWrapper {
                           </h5>
                         </th>,
                         <th
-                          width="22.5%"
+                          width="45%"
                         >
                           <h5>
                             Parent Hash
@@ -14692,13 +13719,6 @@ ShallowWrapper {
                         >
                           <h5>
                             Nonce
-                          </h5>
-                        </th>,
-                        <th
-                          width="22.5%"
-                        >
-                          <h5>
-                            Coinbase
                           </h5>
                         </th>,
                         <th
@@ -14744,7 +13764,7 @@ ShallowWrapper {
                           "children": <h5>
                             Parent Hash
                           </h5>,
-                          "width": "22.5%",
+                          "width": "45%",
                         },
                         "ref": null,
                         "rendered": Object {
@@ -14804,30 +13824,6 @@ ShallowWrapper {
                           },
                           "ref": null,
                           "rendered": "Nonce",
-                          "type": "h5",
-                        },
-                        "type": "th",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <h5>
-                            Coinbase
-                          </h5>,
-                          "width": "22.5%",
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": "Coinbase",
-                          },
-                          "ref": null,
-                          "rendered": "Coinbase",
                           "type": "h5",
                         },
                         "type": "th",

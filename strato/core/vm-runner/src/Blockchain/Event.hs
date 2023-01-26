@@ -31,6 +31,7 @@ import           Blockchain.Stream.Action           (Action)
 import qualified Data.ByteString                    as B
 import qualified Data.DList                         as DL
 import           Data.Map                           (Map)
+import           Data.Text                          (Text)
 
 type VmInEvent = VmEvent
 
@@ -59,7 +60,7 @@ insertInBatch e b = case e of
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
                 | OutIndexEvent IndexEvent
-                | OutToStateDiff Word256 ChainInfo Keccak256
+                | OutToStateDiff Word256 ChainInfo Keccak256 Text Text
                 | OutStateDiff StateDiff
                 | OutLog LogDB
                 | OutEvent EventDB
@@ -72,7 +73,7 @@ data VmOutEventBatch = OutBatch
   , outExecResults  :: DL.DList ExecResults
   , outBlocks       :: DL.DList OutputBlock
   , outIndexEvents  :: DL.DList IndexEvent
-  , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256)
+  , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256, Text, Text)
   , outStateDiffs   :: DL.DList StateDiff
   , outLogs         :: DL.DList LogDB
   , outEvents       :: DL.DList EventDB
@@ -96,13 +97,13 @@ newOutBatch = OutBatch DL.empty
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
-  OutAction a          -> b{ outActions = outActions b `DL.snoc` a }
-  OutBlock a           -> b{ outBlocks = outBlocks b `DL.snoc` a }
-  OutIndexEvent a      -> b{ outIndexEvents = outIndexEvents b `DL.snoc` a }
-  OutToStateDiff x y z -> b{ outToStateDiffs = outToStateDiffs b `DL.snoc` (x,y,z) }
-  OutStateDiff a       -> b{ outStateDiffs = outStateDiffs b `DL.snoc` a }
-  OutLog a             -> b{ outLogs = outLogs b `DL.snoc` a }
-  OutEvent a           -> b{ outEvents = outEvents b `DL.snoc` a }
-  OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
-  OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
-  OutJSONRPC x y       -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
+  OutAction a              -> b{ outActions = outActions b `DL.snoc` a }
+  OutBlock a               -> b{ outBlocks = outBlocks b `DL.snoc` a }
+  OutIndexEvent a          -> b{ outIndexEvents = outIndexEvents b `DL.snoc` a }
+  OutToStateDiff v w x y z -> b{ outToStateDiffs = outToStateDiffs b `DL.snoc` (v,w,x,y,z) }
+  OutStateDiff a           -> b{ outStateDiffs = outStateDiffs b `DL.snoc` a }
+  OutLog a                 -> b{ outLogs = outLogs b `DL.snoc` a }
+  OutEvent a               -> b{ outEvents = outEvents b `DL.snoc` a }
+  OutTXR a                 -> b{ outTXRs = outTXRs b `DL.snoc` a }
+  OutASM a                 -> b{ outASMs = outASMs b `DL.snoc` a }
+  OutJSONRPC x y           -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
