@@ -1352,7 +1352,7 @@ contract A {
 }
 |] in length anns `shouldBe` 3
     
-    fit "Can only call accounts and addresses with delegate call" $
+    it "Can only call accounts and addresses with delegate call" $
       let anns = runTypechecker [r|
 contract A {
   int endofunctor1   = address(0xdeadbeef).delegatecall("garbage()");
