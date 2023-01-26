@@ -6,7 +6,7 @@ exports[`Chains: index filter chain 1`] = `
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
-        Chains
+        Shards
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
@@ -19,7 +19,7 @@ exports[`Chains: index filter chain 1`] = `
     <div className=\\"col-sm-4\\">
       <div className=\\"pt-input-group pt-dark pt-large\\">
         <span className=\\"pt-icon pt-icon-search\\" />
-        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search chains\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search shards\\" onChange={[Function: onChange]} dir=\\"auto\\" />
       </div>
     </div>
   </div>
@@ -355,7 +355,7 @@ exports[`Chains: index render component with empty values 1`] = `
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
-        Chains
+        Shards
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
@@ -368,7 +368,7 @@ exports[`Chains: index render component with empty values 1`] = `
     <div className=\\"col-sm-4\\">
       <div className=\\"pt-input-group pt-dark pt-large\\">
         <span className=\\"pt-icon pt-icon-search\\" />
-        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search chains\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search shards\\" onChange={[Function: onChange]} dir=\\"auto\\" />
       </div>
     </div>
   </div>
@@ -410,7 +410,7 @@ exports[`Chains: index render component with values 1`] = `
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
-        Chains
+        Shards
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
@@ -423,7 +423,7 @@ exports[`Chains: index render component with values 1`] = `
     <div className=\\"col-sm-4\\">
       <div className=\\"pt-input-group pt-dark pt-large\\">
         <span className=\\"pt-icon pt-icon-search\\" />
-        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search chains\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search shards\\" onChange={[Function: onChange]} dir=\\"auto\\" />
       </div>
     </div>
   </div>

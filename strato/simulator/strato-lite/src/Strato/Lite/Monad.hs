@@ -180,8 +180,8 @@ data TestContext = TestContext
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMemberRSet
   , _chainInfoMap          :: Map Word256 ChainInfo
-  , _trueOrgNameChainsMap  :: Map ChainMembers TrueOrgNameChains
-  , _falseOrgNameChainsMap :: Map ChainMembers FalseOrgNameChains
+  , _trueOrgNameChainsMap  :: Map ChainMemberParsedSet TrueOrgNameChains
+  , _falseOrgNameChainsMap :: Map ChainMemberParsedSet FalseOrgNameChains
   , _p2pValidators         :: Set.Set ChainMemberParsedSet
   , _x509certMap           :: Map Address X509CertInfoState
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
@@ -249,23 +249,13 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance (MonadIO m, MonadLogger m) => A.Selectable ChainMembers TrueOrgNameChains (MonadTest m) where
-  select p ip = do
-    res <- A.selectWithDefault p ip
-    pure $ toMaybe (TrueOrgNameChains Set.empty) res
-  selectWithDefault _ ip = do
-    let mems = Set.toList $ unChainMembers ip
-        cms = ChainMembers . Set.singleton <$> mems
-    trueMap <- use trueOrgNameChainsMap
-    let res = flip M.lookup trueMap <$> cms
-    pure $ TrueOrgNameChains $ Set.fromList $ concatMap (\tr -> 
-      case tr of
-        Just chains -> Set.toList $ unTrueOrgNameChains chains
-        Nothing -> []
-      )res
+instance (MonadIO m, MonadLogger m) => A.Selectable ChainMemberParsedSet TrueOrgNameChains (MonadTest m) where
+  select _ ip = use $ trueOrgNameChainsMap . at ip
+  selectWithDefault p ip = fromMaybe (TrueOrgNameChains Set.empty) <$> A.select p ip
 
-instance MonadIO m => A.Selectable ChainMembers FalseOrgNameChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use falseOrgNameChainsMap
+instance MonadIO m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (MonadTest m) where
+  select _ ip = use $ falseOrgNameChainsMap . at ip
+  selectWithDefault p ip = fromMaybe (FalseOrgNameChains Set.empty) <$> A.select p ip
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
@@ -368,16 +358,6 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance MonadIO m => (ChainMembers `A.Alters` Word256) (MonadTest m) where
-  lookup _ _ = error "lookup P2P ChainMembers Word256" 
-  insert _ _ _ = error "insert P2P ChainMembers Word256" 
-  delete _ _ = error "delete P2P ChainMembers Word256" 
-
-instance (ChainMembers `A.Alters` Word256) m => (ChainMembers `A.Alters` Word256) (MonadP2PTest m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
-
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
   put p k = lift $ Mod.put p k
@@ -424,10 +404,10 @@ instance (MonadIO m, (String `A.Alters` PPeer) m) => (String `A.Alters` PPeer) (
   insert p ip = lift . A.insert p ip
   delete p ip = lift $ A.delete p ip
 
-instance A.Selectable ChainMembers TrueOrgNameChains m => A.Selectable ChainMembers TrueOrgNameChains (MonadP2PTest m) where
+instance A.Selectable ChainMemberParsedSet TrueOrgNameChains m => A.Selectable ChainMemberParsedSet TrueOrgNameChains (MonadP2PTest m) where
   select p org = lift $ A.select p org
 
-instance A.Selectable ChainMembers FalseOrgNameChains m => A.Selectable ChainMembers FalseOrgNameChains (MonadP2PTest m) where
+instance A.Selectable ChainMemberParsedSet FalseOrgNameChains m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (MonadP2PTest m) where
   select p org = lift $ A.select p org
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
@@ -1149,7 +1129,6 @@ newSequencerContext bc = do
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
       , _chainInfoRegistry   = M.empty
-      , _orgNameChainsRegistry = M.empty
       , _x509certRegistry    = M.empty
       , _x509certInfoState   = M.empty
       , _getChainsDB         = emptyGetChainsDB
@@ -1451,12 +1430,22 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                                       chainMembersMap . at chainId %= \case
                                         Nothing -> Just newMemRset
                                         Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetUnion rset' newMem
-                                      trueOrgNameChainsMap %= (\m -> case M.lookup org m of
-                                          Nothing -> M.insert org (TrueOrgNameChains $ Set.singleton chainId) m
-                                          Just (TrueOrgNameChains s) -> M.insert org (TrueOrgNameChains $ Set.insert chainId s) m
+                                      trueOrgNameChainsMap %= (\m -> case M.lookup cm m of
+                                          Nothing -> M.insert cm (TrueOrgNameChains $ Set.singleton chainId) m
+                                          Just (TrueOrgNameChains s) -> M.insert cm (TrueOrgNameChains $ Set.insert chainId s) m
                                         )
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
-                                    RemoveOrgName _ _ -> pure () --(Right (cid, (n, u)))
+                                    RemoveOrgName chainId cm -> do
+                                      let org = ChainMembers $ Set.singleton cm
+                                          newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
+                                      chainMembersMap . at chainId %= \case
+                                        Nothing -> Just newMemRset
+                                        Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetIntersection rset' newMem
+                                      falseOrgNameChainsMap %= (\m -> case M.lookup cm m of
+                                          Nothing -> M.insert cm (FalseOrgNameChains $ Set.singleton chainId) m
+                                          Just (FalseOrgNameChains s) -> M.insert cm (FalseOrgNameChains $ Set.insert chainId s) m
+                                        )
+                                      atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IENewChainOrgName chainId cm
                                     ValidatorAdded bHash cm -> do
                                       p2pValidators %= Set.insert cm
                                       atomically . writeTQueue unseqSource . (:[]) . UnseqEvent $ IEValidatorAdded bHash cm

@@ -6,6 +6,7 @@
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Int
+import qualified Data.Text as T
 import           System.Console.CmdArgs
 
 import           Block
@@ -67,8 +68,8 @@ data Options = State{root::String, db::String}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
-             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}  
-             | PushBlocks{startBlock::Integer, endBlock::Integer, peer::ChainMemberParsedSet}
+             | AskForBlocks{startBlock::Integer, endBlock::Integer, qOrg::String, qOrgUnit::String, qCommonName::String}  
+             | PushBlocks{startBlock::Integer, endBlock::Integer, qOrg::String, qOrgUnit::String, qCommonName::String}
              | AskForTxs
              | Redis { key :: String }
              | RedisMatch { pattern :: String }
@@ -238,18 +239,22 @@ checkpointOptions =
 
 askOptions :: Annotate Ann
 askOptions =
-  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = emptyChainMember}
+  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", qOrg = "", qOrgUnit = "", qCommonName = ""}
          [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
          , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
-         , peer := emptyChainMember += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         , qOrg := "" += typ "STRING" += explicit += name "org"
+         , qOrgUnit := "" += typ "STRING" += explicit += name "orgUnit"
+         , qCommonName := "" += typ "STRING" += explicit += name "commonName"
          ]
 
 pushOptions :: Annotate Ann
 pushOptions =
-  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = emptyChainMember}
+  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", qOrg = "", qOrgUnit = "", qCommonName = ""}
          [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
          , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
-         , peer := emptyChainMember += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         , qOrg := "" += typ "STRING" += explicit += name "org"
+         , qOrgUnit := "" += typ "STRING" += explicit += name "orgUnit"
+         , qCommonName := "" += typ "STRING" += explicit += name "commonName"
          ]
 
 txOptions :: Annotate Ann
@@ -424,8 +429,10 @@ run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
       NullOperation -> doCheckpointUsage
-run AskForBlocks{..}           = insertP2P (P2pAskForBlocks startBlock endBlock peer)
-run PushBlocks{..}             = insertP2P (P2pPushBlocks startBlock endBlock peer)
+run AskForBlocks{..}           = let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
+                                  in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run PushBlocks{..}             = let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
+                                  in insertP2P (P2pPushBlocks startBlock endBlock i)
 run AskForTxs                  = insertP2P . P2pGetTx
                                            . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "queryStrato/run")
                                            . filter (not . B.null)

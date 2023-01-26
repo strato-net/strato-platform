@@ -12,6 +12,7 @@ data EventException =
   | EventBeforeHandshake Message
   | WrongGenesisBlock
   | NetworkIDMismatch
+  | PeerDisabled
   | RootCertificateMismatch
   | NoPeerPubKey deriving (Show)
 

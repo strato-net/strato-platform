@@ -154,7 +154,7 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash     --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
-  res <- case mAddress of -- TODO: why does this keeping coming out to Nothing?
+  res <- case mAddress of
     Nothing -> error "Nothing"
     Just a -> A.select (A.Proxy @X509CertInfoState) a
   let cmAddress = getAddressFromCM cm =<< res

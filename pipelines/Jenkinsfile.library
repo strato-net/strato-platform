@@ -149,14 +149,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
         requireCerts=false \\
         gasOn=false \\"""
-      if (rootNodeAddress == null) {
-        runCommand = """${runCommand}
-          isRootNode=true \\"""
-      } else {
-        runCommand = """${runCommand}
-          validators='["${rootNodeAddress}"]' \\
-          blockstanbulAdmins='["${rootNodeAddress}"]' \\"""
-      }
       runCommand = """${runCommand}
         ./strato --blockstanbul"""
       writeFile file:"run.sh", text: """${runCommand}"""

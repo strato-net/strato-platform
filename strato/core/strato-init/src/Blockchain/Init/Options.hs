@@ -34,10 +34,4 @@ defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for m
 defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis block"
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
-defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize - deprecated, except for upgraded networks (pre-6.0)"
-
-defineFlag "genesisBlockTestCert" (False :: Bool) "Generate a test X509 Certificate using this node's public key - ideal for test networks"
-defineFlag "validators" ("[]" :: String) "JSON encoded addresses of Blockstanbul validators"
-defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of network admins. Admins can, for instance, nominate a new validator"
-
 $(return [])

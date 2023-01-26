@@ -802,7 +802,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                   addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
-                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName 
+                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                   popCallInfo
                   return (pure val, OrderedVals []) 
               Nothing -> 
@@ -1872,7 +1872,7 @@ expToVar' (CC.FunctionCall _ e args) = do
           let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr 
           res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args' 
           case res of
-              Just a -> return $ Constant  a
+              Just a  -> return $ Constant  a
               Nothing -> return $ Constant SNULL
         (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
         _ -> regularFunctionCall Nothing
@@ -2079,12 +2079,12 @@ expToVar' (CC.FunctionCall _ e args) = do
                 -- Throw an error if too many arguments are passed
                 OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
                 --If nothing was given or something else, then just return the entire code
-                _ -> pure $ Nothing    
+                _ -> pure $ Nothing
             --get only the contract containing the sweet succulent ContractF definition
             (contract, _, _) <- getCodeAndCollection toAccount
             let codeSnippets :: [String]
-                codeSnippets = 
-                  case (fromMaybe "" searchTerms) of 
+                codeSnippets =
+                  case (fromMaybe "" searchTerms) of
                     --Unparse just the contract
                     "" -> [unparseContract contract]
                     term ->
@@ -2095,15 +2095,15 @@ expToVar' (CC.FunctionCall _ e args) = do
                               True -> Just $ unparseContract contract
                               False -> Nothing
 
-                          constString =   
-                            case ((contract ^. CC.constants) M.!? term) of 
+                          constString =
+                            case ((contract ^. CC.constants) M.!? term) of
                               Just constF -> Just $ unparseConstant (term, constF)
-                              Nothing -> Nothing                          
+                              Nothing -> Nothing
 
-                          storjString = 
+                          storjString =
                             case ((contract ^. CC.storageDefs) M.!? term) of
                               Just storjF -> Just $ unparseVar (term, storjF)
-                              Nothing -> Nothing                           
+                              Nothing -> Nothing
 
                           enumString = 
                             case ((contract ^. CC.enums) M.!? term) of

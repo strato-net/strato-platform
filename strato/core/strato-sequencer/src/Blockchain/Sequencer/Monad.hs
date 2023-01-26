@@ -107,7 +107,6 @@ import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
 import           BlockApps.X509.Certificate
 import qualified LabeledError
 import           Prometheus
@@ -133,8 +132,6 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
   , _chainInfoRegistry   :: !(Map Word256 (Modification ChainInfo))
-  , _orgNameChainsRegistry :: !(Map ChainMembers (Modification Word256))
-  -- , _chainMemberChainsRegistry :: ChainMembers
   , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _x509certInfoState   :: !(Map Address (Modification X509CertInfoState)) --map to pubkey
   , _getChainsDB         :: !GetChainsDB
@@ -232,14 +229,6 @@ instance HasNamespace ChainHashEntry where
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
-
-instance HasNamespace TrueOrgNameChains where
-  type NSKey TrueOrgNameChains = Word256
-  namespace _ = "pnct:"
-
-instance HasNamespace FalseOrgNameChains where
-  type NSKey FalseOrgNameChains = Word256
-  namespace _ = "pncf:"
 
 instance HasNamespace X509CertInfoState where
   type NSKey X509CertInfoState = Address
@@ -486,7 +475,6 @@ runSequencerM c mbc m = do
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
             , _chainInfoRegistry   = M.empty
-            , _orgNameChainsRegistry = M.empty
             , _x509certRegistry    = M.empty
             , _x509certInfoState   = M.empty
             , _getChainsDB         = emptyGetChainsDB

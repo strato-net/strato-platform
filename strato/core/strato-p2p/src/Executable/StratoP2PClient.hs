@@ -32,7 +32,9 @@ import           Data.Conduit
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
+import           Data.Time.Clock
 import           Data.Traversable                      (for)
+import           GHC.IO.Exception                      
 import           UnliftIO
 
 import           BlockApps.Logging
@@ -47,7 +49,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -61,6 +62,9 @@ runPeer peer sSource = do
   void $ register ender
 
   myPublic <- getPub
+
+  curTime <- liftIO getCurrentTime
+  when ((pPeerEnableTime peer) > curTime) $ throwIO PeerDisabled
   
   otherPubKey <- case (pPeerPubkey peer) of
     Nothing -> do
@@ -170,10 +174,26 @@ stratoP2PClient runner = runner $ \_ -> do
           $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
           recordException thePeer e
           eErr <- case e of
-                   e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
-                   e' | Just WrongGenesisBlock <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just WrongGenesisBlock <- fromException e' -> do
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    lengthenPeerDisable thePeer
                    e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
-                   e' | Just NetworkIDMismatch <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just NetworkIDMismatch <- fromException e' -> do
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    lengthenPeerDisable thePeer
+                   e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
+                    case ioErrType of
+                      NoSuchThing -> do
+                        udpErr <- disableUDPPeerForSeconds thePeer 86400
+                        whenLeft udpErr $ \theUDPErr -> do
+                          $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                        lengthenPeerDisable thePeer
+                      _ -> return $ Right ()
                    _  -> return $ Right ()
           whenLeft eErr $ \err -> do
             $logErrorLS "stratoP2PClient/handleRunPeerResult" err

@@ -12,13 +12,13 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Dashboard
       </span>
     </NavLink>
-    <NavLink id=\\"chains\\" to=\\"/chains\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-user-secret\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Chains
+        Shards
       </span>
     </NavLink>
     <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -95,13 +95,13 @@ exports[`SideBar: index render component for public mode 1`] = `
         Dashboard
       </span>
     </NavLink>
-    <NavLink id=\\"chains\\" to=\\"/chains\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-user-secret\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Chains
+        Shards
       </span>
     </NavLink>
     <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -249,9 +249,9 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode secound p
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="chains"
+  id="shards"
   onClick={[Function]}
-  to="/chains"
+  to="/shards"
 >
   <i
     className="fa fa-user-secret"
@@ -262,7 +262,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode secound p
     className="menu-text"
   >
      
-    Chains
+    Shards
   </span>
 </NavLink>
 `;

@@ -855,7 +855,7 @@ contract B {
 
         -- Node 1's cert was registered in the contract so it should receive the chain ID
         (ctxs1 !! 1) ^. trueOrgNameChainsMap `shouldBe`
-          M.singleton (ChainMembers $ Set.singleton $ Org (T.pack "Microsoft") True) (TrueOrgNameChains $ Set.singleton testCid)
+          M.singleton (Org "Microsoft" True) (TrueOrgNameChains $ Set.singleton testCid)
 
         -- Node 2's cert is not registered so it should not have any in the set
         (ctxs1 !! 2) ^. trueOrgNameChainsMap `shouldBe` M.empty
