@@ -78,14 +78,10 @@ import           Text.RawString.QQ
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
-
-
 createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
 createPeer' pk identity as certs n ip = do
   inet <- newTVarIO preAlGoreInternet
   createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
-
-
 
 spec :: Spec
 spec = do
@@ -866,9 +862,7 @@ contract B {
 
   describe "Testing contracts that call other contracts by addresss" $ do
     --Note to the developer
-    --These contracts are shoved into the txrIndexer
-    --Therefore, they do not go through the parser.
-    --It is your job to make sure your contracts are correct.
+    --These contracts are shoved into the txrIndexer ..... Take this into consideration
     fit "can call delegatecall function and not change state variables of contract being called" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..4]
         let validatorAddresses = fromPrivateKey <$> privKeys
@@ -994,14 +988,6 @@ contract C {
           valsOfB <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) contractBLookup
           let fToPreform = map (\xxx' -> case xxx' of Just xxx -> Just $ fromVal xxx; Nothing -> Nothing;)
           pure $ (fToPreform valsOfA, fToPreform valsOfB)
-
-
-
-
-        -- contractB'sStateVars <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
-          
-        --   vals <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) varsToLookUp
-        --   pure $ map (\xxx' -> case xxx' of Just xxx -> Just $ fromVal xxx; Nothing -> Nothing;) vals --[val1a, val2a, val3a]
 
 
         contractA'sStateVars `shouldBe` [Just (BString "Example of Different States"),Nothing, Just (BInteger 47) ]
