@@ -130,34 +130,64 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         oauthDiscovery = nodeData.TRACE_HARVEST.OAUTH_DISCOVERY_URL
       }
       // TODO: rewrite with appending to a file for better readability of the script
-      def runCommand = """#!/bin/bash
+      writeFile file: "run-vault.sh", text: """#!/bin/bash
         sudo \\
-        EXT_STORAGE_S3_BUCKET=strato-external-storage-test \\
-        EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \\
-        EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \\
-        OAUTH_ENABLED=true \\
-        OAUTH_DISCOVERY_URL=${oauthDiscovery} \\
-        OAUTH_JWT_USERNAME_PROPERTY=preferred_username \\
-        OAUTH_CLIENT_ID=${clientID} \\
-        OAUTH_CLIENT_SECRET=${clientSecret} \\
-        PASSWORD=123 \\
-        networkID=65621542345237603456243525965623186344308 \\
-        ssl=true \\
-        sslCertFileType=pem \\
-        NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
-        HTTPS_PORT="${nodeData.PORT}" \\
-        BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
-        requireCerts=false \\
-        gasOn=false \\"""
-      runCommand = """${runCommand}
-        ./strato --blockstanbul"""
-      writeFile file:"run.sh", text: """${runCommand}"""
-      sh "chmod +x run.sh"
-      sh "sudo ./run.sh"
+          ssl=true \\
+          HTTPS_PORT=8093  \\
+          INITIAL_OAUTH_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}' \\
+          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-mercata-dev' \\
+          INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
+          PASSWORD=123 \\
+          ./vault
+      """
+      sh 'chmod +x run-vault.sh'
+      sh './run-vault.sh'
+  
+      // TODO: run node on https (also update check_availability function)
+      writeFile file: "run.sh", text: """#!/bin/bash
+        sudo \\
+          ssl=true \\
+          sslCertFileType=pem \\
+          NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
+          HTTPS_PORT="${nodeData.PORT}" \\
+          networkID=${nodeData.NETWORK_ID} \\
+          BLOC_DEBUG=true \\
+          SLIPSTREAM_OPTIONAL=false \\
+          OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
+          OAUTH_CLIENT_ID=${nodeData.OAUTH_CLIENT_ID} \\
+          OAUTH_CLIENT_SECRET=${nodeData.OAUTH_CLIENT_SECRET} \\
+          VAULT_URL=https://${nodeData.HOST}:8093  \\
+          VAULT_PROXY_DEBUG=true \\
+          requireCerts=false \\
+          certInfo='${nodeData.CERT_INFO}' \\
+          ./strato 
+      """
+      sh 'chmod +x run.sh'
+      sh './run.sh'
       
     }
     sh "until curl --silent localhost:8080; do sleep 1; done"
     sh "sudo docker ps"
+    
+    // Few quick tests
+    sh '''#!/bin/bash -le
+      check_availability() {
+        counter=0
+        until curl --silent --fail --location https://$(</host):8080/health | jq .healthInfo.isHealthy | grep true
+        do
+          if [[ "$counter" -gt 120 ]]; then
+            echo "STRATO node took longer than 2 minutes to initialize! aborting."
+            exit 73
+          fi
+          echo "waiting for STRATO health endpoint to be available through nginx"
+          counter=$((counter+1))
+          sleep 1
+        done
+        echo "STRATO health endpoint is available through nginx - node is running"
+      }
+      
+      check_availability
+    '''
     
     def nodeAddress = sh(
         returnStdout: true,
@@ -173,6 +203,30 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     writeFile file: "publicKey", text: "${nodePubKey}"
     
     return nodeAddress
+    
+  }
+  
+  dir("strato") {
+    // Build genesis-block.json
+    sh '''#!/bin/bash -le
+      cd ..
+      REPO=local make build_buildbase
+      cd strato
+      myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
+      sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
+      stack run x509-generator -- \\
+        --issuer=x509-generator/rootCert.pem \\
+        --subject=x509-generator/subject.json \\
+        --key=x509-generator/rootPriv.pem
+      myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
+      echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
+      stack run genesis-builder -- \\
+        --input=genesis-builder/genesis-block.tpl.json \\
+        --faucets=genesis-builder/faucets.json \\
+        --validators=genesis-builder/validators.json \\
+        --admins=genesis-builder/admins.json \\
+        --certs=genesis-builder/certs.json \\
+        --output=../strato-getting-started/genesis-block.json'''
   }
 }
 
