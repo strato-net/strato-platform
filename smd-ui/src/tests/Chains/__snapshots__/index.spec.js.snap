@@ -11,7 +11,7 @@ exports[`Chains: index filter chain 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
+        <withRouter(Connect(ReduxForm)) limit={10} offset={0} />
       </div>
     </div>
   </div>
@@ -185,7 +185,7 @@ exports[`Chains: index filter chain 1`] = `
         <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
       </div>
       <div className=\\"col-sm-2 text-center\\" style={{...}}>
-        Rows 1-2
+        Rows 1-10
       </div>
       <div className=\\"col-sm-1 smd-pad-16 text-right\\">
         <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={false} />
@@ -360,7 +360,7 @@ exports[`Chains: index render component with empty values 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
+        <withRouter(Connect(ReduxForm)) limit={10} offset={0} />
       </div>
     </div>
   </div>
@@ -415,7 +415,7 @@ exports[`Chains: index render component with values 1`] = `
     </div>
     <div className=\\"col-sm-8 text-right\\">
       <div className=\\"pt-button-group\\">
-        <withRouter(Connect(ReduxForm)) limit={2} offset={0} />
+        <withRouter(Connect(ReduxForm)) limit={10} offset={0} />
       </div>
     </div>
   </div>
@@ -451,7 +451,7 @@ exports[`Chains: index render component with values 1`] = `
         <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
       </div>
       <div className=\\"col-sm-2 text-center\\" style={{...}}>
-        Rows 1-2
+        Rows 1-10
       </div>
       <div className=\\"col-sm-1 smd-pad-16 text-right\\">
         <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={false} />

@@ -29,9 +29,11 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
-    .then(r => { return r.json() })
     .then(function (res) {
-      const url = cirrusUrl + res.address;
+      return res.json();
+    })
+    .then(function (user) {
+      const url = cirrusUrl + user.address;
       return fetch(
         url,
         {
@@ -56,7 +58,7 @@ function getOrCreateOauthUserApi() {
 }
 
 function fetchUserPubKeyRequest() {
-  const pubkeyURL = `${env.STRATO_URL_V23}/key?username=nodekey`
+  const pubkeyURL = `${env.STRATO_URL_V23}/key`
   return fetch(
     pubkeyURL,
     {

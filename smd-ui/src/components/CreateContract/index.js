@@ -170,8 +170,8 @@ class CreateContract extends Component {
         required
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.username : null}>
-          {isModeOauth && this.props.initialValues.username}
+        <option value={isModeOauth ? this.props.initialValues.commonName : null}>
+          {isModeOauth && this.props.initialValues.commonName}
         </option>
         {
           users.map((user, i) => {
@@ -357,7 +357,7 @@ class CreateContract extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Username
+                    Name
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
@@ -546,8 +546,8 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      username: state.user.oauthUser ? state.user.oauthUser.username : '',
-      address: state.user.oauthUser ? state.user.oauthUser.address : '',
+      commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
+      address: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
