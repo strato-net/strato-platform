@@ -716,7 +716,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
   
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 -- grab the org for this codeAddress
-  when (not isRCC) $ do
+  unless isRCC $ do
     org <- getOrg to
     Mod.modifyStatefully_ (Mod.Proxy @Action) $
       Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
@@ -768,13 +768,16 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                 let ro = case mCallInfo of
                           Nothing -> False
                           Just ci -> if fromChain == toChain then readOnly ci else True
-                let f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
+                    f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
                 return (f', args')
           --- Delegatecall logic
           Just theFunction | (isDelegateCall == True) -> do
                 let mtheFunction' = do -- find the func that matches the arguements the user gave, if not found return Nothing and then call fallback
-                      let filterFuncsWithSameArgLength = filter (\thyFunc -> (length argsParsed )  == (length $ CC._funcArgs thyFunc)) ( [theFunction] ++  (CC._funcOverload  theFunction) )
-                      let finalFuncFind = filter (\xxx -> all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs xxx)) (filterFuncsWithSameArgLength)
+
+                      let boolTrueIfArgsSameLength thyFunc = (length argsParsed )  == (length $ CC._funcArgs thyFunc)
+                          filteredFuncsWithSameArgLength = filter boolTrueIfArgsSameLength ( [theFunction] ++  (CC._funcOverload  theFunction) )
+                          boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
+                          finalFuncFind = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
                       if length finalFuncFind /= 0 then Just $ (head finalFuncFind) else Nothing 
                 case mtheFunction' of
                       Just theFunction' | (length argsParsed) == (length argExps) -> do
@@ -783,7 +786,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                 let ro = case mCallInfo of
                                           Nothing -> False
                                           Just ci -> if fromChain == toChain then readOnly ci else True
-                                let f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                                    f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
                                 return (f', args')
                       _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
                                   Just fallbackFunc -> do 
@@ -792,7 +795,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
                                                               Just ci -> if fromChain == toChain then readOnly ci else True
-                                                let f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                                                 return (f', args')
                                   _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
           _ -> do --Maybe the function is actually a getter
@@ -814,7 +817,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
                                                               Just ci -> if fromChain == toChain then readOnly ci else True
-                                                let f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                                                 return (f', args')
                                   _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))       
                   else unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
