@@ -3442,14 +3442,6 @@ ShallowWrapper {
 }
 `;
 
-exports[`CreateContract: index validate with empty values 1`] = `
-Object {
-  "_greeting": "_greeting Required",
-  "address": "address Required",
-  "contract": "contract Required",
-  "password": "password Required",
-  "username": "username Required",
-}
-`;
+exports[`CreateContract: index validate with empty values 1`] = `Object {}`;
 
 exports[`CreateContract: index validate with values 1`] = `Object {}`;
