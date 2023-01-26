@@ -24,9 +24,6 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
-        sh 'cd strato/libs/'
-        sh 'ls'
-        sh 'cd ../..'
         sh 'REPO=private make all'
         sh 'rm -rf .docker-work'
         dir ('blockapps-rest') {
