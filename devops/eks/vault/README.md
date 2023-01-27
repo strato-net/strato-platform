@@ -26,5 +26,5 @@ kubectl apply -f vault-idpconfig-data-pvc.yaml
 kubectl apply -f vault-postgres-data-pvc.yaml
 
 # Create New Deployment
-**Note:** Replace *REPO_URL and VERSION* in eks-vault-deployment.tpl.yaml file and rename it with *eks-vault-deployment.yaml*
+**Note:** Replace *REPO_URL and VERSION* in eks-vault-deployment.tpl.yaml file and rename it as *eks-vault-deployment.yaml*
 kubectl apply -f eks-vault-deployment.yaml
