@@ -805,9 +805,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                   val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                   popCallInfo
                   return (pure val, OrderedVals []) 
-              Nothing -> 
-                if isDelegateCall
-                  then (case M.lookup "fallback" functionsIncludingConstructor of
+              Nothing -> (case M.lookup "fallback" functionsIncludingConstructor of
                                   Just fallbackFunc -> do 
                                                 args' <- argsToVals contract' fallbackFunc argExps
                                                 mCallInfo <- getCurrentCallInfoIfExists  
@@ -816,8 +814,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                                               Just ci -> if fromChain == toChain then readOnly ci else True
                                                     f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                                                 return (f', args')
-                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))       
-                  else unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
+                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
 
               {-
               Just _ -> do
