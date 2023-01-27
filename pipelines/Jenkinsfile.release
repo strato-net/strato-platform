@@ -126,26 +126,31 @@ pipeline {
             check_availability
           '''
         }
-
-        dir("strato-worktree/strato") {
-          // Build genesis-block.json
-          sh '''#!/bin/bash -le
-            myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
-            sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
-            stack run x509-generator -- \\
-              --issuer=x509-generator/rootCert.pem \\
-              --subject=x509-generator/subject.json \\
-              --key=x509-generator/rootPriv.pem
-            myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
-            echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
-            stack run genesis-builder -- \\
-              --input=genesis-builder/genesis-block.tpl.json \\
-              --faucets=genesis-builder/faucets.json \\
-              --validators=genesis-builder/validators.json \\
-              --admins=genesis-builder/admins.json \\
-              --certs=genesis-builder/certs.json \\
-              --output=../../strato-getting-started/genesis-block.json'''
-        }
+  
+        // Generate genesis-block.json to add to strato-getting-started/
+        sh '''#!/bin/bash -le
+          cd strato-getting-started
+          myPub=$(./strato --get-pubkey)
+          cd ..
+          sudo docker cp strato-worktree/strato/genesis-builder strato_strato_1:/
+          sudo docker cp strato-worktree/strato/x509-generator strato_strato_1:/
+          sudo docker exec -e pubkey='${myPub}' strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+          sudo docker exec strato_strato_1 x509-generator \\
+              --issuer=/x509-generator/rootCert.pem \\
+              --subject=/x509-generator/subject.json \\
+              --key=/x509-generator/rootPriv.pem \\
+              --output=/x509-generator/OutputCert.pem
+          echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
+          sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
+          sudo docker exec strato_strato_1 genesis-builder \\
+              --input=/genesis-builder/genesis-block.tpl.json \\
+              --faucets=/genesis-builder/faucets.json \\
+              --validators=/genesis-builder/validators.json \\
+              --admins=/genesis-builder/admins.json \\
+              --certs=/genesis-builder/certs.json \\
+              --output=/genesis-builder/genesis-block.json
+          sudo docker cp strato_strato_1:/genesis-builder/genesis-block.json strato-getting-started/
+        '''
 
         dir("strato-getting-started") {
           sh './strato --wipe'
