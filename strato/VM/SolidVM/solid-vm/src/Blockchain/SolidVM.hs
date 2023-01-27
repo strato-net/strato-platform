@@ -716,7 +716,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
 
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
--- grab the org for this codeAddress
+--  grab the org from the senders account and set it to the codeAddress
   orgAccount <- if isRCC
     then addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \case
            CodeAtAccount{} -> pure to
@@ -2109,18 +2109,18 @@ expToVar' (CC.FunctionCall _ e args) = do
                               Just enumF -> Just $ unparseEnum (term, fst enumF)
                               Nothing -> Nothing
 
-                          structString = 
+                          structString =
                             case ((contract ^. CC.structs) M.!? term) of
                               Just structF -> Just $ unparseStruct (term, structF)
                               Nothing -> Nothing
 
-                          eventString = 
+                          eventString =
                             case ((contract ^. CC.events) M.!? term) of
                               Just eventF -> Just $ unparseEvent (term, eventF)
                               Nothing -> Nothing
 
                           funcString =
-                            case ((contract ^. CC.functions) M.!? term) of 
+                            case ((contract ^. CC.functions) M.!? term) of
                               Just funcF -> Just $ unparseFunc (term, funcF)
                               Nothing -> Nothing
 
@@ -2128,7 +2128,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                             case ((contract ^. CC.modifiers) M.!? term) of
                               Just modF -> Just $ unparseModifier (term, modF)
                               Nothing -> Nothing
-                          
+
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
             pure . Constant $ SString ( unlines codeSnippets)
@@ -2149,13 +2149,13 @@ expToVar' (CC.FunctionCall _ e args) = do
             case argVals of
               OrderedVals [SInteger i] -> do
                 c <- getCurrentContract
-                case M.lookup enumName $ c^.CC.enums  of 
+                case M.lookup enumName $ c^.CC.enums  of
                   Just theEnum -> do
                     case fst theEnum !? fromInteger i of
                       Nothing -> typeError "enum val out of range" argVals
                       Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
                   Nothing -> do
-                    (_, cc) <- getCurrentCodeCollection                            
+                    (_, cc) <- getCurrentCodeCollection
                     let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
                                 $ M.lookup enumName $ cc ^.CC.flEnums
                     case fst theEnum' !? fromInteger i of
@@ -2224,7 +2224,7 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       dstVar <- expToVar dst
       setVar dstVar srcVal
       return $ Constant srcVal
-  
+
 expToVar' ep@(CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _) = do
   missingField "index value cannot be empty" (unparseExpression ep)
 
@@ -2235,7 +2235,7 @@ expToVar' (CC.Binary _ "=" dst src) = do
   dstVar <- expToVar dst
 
   setVar dstVar srcVal
-  
+
   return $ Constant srcVal
 
 
@@ -2269,7 +2269,7 @@ evaluateAccountMember a _ "codehash" = do
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
   -- Get the code at the address
-  cid <- case (a ^. namedAccountChainId) of 
+  cid <- case (a ^. namedAccountChainId) of
     UnspecifiedChain -> do
       cid1 <- view accountChainId <$> getCurrentAccount
       case cid1 of
@@ -2318,7 +2318,7 @@ evaluateAccountMember a _ "chainId" = do
     ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
 evaluateAccountMember a _ "chainIdString" = do
   case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do 
+    UnspecifiedChain -> do
       curCid <- view accountChainId <$> getCurrentAccount
       case curCid of
         Nothing -> return $ Constant $ SString $ replicate 64 '0'
@@ -2383,7 +2383,7 @@ integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
 
 parseBaseInt :: String -> Integer -> Either String Integer
-parseBaseInt s n = 
+parseBaseInt s n =
   case n of
     10 -> readEither s
     16 -> case B16.decode (BC.pack s) of
