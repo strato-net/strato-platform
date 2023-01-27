@@ -134,8 +134,8 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         sudo \\
           ssl=true \\
           HTTPS_PORT=8093  \\
-          INITIAL_OAUTH_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}' \\
-          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-mercata-dev' \\
+          INITIAL_OAUTH_DISCOVERY_URL='${oauthDiscovery}' \\
+          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/beanstalk' \\
           INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
           PASSWORD=123 \\
           ./vault
