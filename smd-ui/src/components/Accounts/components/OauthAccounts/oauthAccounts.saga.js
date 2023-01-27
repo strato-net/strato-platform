@@ -69,7 +69,17 @@ export function* getOauthAccountDetail(action) {
   try {
     const response = yield call(getOauthAccountDetailApi, action.address, action.chainId);
     // don't ask about response['0'].
-    yield put(fetchOauthAccountDetailSuccess(response['0']));
+    if (response['0']) {
+      yield put(fetchOauthAccountDetailSuccess(response['0']));
+    } else {
+      const account = {
+        address: action.address,
+        balance: '0',
+        latestBlockNum: 0,
+        nonce: 0
+      }
+      yield put(fetchOauthAccountDetailSuccess(account));
+    }
   }
   catch (err) {
     yield put(fetchOauthAccountDetailFailure(err));

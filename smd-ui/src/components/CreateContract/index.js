@@ -166,8 +166,6 @@ class CreateContract extends Component {
         component="select"
         name="username"
         onChange={this.handleUsernameChange}
-        validate={required}
-        required
         disabled={isModeOauth}
       >
         <option value={isModeOauth ? this.props.initialValues.commonName : null}>
@@ -520,11 +518,11 @@ export const validate = (values) => {
   //     })
   //   }
   // });
-  Object.getOwnPropertyNames(values).forEach((val) => {
-    if (values[val] === '' || values[val] === undefined) {
-      errors[val] = val + " Required";
-    }
-  });
+  // Object.getOwnPropertyNames(values).forEach((val) => {
+  //   if (values[val] === '' || values[val] === undefined) {
+  //     errors[val] = val + " Required";
+  //   }
+  // });
   return errors
 };
 

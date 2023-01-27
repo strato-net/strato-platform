@@ -29,7 +29,7 @@ class OauthAccounts extends Component {
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('accounts_row_click');
-      this.props.fetchOauthAccountDetail(user.commonName, user.address, this.props.selectedChain);
+      this.props.fetchOauthAccountDetail(user.commonName, user.userAddress, this.props.selectedChain);
     }
   }
 

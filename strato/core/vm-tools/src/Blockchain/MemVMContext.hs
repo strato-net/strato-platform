@@ -58,6 +58,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
@@ -84,6 +85,7 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , storageBlockMap
                                                     ,lookupX509AddrFromCBHash
                                                     )
+import           SolidVM.Model.Storable
 
 import           UnliftIO
 
@@ -305,8 +307,11 @@ instance (Address `A.Selectable` X509Certificate) MemContextM where
   select _ k = do
       let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
       mCertAddress <- lookupX509AddrFromCBHash k
-      fmap join . for mCertAddress $ \certAddress ->
-        maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+      fmap join . for mCertAddress $ \certAddress -> do
+        mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+        case mBString of
+            Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+            _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
   lookup _ n1    = dbsGets $ view (hashDB . at n1)
