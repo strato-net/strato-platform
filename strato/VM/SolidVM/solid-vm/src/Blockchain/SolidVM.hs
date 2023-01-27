@@ -268,7 +268,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
-    -- requireOriginCert origin'
+    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
