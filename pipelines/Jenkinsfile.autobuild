@@ -104,8 +104,9 @@ pipeline {
             check_availability
           '''
         }
-        
-        lib.generateGenesisBlock('.', 'strato-getting-started')
+        script {
+          lib.generateGenesisBlock('.', 'strato-getting-started')
+        }
 
         dir("strato-getting-started") {
           sh './strato --wipe'

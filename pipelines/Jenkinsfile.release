@@ -128,7 +128,9 @@ pipeline {
           '''
         }
   
-        lib.generateGenesisBlock('strato-worktree', 'strato-getting-started')
+        script {
+          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started')
+        }
 
         dir("strato-getting-started") {
           sh './strato --wipe'

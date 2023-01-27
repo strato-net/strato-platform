@@ -1060,6 +1060,7 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
   sh "echo ${stratoGSPath} > _stratogs_path_tmp"
   sh '''#!/bin/bash -le
+    set -x
     cd $(<_stratogs_path_tmp)
     myPub=$(./strato --get-pubkey)
     cd ..
@@ -1073,6 +1074,7 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
         --output=/x509-generator/OutputCert.pem
     echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
     sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
+    sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
     sudo docker exec strato_strato_1 genesis-builder \\
         --input=/genesis-builder/genesis-block.tpl.json \\
         --faucets=/genesis-builder/faucets.json \\
