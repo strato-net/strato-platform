@@ -188,22 +188,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
       
       check_availability
     '''
-    
-    def nodeAddress = sh(
-        returnStdout: true,
-        script: "sudo ./strato --get-address"
-    ).trim()
-    sh "echo '# Address: ${nodeAddress}' >> run.sh"
-    
-    // Save node's public key into file (for future reference)
-    def nodePubKey = sh(
-        returnStdout: true,
-        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
-    ).trim()
-    writeFile file: "publicKey", text: "${nodePubKey}"
-    
-    return nodeAddress
-    
   }
   // Generate genesis-block.json to add to strato-getting-started/
   sh '''#!/bin/bash -le
@@ -212,7 +196,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     cd ..
     sudo docker cp strato/genesis-builder strato_strato_1:/
     sudo docker cp strato/x509-generator strato_strato_1:/
-    sudo docker exec -e pubkey='${myPub}' strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+    sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
     sudo docker exec strato_strato_1 x509-generator \\
         --issuer=/x509-generator/rootCert.pem \\
         --subject=/x509-generator/subject.json \\
