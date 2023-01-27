@@ -646,7 +646,7 @@ argsToVals ctract fn args = case args of
             CC.NumberLiteral _ n (Just nu) -> case nu of
                                                   CC.Wei -> return . coerceType ctract t $ SInteger n
                                                   CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
-                                                  CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+                                                  CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer)))
                                                   CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
@@ -797,8 +797,8 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                   _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.CC.storageDefs of
-              Just _ -> do 
-                  liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName) 
+              Just _ -> do
+                  liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName)
                   addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
@@ -915,7 +915,7 @@ runStatement (CC.RevertStatement mString theArgs _) = do
           let listOfVals = case argVals of
                 OrderedVals ov -> map (\x -> toBasic x) ov
                 NamedVals nv -> map (\(_, y) -> toBasic y) nv
- 
+
           return $ customError "Reverting based on  Error Method:" name listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
       pure $ err

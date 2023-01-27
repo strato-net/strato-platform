@@ -863,7 +863,7 @@ contract B {
   describe "Testing contracts that call other contracts by addresss" $ do
     --Note to the developer
     --These contracts are shoved into the txrIndexer ..... Take this into consideration
-    fit "can call delegatecall function and not change state variables of contract being called" $ do
+    it "can call delegatecall function and not change state variables of contract being called" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..4]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos = [ CommonName "BlockApps" "Engineering" "Admin" True
