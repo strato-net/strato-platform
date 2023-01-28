@@ -134,8 +134,8 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         sudo \\
           ssl=true \\
           HTTPS_PORT=8093  \\
-          INITIAL_OAUTH_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}' \\
-          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-mercata-dev' \\
+          INITIAL_OAUTH_DISCOVERY_URL='${oauthDiscovery}' \\
+          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/beanstalk' \\
           INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
           PASSWORD=123 \\
           ./vault
@@ -153,9 +153,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           networkID=${nodeData.NETWORK_ID} \\
           BLOC_DEBUG=true \\
           SLIPSTREAM_OPTIONAL=false \\
-          OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
-          OAUTH_CLIENT_ID=${nodeData.OAUTH_CLIENT_ID} \\
-          OAUTH_CLIENT_SECRET=${nodeData.OAUTH_CLIENT_SECRET} \\
+          OAUTH_DISCOVERY_URL=${oauthDiscovery} \\
+          OAUTH_CLIENT_ID=${clientID} \\
+          OAUTH_CLIENT_SECRET=${clientSecret} \\
           VAULT_URL=https://${nodeData.HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
@@ -188,46 +188,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
       
       check_availability
     '''
-    
-    def nodeAddress = sh(
-        returnStdout: true,
-        script: "sudo ./strato --get-address"
-    ).trim()
-    sh "echo '# Address: ${nodeAddress}' >> run.sh"
-    
-    // Save node's public key into file (for future reference)
-    def nodePubKey = sh(
-        returnStdout: true,
-        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
-    ).trim()
-    writeFile file: "publicKey", text: "${nodePubKey}"
-    
-    return nodeAddress
-    
   }
-  
-  dir("strato") {
-    // Build genesis-block.json
-    sh '''#!/bin/bash -le
-      cd ..
-      REPO=local make build_buildbase
-      cd strato
-      myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
-      sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
-      stack run x509-generator -- \\
-        --issuer=x509-generator/rootCert.pem \\
-        --subject=x509-generator/subject.json \\
-        --key=x509-generator/rootPriv.pem
-      myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
-      echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
-      stack run genesis-builder -- \\
-        --input=genesis-builder/genesis-block.tpl.json \\
-        --faucets=genesis-builder/faucets.json \\
-        --validators=genesis-builder/validators.json \\
-        --admins=genesis-builder/admins.json \\
-        --certs=genesis-builder/certs.json \\
-        --output=../strato-getting-started/genesis-block.json'''
-  }
+  // Generate genesis-block.json to add to strato-getting-started/
+  generateGenesisBlock('.', 'strato-getting-started')
 }
 
 def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null, appName) {
@@ -241,9 +204,9 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
     sh 'sudo rm -rf beanstalk'
     
     if(appName == 'traceharvest') {
-        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b trace-harvest-demo"
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b STRATO-3027-Update_Cirrus_indexing"
     } else {
-        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b develop"
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b STRATO-3027-Update_Cirrus_indexing"
     }
 
     dir('beanstalk') {
@@ -1083,6 +1046,45 @@ def removeBeanstalkApp() {
   dir("beanstalk") {
     sh 'sudo docker-compose down -v -t 0 --remove-orphans'
   }
+}
+
+/**
+ * Generate genesis-block.json  to add to strato-getting-started/
+ * @param stratoPlatformPath - relative path to strato-platform directory (default '.')
+ * @param stratoGSPath - relative path to strato-getting-started directory (default 'strato-getting-started')
+ * @return
+ */
+def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started') {
+  
+  // (using tmp files to avoid replacing quotes with dobule-quotes which makes escapes even worse)
+  sh "echo ${stratoPlatformPath} > _platform_path_tmp"
+  sh "echo ${stratoGSPath} > _stratogs_path_tmp"
+  sh '''#!/bin/bash -le
+    set -x
+    cd $(<_stratogs_path_tmp)
+    myPub=$(./strato --get-pubkey)
+    cd ..
+    sudo docker cp $(<_platform_path_tmp)/strato/genesis-builder strato_strato_1:/
+    sudo docker cp $(<_platform_path_tmp)/strato/x509-generator strato_strato_1:/
+    sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+    sudo docker exec strato_strato_1 x509-generator \\
+        --issuer=/x509-generator/rootCert.pem \\
+        --subject=/x509-generator/subject.json \\
+        --key=/x509-generator/rootPriv.pem \\
+        --output=/x509-generator/OutputCert.pem
+    echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
+    sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
+    sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
+    sudo docker exec strato_strato_1 genesis-builder \\
+        --input=/genesis-builder/genesis-block.tpl.json \\
+        --faucets=/genesis-builder/faucets.json \\
+        --validators=/genesis-builder/validators.json \\
+        --admins=/genesis-builder/admins.json \\
+        --certs=/genesis-builder/certs.json \\
+        --output=/genesis-builder/genesis-block.json
+    sudo docker cp strato_strato_1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
+  '''
+  sh "rm _*_path_tmp"
 }
 
 return this
