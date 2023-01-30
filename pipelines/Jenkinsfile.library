@@ -194,6 +194,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
   // Generate genesis-block.json to add to strato-getting-started/
   if (rootNodeAddress == null){
     generateGenesisBlock('.', 'strato-getting-started')
+    stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
   }
   
   dir("strato-getting-started") {
