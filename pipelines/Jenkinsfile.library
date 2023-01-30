@@ -134,8 +134,8 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         sudo \\
           ssl=true \\
           HTTPS_PORT=8093  \\
-          INITIAL_OAUTH_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}' \\
-          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-mercata-dev' \\
+          INITIAL_OAUTH_DISCOVERY_URL='${oauthDiscovery}' \\
+          INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/beanstalk' \\
           INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
           PASSWORD=123 \\
           ./vault
@@ -153,9 +153,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           networkID=${nodeData.NETWORK_ID} \\
           BLOC_DEBUG=true \\
           SLIPSTREAM_OPTIONAL=false \\
-          OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
-          OAUTH_CLIENT_ID=${nodeData.OAUTH_CLIENT_ID} \\
-          OAUTH_CLIENT_SECRET=${nodeData.OAUTH_CLIENT_SECRET} \\
+          OAUTH_DISCOVERY_URL=${oauthDiscovery} \\
+          OAUTH_CLIENT_ID=${clientID} \\
+          OAUTH_CLIENT_SECRET=${clientSecret} \\
           VAULT_URL=https://${nodeData.HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
@@ -194,6 +194,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
   // Generate genesis-block.json to add to strato-getting-started/
   if (rootNodeAddress == null){
     generateGenesisBlock('.', 'strato-getting-started')
+    stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
   }
   
   dir("strato-getting-started") {
