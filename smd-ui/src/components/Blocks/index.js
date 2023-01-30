@@ -8,6 +8,7 @@ import { Field, reduxForm } from 'redux-form';
 class Blocks extends Component {
   componentDidMount() {
     mixpanelWrapper.track('blocks_loaded');
+    this.props.fetchChainIds();
   }
 
   render() {

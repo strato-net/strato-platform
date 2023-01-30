@@ -39,6 +39,7 @@ class Contracts extends Component {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    this.props.fetchChainIds();
   }
 
   componentWillReceiveProps(nextProps) {
@@ -110,7 +111,7 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-          <div className="col-sm-2 chain-wrapper">
+          <div className="col-sm-2 chain-wrapper text-right smd-pad-8" style={{paddingLeft: '50px'}}>
             {this.props.chainIds && this.props.chainIds.length ?
               <div className="pt-select">
                 <Field
