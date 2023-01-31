@@ -16,10 +16,10 @@ exports[`App: index componentDidMount 1`] = `
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
       <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
@@ -43,10 +43,10 @@ exports[`App: index componentDidMount 2`] = `
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
       <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
@@ -70,10 +70,10 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
       <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
       <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />

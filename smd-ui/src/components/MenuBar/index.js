@@ -6,8 +6,6 @@ import './menubar.css';
 import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
-import { reduxForm } from 'redux-form';
-import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
 class MenuBar extends Component {
 
@@ -70,10 +68,6 @@ export function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'menu-bar' })(MenuBar);
-const connected = connect(mapStateToProps, {
-  selectChain,
-  fetchChainIds
-})(formed);
+const connected = connect(mapStateToProps, {})(MenuBar);
 
 export default withRouter(connected);
