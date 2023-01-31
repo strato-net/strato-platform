@@ -54,7 +54,6 @@ class Blocks extends Component {
 export function mapStateToProps(state) {
   return {
     chainIds: state.chains.chainIds,
-    oauthUser: state.user.oauthUser
   };
 }
 
