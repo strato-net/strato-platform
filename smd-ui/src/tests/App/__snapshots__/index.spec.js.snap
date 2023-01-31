@@ -5,7 +5,7 @@ exports[` 1`] = `Object {}`;
 exports[`App: index componentDidMount 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(MenuBar)) />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>
@@ -32,7 +32,7 @@ exports[`App: index componentDidMount 1`] = `
 exports[`App: index componentDidMount 2`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(MenuBar)) />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>
@@ -59,7 +59,7 @@ exports[`App: index componentDidMount 2`] = `
 exports[`App: index render component 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(MenuBar)) />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>
