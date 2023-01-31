@@ -71,3 +71,8 @@ export const reducerContract = {
     "greetingA": "Aaaaaaaaa"
   }
 }
+
+export const chainIds = [{
+  id: '0293f9b10a4453667db7fcfe74728c9d821add4b',
+  label: 'new'
+}]

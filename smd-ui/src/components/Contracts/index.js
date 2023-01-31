@@ -8,6 +8,7 @@ import Tour from '../Tour';
 import { Button } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
+import { withRouter } from 'react-router-dom';
 
 const tourSteps = [
   /*  {
@@ -212,4 +213,4 @@ const connected = connect(mapStateToProps, {
   changeContractFilter
 })(formed);
 
-export default connected;
+export default withRouter(connected);
