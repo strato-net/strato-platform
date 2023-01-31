@@ -68,7 +68,11 @@ db['id'] = db.apply( lambda x: x['id'] + index, axis=1)
 
 db['x_user_unique_name'] = db.apply( lambda x: nodeKeyName  if x['x_user_unique_name'] == "nodekey" else x['x_user_unique_name'] , axis=1)
 db['oauth_provider_id'] = db.apply( lambda x: oauthProviderM , axis=1) 
-db = db.drop(['enc_sec_key'], axis=1)
+db = db.drop(['enc_sec_key'], axis=1)#Wait what? This doesn't make sense to me?
+
+oauth_provider_id = db.pop('oauth_provider_id')
+db.insert(2, 'oauth_provider_id', oauth_provider_id)
+
 
 
 print("Headers after some but not all of cleaning")

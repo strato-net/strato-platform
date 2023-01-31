@@ -5,11 +5,11 @@ IndexOfLastIndexOfNewVaultDb=$4
 
 
 # STEP 1: Get data from old vault  --> We only need message table and user table
-docker exec strato_strato_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "\COPY users TO \'userTable.csv\' DELIMITER \',\' CSV HEADER;"'
-docker cp strato_strato_1:var/lib/strato/userTable.csv ./
+docker exec vault_vault-wrapper_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "\COPY users TO \'userTable.csv\' DELIMITER \',\' CSV HEADER;"'
+docker cp vault_vault-wrapper_1:userTable.csv ./
 
-docker exec strato_strato_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "\COPY message TO \'messageTable.csv\' DELIMITER \',\' CSV HEADER;"'
-docker cp strato_strato_1:var/lib/strato/messageTable.csv ./
+docker exec vault_vault-wrapper_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "\COPY message TO \'messageTable.csv\' DELIMITER \',\' CSV HEADER;"'
+docker cp vault_vault-wrapper_1:messageTable.csv ./
 
 
 #STEP 2: remove header from csv file and give proper index to columns, remove columns from old schema, add new oauth provicder id column 

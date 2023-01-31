@@ -81,7 +81,7 @@ main = do
     
   rowsChanged <- return . sum =<< mapM (\(newKey, rowId) -> runUpdate_ conn $ Update
                                    { uTable = usersTable
-                                   , uUpdateWith = updateEasy (set _5 (toFields newKey))
+                                   , uUpdateWith = updateEasy (set _6 (toFields newKey))
                                    , uWhere = views _1 (.== toFields rowId)
                                    , uReturning = rCount
                                    }) idsAndNewEncKeys
