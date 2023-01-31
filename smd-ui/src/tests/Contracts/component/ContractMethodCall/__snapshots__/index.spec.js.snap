@@ -223,15 +223,13 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label label-margin\\">
-              Username
+              Name
             </label>
           </div>
-          <div className=\\"col-sm-9\\">
+          <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"\\">
               <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={true} required={true}>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
+                <option value={[undefined]} />
               </Field>
             </div>
           </div>
@@ -442,88 +440,40 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label label-margin\\">
-              Username
+              Name
             </label>
           </div>
-          <div className=\\"col-sm-9\\">
+          <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
               <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={false} required={true}>
-                <option value={{...}} />
-                <option value=\\"Admin_1085_64667\\">
-                  Admin_1085_64667
+                <option value=\\"Certification Pending\\">
+                  Certification Pending
                 </option>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-                <option value=\\"Supplier2\\">
-                  Supplier2
-                </option>
-                <option value=\\"Buyer1\\">
-                  Buyer1
-                </option>
-                <option value=\\"Buyer2\\">
-                  Buyer2
-                </option>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-                <option value=\\"Admin_1177_39206\\">
-                  Admin_1177_39206
-                </option>
-                <option value=\\"Admin_1177_31203\\">
-                  Admin_1177_31203
-                </option>
-                <option value=\\"User_1177_14462\\">
-                  User_1177_14462
-                </option>
-                <option value=\\"123456789012345678901234567890123\\">
-                  123456789012345678901234567890123
-                </option>
-                <option value=\\"User_1177_26292\\">
-                  User_1177_26292
-                </option>
-                <option value=\\"User_1177_69645 ?#%!@*\\">
-                  User_1177_69645 ?#%!@*
-                </option>
-                <option value=\\"User_1177_59578\\">
-                  User_1177_59578
-                </option>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"User_1177_59359\\">
-                  User_1177_59359
-                </option>
-                <option value=\\"User_1177_42489\\">
-                  User_1177_42489
-                </option>
-                <option value=\\"User_1177_37717\\">
-                  User_1177_37717
-                </option>
-                <option value=\\"User_1177_52307\\">
-                  User_1177_52307
-                </option>
-                <option value=\\"Buyer1177_18955\\">
-                  Buyer1177_18955
-                </option>
-                <option value=\\"Supplier1177_62701\\">
-                  Supplier1177_62701
-                </option>
-                <option value=\\"Admin_1301_86023\\">
-                  Admin_1301_86023
-                </option>
-                <option value=\\"Admin_1301_62816\\">
-                  Admin_1301_62816
-                </option>
-                <option value=\\"Supplier0_1301_46441\\">
-                  Supplier0_1301_46441
-                </option>
-                <option value=\\"Supplier1_1301_46441\\">
-                  Supplier1_1301_46441
-                </option>
-                <option value=\\"Supplier2_1301_46441\\">
-                  Supplier2_1301_46441
-                </option>
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
+                <option value={[undefined]} />
               </Field>
             </div>
           </div>
@@ -537,10 +487,10 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
               <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={false} required={true}>
-                <option value={{...}} />
-                <option value=\\"044eda43ba9c76fc36b9183c96f7a8fad8d21fe6\\">
-                  044eda43ba9c76fc36b9183c96f7a8fad8d21fe6
+                <option value=\\"Certification Pending\\">
+                  Certification Pending
                 </option>
+                <option value={[undefined]} />
               </Field>
             </div>
           </div>

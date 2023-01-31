@@ -42,7 +42,8 @@ kubectl apply -f zookeeper-pvc.yaml
 kubectl apply -f postgres-pvc.yaml
 
 # Create New Deployment
-kubectl apply -f deployment.yaml
+**Note:** Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+kubectl apply -f eks-strato-deployment.yaml
 
 # Create nginx Service
 kubectl apply -f nginx-service.yaml

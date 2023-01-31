@@ -340,7 +340,7 @@ class SendTokens extends Component {
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
           // TODO: remove public mode
-          isModeOauth && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
+          isModeOauth && (this.props.initialValues.fromAddress != "Certification Pending") && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
           this.props.fetchChainIds();
           this.props.sendTokensOpenModal();
           this.props.reset();
@@ -465,8 +465,8 @@ export function mapStateToProps(state) {
     fromUsername: selector(state, 'from'),
     toUsername: selector(state, 'to'),
     initialValues: {
-      from: state.user.oauthUser ? state.user.oauthUser.username : '',
-      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : ''
+      from: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
+      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending'
     },
     balance: state.accounts.currentUserBalance,
     chainLabel: state.chains.listChain,

@@ -222,7 +222,7 @@ Object {
     "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
     "chainId": "",
     "chainLabel": "",
-    "username": "tanuj41",
+    "commonName": undefined,
   },
   "isOpen": true,
   "isToasts": false,
@@ -3442,14 +3442,6 @@ ShallowWrapper {
 }
 `;
 
-exports[`CreateContract: index validate with empty values 1`] = `
-Object {
-  "_greeting": "_greeting Required",
-  "address": "address Required",
-  "contract": "contract Required",
-  "password": "password Required",
-  "username": "username Required",
-}
-`;
+exports[`CreateContract: index validate with empty values 1`] = `Object {}`;
 
 exports[`CreateContract: index validate with values 1`] = `Object {}`;

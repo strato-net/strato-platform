@@ -208,7 +208,7 @@ Object {
   ],
   "fromUsername": undefined,
   "initialValues": Object {
-    "from": "Admin_1177_49507",
+    "from": undefined,
     "fromAddress": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
   },
   "isOpen": true,

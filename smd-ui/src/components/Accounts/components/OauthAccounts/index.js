@@ -29,34 +29,30 @@ class OauthAccounts extends Component {
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('accounts_row_click');
-      this.props.fetchOauthAccountDetail(user.commonName, user.address, this.props.selectedChain);
+      this.props.fetchOauthAccountDetail(user.commonName, user.userAddress, this.props.selectedChain);
     }
   }
 
   render() {
     const filter = this.props.filter;
-    const users = this.props.oauthAccounts;
-    const rows = [];
 
-    users.filter(user => {
+    const rows = this.props.oauthAccounts.filter(user => {
+      if (!user || user === undefined) {
+        return false;
+      }
       if (!filter) {
         return true;
       }
       return user.commonName.toLowerCase().indexOf(filter) > -1
     })
-      .forEach(function (user, index) {
+      .map(function (user, index) {
         const position = index + 1;
-
-        if (user.address === '8b312340d741b6fd1b1cab30b3360adc36e9f64a') {
-          return
-        }
-        
         let userClasseName = '';
         if (this.state.selected === position) {
           userClasseName = ' selected';
         }
         // change this
-        rows.push(
+        return (
           <div className="smd-margin-8" key={user.commonName}>
             <div className="row">
               <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {

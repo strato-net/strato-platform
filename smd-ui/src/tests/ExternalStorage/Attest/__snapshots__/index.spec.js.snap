@@ -74,7 +74,7 @@ Object {
   },
   "initialValues": Object {
     "address": "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
-    "username": "tanuj1000",
+    "username": undefined,
   },
   "isLoading": false,
   "isOpen": true,
