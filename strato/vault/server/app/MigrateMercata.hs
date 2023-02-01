@@ -50,8 +50,7 @@ main = do
   
   
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQueryAll
-  let [(_, _, _), (globaOldSalt, _, _)] = mMsgLst -- make this a case statement that throws an error if not two tripules
-  
+
   pwKey <- case mMsgLst of
     [] -> error "message table is empty, so the password must not be set. Aborting..."
     [(msgSalt, msgNonce, ciphertext), (_,_,_)] -> do
@@ -61,12 +60,21 @@ main = do
         _ -> error "couldn't decrypt the secret message, probably you entered the wrong vault password"
     _ -> error ("Not right number of  rows in message table, something is not right" ++ (show  $ length mMsgLst ))
   
+  pwKey' <- case mMsgLst of
+    [] -> error "message table is empty, so the password must not be set. Aborting..."
+    [ (_,_,_), (msgSalt, msgNonce, ciphertext)] -> do
+      let key = VP.getKeyFromPasswordAndSalt pwOld msgSalt
+      case VC.decrypt key msgNonce ciphertext of
+        Just msg | msg == VP.superSecretVaultWrapperMessage -> pure key
+        _ -> error "couldn't decrypt the secret message, probably you entered the wrong vault password"
+    _ -> error ("Not right number of  rows in message table, something is not right" ++ (show  $ length mMsgLst ))
+  
+
   allUsers <- getUsersQuery conn
 
   let reencrypt ::   Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, Int32)
       reencrypt  i _ nonce encKey = do
-          let sbKey     =  VP.getKeyFromPasswordAndSalt pwOld globaOldSalt
-          decKey        <- VC.decryptSecKey sbKey nonce encKey
+          decKey        <- VC.decryptSecKey pwKey' nonce encKey
           let newEncKey =  VC.encrypt pwKey nonce (exportPrivateKey decKey)
           pure (newEncKey, i)
 
@@ -77,8 +85,6 @@ main = do
   putStrLn $ (show $ length idsAndNewEncKeys) ++ " of those keys can be reencrypted"
   putStrLn $ "\nFound " ++ (show $ length allUsers) ++ " keys"
 
-
-    
   rowsChanged <- return . sum =<< mapM (\(newKey, rowId) -> runUpdate_ conn $ Update
                                    { uTable = usersTable
                                    , uUpdateWith = updateEasy (set _6 (toFields newKey))
