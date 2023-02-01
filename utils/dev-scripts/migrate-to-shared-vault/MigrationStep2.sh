@@ -17,4 +17,4 @@ echo "imported message table into postgres, existing table"
 
 docker exec vault_vault-wrapper_1 bash -c "migrate-mercata --pw=$newPass  --pwOld=$oldPass --indexToStartAt=$curPostgresIndex"
 
-docker exec vault_vault-wrapper_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "DELETE from message where id<>1;"
+docker exec vault_vault-wrapper_1 bash -c $'PGPASSWORD=api psql -U postgres -h postgres oauth -c "DELETE from message where id<>1;"'
