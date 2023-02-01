@@ -2,7 +2,6 @@ import pandas as pd
 import sys
 from collections import defaultdict
 import requests
-import sys
 from requests.exceptions import HTTPError
 from requests.auth import HTTPBasicAuth
 
@@ -80,7 +79,8 @@ for col in db.columns: print(col)
 print()
 
 
-db.to_csv("userTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
+db.to_csv("userTableModfied.csv", header=False, index=False)
+db.to_csv("userTableModfiedWithHeaders.csv", index=False)
 print("Clean headers and indexed-index column for user table")
 db       = pd.read_csv("messageTable.csv")
 print()
@@ -89,7 +89,7 @@ print()
 db['id'] = db.apply( lambda x: x['id'] + 1, axis=1)
 
 
-db.to_csv("messageTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
-
+db.to_csv("messageTableModfied.csv", header=False, index=False)
+db.to_csv("messageTableModfiedWithHeaders.csv", index=False)
 
 print("Cleaned headers from message table")
