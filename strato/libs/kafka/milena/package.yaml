@@ -18,11 +18,6 @@ extra-source-files:
   - README.md
   - CHANGELOG.md
 
-ghc-options:
-  - -Wall
-  - -fwarn-unused-imports
-  - -Wincomplete-uni-patterns
-  - -Wincomplete-record-updates
 
 default-extensions:
   - ConstraintKinds
@@ -43,6 +38,11 @@ library:
     - Network.Kafka.Producer
   other-modules:
     - DeprecatedNetworkFunction
+  ghc-options:
+  - -Wall
+  - -fwarn-unused-imports
+  - -Wincomplete-uni-patterns
+  - -Wincomplete-record-updates
 
   dependencies:
     - base >=4.7 && <5

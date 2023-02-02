@@ -92,10 +92,10 @@ spec = do
       let input = defaultGenesisInfo
           want = [vehicleHash]
           slots = replicate 10 []
-          got = map hash .
-                map (\(CodeInfo bin _ _) -> bin) .
-                genesisInfoCodeInfo .
-                insertContracts slots "Vehicle" vehicleSource vehicleContractB16 sharedStart $ input
+          got = (map (hash . (\ (CodeInfo bin _ _) -> bin))
+                  . genesisInfoCodeInfo
+                  . insertContracts
+                    slots "Vehicle" vehicleSource vehicleContractB16 sharedStart) input
       in got `shouldBe` want
 
   describe "Parsing storage values" $ do

@@ -58,7 +58,6 @@ tests:
   strato-redis-blockdb-test:
     source-dirs: test
     main: Test.hs
-    ghc-options: -dynamic
     dependencies:
       - QuickCheck
       - containers
@@ -71,4 +70,4 @@ tests:
       - strato-model
       - strato-redis-blockdb
     # We use -O0 here, since GHC takes *very* long to compile so many constants
-    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
+    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic
