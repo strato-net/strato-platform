@@ -91,6 +91,7 @@ tests:
   contextm-test:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -dynamic
     dependencies:
       - bytestring
       - common-log

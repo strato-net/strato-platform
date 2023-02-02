@@ -138,6 +138,7 @@ tests:
   vault-wrapper-spec:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -dynamic
     dependencies:
       - blockapps-data
       - blockapps-vault-wrapper-server

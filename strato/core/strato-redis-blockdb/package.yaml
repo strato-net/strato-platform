@@ -58,6 +58,7 @@ tests:
   strato-redis-blockdb-test:
     source-dirs: test
     main: Test.hs
+    ghc-options: -dynamic
     dependencies:
       - QuickCheck
       - containers

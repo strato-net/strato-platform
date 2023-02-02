@@ -68,6 +68,7 @@ tests:
     ghc-options:
       - -threaded
       - -rtsopts
+      - -dynamic
     dependencies:
       - base
       - milena

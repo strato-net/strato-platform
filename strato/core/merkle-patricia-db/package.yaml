@@ -35,6 +35,7 @@ tests:
   test-merkle-patricia-db:
     source-dirs: test
     main:        MerklePatriciaSpec.hs
+    ghc-options: -dynamic
     dependencies:
       - HUnit
       - hspec

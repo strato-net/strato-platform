@@ -86,6 +86,7 @@ executables:
 tests:
   slipstream-test:
     main: Main.hs
+    ghc-options: -dynamic
     source-dirs: tests/
     dependencies:
       - base

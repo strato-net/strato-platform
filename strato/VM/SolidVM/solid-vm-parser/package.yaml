@@ -49,6 +49,7 @@ executables:
 tests:
   solid-vm-spec:
     source-dirs: tests/
+    ghc-options: -dynamic
     main: Main.hs
     dependencies:
       - hflags

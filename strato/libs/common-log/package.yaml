@@ -17,6 +17,7 @@ library:
 tests:
   common-log-test:
     main: LogSpec.hs
+    ghc-options: -dynamic
     source-dirs: test/
     dependencies:
       - common-log

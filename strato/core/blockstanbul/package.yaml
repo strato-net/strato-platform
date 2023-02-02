@@ -1,5 +1,5 @@
 name: blockstanbul
-ghc-options: -Wall -Werror
+ 
 
 dependencies:
   - base
@@ -7,6 +7,7 @@ dependencies:
 
 library:
   source-dirs: src/
+  ghc-options: -Wall -Werror
   dependencies:
   - QuickCheck
   - aeson
@@ -44,6 +45,7 @@ tests:
   blockstanbul-test:
     main: Main.hs
     source-dirs: test/
+    ghc-options: -Wall -Werror -dynamic
     dependencies:
       - QuickCheck
       - aeson
@@ -72,6 +74,7 @@ tests:
 benchmarks:
   one-node:
     source-dirs: bench/
+    ghc-options: -Wall -Werror -dynamic
     main: OneNode.hs
     dependencies:
       - blockstanbul

@@ -40,6 +40,7 @@ tests:
   storage-test:
     source-dirs: test/
     main: StorageTest.hs
+    ghc-options: -dynamic
     other-modules: []
     dependencies:
       - bytestring

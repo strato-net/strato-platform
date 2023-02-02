@@ -9,7 +9,7 @@ dependencies:
 
 library:
   source-dirs: src/
-  ghc-options: -fconstraint-solver-iterations=8
+  ghc-options: -fconstraint-solver-iterations=8 # needed for compiler not to crash, remove when neccessary
   dependencies:
     - aeson
     - blockstanbul
@@ -31,6 +31,7 @@ library:
 tests:
   seqevents-spec:
     source-dirs: test/
+    ghc-options: -dynamic 
     main: EventSpec.hs
     dependencies:
       - hspec

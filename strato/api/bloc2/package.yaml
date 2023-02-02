@@ -82,7 +82,7 @@ tests:
   blockapps-bloc22-server-test:
     source-dirs: test/
     main: Spec.hs
-    ghc-options: -Wall -Werror
+    ghc-options: -Wall -Werror -dynamic
     dependencies:
       - bloc2
       - hspec

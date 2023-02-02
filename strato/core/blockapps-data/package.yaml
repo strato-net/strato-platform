@@ -15,6 +15,7 @@ ghc-options: -Wall -O2
 library:
   source-dirs: src/
   default-extensions: TemplateHaskell
+  ghc-options: -Wall -O2
   dependencies:
   - QuickCheck
   - aeson
@@ -77,6 +78,8 @@ tests:
   blockapps-data-test:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -Wall -O2 -dynamic
+
     dependencies:
       - aeson
       - aeson-diff
