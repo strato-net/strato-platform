@@ -10,7 +10,7 @@ RUN apt-get update && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    opm get zmartzone/lua-resty-openidc=1.7.4
+    opm get zmartzone/lua-resty-openidc=1.7.6
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
