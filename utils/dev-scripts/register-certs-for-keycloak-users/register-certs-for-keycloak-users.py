@@ -12,6 +12,7 @@ import credentials
 class MercataManager:
 
     vault_url = 'https://vault.mercata-testnet-staging-mts2j0d.blockapps.net:8093'  # should be parametrized
+    node_url = 'https://node1.mercata-testnet-staging-mts2j0d.blockapps.net'
 
     @staticmethod
     def _get_keycloak_token(realm_name, client_id, client_secret, username=None, password=None):
@@ -125,6 +126,7 @@ if __name__ == '__main__':
 
     processed_users = []
     for user in users_to_update:
+        print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=v_user['uuid']))
         try:
             subject_json = {
               "commonName": user['fullname'],
@@ -140,45 +142,48 @@ if __name__ == '__main__':
                 'mv OutputCert.pem subject/" &> /dev/null'
             ], shell=True)
 
-
-            # TODO: register the cert ("translate the bash below")
             f = open("subject/OutputCert.pem", "r")
             raw_cert = f.read()
-
-            print(raw_cert)
-            # todo: escape cert
-            pass
-            
+            escaped_cert = (raw_cert.replace('\n', '\\n'))
             # Updating token for each user as it may expire (can be optimized with the lifetime checks)
             mercata_testnet_token = m.get_keycloak_mercata_token()
+
+            data = {
+                "txs": [{
+                    "payload": {
+                        "contractName": "CertificateRegistry",
+                        "contractAddress": "509",
+                        "method": "registerCertificate",
+                        "args": {
+                            "newCertificateString": escaped_cert
+                        },
+                        "metadata": {}
+                    },
+                    "type": "FUNCTION"
+                }]
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer %s' % mercata_testnet_token
+            }
+            resp = requests.request("POST", m.node_url, headers=headers, json={'json_payload': data})
+            # curl 'https://node1.mercata-testnet.blockapps.net/strato/v2.3/transaction?resolve=true' \
+            # -X 'POST' \
+            # -H 'Accept: application/json' \
+            # -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            # -H 'Content-Type: application/json' \
+            # -H 'Origin: https://node1.mercata-testnet.blockapps.net' \
+            # -H 'Accept-Language: en-US,en;q=0.9' \
+            # -H 'Host: node1.mercata-testnet.blockapps.net' \
+            # -H 'Accept-Encoding: gzip, deflate, br' \
+            # -H 'Connection: keep-alive' \
+            # --data-binary "{\"txs\":[{\"payload\":{\"contractName\":\"OfficialCertificateRegistry\",\"contractAddress\":\"24c6003021471df20530ba4ae973527a8d2f4385\",\"method\":\"registerCertificate\",\"args\":{\"newCertificateString\":\"${CERT_ESCAPED}\"},\"metadata\":{}},\"type\":\"FUNCTION\"}]}"
+
             processed_users.append(user)
         except Exception as e:
-            skipped_users.append({user['uuid']: 'Failed to process user cert issuance or registration with the exception: %s' % e})
-
-
-    
-    
-    # CERT_ESCAPED=$(perl -pe 's/\n/\\n/g' subject/OutputCert.pem)
-    # 
-    # ADMIN_TOKEN=$(sudo ./get-support-user-token.sh)
-    # 
-    # echo "
-    # ESCAPED CERT:
-    # ${CERT_ESCAPED}
-    # "
-    # 
-    # curl 'https://node1.mercata-testnet.blockapps.net/strato/v2.3/transaction?resolve=true' \
-    # -X 'POST' \
-    # -H 'Accept: application/json' \
-    # -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-    # -H 'Content-Type: application/json' \
-    # -H 'Origin: https://node1.mercata-testnet.blockapps.net' \
-    # -H 'Accept-Language: en-US,en;q=0.9' \
-    # -H 'Host: node1.mercata-testnet.blockapps.net' \
-    # -H 'Accept-Encoding: gzip, deflate, br' \
-    # -H 'Connection: keep-alive' \
-    # --data-binary "{\"txs\":[{\"payload\":{\"contractName\":\"OfficialCertificateRegistry\",\"contractAddress\":\"24c6003021471df20530ba4ae973527a8d2f4385\",\"method\":\"registerCertificate\",\"args\":{\"newCertificateString\":\"${CERT_ESCAPED}\"},\"metadata\":{}},\"type\":\"FUNCTION\"}]}"
-
+            err_msg = 'Failed to process user cert issuance or registration with the exception: %s' % e
+            print(err_msg)
+            skipped_users.append({user['uuid']: err_msg})
 
     print('Total users processed (certs registered): %s' % len(processed_users))
     print('!!! SKIPPED USERS:', skipped_users)
