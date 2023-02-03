@@ -10,7 +10,12 @@ RUN apt-get update && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    opm get zmartzone/lua-resty-openidc=1.7.4
+    opm get zmartzone/lua-resty-openidc=1.7.4 && \
+    opm remove bungle/lua-resty-session && \
+    opm get bungle/lua-resty-session=3.10    
+    # ^ Remove lines to reinstall lua-resty-session once switched to lua-resty-openidc=1.7.6-3 (when 1.7.6 is available in OPM, see here in the bottoms: https://opm.openresty.org/package/zmartzone/lua-resty-openidc/ )
+    # ^ Additional dependency issue context: https://github.com/zmartzone/lua-resty-openidc/issues/463
+    # ^ NOTE: There is a same workaround used in VAULT nginx
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
