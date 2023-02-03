@@ -2,145 +2,183 @@
 
 import ast
 import base64
+import json
 import requests
 import subprocess
 
 import credentials
 
 
+class MercataManager:
 
-# TODO: call https://vault.mercata-testnet-staging-mts2j0d.blockapps.net:8093/strato/v2.3/users to get the list of users in shared vault
-# Response format:
-# [
-#     {
-#         "username": "7a49633d-7608-451d-a74a-56cc9a78a6fc",
-#         "address": "07a4d47662ebe7fc49a62f40892bf04572309c68"
-#     },
-#     {
-#         "username": "9d348133-8baf-4bf4-b79f-d930a24e89f7",
-#         "address": "e098d5625a131d6b9d6712a41a3a44b8b7214714"
-#     },
-#     {
-#         "username": "c8745d25-51db-4f38-a665-a121705a79d4",
-#         "address": "bb915655220140baf5f7bd4abd9f412771a53681"
-#     },
-#     {
-#         "username": "6a7d086a-b565-4547-8896-17b2131196af",
-#         "address": "ce7818c494c77ba92f170600f9097443b42d4bd0"
-#     }
-# ]
+    vault_url = 'https://vault.mercata-testnet-staging-mts2j0d.blockapps.net:8093'  # should be parametrized
 
-
-
-
-
-# TODO: get the list of usernames from that response
-
-# TODO: get the COMMON NAME (full name?) and ORGANIZATION for each of the user id in the list
-
-# TODO: register certs for each user
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def _get_keycloak_token(realm_name, client_id, client_secret, username=None, password=None):
-    basic_token = base64.b64encode(bytes('%s:%s' % (client_id, client_secret), 'utf-8')).decode('utf-8')
-    url = "https://keycloak.blockapps.net/auth/realms/%s/protocol/openid-connect/token" % realm_name
-    payload = {
-        'grant_type': 'client_credentials' if not username else 'password',
-        'username': username,
-        'password': password
-    }
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic %s' % basic_token
-    }
-    resp = requests.request("POST", url, headers=headers, data=payload)
-    return ast.literal_eval(resp.text)['access_token']
-
-
-def get_keycloak_master_token():
-    creds = credentials.KEYCLOAK_CREDENTIALS['master']
-    return _get_keycloak_token(
-        'master',
-        creds['client_id'],
-        creds['client_secret']
-    )
-
-
-def get_keycloak_mercata_users():
-    offset = 0
-    result = []
-    while True:
-        url = 'https://keycloak.blockapps.net/auth/admin/realms/mercata-testnet/users?first={offset}&max=100'.format(offset=offset)
+    @staticmethod
+    def _get_keycloak_token(realm_name, client_id, client_secret, username=None, password=None):
+        basic_token = base64.b64encode(bytes('%s:%s' % (client_id, client_secret), 'utf-8')).decode('utf-8')
+        url = "https://keycloak.blockapps.net/auth/realms/%s/protocol/openid-connect/token" % realm_name
+        payload = {
+            'grant_type': 'client_credentials' if not username else 'password',
+            'username': username,
+            'password': password
+        }
         headers = {
-            'content-type': 'application/json',
-            'Authorization': 'Bearer %s' % get_keycloak_master_token()
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic %s' % basic_token
+        }
+        resp = requests.request("POST", url, headers=headers, data=payload)
+        return ast.literal_eval(resp.text)['access_token']
+
+    @staticmethod
+    def get_keycloak_master_token():
+        creds = credentials.KEYCLOAK_CREDENTIALS['master']
+        return MercataManager._get_keycloak_token(
+            'master',
+            creds['client_id'],
+            creds['client_secret']
+        )
+
+    @staticmethod
+    def get_keycloak_mercata_token():
+        creds = credentials.KEYCLOAK_CREDENTIALS['mercata-testnet']
+        return MercataManager._get_keycloak_token(
+            'mercata-testnet',
+            creds['client_id'],
+            creds['client_secret'],
+            creds['username'],
+            creds['password'],
+        )
+
+    @staticmethod
+    def get_keycloak_mercata_users():
+        offset = 0
+        result = []
+        while True:
+            url = 'https://keycloak.blockapps.net/auth/admin/realms/mercata-testnet/users?first={offset}&max=100'.format(offset=offset)
+            headers = {
+                'content-type': 'application/json',
+                'Authorization': 'Bearer %s' % MercataManager.get_keycloak_master_token()
+            }
+            resp = requests.get(url, headers=headers)
+            resp_json = resp.json()
+            result += resp_json
+            if len(resp_json) < 100:
+                break
+            else:
+                offset += 100
+        return result
+
+    @staticmethod
+    def get_vault_users():
+        url = '{vault_url}/strato/v2.3/users'.format(vault_url=MercataManager.vault_url)
+        headers = {
+            'Authorization': 'Bearer %s' % MercataManager.get_keycloak_mercata_token()
+        }
+        resp = requests.get(url, headers=headers)
+        return resp.json()
+
+    @staticmethod
+    def get_vault_user_pubkey(username, token=None):
+        if not token:
+            token = MercataManager.get_keycloak_mercata_token()
+
+        url = '{vault_url}/strato/v2.3/key?user={username}'.format(vault_url=MercataManager.vault_url, username=username)
+        headers = {
+            'Authorization': 'Bearer %s' % token
         }
         resp = requests.get(url, headers=headers)
         resp_json = resp.json()
-        result += resp_json
-        if len(resp_json) < 100:
-            break
-        else:
-            offset += 100
-    return result
+        return resp_json['pubkey']
 
 
 if __name__ == '__main__':
 
-    keycloak_users = get_keycloak_mercata_users()
-    username_id_mapping = {u['username']: u['id'] for u in keycloak_users}
+    m = MercataManager()
+    vault_users = m.get_vault_users()  # format: [{'username': '7a49633d-7608-451d-a74a-56cc9a78a6fc', 'address': '07a4d47662ebe7fc49a62f40892bf04572309c68'}, ... ]
 
-    print('Number of users obtained from Keycloak: %s' % len(username_id_mapping))
+    print('Vault user [0] from the list: ', vault_users[0])
+    print('Total number of Vault users: %s' % len(vault_users))
 
-    updated_users = []
-    failed_users = []
+    keycloak_users = m.get_keycloak_mercata_users()  # format: [{'id': '99681621-4aac-4bb5-8298-f30b6f9e2b3a', 'createdTimestamp': 1675216943885, 'username': '641824@student.dmschools.org', 'enabled': True, 'totp': False, 'emailVerified': False, 'firstName': 'xavier', 'lastName': 'lous', 'email': '641824@student.dmschools.org', 'attributes': {'companyName': ['desmoince']}, 'disableableCredentialTypes': ['password'], 'requiredActions': ['VERIFY_EMAIL'], 'notBefore': 0, 'access': {'manageGroupMembership': False, 'view': True, 'mapRoles': False, 'impersonate': False, 'manage': False}}, ... ]
+    print('Keycloak user [0] from the list: ', keycloak_users[0])
+    print('Total number of Keycloak users: %s' % len(keycloak_users))
+    keycloak_users_keyed = {ku['id']: ku for ku in keycloak_users}
 
-    for username, uuid in username_id_mapping.items():
+    mercata_testnet_token = m.get_keycloak_mercata_token()
+
+    users_to_update = []
+    skipped_users = []
+    for v_user in vault_users:
+        if v_user['username'] not in keycloak_users_keyed:
+            skipped_users.append({'username': v_user['username'], 'reason': 'vault user id not in keycloak (service user?)'})
+        else:
+            k_user = keycloak_users_keyed[v_user['username']]
+            pubkey = m.get_vault_user_pubkey(v_user['username'], token=mercata_testnet_token)
+            users_to_update.append(
+                {
+                    'uuid': v_user['username'],
+                    'fullname': '{first_name} {last_name}'.format(first_name=k_user['firstName'], last_name=k_user['lastName']),
+                    'org': k_user['attributes']['companyName'][0],
+                    'pubkey': pubkey,
+                }
+            )
+
+    processed_users = []
+    for user in users_to_update:
         try:
-            subprocess.check_call(['sudo docker exec vault_postgres_1 bash -c "PGPASSWORD=api psql -U postgres -h postgres oauth -c \\"UPDATE users SET x_user_unique_name = \'{uuid}\' where x_user_unique_name=\'{username}\';\\""'
-                             .format(uuid=uuid, username=username)], shell=True)
-            updated_users.append({username: uuid})
+            subject_json = {
+              "commonName": user['fullname'],
+              "organization": user['org'],
+              "pubKey": user['pubkey']
+            }
+            with open('subject/subject.json', 'w', encoding='utf-8') as f:
+                json.dump(subject_json, f, ensure_ascii=False, indent=2)
+            subprocess.check_call([
+                # TODO: `sudo`
+                'docker run --rm -v $(pwd)/cert:/x509scripts/cert -v $(pwd)/subject:/x509scripts/subject registry-aws.blockapps.net:5000/blockapps/x509-tools:2 sh -c "'
+                './x509-generator --issuer=cert/rootCert.pem --subject=subject/subject.json --key=cert/rootPriv.pem > /dev/null && '
+                'mv OutputCert.pem subject/" &> /dev/null'
+            ], shell=True)
+
+
+            # TODO: register the cert ("translate the bash below")
+            f = open("subject/OutputCert.pem", "r")
+            raw_cert = f.read()
+
+            print(raw_cert)
+            # todo: escape cert
+            pass
+            
+            # Updating token for each user as it may expire (can be optimized with the lifetime checks)
+            mercata_testnet_token = m.get_keycloak_mercata_token()
+            processed_users.append(user)
         except Exception as e:
-            failed_users.append({username: e})
+            skipped_users.append({user['uuid']: 'Failed to process user cert issuance or registration with the exception: %s' % e})
 
-    print('Keycloak users processed: %s' % len(updated_users))
-    if len(failed_users):
-        print('FAILED UPDATES:')
-        for username, err in failed_users.items():
-            print('{username} : {error}'.format(username=username, error=err))
 
-    pass
+    
+    
+    # CERT_ESCAPED=$(perl -pe 's/\n/\\n/g' subject/OutputCert.pem)
+    # 
+    # ADMIN_TOKEN=$(sudo ./get-support-user-token.sh)
+    # 
+    # echo "
+    # ESCAPED CERT:
+    # ${CERT_ESCAPED}
+    # "
+    # 
+    # curl 'https://node1.mercata-testnet.blockapps.net/strato/v2.3/transaction?resolve=true' \
+    # -X 'POST' \
+    # -H 'Accept: application/json' \
+    # -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    # -H 'Content-Type: application/json' \
+    # -H 'Origin: https://node1.mercata-testnet.blockapps.net' \
+    # -H 'Accept-Language: en-US,en;q=0.9' \
+    # -H 'Host: node1.mercata-testnet.blockapps.net' \
+    # -H 'Accept-Encoding: gzip, deflate, br' \
+    # -H 'Connection: keep-alive' \
+    # --data-binary "{\"txs\":[{\"payload\":{\"contractName\":\"OfficialCertificateRegistry\",\"contractAddress\":\"24c6003021471df20530ba4ae973527a8d2f4385\",\"method\":\"registerCertificate\",\"args\":{\"newCertificateString\":\"${CERT_ESCAPED}\"},\"metadata\":{}},\"type\":\"FUNCTION\"}]}"
+
+
+    print('Total users processed (certs registered): %s' % len(processed_users))
+    print('!!! SKIPPED USERS:', skipped_users)
