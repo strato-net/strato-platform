@@ -219,9 +219,9 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
     sh 'sudo rm -rf beanstalk'
     
     if(appName == 'traceharvest') {
-        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b STRATO-3027-Update_Cirrus_indexing"
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git"
     } else {
-        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b STRATO-3027-Update_Cirrus_indexing"
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git"
     }
 
     dir('beanstalk') {
