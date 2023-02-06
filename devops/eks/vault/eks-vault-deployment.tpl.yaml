@@ -28,7 +28,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: vault-postgres-data
-      - image: <REPO_URL>vault-nginx:<VERSION>
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-nginx:9.0.0-62f3794fd
         name: nginx
         ports:
           - containerPort: 80
@@ -49,7 +49,7 @@ spec:
         volumeMounts:
           - mountPath: /config
             name: vault-idpconfig-data
-      - image: <REPO_URL>vault-wrapper:<VERSION>
+      - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/vault-wrapper:9.0.0-62f3794fd
         name: vault-wrapper
         env:
         - name: keyStoreCacheTimeout
@@ -68,8 +68,10 @@ spec:
           value: "true"
       volumes:
         - name: vault-idpconfig-data
-          persistentVolumeClaim:
-            claimName: vault-idpconfig-data-pvc
+          awsElasticBlockStore:
+            volumeID: vol-0b4772e3dfa5ead6d
+            fsType: ext4
         - name: vault-postgres-data
-          persistentVolumeClaim:
-            claimName: vault-postgres-data-pvc
+          awsElasticBlockStore:
+            volumeID: vol-0c7bf0878de7863d8
+            fsType: ext4
