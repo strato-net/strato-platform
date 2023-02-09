@@ -112,6 +112,7 @@ benchmarks:
     source-dirs: bench/
     main: Microbench.hs
     other-modules: []
+    ghc-options: -dynamic
     dependencies:
       - bytestring
       - containers
@@ -124,6 +125,7 @@ benchmarks:
   extractbench:
     source-dirs: bench/
     main: ExtractBench.hs
+    ghc-options: -dynamic
     other-modules: []
     dependencies:
       - bytestring
