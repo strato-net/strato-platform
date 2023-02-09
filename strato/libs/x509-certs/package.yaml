@@ -13,12 +13,11 @@ dependencies:
   - monad-alter
 
 
-ghc-options: -Wall -Werror
+ghc-options: -Wall -Werror -O2 -dynamic
 
 
 library:
   source-dirs: src
-  ghc-options: -Wall -O2 
   dependencies:
   - aeson
   - asn1-encoding
