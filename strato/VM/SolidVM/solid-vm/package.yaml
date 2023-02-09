@@ -114,6 +114,7 @@ benchmarks:
     codebench:
       source-dirs: bench/
       main: CodeBench.hs
+      ghc-options: -dynamic
       dependencies:
         - file-embed
         - solid-vm
