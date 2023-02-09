@@ -44,6 +44,7 @@ tests:
   blockstanbul-test:
     main: Main.hs
     source-dirs: test/
+    ghc-options: -dynamic
     dependencies:
       - QuickCheck
       - aeson
