@@ -50,6 +50,7 @@ tests:
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs
+    ghc-options: -dynamic
     dependencies:
       - hflags
       - hspec
