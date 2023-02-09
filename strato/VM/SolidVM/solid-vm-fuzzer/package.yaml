@@ -3,14 +3,13 @@ name: solid-vm-fuzzer
 dependencies:
   - base
 
-ghc-options: -Wall -O2 -dynamic
-
 library:
   source-dirs: src/
   exposed-modules:
     - SolidVM.Solidity.Fuzzer
     - SolidVM.Solidity.Fuzzer.Types
     - SolidVM.Solidity.SourceTools
+  ghc-options: -Wall -O2
   dependencies:
   - aeson
   - bytestring
@@ -33,6 +32,7 @@ tests:
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs
+    ghc-options: -Wall -O2 -dynamic
     dependencies:
       - hflags
       - hspec
