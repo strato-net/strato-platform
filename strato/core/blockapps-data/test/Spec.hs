@@ -16,7 +16,6 @@ import qualified Data.Binary                     as Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy.Char8      as C8
 import qualified Data.ByteString.Short           as BSS
--- import qualified Data.HashMap.Strict             as HM
 import           Data.Map.Strict                 (Map)
 import           Data.Maybe                      (isNothing, fromMaybe)
 import qualified Data.Text                       as T

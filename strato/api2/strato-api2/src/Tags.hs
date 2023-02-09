@@ -1,4 +1,4 @@
--- move lobrary
+-- moved library for unworking Swagger.Tags
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE KindSignatures        #-}

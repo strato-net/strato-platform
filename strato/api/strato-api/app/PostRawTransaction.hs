@@ -175,7 +175,6 @@ options =
             Nothing -> return opts
             Just metadata -> do
               let mp = M.fromList $ map (\el ->
-                          -- let (k:xs) = splitOn ":" el
                           let (k,xs) = case splitOn ":" el of
                                          (k':xs') -> (k',xs')
                                          [] -> ("",[])

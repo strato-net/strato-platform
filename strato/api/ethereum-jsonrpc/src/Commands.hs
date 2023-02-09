@@ -12,7 +12,6 @@ import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
 import qualified Data.ByteString.Lazy.Char8  as BLC
--- import qualified Data.HashMap.Strict         as H
 import qualified Data.Map                    as M
 import qualified Data.Text                   as T
 import qualified Data.Vector                 as V
