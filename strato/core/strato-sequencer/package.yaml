@@ -110,7 +110,7 @@ tests:
   strato-sequencer-spec:
     source-dirs:   test
     main:          Main.hs
-    ghc-options: -threaded
+    ghc-options: -threaded -dynamic
     dependencies:
       - async
       - base16-bytestring
