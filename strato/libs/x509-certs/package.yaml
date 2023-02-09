@@ -13,11 +13,9 @@ dependencies:
   - monad-alter
 
 
-ghc-options: -Wall -Werror -O2 -dynamic
-
-
 library:
   source-dirs: src
+  ghc-options: -Wall -Werror -O2 
   dependencies:
   - aeson
   - asn1-encoding
@@ -51,6 +49,7 @@ tests:
   x509-test:
     main: Spec.hs
     source-dirs: test/
+    ghc-options: -Wall -Werror -O2 -dynamic
     dependencies:
       - x509-certs
       - aeson
