@@ -155,6 +155,7 @@ benchmarks:
   send-to-blockstanbul:
     source-dirs: bench/
     main: BlockstanbulSend.hs
+    ghc-options: -dynamic
     dependencies:
       - blockstanbul
       - strato-sequencer

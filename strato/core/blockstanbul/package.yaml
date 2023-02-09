@@ -74,6 +74,7 @@ benchmarks:
   one-node:
     source-dirs: bench/
     main: OneNode.hs
+    ghc-options: -dynamic
     dependencies:
       - blockstanbul
       - transformers

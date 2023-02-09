@@ -47,6 +47,7 @@ benchmarks:
   mpbench:
     main: MPBench.hs
     source-dirs: bench/
+    ghc-options: -dynamic
     dependencies:
       - bytestring
       - deepseq

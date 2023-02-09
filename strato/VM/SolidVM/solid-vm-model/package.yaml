@@ -54,6 +54,7 @@ benchmarks:
   storage-bench:
     source-dirs: bench/
     main: StorageBench.hs
+    ghc-options: -dynamic
     other-modules: []
     dependencies:
       - binary
