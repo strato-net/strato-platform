@@ -105,8 +105,8 @@ peekOld = fmap fst . popOld
 
 swapOld :: Int -> OldStack -> Maybe OldStack
 swapOld i (OldStack os) | i >= length os = Nothing
-                        | otherwise = let (v1:middle, v2:rest) = case splitAt i os of
-                                                            (v1':middle', v2':rest') -> (v1':middle', v2':rest')
+                        | otherwise = let (v1,middle, v2, rest) = case splitAt i os of
+                                                            (v1':middle', v2':rest') -> (v1', middle', v2', rest')
                                                             _ -> error "impossible"
                                       in Just $! OldStack $! (v2:middle) ++ (v1:rest)
 
