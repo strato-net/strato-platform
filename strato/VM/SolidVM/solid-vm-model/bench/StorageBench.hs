@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
-{-# OPTIONS GHC -fno-warn-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 import Control.Monad
 import Criterion.Main
 import Data.Binary (encode)
