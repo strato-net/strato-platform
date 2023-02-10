@@ -99,5 +99,6 @@ benchmarks:
     main: Word256Bench.hs
     dependencies:
       - strato-model
+      - criterion
 
 

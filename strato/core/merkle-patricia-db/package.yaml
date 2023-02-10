@@ -50,6 +50,7 @@ benchmarks:
     ghc-options: -dynamic
     dependencies:
       - bytestring
+      - criterion
       - deepseq
       - directory
       - merkle-patricia-db

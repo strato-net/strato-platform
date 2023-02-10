@@ -7,7 +7,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Random as BR
 import Text.Printf
 
-import Control.Monad (replicateM)
 
 import Blockchain.Data.RLP
 
