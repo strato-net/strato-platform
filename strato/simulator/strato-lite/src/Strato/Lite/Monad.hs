@@ -26,6 +26,7 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import qualified Control.Monad.State                   as State
+import qualified Control.Monad.Trans.State             as StateT
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Crypto.Types.PubKey.ECC
@@ -691,6 +692,11 @@ instance MonadIO m => HasMemAddressStateDB (MonadTest m) where
   getAddressStateBlockDBMap = gets $ Lens.view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
+instance MonadIO m => HasMemAddressStateDB (StateT.StateT s (MonadTest m) ) where
+  getAddressStateTxDBMap = lift . gets $ Lens.view $ memDBs . stateTxMap 
+  putAddressStateTxDBMap theMap =lift .  modify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = lift .   gets $ Lens.view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = lift .    modify $ memDBs . stateBlockMap .~ theMap
 
 instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
   lookup _ sr    = dbsGets $ Lens.view (stateDB . at sr)

@@ -1421,6 +1421,14 @@ tcExpr (FunctionCall x (Variable _ "type") args) =
   pure $ case args  of 
     (OrderedArgs _) ->  Static (SVMType.UnknownLabel "type" Nothing) x
     _ -> bottom $ "Improper use of type function" <$ x
+
+tcExpr (FunctionCall x (MemberAccess _ var "delegatecall" )  args ) = do
+  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
+  case (args, res) of
+    (_, Bottom _ )             ->  pure $ bottom $ "Can only call delegatecall as a method on an account or address" <$ x 
+    ((OrderedArgs []), _)      ->  pure $ bottom $ "Delegatecall needs arguements" <$ x
+    ((OrderedArgs (a: _ )), _) ->  (stringType' x)  ~> tcExpr a !>  (pure $ topType' x)
+    _ -> pure $ bottom $ "DelegateCall does not take named arguements" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of

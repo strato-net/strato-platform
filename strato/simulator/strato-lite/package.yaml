@@ -157,6 +157,7 @@ tests:
       - strato-lite
       - strato-model
       - strato-p2p
+      - solid-vm-model
       - strato-sequencer
       - text
       - transformers
@@ -164,3 +165,4 @@ tests:
       - vm-runner
       - vm-tools
       - x509-certs
+            
