@@ -1,10 +1,109 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Transactions: index render with empty values 1`] = `
+exports[`Transactions: index mapStateToProps with default values 1`] = `
+Object {
+  "chainIds": Array [
+    Object {
+      "id": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+      "label": "mock-label",
+    },
+  ],
+  "oauthUser": Object {
+    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "username": "tanuj41",
+  },
+}
+`;
+
+exports[`Transactions: index render component With values 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <Transactions />,
+  Symbol(enzyme.__unrendered__): <Transactions
+    anyTouched={false}
+    array={
+      Object {
+        "insert": [Function],
+        "move": [Function],
+        "pop": [Function],
+        "push": [Function],
+        "remove": [Function],
+        "removeAll": [Function],
+        "shift": [Function],
+        "splice": [Function],
+        "swap": [Function],
+        "unshift": [Function],
+      }
+    }
+    asyncValidate={[Function]}
+    asyncValidating={false}
+    autofill={[Function]}
+    blur={[Function]}
+    chainIds={
+      Array [
+        Object {
+          "id": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+          "label": "mock-label",
+        },
+      ]
+    }
+    change={[Function]}
+    clearAsyncError={[Function]}
+    clearSubmit={[Function]}
+    clearSubmitErrors={[Function]}
+    destroy={[Function]}
+    dirty={false}
+    dispatch={[Function]}
+    error={undefined}
+    fetchChainIds={[Function]}
+    form="transactions"
+    handleSubmit={[Function]}
+    initialValues={undefined}
+    initialize={[Function]}
+    initialized={false}
+    invalid={false}
+    pristine={true}
+    pure={true}
+    reset={[Function]}
+    selectChain={[Function]}
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+    storeSubscription={
+      Subscription {
+        "listeners": Object {
+          "clear": [Function],
+          "notify": [Function],
+          "subscribe": [Function],
+        },
+        "onStateChange": [Function],
+        "parentSub": undefined,
+        "store": Object {
+          "dispatch": [Function],
+          "getState": [Function],
+          "replaceReducer": [Function],
+          "subscribe": [Function],
+          Symbol(observable): [Function],
+        },
+        "unsubscribe": [Function],
+      }
+    }
+    submit={[Function]}
+    submitFailed={false}
+    submitSucceeded={false}
+    submitting={false}
+    touch={[Function]}
+    triggerSubmit={undefined}
+    untouch={[Function]}
+    valid={true}
+    warning={undefined}
+  />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
     "getNode": [Function],
@@ -46,11 +145,35 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-12"
+            className="col-sm-10"
           >
             <h3>
               Transactions
             </h3>
+          </div>
+          <div
+            className="col-sm-2 chain-wrapper"
+          >
+            <div
+              className="pt-select"
+            >
+              <Field
+                className="pt-input select-chain"
+                component="select"
+                name="chainLabel"
+                onChange={[Function]}
+                required={true}
+              >
+                <option>
+                   Main Chain 
+                </option>
+                <option
+                  value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                >
+                  mock-label
+                </option>
+              </Field>
+            </div>
           </div>
         </div>,
         <withRouter(Connect(ReduxForm)) />,
@@ -94,40 +217,175 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": <div
-            className="col-sm-12"
-          >
-            <h3>
-              Transactions
-            </h3>
-          </div>,
+          "children": Array [
+            <div
+              className="col-sm-10"
+            >
+              <h3>
+                Transactions
+              </h3>
+            </div>,
+            <div
+              className="col-sm-2 chain-wrapper"
+            >
+              <div
+                className="pt-select"
+              >
+                <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={[Function]}
+                  required={true}
+                >
+                  <option>
+                     Main Chain 
+                  </option>
+                  <option
+                    value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                  >
+                    mock-label
+                  </option>
+                </Field>
+              </div>
+            </div>,
+          ],
           "className": "row",
         },
         "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": <h3>
-              Transactions
-            </h3>,
-            "className": "col-sm-12",
-          },
-          "ref": null,
-          "rendered": Object {
+        "rendered": Array [
+          Object {
             "instance": null,
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": "Transactions",
+              "children": <h3>
+                Transactions
+              </h3>,
+              "className": "col-sm-10",
             },
             "ref": null,
-            "rendered": "Transactions",
-            "type": "h3",
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Transactions",
+              },
+              "ref": null,
+              "rendered": "Transactions",
+              "type": "h3",
+            },
+            "type": "div",
           },
-          "type": "div",
-        },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-select"
+              >
+                <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={[Function]}
+                  required={true}
+                >
+                  <option>
+                     Main Chain 
+                  </option>
+                  <option
+                    value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                  >
+                    mock-label
+                  </option>
+                </Field>
+              </div>,
+              "className": "col-sm-2 chain-wrapper",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={[Function]}
+                  required={true}
+                >
+                  <option>
+                     Main Chain 
+                  </option>
+                  <option
+                    value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                  >
+                    mock-label
+                  </option>
+                </Field>,
+                "className": "pt-select",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "children": Array [
+                    <option>
+                       Main Chain 
+                    </option>,
+                    Array [
+                      <option
+                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                      >
+                        mock-label
+                      </option>,
+                    ],
+                  ],
+                  "className": "pt-input select-chain",
+                  "component": "select",
+                  "name": "chainLabel",
+                  "onChange": [Function],
+                  "required": true,
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": " Main Chain ",
+                    },
+                    "ref": null,
+                    "rendered": " Main Chain ",
+                    "type": "option",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "mock-label",
+                      "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                    },
+                    "ref": null,
+                    "rendered": "mock-label",
+                    "type": "option",
+                  },
+                ],
+                "type": [Function],
+              },
+              "type": "div",
+            },
+            "type": "div",
+          },
+        ],
         "type": "div",
       },
       Object {
@@ -177,11 +435,35 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-12"
+              className="col-sm-10"
             >
               <h3>
                 Transactions
               </h3>
+            </div>
+            <div
+              className="col-sm-2 chain-wrapper"
+            >
+              <div
+                className="pt-select"
+              >
+                <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={[Function]}
+                  required={true}
+                >
+                  <option>
+                     Main Chain 
+                  </option>
+                  <option
+                    value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                  >
+                    mock-label
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>,
           <withRouter(Connect(ReduxForm)) />,
@@ -225,17 +507,395 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": <div
-              className="col-sm-12"
+            "children": Array [
+              <div
+                className="col-sm-10"
+              >
+                <h3>
+                  Transactions
+                </h3>
+              </div>,
+              <div
+                className="col-sm-2 chain-wrapper"
+              >
+                <div
+                  className="pt-select"
+                >
+                  <Field
+                    className="pt-input select-chain"
+                    component="select"
+                    name="chainLabel"
+                    onChange={[Function]}
+                    required={true}
+                  >
+                    <option>
+                       Main Chain 
+                    </option>
+                    <option
+                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                    >
+                      mock-label
+                    </option>
+                  </Field>
+                </div>
+              </div>,
+            ],
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <h3>
+                  Transactions
+                </h3>,
+                "className": "col-sm-10",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Transactions",
+                },
+                "ref": null,
+                "rendered": "Transactions",
+                "type": "h3",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <div
+                  className="pt-select"
+                >
+                  <Field
+                    className="pt-input select-chain"
+                    component="select"
+                    name="chainLabel"
+                    onChange={[Function]}
+                    required={true}
+                  >
+                    <option>
+                       Main Chain 
+                    </option>
+                    <option
+                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                    >
+                      mock-label
+                    </option>
+                  </Field>
+                </div>,
+                "className": "col-sm-2 chain-wrapper",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": <Field
+                    className="pt-input select-chain"
+                    component="select"
+                    name="chainLabel"
+                    onChange={[Function]}
+                    required={true}
+                  >
+                    <option>
+                       Main Chain 
+                    </option>
+                    <option
+                      value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                    >
+                      mock-label
+                    </option>
+                  </Field>,
+                  "className": "pt-select",
+                },
+                "ref": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": Array [
+                      <option>
+                         Main Chain 
+                      </option>,
+                      Array [
+                        <option
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        >
+                          mock-label
+                        </option>,
+                      ],
+                    ],
+                    "className": "pt-input select-chain",
+                    "component": "select",
+                    "name": "chainLabel",
+                    "onChange": [Function],
+                    "required": true,
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": " Main Chain ",
+                      },
+                      "ref": null,
+                      "rendered": " Main Chain ",
+                      "type": "option",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "mock-label",
+                        "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                      },
+                      "ref": null,
+                      "rendered": "mock-label",
+                      "type": "option",
+                    },
+                  ],
+                  "type": [Function],
+                },
+                "type": "div",
+              },
+              "type": "div",
+            },
+          ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+      ],
+      "type": "div",
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`Transactions: index render component without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Transactions
+    anyTouched={false}
+    array={
+      Object {
+        "insert": [Function],
+        "move": [Function],
+        "pop": [Function],
+        "push": [Function],
+        "remove": [Function],
+        "removeAll": [Function],
+        "shift": [Function],
+        "splice": [Function],
+        "swap": [Function],
+        "unshift": [Function],
+      }
+    }
+    asyncValidate={[Function]}
+    asyncValidating={false}
+    autofill={[Function]}
+    blur={[Function]}
+    chainIds={Array []}
+    change={[Function]}
+    clearAsyncError={[Function]}
+    clearSubmit={[Function]}
+    clearSubmitErrors={[Function]}
+    destroy={[Function]}
+    dirty={false}
+    dispatch={[Function]}
+    error={undefined}
+    fetchChainIds={[Function]}
+    form="transactions"
+    handleSubmit={[Function]}
+    initialValues={undefined}
+    initialize={[Function]}
+    initialized={false}
+    invalid={false}
+    pristine={true}
+    pure={true}
+    reset={[Function]}
+    selectChain={[Function]}
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+    storeSubscription={
+      Subscription {
+        "listeners": Object {
+          "clear": [Function],
+          "notify": [Function],
+          "subscribe": [Function],
+        },
+        "onStateChange": [Function],
+        "parentSub": undefined,
+        "store": Object {
+          "dispatch": [Function],
+          "getState": [Function],
+          "replaceReducer": [Function],
+          "subscribe": [Function],
+          Symbol(observable): [Function],
+        },
+        "unsubscribe": [Function],
+      }
+    }
+    submit={[Function]}
+    submitFailed={false}
+    submitSucceeded={false}
+    submitting={false}
+    touch={[Function]}
+    triggerSubmit={undefined}
+    untouch={[Function]}
+    valid={true}
+    warning={undefined}
+  />,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "host",
+    "props": Object {
+      "children": Array [
+        <withRouter(Connect(Tour))
+          finalStepSelector="#tour-bloc-api-button"
+          name="transactions"
+          steps={
+            Array [
+              Object {
+                "isFixed": true,
+                "position": "bottom",
+                "selector": "#tour-query-type",
+                "text": "Run search queries against all transactions launched by your Smart Contracts.",
+                "title": "Search your Transactions",
+                "type": "hover",
+              },
+              Object {
+                "isFixed": true,
+                "position": "bottom",
+                "selector": "#tour-bloc-api-button",
+                "text": "<strong>Bloc API</strong> offers a library of API endpoints you may use in any web application. Send and receive JSON data to your custom blockchains using <strong>Bloc API</strong>.",
+                "title": "Add API endpoints to your application",
+                "type": "hover",
+              },
+            ]
+          }
+        />,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-10"
+          >
+            <h3>
+              Transactions
+            </h3>
+          </div>
+          <div
+            className="col-sm-2 chain-wrapper"
+          >
+            
+          </div>
+        </div>,
+        <withRouter(Connect(ReduxForm)) />,
+      ],
+      "className": "container-fluid pt-dark",
+    },
+    "ref": null,
+    "rendered": Array [
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {
+          "finalStepSelector": "#tour-bloc-api-button",
+          "name": "transactions",
+          "steps": Array [
+            Object {
+              "isFixed": true,
+              "position": "bottom",
+              "selector": "#tour-query-type",
+              "text": "Run search queries against all transactions launched by your Smart Contracts.",
+              "title": "Search your Transactions",
+              "type": "hover",
+            },
+            Object {
+              "isFixed": true,
+              "position": "bottom",
+              "selector": "#tour-bloc-api-button",
+              "text": "<strong>Bloc API</strong> offers a library of API endpoints you may use in any web application. Send and receive JSON data to your custom blockchains using <strong>Bloc API</strong>.",
+              "title": "Add API endpoints to your application",
+              "type": "hover",
+            },
+          ],
+        },
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="col-sm-10"
             >
               <h3>
                 Transactions
               </h3>
             </div>,
-            "className": "row",
-          },
-          "ref": null,
-          "rendered": Object {
+            <div
+              className="col-sm-2 chain-wrapper"
+            >
+              
+            </div>,
+          ],
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
             "instance": null,
             "key": undefined,
             "nodeType": "host",
@@ -243,7 +903,7 @@ ShallowWrapper {
               "children": <h3>
                 Transactions
               </h3>,
-              "className": "col-sm-12",
+              "className": "col-sm-10",
             },
             "ref": null,
             "rendered": Object {
@@ -259,6 +919,176 @@ ShallowWrapper {
             },
             "type": "div",
           },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": "",
+              "className": "col-sm-2 chain-wrapper",
+            },
+            "ref": null,
+            "rendered": "",
+            "type": "div",
+          },
+        ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+    ],
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": Array [
+          <withRouter(Connect(Tour))
+            finalStepSelector="#tour-bloc-api-button"
+            name="transactions"
+            steps={
+              Array [
+                Object {
+                  "isFixed": true,
+                  "position": "bottom",
+                  "selector": "#tour-query-type",
+                  "text": "Run search queries against all transactions launched by your Smart Contracts.",
+                  "title": "Search your Transactions",
+                  "type": "hover",
+                },
+                Object {
+                  "isFixed": true,
+                  "position": "bottom",
+                  "selector": "#tour-bloc-api-button",
+                  "text": "<strong>Bloc API</strong> offers a library of API endpoints you may use in any web application. Send and receive JSON data to your custom blockchains using <strong>Bloc API</strong>.",
+                  "title": "Add API endpoints to your application",
+                  "type": "hover",
+                },
+              ]
+            }
+          />,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-10"
+            >
+              <h3>
+                Transactions
+              </h3>
+            </div>
+            <div
+              className="col-sm-2 chain-wrapper"
+            >
+              
+            </div>
+          </div>,
+          <withRouter(Connect(ReduxForm)) />,
+        ],
+        "className": "container-fluid pt-dark",
+      },
+      "ref": null,
+      "rendered": Array [
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {
+            "finalStepSelector": "#tour-bloc-api-button",
+            "name": "transactions",
+            "steps": Array [
+              Object {
+                "isFixed": true,
+                "position": "bottom",
+                "selector": "#tour-query-type",
+                "text": "Run search queries against all transactions launched by your Smart Contracts.",
+                "title": "Search your Transactions",
+                "type": "hover",
+              },
+              Object {
+                "isFixed": true,
+                "position": "bottom",
+                "selector": "#tour-bloc-api-button",
+                "text": "<strong>Bloc API</strong> offers a library of API endpoints you may use in any web application. Send and receive JSON data to your custom blockchains using <strong>Bloc API</strong>.",
+                "title": "Add API endpoints to your application",
+                "type": "hover",
+              },
+            ],
+          },
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": Array [
+              <div
+                className="col-sm-10"
+              >
+                <h3>
+                  Transactions
+                </h3>
+              </div>,
+              <div
+                className="col-sm-2 chain-wrapper"
+              >
+                
+              </div>,
+            ],
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <h3>
+                  Transactions
+                </h3>,
+                "className": "col-sm-10",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Transactions",
+                },
+                "ref": null,
+                "rendered": "Transactions",
+                "type": "h3",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "",
+                "className": "col-sm-2 chain-wrapper",
+              },
+              "ref": null,
+              "rendered": "",
+              "type": "div",
+            },
+          ],
           "type": "div",
         },
         Object {
