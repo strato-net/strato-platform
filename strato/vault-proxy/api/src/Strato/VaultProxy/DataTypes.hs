@@ -129,7 +129,7 @@ instance ToJSON Version where
 
 instance FromJSON Version where
   parseJSON (Object o) = do
-    ver  <- o .: T.pack "version"
+    ver  <- o .: DAK.fromString "version"
 
     vers <- case ver of
         (Number ver1) -> do 
