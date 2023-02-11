@@ -75,6 +75,8 @@ benchmarks:
     other-modules: []
     dependencies:
       - ethereum-rlp
+      - random-bytestring
+      - criterion
   zipbench:
     source-dirs: bench/
     main: ZipBench.hs
@@ -83,3 +85,5 @@ benchmarks:
       - base16-bytestring
       - ethereum-rlp
       - zlib
+      - criterion
+      - random-bytestring

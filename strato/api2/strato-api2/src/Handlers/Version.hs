@@ -12,7 +12,9 @@ module Handlers.Version (
 import           Data.Aeson
 import           GHC.Generics
 import           Servant
-import           Servant.Swagger.Tags
+-- import           Servant.Swagger.Tags
+import           Tags
+
 
 import           Versioning
 

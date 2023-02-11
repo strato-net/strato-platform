@@ -2,13 +2,15 @@ module Strato.Strato23.Database.Tables where
 
 import           Data.Profunctor.Product
 import           Opaleye
+import           Opaleye.Internal.PGTypesExternal
+import           Opaleye.Internal.Table
 
 schemaVersionTable :: Table
-  ( Maybe (Column PGInt4)
-  , Column PGInt4
+  ( Maybe (Field PGInt4)
+  , Field PGInt4
   )
-  ( Column PGInt4
-  , Column PGInt4
+  ( Field PGInt4
+  , Field PGInt4
   )
 schemaVersionTable = Table "vault_wrapper_schema_version" $ p2
   ( optionalTableField "id"
@@ -16,21 +18,21 @@ schemaVersionTable = Table "vault_wrapper_schema_version" $ p2
   )
 
 usersTable :: Table
-  ( Maybe (Column PGInt4)
-  , Column PGText
-  , Column PGText
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
+  ( Maybe (Field PGInt4)
+  , Field PGText
+  , Field PGText
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
   )
-  ( Column PGInt4
-  , Column PGText
-  , Column PGText
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
+  ( Field PGInt4
+  , Field PGText
+  , Field PGText
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
   )
 usersTable = Table "users" $ p7
   ( optionalTableField "id"
@@ -43,15 +45,15 @@ usersTable = Table "users" $ p7
   )
 
 messageTable :: Table
-  ( Maybe (Column PGInt4)
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
+  ( Maybe (Field PGInt4)
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
   )
-  ( Column PGInt4
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
+  ( Field PGInt4
+  , Field PGBytea
+  , Field PGBytea
+  , Field PGBytea
   )
 messageTable = Table "message" $ p4
   ( optionalTableField "id"

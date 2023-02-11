@@ -227,7 +227,7 @@ function newnode {
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
+                         --miningVerification=$verifyBlocks  \
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
                          --debugPort=$debugPort --debugWSPort=$debugWSPort \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
@@ -441,7 +441,7 @@ setEnv numMinPeers 100
 setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 1000
-setEnv difficultyBomb false
+
 
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}

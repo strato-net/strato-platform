@@ -23,7 +23,8 @@ import           Data.Swagger
 --import           Data.Swagger.Schema
 import           GHC.Generics
 import           Servant
-import           Servant.Swagger.Tags
+-- import           Servant.Swagger.Tags
+import           Tags
 
 
 import           Blockchain.Data.Json          ()

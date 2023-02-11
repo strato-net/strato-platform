@@ -1834,7 +1834,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                         CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
-            val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
+            val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
             case (val', last pieces) of
 
               (SContract _ toAddress', MS.Field funcName) -> do

@@ -35,6 +35,7 @@ tests:
   test-merkle-patricia-db:
     source-dirs: test
     main:        MerklePatriciaSpec.hs
+    ghc-options: -dynamic
     dependencies:
       - HUnit
       - hspec
@@ -46,8 +47,10 @@ benchmarks:
   mpbench:
     main: MPBench.hs
     source-dirs: bench/
+    ghc-options: -dynamic
     dependencies:
       - bytestring
+      - criterion
       - deepseq
       - directory
       - merkle-patricia-db

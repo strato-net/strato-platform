@@ -33,6 +33,7 @@ import              Control.Lens.Operators
 import              Control.Monad          ((<=<))
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
+import qualified    Data.Aeson.Key                       as DAK
 import              Data.Binary
 import              Data.Binary.Get
 import              Data.Binary.Put
@@ -113,8 +114,9 @@ instance Ae.FromJSON Keccak256 where
       _ -> fail $ "error parsing Keccak256: " ++ show t
 
 instance Ae.ToJSONKey Keccak256 where
-  toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
-      where f = T.pack . keccak256ToHex
+  toJSONKey = Ae.ToJSONKeyText f (Enc.text . t)
+      where f = DAK.fromText . T.pack . keccak256ToHex
+            t = T.pack . keccak256ToHex
 
 instance Ae.FromJSONKey Keccak256 where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
@@ -235,14 +237,14 @@ instance ToParamSchema Keccak256 where
 
 instance ToSample Keccak256 where
   toSamples _ =
-    samples [hash $ BLC.toStrict (encode @ Integer n) | n <- [1..10]]
+    samples [hash $ BLC.toStrict (encode @Integer n) | n <- [1..10]]
 
 instance ToSchema Keccak256 where
   declareNamedSchema _ = return $
     NamedSchema (Just "Keccak256 hash, 32 byte hex encoded string")
       ( mempty
         & type_ ?~ SwaggerString
-        & example ?~ Ae.toJSON (hash $ BLC.toStrict (encode @ Integer 1))
+        & example ?~ Ae.toJSON (hash $ BLC.toStrict (encode @Integer 1))
         & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
 
 blockstanbulMixHash :: Keccak256

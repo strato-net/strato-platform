@@ -5,7 +5,7 @@ module Blockchain.Options where
 import           Data.ByteString.Internal
 import           HFlags
 
-import           Blockchain.CoreFlags
+import           Blockchain.VMOptions 
 import           Blockchain.Participation (ParticipationMode(..))
 import           Blockchain.Strato.Model.Util
 

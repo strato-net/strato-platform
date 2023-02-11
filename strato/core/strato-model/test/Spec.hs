@@ -18,7 +18,9 @@ import qualified Data.Text                          as T
 import           Data.Word ()
 import           Database.Persist.Sql
 import           GHC.Exts
-import           GHC.Integer.GMP.Internals
+-- import           GHC.Integer.GMP.Internals
+-- import           GHC.Num.BigNat
+import           GHC.Num.Integer
 import           Numeric                            (showHex)
 import           Test.Hspec
 import           Test.QuickCheck
@@ -32,6 +34,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1  as SEC
 import qualified LabeledError
 import           Network.Haskoin.Crypto.BigWord     (BigWord(..))
+
 
 
 
@@ -89,14 +92,14 @@ spec = do
       word256ToBytes n `shouldBe` B.pack (slowWord256ToBytes n)
 
     it "works on small word256" $ do
-        let input = BigWord (S# 1#)
+        let input = BigWord (IS 1#)
         let want = B.replicate 31 0 <> B.replicate 1 1
         word256ToBytes input `shouldBe` want
 
   describe "fastDeserialize" $ do
     it "maintains Integer invariants" $ property $ \n ->
       let n' = bytesToWord256 . word256ToBytes $ n
-      in I# (isValidInteger# (getBigWordInteger n')) `shouldBe` 1
+      in I# (integerCheck# (getBigWordInteger n')) `shouldBe` 1
     it "works on 99656985947821947480 (66 bits)" $ do
       let b = word256ToBytes 99656985947821947480
       bytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
@@ -113,7 +116,7 @@ spec = do
     it "works on arbitrary word256" $ property $ \n ->
       fastWord256LSB n `shouldBe` slowByte n
     it "works on S# Word256" $ do
-      fastWord256LSB (BigWord (S# 0x93342434#)) `shouldBe` 0x34
+      fastWord256LSB (BigWord (IS 0x93342434#)) `shouldBe` 0x34
 
   describe "Address serialization" $ do
     it "should be fixed width" $ do

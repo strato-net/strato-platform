@@ -99,8 +99,7 @@ metadataSchemaOptions = SchemaOptions
   , unwrapUnaryRecords = True
   }
 
-getMetaData :: (  MonadIO m
-                , MonadLogger m
+getMetaData :: (  MonadLogger m
                 , HasVault m
                 , Accessible [ChainMemberParsedSet] m
                 , HasSQL m )

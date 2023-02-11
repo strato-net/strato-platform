@@ -22,7 +22,8 @@ import           Data.Aeson
 import           Data.Swagger.Schema
 import           GHC.Generics
 import           Servant
-import           Servant.Swagger.Tags
+-- import           Servant.Swagger.Tags
+import Tags
 
 import           Blockchain.Data.Json                ()
 import           Handlers.Record                     (RecordLocation(..))

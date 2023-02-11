@@ -19,7 +19,7 @@ import           Test.QuickCheck.Instances    ()
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 
 defAesonOptions :: Options
-defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+defAesonOptions = defaultOptions
 
 data Def = Enum { names::[Text], bytes::Word }
          | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }

@@ -866,7 +866,7 @@ instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance (MonadIO m, MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
+instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
     myIP@(IPAsText ip) <- lift $ asks _p2pMyIPAddress
@@ -943,8 +943,7 @@ instance ( MonadIO m
             Nothing -> pure ()
             Just myAddr -> atomically $ writeTQueue s (msg, myAddr)
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          , MonadLogger m
          , MonadReader P2PPeer m
          ) => A.Selectable () (B.ByteString, SockAddr) (MonadP2PTest m) where
@@ -953,8 +952,7 @@ instance ( MonadIO m
     mMsg <- timeout 10000000 . atomically $ readTQueue s
     pure mMsg
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          , MonadLogger m
          , MonadReader P2PPeer m
          ) => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (MonadP2PTest m) where
@@ -1538,7 +1536,10 @@ mkSignedTx privKey utx =
       Wei val = U.unsignedTransactionValue utx
       (r', s', v') = getSigVals . signMsg privKey $ U.rlpHash utx
    in if isJust $ U.unsignedTransactionTo utx
-        then let Code c = U.unsignedTransactionInitOrData utx
+        -- then let Code c = U.unsignedTransactionInitOrData utx
+        then let c = case U.unsignedTransactionInitOrData utx of
+                        Code c' -> c'
+                        _ -> error "mkSignedTx: impossible"
               in MessageTX
                    { transactionNonce    = fromIntegral n
                    , transactionGasPrice = fromIntegral gp

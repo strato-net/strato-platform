@@ -13,7 +13,7 @@ import           Control.Concurrent.Lock                as L
 -- import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.ByteString                        as B hiding (putStrLn, map, filter)
+import           Data.ByteString                        as B hiding (map, filter)
 import qualified Data.Cache                             as Cache
 import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE

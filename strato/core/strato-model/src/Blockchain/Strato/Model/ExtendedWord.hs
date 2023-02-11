@@ -32,12 +32,15 @@ import qualified Data.Primitive.ByteArray  as PBA
 import           Data.Swagger              hiding (Format, format)
 import           Data.Swagger.Internal.Schema (named)
 import qualified Data.Text                 as T
+import qualified Data.Aeson.Key            as DAK 
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
 import qualified Foreign.Storable          as FS
 import           GHC.Exts
 import           GHC.Integer.GMP.Internals
 import           GHC.Word
+import           GHC.Num.BigNat
+import           GHC.Num.Integer
 import           Numeric
 import           System.Endian
 import           System.IO.Unsafe
@@ -85,23 +88,23 @@ word256ToBytes ws = unsafePerformIO $ do
     FS.pokeElemOff dst 2 0
     FS.pokeElemOff dst 3 0
     case n of
-      S# i# -> FS.pokeElemOff dst 3 (toBE64 (W64# (int2Word# i#)))
-      Jp# bn -> do
-        case sizeofBigNat# bn of
+      IS i# -> FS.pokeElemOff dst 3 (toBE64 (W64# (int2Word# i#)))
+      IP bn -> do
+        case bigNatSize# bn of
           1# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
           2# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
           3# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-            FS.pokeElemOff dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (bigNatIndex# bn 2#)))
           _ -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-            FS.pokeElemOff dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
-            FS.pokeElemOff dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (bigNatIndex# bn 2#)))
+            FS.pokeElemOff dst 0 (toBE64 (W64# (bigNatIndex# bn 3#)))
       _ -> error "negative Word256"
   return $! BI.PS dstFP 0 32
 
@@ -131,7 +134,7 @@ bytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256 called wit
     -- fragmentation.
     if numWords == 1 && ll <= 0x7fffffffffffffff
       then let !(W64# w#) = ll
-           in return (BigWord (S# (word2Int# w#)))
+           in return (BigWord (IS (word2Int# w#)))
       else do
         dst <- PBA.newPinnedByteArray (8 * numWords)
         case numWords of
@@ -151,14 +154,14 @@ bytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256 called wit
           _ -> error $ "unexpected number of words in word256: " ++ show numWords
         dst' <- PBA.unsafeFreezeByteArray dst
         let !(PBA.ByteArray dst'#) = dst'
-        return . BigWord $ Jp# (BN# dst'#)
+        return . BigWord $ IP (unBigNat (BN# dst'#))
 
 fastWord256LSB :: Word256 -> Word8
-fastWord256LSB ws = case (getBigWordInteger ws) of
-                      S# i# -> W8# (int2Word# (andI# i# 0xff#))
-                      Jp# bn -> let w# = bigNatToWord bn
-                                in W8# (and# w# (int2Word# 0xff#))
-                      _ -> error "negative Word256"
+fastWord256LSB (BigWord (IS i#)) = fromIntegral (W# (int2Word# i#))
+-- fastWord256LSB (BigWord (Jp# bn)) = fromIntegral (W# (bigNatIndex# (unBigNat bn) 0#))
+fastWord256LSB (BigWord (IP bn)) = fromIntegral (W# (bigNatIndex# bn 0#))
+fastWord256LSB (BigWord (IN bn)) = fromIntegral (W# (bigNatIndex# bn 0#))
+
 
 word512ToBytes :: Word512 -> [Word8]
 word512ToBytes word = map (fromIntegral . (word `shiftR`)) [512-8, 512-16..0]
@@ -232,8 +235,9 @@ instance Format Word256 where
   format x = BC.unpack $ B16.encode $ B.pack $ slowWord256ToBytes x
 
 instance Ae.ToJSONKey Word256 where
-  toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
-    where f = T.pack . format
+  toJSONKey = Ae.ToJSONKeyText f (Enc.text . t)
+    where f = DAK.fromText . T.pack . format
+          t = T.pack . format
 
 instance Ae.FromJSONKey Word256 where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)

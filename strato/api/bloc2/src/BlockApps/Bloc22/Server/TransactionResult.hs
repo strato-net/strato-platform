@@ -107,8 +107,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- getBlocTransactionResult' will return only one of the results
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
-getBlocTransactionResult' :: ( MonadIO m
-                             , (Keccak256 `A.Alters` SourceMap) m
+getBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                              , A.Selectable Account AddressState m
                              , MonadLogger m
                              , HasBlocSQL m
@@ -131,8 +130,7 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
         
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
-getBlocTransactionResult :: ( MonadIO m
-                            , (Keccak256 `A.Alters` SourceMap) m
+getBlocTransactionResult :: ( (Keccak256 `A.Alters` SourceMap) m
                             , A.Selectable Account AddressState m
                             , MonadLogger m
                             , HasBlocSQL m
@@ -143,8 +141,7 @@ getBlocTransactionResult :: ( MonadIO m
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 
-getBatchBlocTransactionResult' :: ( MonadIO m
-                                  , (Keccak256 `A.Alters` SourceMap) m
+getBatchBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                                   , A.Selectable Account AddressState m
                                   , MonadLogger m
                                   , HasBlocSQL m
@@ -157,8 +154,7 @@ getBatchBlocTransactionResult' hashes resolve =
     then postBlocTransactionResults True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
-postBlocTransactionResults :: ( MonadIO m
-                              , (Keccak256 `A.Alters` SourceMap) m
+postBlocTransactionResults :: ( (Keccak256 `A.Alters` SourceMap) m
                               , A.Selectable Account AddressState m
                               , MonadLogger m
                               , HasBlocSQL m
@@ -227,8 +223,7 @@ rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
   , Deprecated.posttransactionMetadata = Map.fromList <$> rawTransactionMetadata
   }
 
-evalAndReturn :: ( MonadIO m
-                 , (Keccak256 `A.Alters` SourceMap) m
+evalAndReturn :: ( (Keccak256 `A.Alters` SourceMap) m
                  , A.Selectable Account AddressState m
                  , MonadLogger m
                  , HasBlocSQL m
@@ -252,8 +247,7 @@ nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
       | n `mod` 10 == 2 = Text.pack (show $ n + 1) <> "rd"
       | otherwise       = Text.pack (show $ n + 1) <> "th"
 
-contractResult :: ( MonadIO m
-                  , A.Selectable Account AddressState m
+contractResult :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m
@@ -305,8 +299,7 @@ contractResult i txHash code txResult mmd = do
             Just (_, ds) -> contractDetailsMap . at cn <?= ds{contractdetailsAccount = Just acct}
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
-functionResult :: ( MonadIO m
-                  , A.Selectable Account AddressState m
+functionResult :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m

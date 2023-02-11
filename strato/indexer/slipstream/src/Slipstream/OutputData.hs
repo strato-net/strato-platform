@@ -176,7 +176,7 @@ handlePostgresError :: MonadLogger m => SomeException -> m ()
 handlePostgresError e =
   if crashOnSQLError
   then error . show $ e
-    else$logErrorLS "handlePGError" e
+    else $logErrorLS "handlePGError" e
 
 outputData' :: OutputM m
            => PGConnection

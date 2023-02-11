@@ -12,6 +12,7 @@ pipeline {
             } catch (Exception e) {
               currentBuild.description = "Agent ${env.NODE_NAME}// github"
             }
+            lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
           }
         }
         sh '''#!/bin/bash -le
@@ -19,6 +20,7 @@ pipeline {
         '''
       }
     }
+
 
     stage('Build') {
       steps {
@@ -103,25 +105,8 @@ pipeline {
             check_availability
           '''
         }
-
-        dir("strato") {
-          // Build genesis-block.json
-          sh '''#!/bin/bash -le
-            myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
-            sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
-            stack run x509-generator -- \\
-              --issuer=x509-generator/rootCert.pem \\
-              --subject=x509-generator/subject.json \\
-              --key=x509-generator/rootPriv.pem
-            myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
-            echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
-            stack run genesis-builder -- \\
-              --input=genesis-builder/genesis-block.tpl.json \\
-              --faucets=genesis-builder/faucets.json \\
-              --validators=genesis-builder/validators.json \\
-              --admins=genesis-builder/admins.json \\
-              --certs=genesis-builder/certs.json \\
-              --output=../strato-getting-started/genesis-block.json'''
+        script {
+          lib.generateGenesisBlock('.', 'strato-getting-started')
         }
 
         dir("strato-getting-started") {

@@ -102,6 +102,7 @@ tests:
   blockapps-tools-test:
     source-dirs: test/
     main: KafkaSpec.hs
+    ghc-options: -dynamic
     dependencies:
       - QuickCheck
       - blockapps-tools
