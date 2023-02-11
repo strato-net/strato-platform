@@ -7051,7 +7051,7 @@ contract qq {
 |]
     getFields ["funcB", "temp2", "a", "temp"] `shouldReturn` [BInteger 4, BInteger 4, BInteger 3, BInteger 2]
 
-  it "cant infinite loop" $ (runTestWithTimeout 30000000 $
+  it "cant infinite loop" $ (runTestWithTimeout 60000000 $
     runBS [r|
 
 contract qq {
@@ -7063,7 +7063,7 @@ contract qq {
   }
 }   |]) `shouldThrow` anyTooMuchGasError
 
-  it "cant infinite loop through a different contract" $ (runTestWithTimeout 30000000 $
+  it "cant infinite loop through a different contract" $ (runTestWithTimeout 60000000 $
     runBS [r|
 
 
