@@ -79,6 +79,15 @@ tests:
     main: Main.hs
     ghc-options: -dynamic
     dependencies:
+      - strato-init
+      - aeson
+      - json-stream
+      - seqevents
+      - mtl
+      - crypto-api
+      - blockapps-data
+      - core-api2
+      - strato-genesis
       - async
       - base16-bytestring
       - blockapps-datadefs
