@@ -7,11 +7,11 @@
 
 module Strato.Strato23.Server where
 
-import           Control.Lens             ((&), (.~), (?~))
+import           Control.Lens                       ((&), (.~), (?~))
 import           Data.Proxy
-import           Data.Swagger
+import           Data.Swagger                       as Swag   
 import           Servant
-import           Servant.Swagger
+import           Servant.Swagger                    (toSwagger)
 
 import           Strato.Strato23.API
 import           Strato.Strato23.Monad
@@ -41,7 +41,7 @@ serverProxy = Proxy
 vaultWrapperSwagger :: Swagger
 vaultWrapperSwagger = toSwagger (Proxy @VaultWrapperAPI)
     & info.title   .~ "Vault Wrapper API"
-    & info.version .~ "2.3"
+    & info.Swag.version .~ "2.3"
     & info.description ?~ "This is the V2.3 API for Vault Wrapper"
     & basePath ?~ "/strato/v2.3"
 
