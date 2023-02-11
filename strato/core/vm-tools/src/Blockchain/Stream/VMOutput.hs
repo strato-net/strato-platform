@@ -74,7 +74,9 @@ produceVMOutputsM vmOutputs = do
     x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
 
-    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+    let offset = case concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x of 
+          [offset'] -> offset'
+          _ -> error "produceVMOutputsM: unexpected response from Kafka"
     return offset
 
 -- todo: refactor this to consume produceVMOutputsM
@@ -86,8 +88,11 @@ produceVMOutputs vmOutputs = do
   case result of
    Left e -> error $ show e
    Right x -> do
-     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-     return offset
+      -- let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+      let offset = case concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x of 
+            [offset'] -> offset'
+            _ -> error "produceVMOutputs: unexpected response from Kafka"
+      return offset
 
 -- | Reads VMOutputs from `defaultVMOutputsTopicName`
 fetchVMOutputs :: Kafka k => Offset -> k [VMOutput]

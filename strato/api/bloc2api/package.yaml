@@ -42,6 +42,7 @@ tests:
   blockapps-strato-api-test:
     main: Spec.hs
     source-dirs: test/
+    ghc-options: -dynamic
     dependencies:
       - bloc2api
       - hspec

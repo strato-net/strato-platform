@@ -9,7 +9,6 @@ import           Control.Monad.Reader
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Class              as Saltine
-import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                  (ByteString)
 import           Data.Maybe                       (fromMaybe, listToMaybe, isJust)
 import           Data.IORef
@@ -21,6 +20,10 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries
 import           Strato.Strato23.Monad
 
+
+
+
+
 superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =
   "A monad is just a monoid in the category of endofunctors, what's the problem?"
@@ -31,7 +34,7 @@ getKeyFromPasswordAndSalt (Password pw) salt =
         { Scrypt.n = 16384
         , Scrypt.r = 8
         , Scrypt.p = 1
-        , Scrypt.outputLength = Saltine.secretBoxKey
+        , Scrypt.outputLength = 32 -- ???? could break everything
         }
   in fromMaybe (error "could not decode encryption key") . Saltine.decode $
      Scrypt.generate scryptParams pw salt

@@ -22,7 +22,10 @@ spec = describe "DelayedBloomFilter" $ do
     map (DBF.elem 17) (take 5 fs) `shouldBe` [False, False, False, False, True]
     let insertAndInc (n, f) = Just (f, (n+1, DBF.insert n f))
         fs2 = unfoldr insertAndInc (0 :: Int, DBF.newFilter 512)
-        (empties, populated:_) = splitAt 513 fs2
+        -- (empties, populated:_) = splitAt 513 fs2
+        (empties, populated) = case splitAt 513 fs2 of
+          (e, p:_) -> (e, p)
+          _ -> error "impossible"
     forM_ empties $ \e ->
       forM_ [0..1024] $ \n ->
         n `shouldNotSatisfy` flip DBF.elem e

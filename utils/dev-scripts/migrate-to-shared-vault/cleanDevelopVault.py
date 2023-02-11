@@ -2,7 +2,6 @@ import pandas as pd
 import sys
 from collections import defaultdict
 import requests
-import sys
 from requests.exceptions import HTTPError
 from requests.auth import HTTPBasicAuth
 
@@ -70,13 +69,19 @@ db['x_user_unique_name'] = db.apply( lambda x: nodeKeyName  if x['x_user_unique_
 db['oauth_provider_id'] = db.apply( lambda x: oauthProviderM , axis=1) 
 db = db.drop(['enc_sec_key'], axis=1)
 
+oauth_provider_id = db.pop('oauth_provider_id')
+db.insert(2, 'oauth_provider_id', oauth_provider_id)
+
+
 
 print("Headers after some but not all of cleaning")
 for col in db.columns: print(col)
 print()
 
 
-db.to_csv("userTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
+db.to_csv("userTableModfied.csv", header=False, index=False)
+# db.to_csv("userTableModfiedWithHeaders.csv", index=False)
+
 print("Clean headers and indexed-index column for user table")
 db       = pd.read_csv("messageTable.csv")
 print()
@@ -85,7 +90,7 @@ print()
 db['id'] = db.apply( lambda x: x['id'] + 1, axis=1)
 
 
-db.to_csv("messageTableModfied.csv", header=False, index=False) #Add nodeRelated to this to file name?
-
+db.to_csv("messageTableModfied.csv", header=False, index=False)
+# db.to_csv("messageTableModfiedWithHeaders.csv", index=False)
 
 print("Cleaned headers from message table")

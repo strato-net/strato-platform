@@ -87,6 +87,7 @@ tests:
   slipstream-test:
     main: Main.hs
     source-dirs: tests/
+    ghc-options: -dynamic
     dependencies:
       - base
       - aeson

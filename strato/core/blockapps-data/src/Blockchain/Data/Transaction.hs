@@ -221,7 +221,9 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
 
   let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
   
-  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+  return $ case unsignedTX of
+    MessageTX{} -> unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+    _ -> error "createChainMessageTX: PrivateHashTX not supported should be impossible"
 
 createContractCreationTX::Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> EC.PrivateKey->IO Transaction
 createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
@@ -253,7 +255,12 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 
   let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
   
-  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+  
+  return $ case unsignedTX of
+    ContractCreationTX{} -> unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+    _ -> error "createChainContractCreationTX: not supported should be impossible"
+
+  -- return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
 
 {-
   Switch to Either?

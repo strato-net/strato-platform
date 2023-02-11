@@ -9,6 +9,10 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
+--EVM is deprecated so these are added
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns    #-}
+
 module Blockchain.EVM
     ( runCodeFromStart
     , call

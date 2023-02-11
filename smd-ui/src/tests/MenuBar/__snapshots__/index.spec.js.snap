@@ -1,21 +1,109 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`MenuBar: index mapStateToProps 1`] = `
+exports[`MenuBar: index renders Oauth mode component with values 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <small className=\\"pt-text-muted\\">
+      STRATO 
+      N/A
+    </small>
+    <div>
+      <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Contact BlockApps Support
+        </button>
+      </a>
+      <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Dev Docs
+        </button>
+      </a>
+      <span>
+        <span className=\\"pt-navbar-divider\\" />
+        <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+             Get Certified 
+          </button>
+        </a>
+        <span className=\\"pt-navbar-divider\\" />
+        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: logout]}>
+            Logout
+          </button>
+        </a>
+      </span>
+    </div>
+  </div>
+</nav>"
+`;
+
+exports[`MenuBar: index renders Oauth mode component without values 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <small className=\\"pt-text-muted\\">
+      STRATO 
+      N/A
+    </small>
+    <div>
+      <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Contact BlockApps Support
+        </button>
+      </a>
+      <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Dev Docs
+        </button>
+      </a>
+      <span>
+        <span className=\\"pt-navbar-divider\\" />
+        <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+             Get Certified 
+          </button>
+        </a>
+        <span className=\\"pt-navbar-divider\\" />
+        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: logout]}>
+            Logout
+          </button>
+        </a>
+      </span>
+    </div>
+  </div>
+</nav>"
+`;
+
+exports[`MenuBar: index renders Oauth mode mapStateToProps 1`] = `
 Object {
-  "chainIds": Array [
-    Object {
-      "id": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
-      "label": "airline cartel 1",
-    },
-    Object {
-      "id": "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e",
-      "label": "airline cartel 2",
-    },
-    Object {
-      "id": "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f",
-      "label": "airline cartel 3",
-    },
-  ],
   "oauthUser": Object {
     "address": "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
     "block_hash": "dcvn97pwo8yoh1ep9iwdo6hdulk9uxtz1dehps53emm6tpznqz7eba3p5p7pqoqc",
@@ -43,196 +131,4 @@ VRBEESfuZn6/YKyN8YQfL6uwbLFUPZFWTwZZswyXv6KRDbpXwBcQuoNuB5AIiQ9saR4yxBJRhaHLSQEZ
     "userAddress": "bzvlsnw1xpmipq866nuxkyjxb2crh0jcw1t8olbj",
   },
 }
-`;
-
-exports[`MenuBar: index renders Oauth mode component with values 1`] = `
-"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div>
-      <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
-      </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-right\\">
-    <span>
-      <span className=\\"pt-navbar-divider\\" />
-      <small className=\\"pt-text-muted\\">
-        <div className=\\"pt-select\\">
-          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-            <option>
-               Main Chain 
-            </option>
-            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
-              airline cartel 1
-            </option>
-            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
-              airline cartel 2
-            </option>
-            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
-              airline cartel 3
-            </option>
-          </Field>
-        </div>
-      </small>
-      <span className=\\"pt-navbar-divider\\" />
-    </span>
-    <small className=\\"pt-text-muted\\">
-      STRATO 
-      N/A
-    </small>
-    <div>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Contact BlockApps Support
-        </button>
-      </a>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Dev Docs
-        </button>
-      </a>
-      <span>
-        <span className=\\"pt-navbar-divider\\" />
-        <small className=\\"pt-text-muted welcome-user\\">
-           
-           
-        </small>
-        <span className=\\"pt-navbar-divider\\" />
-        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: logout]}>
-            Logout
-          </button>
-        </a>
-      </span>
-    </div>
-  </div>
-</nav>"
-`;
-
-exports[`MenuBar: index renders Oauth mode component without values 1`] = `"<Connect(Form(MenuBar)) isLoggedIn={false} currentUser={{...}} chainIds={{...}} openWalkThroughOverlay={[Function: mockConstructor]} location={{...}} initialValues={[undefined]} touchOnBlur={true} touchOnChange={false} persistentSubmitErrors={false} destroyOnUnmount={true} shouldAsyncValidate={[Function: defaultShouldAsyncValidate]} shouldValidate={[Function: defaultShouldValidate]} enableReinitialize={false} keepDirtyOnReinitialize={false} getFormState={[Function: getFormState]} pure={true} forceUnregisterOnUnmount={false} form=\\"menu-bar\\" />"`;
-
-exports[`MenuBar: index renders non Oauth mode component with values 1`] = `
-"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div>
-      <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
-      </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-right\\">
-    <span>
-      <span className=\\"pt-navbar-divider\\" />
-      <small className=\\"pt-text-muted\\">
-        <div className=\\"pt-select\\">
-          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-            <option>
-               Main Chain 
-            </option>
-            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
-              airline cartel 1
-            </option>
-            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
-              airline cartel 2
-            </option>
-            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
-              airline cartel 3
-            </option>
-          </Field>
-        </div>
-      </small>
-      <span className=\\"pt-navbar-divider\\" />
-    </span>
-    <small className=\\"pt-text-muted\\">
-      STRATO 
-      N/A
-    </small>
-    <div>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Contact BlockApps Support
-        </button>
-      </a>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Dev Docs
-        </button>
-      </a>
-    </div>
-  </div>
-</nav>"
-`;
-
-exports[`MenuBar: index renders non Oauth mode component without values 1`] = `
-"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div>
-      <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
-      </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-right\\">
-    <span>
-      <span className=\\"pt-navbar-divider\\" />
-      <small className=\\"pt-text-muted\\">
-        <div className=\\"pt-select\\">
-          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-            <option>
-               Main Chain 
-            </option>
-            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
-              airline cartel 1
-            </option>
-            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
-              airline cartel 2
-            </option>
-            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
-              airline cartel 3
-            </option>
-          </Field>
-        </div>
-      </small>
-      <span className=\\"pt-navbar-divider\\" />
-    </span>
-    <small className=\\"pt-text-muted\\">
-      STRATO 
-      N/A
-    </small>
-    <div>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Contact BlockApps Support
-        </button>
-      </a>
-      <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"https://docs.blockapps.net/\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Dev Docs
-        </button>
-      </a>
-    </div>
-  </div>
-</nav>"
 `;

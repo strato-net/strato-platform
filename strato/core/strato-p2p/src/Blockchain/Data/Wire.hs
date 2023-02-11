@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
+
 module Blockchain.Data.Wire (
   Message(..),
   TerminationReason(..),

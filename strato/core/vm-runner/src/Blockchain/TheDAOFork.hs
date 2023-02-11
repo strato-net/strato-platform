@@ -7,7 +7,6 @@ import           Control.Monad
 import           Control.Monad.Change.Alter
 
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.DB.HashDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 
@@ -132,7 +131,7 @@ addresses = map (flip Account Nothing)
     0x807640a13483f8ac783c557fcdf27be11ea4ac7a
   ]
 
-runTheDAOFork :: (Monad m, HasHashDB m, (Account `Alters` AddressState) m) => m ()
+runTheDAOFork :: ((Account `Alters` AddressState) m) => m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do

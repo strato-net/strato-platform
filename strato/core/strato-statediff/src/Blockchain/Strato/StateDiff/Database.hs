@@ -41,7 +41,7 @@ import           UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: (MonadLogger m, MonadUnliftIO m, HasSQLDB m) => StateDiff -> m ()
+commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   sqlQuery $ do
     createAccount blockNumber $ Map.toList createdAccounts
@@ -66,7 +66,7 @@ codePtrChainId :: CodePtr -> Maybe Word256
 codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
 codePtrChainId _ = Nothing
 
-createAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+createAccount :: (MonadUnliftIO m, MonadLogger m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
   catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
@@ -118,7 +118,7 @@ deleteAccount account = do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
-updateAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+updateAccount :: (MonadUnliftIO m, MonadLogger m) =>
                  Integer -> Account -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount blockNumber account diff = do
   mAddrID <- getAddressStateSQL account

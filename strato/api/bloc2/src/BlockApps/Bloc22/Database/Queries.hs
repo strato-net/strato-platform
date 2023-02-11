@@ -52,6 +52,8 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Traversable                (for)
 import           Database.PostgreSQL.Simple.FromField hiding (name, format)
 import           Opaleye                         hiding (not, null, index, FromField)
+import qualified Opaleye as O
+import           Opaleye.Internal.PGTypesExternal
 import           System.Clock
 import           Text.Format
 import           UnliftIO
@@ -353,7 +355,7 @@ instance FromField Address where
     theByteString <- fromField f mdata
     return $ Address $ bytesToWord160 $ B.unpack theByteString
 
-instance Default ToFields Address (Column PGBytea) where
+instance Default ToFields Address (O.Field PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
@@ -366,12 +368,12 @@ instance FromField SecretBox.Nonce where
     theByteString <- fromField f mdata
     return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
 
-instance Default ToFields SecretBox.Nonce (Column PGBytea) where
+instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
-instance Default ToFields JwtToken (Column PGText) where
+instance Default ToFields JwtToken (O.Field PGText) where
   def = lmap getJwtToken def
 
-instance Default ToFields StateMutability (Column PGText) where
+instance Default ToFields StateMutability (O.Field PGText) where
   def = lmap tShow def
 
 instance DefaultFromField PGText StateMutability where
@@ -390,7 +392,7 @@ instance FromField Keccak256 where
     theByteString <- fromField f mdata
     return $ unsafeCreateKeccak256FromByteString theByteString
 
-instance Default ToFields Keccak256 (Column PGBytea) where
+instance Default ToFields Keccak256 (O.Field PGBytea) where
   def = lmap keccak256ToByteString def
 
 instance DefaultFromField PGBytea CodePtr where
@@ -401,7 +403,7 @@ instance FromField CodePtr where
     theByteString <- fromField f mdata
     return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
 
-instance Default ToFields CodePtr (Column PGBytea) where
+instance Default ToFields CodePtr (O.Field PGBytea) where
   def = lmap rlpSerialize def
 
 instance DefaultFromField PGBytea (Maybe ChainId) where
@@ -412,7 +414,7 @@ instance FromField ChainId where
     theByteString <- fromField f mdata
     return $ ChainId $ byteStringToWord256 theByteString
 
-instance Default ToFields (Maybe ChainId) (Column PGBytea) where
+instance Default ToFields (Maybe ChainId) (O.Field PGBytea) where
   def = lmap fromChainId def
         where fromChainId = \case
                 Nothing -> B.empty

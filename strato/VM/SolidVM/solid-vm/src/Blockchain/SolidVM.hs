@@ -223,7 +223,7 @@ solidVMBreakpoint ann = do
 -- end debugger-related code
 
 requireOriginCert :: MonadSM m => Account -> m ()
-requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
+requireOriginCert acct = when flags_requireCerts $ do
   originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress)
   unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
 
@@ -716,7 +716,12 @@ callWrapper' from to mContract functionName isRCC argExps  = do
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
 
 --  grab the org from the senders account and set it to the codeAddress
-  org <- getOrg to
+  orgAccount <- if isRCC
+    then addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \case
+           CodeAtAccount{} -> pure to
+           _ -> pure from
+    else pure to
+  org <- getOrg orgAccount
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
   when (isRCC) $
@@ -1829,7 +1834,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                         CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
-            val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
+            val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
             case (val', last pieces) of
 
               (SContract _ toAddress', MS.Field funcName) -> do

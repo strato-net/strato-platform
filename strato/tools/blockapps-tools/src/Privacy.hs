@@ -11,7 +11,6 @@ module Privacy where
 
 import           Control.Monad
 import           Control.Monad.Change.Modify     (Accessible(..))
-import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 
@@ -85,7 +84,6 @@ newCollector s c = Collector s c []
 getSomeKeysInNamespace :: ( HasNamespace a
                           , Binary (NSKey a)
                           , Accessible DB.DB m
-                          , MonadIO m
                           , MonadResource m
                           )
                        => Proxy a -> Int -> Int -> m [NSKey a]
@@ -101,8 +99,7 @@ getSomeKeysInNamespace p' start' count' | start' <= 0 = return []
     else return []
   where
     getKeysInNamespace' :: ( HasNamespace a
-                           , Binary (NSKey a)
-                           , MonadIO m
+                           , Binary (NSKey a) 
                            , MonadResource m
                            )
                         => Proxy a -> DB.Iterator -> Collector (NSKey a) -> m [NSKey a]

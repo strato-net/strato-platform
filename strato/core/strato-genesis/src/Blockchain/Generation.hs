@@ -24,15 +24,17 @@ module Blockchain.Generation (
 ) where
 
 import qualified Data.Aeson as Ae
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Aeson.Key as DAK
 import qualified Data.JsonStream.Parser as JS
 import Data.Bits
 import Data.Maybe
+import qualified Data.Bifunctor as BF
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.List as List
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import Data.Scientific (floatingOrInteger)
 import           Data.Text (Text)
@@ -60,7 +62,7 @@ data Type = Number Integer
           | List (V.Vector Type)
           | Struct [Type]
           -- TODO(tim): Make the key type generic over hashable things.
-          | Mapping (HM.HashMap Text Type)
+          | Mapping (KM.KeyMap Type)
   deriving (Eq, Show, Generic)
 
 instance Ae.FromJSON Type where
@@ -70,7 +72,7 @@ instance Ae.FromJSON Type where
                                 Right n -> return . Number $ n
   parseJSON (Ae.Array as) = List <$> V.mapM Ae.parseJSON as
   parseJSON (Ae.Object ss) = let a `cmp` b = fst a `compare` fst b
-                             in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . HM.toList $ ss)
+                             in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . KM.toList $ ss)
   parseJSON (Ae.Bool b) = return . Number $ if b then 1 else 0
   parseJSON _ = fail "unknown aeson type"
 
@@ -78,7 +80,7 @@ instance Ae.FromJSON Type where
 -- and probably needs to be replaced with something more generic.
 -- For example, this prohibits mapping(address => mapping(address => bool)),
 -- both because it only uses a string key and because the values is not Type2
-data TypeHashMap = Type Type | MappingHashMap (HM.HashMap Text Type) deriving (Eq, Show, Generic)
+data TypeHashMap = Type Type | MappingHashMap (KM.KeyMap Type) deriving (Eq, Show, Generic)
 
 toType :: TypeHashMap -> Type
 toType (Type t) = t
@@ -150,7 +152,7 @@ encodeType p (Mapping hm) =
       -- the slot is keccak256(s <> p)
       trieKey s = mapHash (bytesToWord256 . payload $ s) p
       place (s, v) = fst . encodeType (trieKey s) $ v
-  in (pointer:(concatMap place . HM.toList $ hm), p+1)
+  in (pointer:(concatMap place . fmap (BF.first DAK.toText) . KM.toList $ hm), p+1)
 
 encodeRecord :: Word256 -> [Type] -> [(Word256, Word256)]
 encodeRecord k = fst . encodeSequentially k
@@ -439,28 +441,37 @@ insertMercataGovernanceContract validators admins gi =
           [ (".owner", rootAddress),
             (".validatorCount", rlpWrap . BInteger . toInteger $ length validators),
             (".adminCount", rlpWrap . BInteger . toInteger $ length admins)
-          ] ++ map (\(i, CommonName o u c True) ->
-                     ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                     , addrToCertIdx . show $ validatorAddr i)) valIx
-            ++ map (\(i, CommonName o u c True) ->
-                     ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                     , addrToCertIdx . show $ adminAddr i)) adminIx
-        validatorAccts = map (\(i, CommonName o u c True) ->
-          SolidVMContractWithStorage (validatorAddr i) 0 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance)) [
-            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-            (".org", rlpWrap . BString $ encodeUtf8 o),
-            (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-            (".commonName", rlpWrap . BString $ encodeUtf8 c),
-            (".isActive", rlpWrap $ BBool True)]
-          ) valIx
-        adminAccts = map (\(i, CommonName o u c True) ->
-          SolidVMContractWithStorage (adminAddr i) 0 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance)) [
-            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-            (".org", rlpWrap . BString $ encodeUtf8 o),
-            (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-            (".commonName", rlpWrap . BString $ encodeUtf8 c),
-            (".isActive", rlpWrap $ BBool True)]
-          ) adminIx
+          ] 
+            -- ++ map (\(i, CommonName o u c True) ->
+            --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+            --          , addrToCertIdx . show $ validatorAddr i)) valIx
+            -- ++ map (\(i, CommonName o u c True) ->
+            --          ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+            --          , addrToCertIdx . show $ adminAddr i)) adminIx
+            ++ map (\case
+                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+                                                    , addrToCertIdx . show $ validatorAddr i)
+                        _ -> error "Invalid validator cert") valIx
+            ++ map (\case
+                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+                                                    , addrToCertIdx . show $ adminAddr i)
+                        _ -> error "Invalid admin cert") adminIx
+        validatorAccts = map (\case 
+                                (i, CommonName o u c True) -> SolidVMContractWithStorage (validatorAddr i) 0 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance)) [
+                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                                    (".org", rlpWrap . BString $ encodeUtf8 o),
+                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                                    (".isActive", rlpWrap $ BBool True)]
+                                _ -> error "Invalid validator cert") valIx
+        adminAccts = map (\case
+                                (i, CommonName o u c True) -> SolidVMContractWithStorage (adminAddr i) 0 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance)) [
+                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                                    (".org", rlpWrap . BString $ encodeUtf8 o),
+                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                                    (".isActive", rlpWrap $ BBool True)]
+                                _ -> error "Invalid admin cert") adminIx
 
 mercataGovernanceContract :: Text
 mercataGovernanceContract = [r|

@@ -15,6 +15,8 @@ import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson.Encoding    as AesonEnc
+import qualified Data.Aeson.Key            as DAK 
+
 import qualified Data.Binary            as Binary
 import           Data.Either.Extra      (maybeToEither)
 import           Data.Hashable
@@ -41,7 +43,7 @@ instance Show ChainId where show = chainIdString
 
 instance ToJSONKey ChainId where
   toJSONKey = ToJSONKeyText f g
-    where f x = Text.pack $ chainIdString x
+    where f x = DAK.fromText . Text.pack $ chainIdString x
           g x = AesonEnc.text . Text.pack $ chainIdString x
 
 instance PersistField ChainId where

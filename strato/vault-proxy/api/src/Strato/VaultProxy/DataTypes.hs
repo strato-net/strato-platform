@@ -11,6 +11,7 @@ module Strato.VaultProxy.DataTypes (
 import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
+import qualified Data.Aeson.Key as DAK
 import           Data.Cache
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
@@ -32,14 +33,14 @@ data VaultToken = VaultToken {
 
 instance FromJSON VaultToken where
   parseJSON (Object o) = do
-    ao  <- o .: T.pack "access_token"
-    ei  <- o .: T.pack "expires_in"
-    rei <- o .: T.pack "refresh_expires_in"
-    rt  <- o .: T.pack "refresh_token"
-    tt  <- o .: T.pack "token_type"
-    nbp <- o .: T.pack "not-before-policy"
-    ss  <- o .: T.pack "session_state"
-    sc  <- o .: T.pack "scope"
+    ao  <- o .: DAK.fromString "access_token"
+    ei  <- o .: DAK.fromString "expires_in"
+    rei <- o .: DAK.fromString "refresh_expires_in"
+    rt  <- o .: DAK.fromString "refresh_token"
+    tt  <- o .: DAK.fromString "token_type"
+    nbp <- o .: DAK.fromString "not-before-policy"
+    ss  <- o .: DAK.fromString "session_state"
+    sc  <- o .: DAK.fromString "scope"
     --Ensure the correct data types are coming into the system
     access_token <- case ao of
         (String s) -> pure s
@@ -105,8 +106,8 @@ data RawOauth = RawOauth {
 
 instance FromJSON RawOauth where
   parseJSON (Object o) = do
-    aue  <- o .: T.pack "authorization_endpoint"
-    ton  <- o .: T.pack "token_endpoint"
+    aue  <- o .: DAK.fromString "authorization_endpoint"
+    ton  <- o .: DAK.fromString "token_endpoint"
 
     authend <- case aue of
         (String s) -> pure s

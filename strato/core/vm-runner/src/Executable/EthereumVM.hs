@@ -102,7 +102,6 @@ import           Text.Format                           (format)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
-    $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
@@ -141,7 +140,7 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+handleVmEvents :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   rpcResps <- lift $ do
@@ -305,11 +304,21 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
-  yield $ OutToStateDiff cId cInfo bHash
+  let org = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataOrganization
+      app = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataApplication
+  yield $ OutToStateDiff cId cInfo bHash org app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
 
-processBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+processBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
               -> ConduitT a VmOutEvent m ()
 processBlocks blocks = do
@@ -336,15 +345,13 @@ processBlockSummaries = mapM_ $ \b -> do
     ]
   writeBlockSummary b
 
-processTransactions :: ( MonadLogger m
-                       , Bagger.MonadBagger m
+processTransactions :: ( Bagger.MonadBagger m
                        )
                     => [(Timestamp, OutputTx)]
                     -> m ([VmOutEvent], Int)
 processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
 
-getNumPoolable :: ( MonadLogger m
-                  , Bagger.MonadBagger m
+getNumPoolable :: ( Bagger.MonadBagger m
                   )
                => [(Timestamp, OutputTx)]
                -> m Int
@@ -564,8 +571,8 @@ sendOutEvents OutBatch{..} = do
         _ -> Nothing
   
   for_ outJSONRPCs $ liftIO . uncurry produceResponse
-  for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
-    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
+  for_ outToStateDiffs $ \(cId, cInfo, bHash, org, app) ->
+    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
   traverse_ commitSqlDiffs outStateDiffs
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $

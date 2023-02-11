@@ -76,8 +76,8 @@ appVaultWrapper env =
   . instrumentApp "vault-wrapper"
   . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . cors (const $ Just policy)
-  . provideOptions (Proxy @ Strato23.VaultWrapperAPI)
-  . serve (Proxy @ (
+  . provideOptions (Proxy @Strato23.VaultWrapperAPI)
+  . serve (Proxy @(
               "strato" :> "v2.3" :> Strato23.VaultWrapperAPI
          :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
               ))

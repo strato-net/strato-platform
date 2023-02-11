@@ -2,15 +2,17 @@ module BlockApps.Bloc22.Database.Tables where
 
 import Data.Profunctor.Product
 import Opaleye
+import Opaleye.Internal.PGTypesExternal
+import Opaleye.Internal.Table
 
 contractsSourceTable :: Table
-  ( Maybe (Column PGInt4)
-  , Column PGBytea
-  , Column PGText
+  ( Maybe (Field PGInt4)
+  , Field PGBytea
+  , Field PGText
   )
-  ( Column PGInt4
-  , Column PGBytea
-  , Column PGText
+  ( Field PGInt4
+  , Field PGBytea
+  , Field PGText
   )
 contractsSourceTable = Table "contracts_source" $ p3
   ( optionalTableField "id"
@@ -19,15 +21,15 @@ contractsSourceTable = Table "contracts_source" $ p3
   )
 
 evmContractNameTable :: Table
-  ( Maybe (Column PGInt4)
-  , Column PGBytea
-  , Column PGText
-  , Column PGBytea
+  ( Maybe (Field PGInt4)
+  , Field PGBytea
+  , Field PGText
+  , Field PGBytea
   )
-  ( Column PGInt4
-  , Column PGBytea
-  , Column PGText
-  , Column PGBytea
+  ( Field PGInt4
+  , Field PGBytea
+  , Field PGText
+  , Field PGBytea
   )
 evmContractNameTable = Table "evm_contract_name" $ p4
   ( optionalTableField "id"

@@ -16,6 +16,7 @@ pipeline {
             currentBuild.result = 'FAILURE'
             sh "exit 1"
           }
+          lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
         sh '''#!/bin/bash -le
           set -x
@@ -62,7 +63,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv
+          git clone https://github.com/blockapps/strato-getting-started
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
         '''
@@ -126,25 +127,9 @@ pipeline {
             check_availability
           '''
         }
-
-        dir("strato-worktree/strato") {
-          // Build genesis-block.json
-          sh '''#!/bin/bash -le
-            myPub=$(docker exec strato_strato_1 bash -c "curl http://strato:8013/strato/v2.3/key" | python3 -c "import sys, json; print(json.load(sys.stdin)['pubkey'])")
-            sed "s/<PUBKEY>/$(echo $myPub)/g" x509-generator/subject.tpl.json > x509-generator/subject.json
-            stack run x509-generator -- \\
-              --issuer=x509-generator/rootCert.pem \\
-              --subject=x509-generator/subject.json \\
-              --key=x509-generator/rootPriv.pem
-            myCert=$(cat OutputCert.pem | perl -pe 's/\\n/\\\\n/g')
-            echo "[\\"$(echo $myCert)\\"]" > genesis-builder/certs.json
-            stack run genesis-builder -- \\
-              --input=genesis-builder/genesis-block.tpl.json \\
-              --faucets=genesis-builder/faucets.json \\
-              --validators=genesis-builder/validators.json \\
-              --admins=genesis-builder/admins.json \\
-              --certs=genesis-builder/certs.json \\
-              --output=../../strato-getting-started/genesis-block.json'''
+  
+        script {
+          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started')
         }
 
         dir("strato-getting-started") {
@@ -246,8 +231,10 @@ pipeline {
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+              docker-compose --log-level ERROR -f docker-compose.vault.push.yml push 2>&1
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker-compose --log-level ERROR -f docker-compose.push.ecr.yml push 2>&1
+              docker-compose --log-level ERROR -f docker-compose.vault.push.ecr.yml push 2>&1
             '''
 
             // Release to blockapps/strato-getting-started

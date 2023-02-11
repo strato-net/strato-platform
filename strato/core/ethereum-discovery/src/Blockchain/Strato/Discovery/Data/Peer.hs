@@ -316,6 +316,6 @@ getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m 
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
 
 -- todo: respect the requester's target. also is this basically getClosePeers?s
-getPeersClosestTo :: (MonadUnliftIO m, A.Selectable IPAsText ClosestPeers m)
+getPeersClosestTo :: (A.Selectable IPAsText ClosestPeers m)
                   => NodeID -> T.Text -> Point -> m [PPeer]
 getPeersClosestTo _ requesterIP _ = take 20 . maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)

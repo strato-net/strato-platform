@@ -11,11 +11,11 @@ import qualified Crypto.Secp256k1                as SEC
 import           Data.Aeson
 import           Data.Aeson                      as Ae
 import           Data.Aeson.Diff
+import qualified Data.Aeson.KeyMap               as KM
 import qualified Data.Binary                     as Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy.Char8      as C8
 import qualified Data.ByteString.Short           as BSS
-import qualified Data.HashMap.Strict             as HM
 import           Data.Map.Strict                 (Map)
 import           Data.Maybe                      (isNothing, fromMaybe)
 import qualified Data.Text                       as T
@@ -136,17 +136,17 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
       encode (0x45 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000045\""
 
   describe "Address" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ Address
-    prop "has inverse HTTP Api Data decode/encode" $ httpApiDataProp @ Address
-    prop "has inverse Form Url decode/encode" $ formProp @ Address
+    prop "has inverse JSON decode/encode" $ jsonProp @Address
+    prop "has inverse HTTP Api Data decode/encode" $ httpApiDataProp @Address
+    prop "has inverse Form Url decode/encode" $ formProp @Address
     prop "has inverse String decode/encode" $ \ address ->
       stringAddress (formatAddressWithoutColor address) === Just address
 
   describe "Keccak256" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ Keccak256
+    prop "has inverse JSON decode/encode" $ jsonProp @Keccak256
     prop "has inverse HTTP Api Data decode/encode" $
-      httpApiDataProp @ Keccak256
-    prop "has inverse Form Url decode/encode" $ formProp @ Keccak256
+      httpApiDataProp @Keccak256
+    prop "has inverse Form Url decode/encode" $ formProp @Keccak256
     prop "has inverse String decode/encode" $ \ hash' ->
       stringKeccak256 (formatKeccak256WithoutColor hash') === Just hash'
 
@@ -319,7 +319,11 @@ stringToAddress x = Address
              $ T.pack x
 
 addressToString :: Address -> T.Text
-addressToString address = let (String t) = toJSON address in t
+addressToString address = 
+  let t = case toJSON address of 
+        (Ae.String t') -> t'
+        _ -> error "addressToString: toJSON returned non-string" 
+  in t
 
 testAddresses :: [String]
 testAddresses = map (\i -> (take (40 - i) $ repeat '0') ++ (take i $ repeat 'a')) [0..40]
@@ -414,7 +418,7 @@ matchingHash = it "doesnt mutate the hash" $ do
              Right (Array os) -> V.head os
              _ -> undefined
   let h = case obj of
-             Object o -> HM.lookup "hash" o
+             Object o -> KM.lookup "hash" o
              _ -> undefined
 
   let jsonHash = case h of

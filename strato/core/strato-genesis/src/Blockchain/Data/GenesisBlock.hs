@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -23,7 +24,6 @@ import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
 import           Data.ByteString                      as BS hiding (zip, map)
-import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes, fromMaybe)
@@ -290,8 +290,10 @@ initializeChainDBs :: ( MonadLogger m
                       )
                    => Maybe Word256
                    -> ChainInfo
+                   -> T.Text
+                   -> T.Text
                    -> m ()
-initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) org app = do
   sRoot <- A.lookupWithDefault (A.Proxy @StateRoot) chainId
   genAddrStates <- getAllAddressStates chainId
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
@@ -306,8 +308,16 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
   }
   commitSqlDiffs diff
 
-  forM_ [ (src, name) | CodeInfo{codeInfoSource=src, codeInfoName=name} <- codeInfo] $ \(src, name) ->
-    produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) "" "" []]
+  let resolveAndProduce cp = resolveCodePtr chainId cp >>= \case
+        Just (SolidVMCode name ch) -> fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
+          Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app []]
+          _ -> pure ()
+        _ -> pure ()
+  forM_ accountInfo $ \case
+    ContractNoStorage _ _ cp -> resolveAndProduce cp
+    ContractWithStorage _ _ cp _ -> resolveAndProduce cp
+    SolidVMContractWithStorage _ _ cp _ -> resolveAndProduce cp
+    _ -> pure ()
 
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci

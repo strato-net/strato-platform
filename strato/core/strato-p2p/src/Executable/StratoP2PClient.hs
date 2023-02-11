@@ -32,7 +32,7 @@ import           Data.Conduit
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
-import           Data.Time.Clock
+-- import           Data.Time.Clock
 import           Data.Traversable                      (for)
 import           GHC.IO.Exception                      
 import           UnliftIO
@@ -49,7 +49,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -64,8 +63,8 @@ runPeer peer sSource = do
 
   myPublic <- getPub
 
-  curTime <- liftIO getCurrentTime
-  when ((pPeerEnableTime peer) > curTime) $ throwIO PeerDisabled
+  -- curTime <- liftIO getCurrentTime
+  -- when ((pPeerEnableTime peer) > curTime) $ throwIO PeerDisabled
   
   otherPubKey <- case (pPeerPubkey peer) of
     Nothing -> do
@@ -121,9 +120,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
                   .| pSink
 
 
-runPeerInList :: ( MonadIO m
-                 , MonadUnliftIO m
-                 , MonadP2P m
+runPeerInList :: ( MonadP2P m
                  , RunsClient m
                  )
               => PPeer
@@ -175,7 +172,6 @@ stratoP2PClient runner = runner $ \_ -> do
           $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
           recordException thePeer e
           eErr <- case e of
-                   e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just WrongGenesisBlock <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do

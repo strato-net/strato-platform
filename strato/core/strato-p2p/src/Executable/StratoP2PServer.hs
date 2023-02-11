@@ -25,7 +25,7 @@ import qualified Data.ByteString                       as B
 import           Data.Either.Combinators
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
-import           Data.Time.Clock
+-- import           Data.Time.Clock
 import           GHC.IO.Exception
 import           UnliftIO
 
@@ -37,7 +37,6 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 
@@ -63,8 +62,8 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
 
-      curTime <- liftIO getCurrentTime
-      when ((pPeerEnableTime p) > curTime) $ throwIO PeerDisabled
+      -- curTime <- liftIO getCurrentTime
+      -- when ((pPeerEnableTime p) > curTime) $ throwIO PeerDisabled
 
       case pPeerPubkey p of
         Nothing -> do
@@ -77,7 +76,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
             Just err -> do
               $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
               _ <- case err of
-                e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable p
                 e' | Just WrongGenesisBlock <- fromException e' -> do
                  udpErr <- disableUDPPeerForSeconds p 86400
                  whenLeft udpErr $ \theUDPErr -> do

@@ -104,9 +104,7 @@ getContractsData (ContractName contractName) = blocTransaction $ do
     }
   return $ (\(AddressStateRef' r _)-> addressStateRefAddress r) <$> (evmRefs <> svmRefs)
 
-getContractsContract :: ( MonadIO m
-                        , MonadUnliftIO m
-                        , A.Selectable Account AddressState m
+getContractsContract :: ( A.Selectable Account AddressState m
                         , (Keccak256 `A.Alters` SourceMap) m
                         , MonadLogger m
                         , HasBlocSQL m
@@ -146,8 +144,7 @@ translateStorageMap storage' =
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
-getContractsState :: ( MonadIO m
-                     , MonadLogger m
+getContractsState :: ( MonadLogger m
                      , A.Selectable Account AddressState m
                      , (Keccak256 `A.Alters` SourceMap) m
                      , HasBlocSQL m
@@ -231,8 +228,7 @@ getContractsState _ address chainId mName mCount mOffset mLength = do
                            , qsChainId = MaybeNamed.Unnamed <$> chainId
                            }
 
-postContractsBatchStates :: ( MonadIO m
-                            , MonadLogger m
+postContractsBatchStates :: ( MonadLogger m
                             , A.Selectable Account AddressState m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , HasBlocSQL m
@@ -252,8 +248,7 @@ postContractsBatchStates = traverse flattenRequest
                             postcontractsbatchstatesrequestOffset
                             (fromMaybe False postcontractsbatchstatesrequestLength)
 
-getContractsDetails' :: ( MonadUnliftIO m
-                        , A.Selectable Account AddressState m
+getContractsDetails' :: ( A.Selectable Account AddressState m
                         , (Keccak256 `A.Alters` SourceMap) m
                         , MonadLogger m
                         , HasSQL m
@@ -282,8 +277,7 @@ getContractsDetails' contractAddress chainId = do
         Left e -> throwIO $ UserError e
         Right details -> pure details{contractdetailsAccount = Just (Account contractAddress (unChainId <$> chainId))}
 
-getContractsDetails :: ( MonadUnliftIO m
-                       , A.Selectable Account AddressState m
+getContractsDetails :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
@@ -294,8 +288,7 @@ getContractsDetails :: ( MonadUnliftIO m
 getContractsDetails contractAddress chainId = 
   completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
 
-getContractXabi :: ( MonadUnliftIO m
-                   , A.Selectable Account AddressState m
+getContractXabi :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasSQL m
@@ -305,8 +298,7 @@ getContractXabi :: ( MonadUnliftIO m
                 => Account -> m Xabi
 getContractXabi (Account addr chainId) = contractdetailsXabi <$> getContractsDetails' addr (ChainId <$> chainId)
 
-getContractsFunctions :: ( MonadIO m
-                         , A.Selectable Account AddressState m
+getContractsFunctions :: ( A.Selectable Account AddressState m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , MonadLogger m
                          , HasSQL m
@@ -318,8 +310,7 @@ getContractsFunctions _ contractId chainId = blocTransaction $ do
   mXabi <- getContractXabi (Account contractId $ unChainId <$> chainId)
   pure . map FunctionName . Map.keys $ xabiFuncs mXabi
 
-getContractsSymbols :: ( MonadIO m
-                       , A.Selectable Account AddressState m
+getContractsSymbols :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
@@ -331,8 +322,7 @@ getContractsSymbols _ contractId chainId = blocTransaction $ do
   mXabi <- getContractXabi (Account contractId $ unChainId <$> chainId)
   pure . map SymbolName . Map.keys $ xabiVars mXabi
 
-getContractsEnum :: (MonadIO m
-                    , A.Selectable Account AddressState m
+getContractsEnum :: ( A.Selectable Account AddressState m
                     , (Keccak256 `A.Alters` SourceMap) m
                     , MonadLogger m
                     , HasSQL m
@@ -345,8 +335,7 @@ getContractsEnum _ contractId (EnumName enumName) chainId = blocTransaction $ do
   let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
    in return $ map EnumValue enums
 
-getContractsStateMapping :: (MonadIO m
-                            , A.Selectable Account AddressState m
+getContractsStateMapping :: ( A.Selectable Account AddressState m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , MonadLogger m
                             , HasSQL m
@@ -392,8 +381,7 @@ getContractsStates :: MonadIO m =>
                       ContractName -> m [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 
-postContractsCompile :: ( MonadIO m
-                        , (Keccak256 `A.Alters` SourceMap) m
+postContractsCompile :: ( (Keccak256 `A.Alters` SourceMap) m
                         , MonadLogger m
                         , HasBlocSQL m
                         )

@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings     #-}
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
+import           Blockchain.VMOptions       ()
+
 import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus

@@ -38,6 +38,7 @@ import           Control.Monad                               (when)
 import           Control.Monad.Change                        as A
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
+import           Data.Kind                                   (Type)
 import           Data.Function
 import           Data.Maybe
 import           Data.String
@@ -125,7 +126,7 @@ newtype instance Diff a 'Eventual = Value a
 data Detail = Incremental | Eventual
 
 -- | A class for condensing information in a diff
-class Detailed (t :: Detail -> *) where
+class Detailed (t :: Detail -> Type) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
 
 instance Detailed AccountDiff where

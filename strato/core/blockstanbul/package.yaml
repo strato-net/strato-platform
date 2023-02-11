@@ -44,6 +44,7 @@ tests:
   blockstanbul-test:
     main: Main.hs
     source-dirs: test/
+    ghc-options: -dynamic
     dependencies:
       - QuickCheck
       - aeson
@@ -73,6 +74,7 @@ benchmarks:
   one-node:
     source-dirs: bench/
     main: OneNode.hs
+    ghc-options: -dynamic
     dependencies:
       - blockstanbul
       - transformers

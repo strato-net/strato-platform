@@ -78,7 +78,7 @@ p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer
 
 postParticipationMode :: ParticipationMode -> ClientM ParticipationMode
-_ :<|> postParticipationMode = client (Proxy @ P2PAPI)
+_ :<|> postParticipationMode = client (Proxy @P2PAPI)
 
 remoteSetParticipationMode :: ParticipationMode -> IO ()
 remoteSetParticipationMode mode = do
