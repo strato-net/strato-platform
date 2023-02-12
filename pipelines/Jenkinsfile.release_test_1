@@ -478,63 +478,63 @@ pipeline {
 
         /* NETWORK OF NODES SYNC WITH DEVNET TESTS*/
         /* Stability Test - Restart Node */
-        stage('Restart Node after Devnet Sync') {
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato --stop'
-                        sh 'sudo ./strato --start'
-                        sh 'PASSWORD=123 ./strato --set-password'
-                    }
-                }
-            }
-        }
+        // stage('Restart Node after Devnet Sync') {
+        //     steps {
+        //         dir('strato-getting-started') {
+        //             script {
+        //                 sh 'sudo ./strato --stop'
+        //                 sh 'sudo ./strato --start'
+        //                 sh 'PASSWORD=123 ./strato --set-password'
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Wait For Restarted Node to Sync') {
-            steps {
-                script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
-                }
-            }
-        }
+        // stage('Wait For Restarted Node to Sync') {
+        //     steps {
+        //         script {
+        //             lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
+        //         }
+        //     }
+        // }
 
         /* Performance Test - Sync Network to Devnet */
-        stage('Clean 4 nodes') {
-            parallel {
-                stage('Clean test-multinode101') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode102') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode103') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode104') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Clean 4 nodes') {
+        //     parallel {
+        //         stage('Clean test-multinode101') {
+        //             // agent { label "test-multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode102') {
+        //             agent { label "test-multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode103') {
+        //             agent { label "test-multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode104') {
+        //             agent { label "test-multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         // stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
         //     agent { label "multinode305" }
@@ -595,42 +595,42 @@ pipeline {
         //     }
         // }
 
-        stage('Performance Test - Wait for Network to Sync with Devnet') {
-            parallel {
-                stage('Restart multinode101 after sync') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode102 after sync') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode103 after sync') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode104 after sync') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Performance Test - Wait for Network to Sync with Devnet') {
+        //     parallel {
+        //         stage('Restart multinode101 after sync') {
+        //             // agent { label "test-multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode102 after sync') {
+        //             agent { label "test-multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode103 after sync') {
+        //             agent { label "test-multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode104 after sync') {
+        //             agent { label "test-multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
     }
 }

@@ -150,6 +150,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         sudo \\
           ssl=true \\
           sslCertFileType=pem \\
+          BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
           NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
           HTTPS_PORT="${nodeData.PORT}" \\
           networkID=${nodeData.NETWORK_ID} \\
