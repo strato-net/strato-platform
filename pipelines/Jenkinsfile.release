@@ -129,7 +129,8 @@ pipeline {
         }
   
         script {
-          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started')
+          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started', null)
+
         }
 
         dir("strato-getting-started") {
