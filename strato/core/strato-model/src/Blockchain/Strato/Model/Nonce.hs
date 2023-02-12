@@ -29,7 +29,7 @@ instance FromJSON Nonce where
   parseJSON = fmap (Nonce . fromInteger) . parseJSON
 
 instance ToParamSchema Nonce where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
+  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @Word256
 
 instance ToSchema Nonce where
   declareNamedSchema _ = return $

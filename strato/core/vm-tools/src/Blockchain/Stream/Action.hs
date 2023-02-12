@@ -13,12 +13,15 @@ import           Control.Lens                 hiding ((.=))
 import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
+import qualified Data.Aeson.KeyMap            as KM
+import qualified Data.Aeson.Key               as DAK
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Char8        as BC
 import qualified Data.ByteString.Short        as BSS
+import qualified Data.Bifunctor               as BF
 import           Data.Foldable
 import           Data.Function                (on)
-import qualified Data.HashMap.Strict          as HM
+-- import qualified Data.HashMap.Strict          as HM
 import           Data.List
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -133,7 +136,7 @@ sequenceTuple = uncurry (liftM2 (,))
 parseDiffEVM :: Value -> Parser DataDiff
 parseDiffEVM (Object obs) = fmap (EVMDiff . M.fromList)
                           . mapM (sequenceTuple . bimap (f.String) f)
-                          $ HM.toList obs
+                          $ BF.first DAK.toText <$> KM.toList obs
   where f :: Value -> Parser Word256
         f = fmap bytesToWord256 . parseJSON
 parseDiffEVM x = typeMismatch "EVMDiff" x
@@ -141,7 +144,7 @@ parseDiffEVM x = typeMismatch "EVMDiff" x
 parseDiffSolidVM :: Value -> Parser DataDiff
 parseDiffSolidVM (Object obs) = fmap (SolidVMDiff . M.fromList)
                               . mapM (sequenceTuple . bimap (f.String) f)
-                              $ HM.toList obs
+                              $ BF.first DAK.toText <$> KM.toList obs
   where f :: Value -> Parser B.ByteString
         f = parseJSON
 parseDiffSolidVM x = typeMismatch "SolidVMDiff" x

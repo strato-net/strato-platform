@@ -24,6 +24,9 @@ import qualified Data.Text                       as T
 import           Database.PostgreSQL.Simple      (Connection)
 import           Database.PostgreSQL.Simple.FromField hiding (name)
 import           Opaleye                         hiding (not, null, index, FromField)
+import qualified Opaleye                         as O
+import           Opaleye.Internal.PGTypesExternal
+import           Opaleye.Internal.QueryArr
 
 import           Blockchain.Strato.Model.Address
 
@@ -32,42 +35,42 @@ import           Strato.Strato23.Database.Tables
 
 
 
-countUsers :: T.Text -> Query (Column PGInt8)
+countUsers :: T.Text -> Query (O.Field PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
   (_, name, _, _, _, _, _) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
 
-countUsers' :: T.Text -> T.Text -> Query (Column PGInt8)
+countUsers' :: T.Text -> T.Text -> Query (O.Field PGInt8)
 countUsers' username oauthRealm  = aggregate countStar $ proc () -> do
   (_, name, oauth, _, _, _, _ ) <- selectTable usersTable -< ()
   restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
 
 
-getUserKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
+getUserKeyQuery :: T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getUserKeyQuery username = proc () -> do
   (_, name, _, salt, nonce, encSecPrvKey, address) <- selectTable usersTable -< ()
   restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecPrvKey, address)
 
-getUserKeyQuery' :: T.Text -> T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
+getUserKeyQuery' :: T.Text -> T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getUserKeyQuery' username oauthRealm = proc () -> do
   (_, name, oauth, salt, nonce, encSecPrvKey, address) <- selectTable usersTable -< ()
   restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
   returnA -< (salt, nonce, encSecPrvKey, address)
 
-getUserByAddress :: Address -> Query (Column PGText)
+getUserByAddress :: Address -> Query (O.Field PGText)
 getUserByAddress qaddr = proc () -> do
   (_, name, _,  _, _, _, taddr) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< name
 
-getUserByAddress' :: Address -> Query (Column PGText, Column PGText)
+getUserByAddress' :: Address -> Query (O.Field PGText, O.Field PGText)
 getUserByAddress' qaddr = proc () -> do
   (_, name, oauth, _, _,  _, taddr) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< (name, oauth)
 
-getUserAddresses :: Maybe Int -> Maybe Int -> Query (Column PGText, Column PGBytea)
+getUserAddresses :: Maybe Int -> Maybe Int -> Query (O.Field PGText, O.Field PGBytea)
 getUserAddresses mOffset mLimit = maybe id limit mLimit
                                 . maybe id offset mOffset
                                 $ proc () -> do
@@ -124,14 +127,14 @@ postUserKeyQuery' userName oauthProvider KeyStore{..} conn = do
         }
       return True
 
-getMessageQuery :: Query (Column PGBytea, Column PGBytea, Column PGBytea)
+getMessageQuery :: Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getMessageQuery = proc () -> do
   (id', salt, nonce, enc_msg) <- selectTable messageTable -< ()
   restrict -< id' .== toFields (1 :: Int)
   returnA -< (salt, nonce, enc_msg)
 
 -- Used for the mercata migration. --Can be deleted
-getMessageQueryAll :: Query (Column PGBytea, Column PGBytea, Column PGBytea)
+getMessageQueryAll :: Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getMessageQueryAll = proc () -> do
   (_, salt, nonce, enc_msg) <- selectTable messageTable -< ()
   returnA -< (salt, nonce, enc_msg)
@@ -164,8 +167,8 @@ instance FromField Address where
   fromField f mdata = do
     theByteString <- fromField f mdata
     return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
-
-instance Default ToFields Address (Column PGBytea) where
+ 
+instance Default ToFields Address (O.Field PGBytea) where
   def = lmap (C8.pack . formatAddressWithoutColor) def
 
 instance DefaultFromField PGBytea SecretBox.Nonce where
@@ -176,6 +179,6 @@ instance FromField SecretBox.Nonce where
     theByteString <- fromField f theData
     return $ fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
 
-instance Default ToFields SecretBox.Nonce (Column PGBytea) where
+instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
 

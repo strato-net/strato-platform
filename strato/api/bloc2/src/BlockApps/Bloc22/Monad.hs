@@ -46,6 +46,7 @@ import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
 import           Opaleye
+import           Opaleye.Internal.QueryArr
 import           Servant
 import           Servant.Client
 
@@ -85,7 +86,7 @@ data BlocEnv = BlocEnv
 
 --------------------------------------------------------------------------------
 
-blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, HasBlocSQL m,
+blocQuery :: (HasCallStack, Default Unpackspec x x, Default FromFields x y, HasBlocSQL m,
               MonadLogger m) =>
              Query x -> m [y]
 blocQuery q = do
@@ -94,8 +95,8 @@ blocQuery q = do
   liftIO $ withResource pool $ liftIO . flip runSelect q
 
 blocQueryMaybe
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
-      MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y,
+      MonadLogger m, HasBlocSQL m)
   => Query x
   -> m (Maybe y)
 blocQueryMaybe q = blocQuery q >>= \case
@@ -104,8 +105,8 @@ blocQueryMaybe q = blocQuery q >>= \case
     _:_:_ -> throwIO $ DBError "blocQueryMaybe: Multiple results, expected one row"
 
 blocQuery1
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
-      MonadIO m, MonadLogger m, HasBlocSQL m) =>
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y,
+      MonadLogger m, HasBlocSQL m) =>
   Text -> Query x -> m y
 blocQuery1 loc q = blocQuery q >>= \case
     [] -> blocError . DBError . Text.concat $ ["blocQuery1: ", loc, ": No result, expected one row"]
@@ -113,14 +114,14 @@ blocQuery1 loc q = blocQuery q >>= \case
     _:_:_ -> throwIO . DBError . Text.concat $
        ["blocQuery1: ", loc, ": Multiple results, expected one row"]
 
-blocModify :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
+blocModify :: (HasCallStack, HasBlocSQL m, MonadLogger m) =>
               (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
   BlocSQLEnv pool <- access Proxy
   liftIO $ withResource pool (liftIO . modify)
 
-blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
+blocModify1 :: (HasCallStack, HasBlocSQL m, MonadLogger m) =>
                (Connection -> IO [x]) -> m x
 blocModify1 modify = do
   logInfoCS callStack "Updating the database"

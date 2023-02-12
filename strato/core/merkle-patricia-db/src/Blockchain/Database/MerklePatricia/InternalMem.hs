@@ -54,10 +54,9 @@ unsafeDeleteKeyMem db key = do
   putNodeDataMem (fst dbDeleteNodeData) (snd dbDeleteNodeData)
 
 keyToSafeKeyMem::N.NibbleString->N.NibbleString
-keyToSafeKeyMem key =
-  N.EvenNibbleString $ keccak256ToByteString $ hash keyByteString
-  where
-    N.EvenNibbleString keyByteString = key
+keyToSafeKeyMem key
+  | N.EvenNibbleString keyByteString <- key = N.EvenNibbleString $ keccak256ToByteString $ hash keyByteString
+  | otherwise = error $ "keyToSafeKeyMem: key is not an EvenNibbleString: " ++ (show key)
 
 -----
 
@@ -269,9 +268,10 @@ prependToKey::Key->(Key, Val)->(Key, Val)
 prependToKey prefix (key, val) = (prefix `N.append` key, val)
 
 replace::Integral i=>[a]->i->a->[a]
-replace lst i newVal = left ++ [newVal] ++ right
-            where
-              (left, _:right) = splitAt (fromIntegral i) lst
+replace lst i newVal = case splitAt (fromIntegral i) lst of
+                         (left, _:right) -> left ++ [newVal] ++ right
+                         _               -> lst  -- case where i is greater than or equal to the length of lst
+
 
 slotIsEmpty::[NodeRef]->N.Nibble->Bool
 slotIsEmpty [] _ =

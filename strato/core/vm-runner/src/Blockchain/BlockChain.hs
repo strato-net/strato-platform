@@ -126,7 +126,7 @@ instance (Monad m, HasMemAddressStateDB m) => HasMemAddressStateDB (ConduitT i o
   getAddressStateBlockDBMap = lift getAddressStateBlockDBMap
   putAddressStateBlockDBMap = lift . putAddressStateBlockDBMap 
 
-instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
+instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
   getMemRawStorageTxDB     = lift getMemRawStorageTxDB
   putMemRawStorageTxMap    = lift . putMemRawStorageTxMap
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
@@ -135,7 +135,7 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
 
 -- todo: lovely!
 
-addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
+addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
@@ -186,7 +186,7 @@ setParentStateRoot OutputBlock{..} = do
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
     BSDB.getBSum (blockDataParentHash obBlockData)
 
-addBlock :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b in withCurrentBlockHash obh $ do
     $logInfoS "addBlocks" . T.pack $
@@ -242,7 +242,7 @@ addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
     lift $ P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
 
-addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let txs = filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t))
@@ -253,7 +253,7 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
 
-addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+addTransactions :: (VMBase m, MonadMonitor m)
                 => BlockData
                 -> [OutputTx]
                 -> ConduitT a VmOutEvent m ()
@@ -642,7 +642,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: (VMBase m, Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
+replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
     bbi <- getContextBestBlockInfo

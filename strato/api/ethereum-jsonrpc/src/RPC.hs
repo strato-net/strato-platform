@@ -11,6 +11,6 @@ import           Data.Maybe
 
 import           Commands
 
-doRPC::B.ByteString->IO B.ByteString
+doRPC::B.ByteString -> IO B.ByteString
 doRPC request = do
   fmap fromJust $ call methods request

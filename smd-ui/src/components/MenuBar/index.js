@@ -6,14 +6,8 @@ import './menubar.css';
 import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
-import { Field, reduxForm } from 'redux-form';
-import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
 class MenuBar extends Component {
-
-  componentDidMount() {
-    this.props.fetchChainIds();
-  }
 
   logout() {
     localStorage.removeItem('user');
@@ -46,42 +40,6 @@ class MenuBar extends Component {
     );
   }
 
-  renderChainDropDown() {
-    if (this.props.chainIds.length) {
-      return (
-        <span>
-          <span className="pt-navbar-divider" />
-          <small className="pt-text-muted">
-            <div className="pt-select">
-              <Field
-                className="pt-input select-chain"
-                component="select"
-                name="chainLabel"
-                onChange={
-                  (e) => {
-                    const data = e.target.value === 'Main Chain' ? null : e.target.value;
-                    this.props.selectChain(data);
-                  }
-                }
-                required
-              >
-                <option> Main Chain </option>
-                {
-                  this.props.chainIds.map((label, i) => {
-                    return (
-                      <option key={label.id} value={label.id}>{label.label}</option>
-                    )
-                  })
-                }
-              </Field>
-            </div>
-          </small>
-          <span className="pt-navbar-divider" />
-        </span>
-      );
-    }
-  }
-
   render() {
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
@@ -101,7 +59,6 @@ class MenuBar extends Component {
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
-          {this.renderChainDropDown()}
           <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
         </div>
@@ -112,15 +69,10 @@ class MenuBar extends Component {
 
 export function mapStateToProps(state) {
   return {
-    chainIds: state.chains.chainIds,
     oauthUser: state.user.oauthUser
   };
 }
 
-const formed = reduxForm({ form: 'menu-bar' })(MenuBar);
-const connected = connect(mapStateToProps, {
-  selectChain,
-  fetchChainIds
-})(formed);
+const connected = connect(mapStateToProps, {})(MenuBar);
 
 export default withRouter(connected);

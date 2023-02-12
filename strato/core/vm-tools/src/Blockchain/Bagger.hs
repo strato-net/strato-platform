@@ -590,7 +590,6 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> m DD.BlockData
 buildRewardedBlockHeader bd = do
-  $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
   oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   let rewardedStateRoot = oldSR

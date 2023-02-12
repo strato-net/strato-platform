@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 
 --import Control.Monad
 --import Control.Monad.Trans.Class
@@ -12,8 +14,15 @@ import LevelDBTools
 
 main :: IO ()
 main = do
-  c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> (LevelKV (LabeledError.b16Decode "insertLDB.hs" x) (LabeledError.b16Decode "insertLDB.hs" y))) c
+  c <- map BC.words . BC.lines <$> BC.getContents
+  -- let input = map (\[x, y] -> (LevelKV (LabeledError.b16Decode "insertLDB.hs" x) (LabeledError.b16Decode "insertLDB.hs" y))) c
+  let input = map (\case
+        [] -> error "Input list is empty"
+        [_] -> error "Input list contains only one element"
+        [x, y] -> (LevelKV (LabeledError.b16Decode "insertLDB.hs" x) (LabeledError.b16Decode "insertLDB.hs" y))
+        _ -> error "Input list contains more than two elements"
+        ) c
+        
 
 
 

@@ -1,8 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.VMOptions (
-  flags_difficultyBomb,
-  flags_testnet,
   flags_debug,
   flags_trace,
   flags_svmTrace,
@@ -22,12 +20,12 @@ module Blockchain.VMOptions (
   flags_evmCompatible,
   flags_network,
   flags_networkID,
+  flags_testnet,
   flags_requireCerts
   ) where
 
 import           Blockchain.Mining
 
-import           Blockchain.CoreFlags
 import           HFlags
 
 defineFlag "debug" False "turn debug info on or off"
@@ -54,3 +52,7 @@ defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "evmCompatible" (False::Bool) "Whether to turn off STRATO enhancements or not"
 defineFlag "requireCerts" (True::Bool) "Flag to enable the requirement of a cert to send transactions"
+
+defineFlag "network" (""::String) "Choose a network to join"
+defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
+defineFlag "testnet" False "connect to testnet"

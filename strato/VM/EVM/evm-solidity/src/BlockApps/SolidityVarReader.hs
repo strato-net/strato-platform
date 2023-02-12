@@ -393,7 +393,9 @@ decodeValue'
 decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Position{..} = \case
   SimpleType TypeBool ->
     let
-      Just (SimpleValue (ValueInt _ (Just 1) word8)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1)
+      word8 = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1) of
+            Just (SimpleValue (ValueInt _ (Just 1) word8')) -> word8'
+            _ -> error "decodeValue': Expected ValueInt 1" -- ++ show v
     in
      Just $ SimpleValue $ ValueBool $ word8 /= 0
   SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
@@ -408,17 +410,23 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
                                      $ storage offset
   SimpleType TypeAddress ->
     let
-      Just (SimpleValue (ValueInt _ _ addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
+      addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
+            Just (SimpleValue (ValueInt _ _ addr')) -> addr'
+            _ -> error "decodeValue': Expected ValueInt 2" -- ++ show v
     in
       Just . SimpleValue . ValueAddress . Address $ fromIntegral addr
   SimpleType TypeAccount ->
     let
-      Just (SimpleValue (ValueInt _ _ addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
+      addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
+            Just (SimpleValue (ValueInt _ _ addr')) -> addr'
+            _ -> error "decodeValue': Expected ValueInt 3" -- ++ show v
     in
       Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
   TypeContract _ ->
     let
-      Just (SimpleValue (ValueAccount addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount
+      addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount of
+            Just (SimpleValue (ValueAccount addr')) -> addr'
+            _ -> error "decodeValue': Expected ValueAccount" -- ++ show v
     in
       Just $ ValueContract addr
   SimpleType (TypeBytes (Just n)) -> Just $ decodeByteString storage offset byte $ fromInteger n
@@ -436,7 +444,9 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
   SimpleType TypeString ->
     let
-      Just (SimpleValue (ValueBytes Nothing bytes)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes
+      bytes = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes of 
+            Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'
+            _ -> error "decodeValue': Expected ValueBytes Nothing" -- ++ show v
     in
       Just $ SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 

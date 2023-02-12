@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Bloc22.API
   ( BlocAPI
@@ -61,6 +63,10 @@ type BlocAPI =
   :<|> PostBlocTransactionParallel
   :<|> PostBlocTransactionRaw
   :<|> PostBlocTransaction
+
+--Unsure what this will break if anything but remove later
+instance ToSample Text where
+  toSamples _ = [("sample", "sample")]
 
 markdownBloc :: String
 markdownBloc = markdown $ docs blocApi

@@ -1322,7 +1322,7 @@ contract B {
 
 }|] in length anns `shouldBe` 0
 
-  describe "Built in type function tests" $ do
+  describe "function tests calling other contracts" $ do
     it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
       let anns = runTypechecker [r|
 contract A {
@@ -1351,3 +1351,11 @@ contract A {
   int groupoid       = type(A).runtimeCode;
 }
 |] in length anns `shouldBe` 3
+    
+    it "Can only call accounts and addresses with delegate call" $
+      let anns = runTypechecker [r|
+contract A {
+  int endofunctor1   = address(0xdeadbeef).delegatecall("garbage()");
+  int endofunctor2   = type(A).delegatecall("garbage()");
+}
+|] in length anns `shouldBe` 1

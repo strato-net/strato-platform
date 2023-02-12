@@ -21,6 +21,7 @@ pipeline {
       }
     }
 
+
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'

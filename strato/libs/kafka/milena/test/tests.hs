@@ -4,6 +4,7 @@ module Main where
 
 import Prelude
 
+
 -- base
 import Data.Either (isRight, isLeft)
 import qualified Data.List.NonEmpty as NE
@@ -15,6 +16,9 @@ import Control.Monad.Trans (liftIO)
 import Test.Tasty
 import Test.Tasty.Hspec
 import Test.Tasty.QuickCheck
+import Test.Hspec
+
+
 import qualified Data.ByteString.Char8 as B
 
 -- local
@@ -188,7 +192,7 @@ specs = do
   let commitOffsetTopicName = "commit-offset"
       t = commitOffsetTopicName
 
-  Test.Tasty.Hspec.afterAll_ (cleanup commitOffsetTopicName) $ do
+  afterAll_ (cleanup commitOffsetTopicName) $ do
     describe "can commit messages" $ do
       it "create a topic" $ do
         topicCreation <- run $ do

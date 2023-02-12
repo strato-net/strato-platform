@@ -268,7 +268,7 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 instance Monad m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
 
-instance (Monad m, Mod.Modifiable (Maybe DebugSettings) m)
+instance (Mod.Modifiable (Maybe DebugSettings) m)
   => Mod.Modifiable (Maybe DebugSettings) (SM m) where
   get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
   put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
@@ -302,8 +302,7 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
     action . Action.events .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
-runSM :: ( MonadIO m
-         , MonadUnliftIO m
+runSM :: ( MonadUnliftIO m
          , MonadLogger m
          , Mod.Modifiable ContextState m
          )
@@ -423,7 +422,7 @@ getVariableOfName name = do
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256", "ripemd160", "payable"
-                                                  , "require", "revert", "assert", "sha3"
+                                                  , "require", "revert", "assert", "sha3"  , "delegatecall"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
                                                   , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $

@@ -12,6 +12,7 @@ module Strato.Strato23.API.Types
   , Signature(..) -- TODO: remove, ideally
   , PublicKey(..) --       same
   , SharedKey(..) --       same
+  , Version(..)
   ) where
 
 
@@ -36,8 +37,27 @@ import qualified LabeledError
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
+data Version = Version { version :: Int } deriving (Show, Eq, Generic, Ord)
+
+instance ToJSON Version where
+  toJSON (Version v) = object ["version" .= v]
+
+instance FromJSON Version where
+  parseJSON (Object o) = do
+    v <- o .: "version"
+    return $ Version v
+  parseJSON o = error $ "parseJSON Version: expected object, but got " ++ show o
+
+instance ToSchema Version where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Version")
+      ( mempty
+        & type_ ?~ SwaggerString
+        & example ?~ "{\"version\" : \"1\"}"
+        & description ?~ "Check to see if vault server is alive, and version the vault is running. Contains an Int for the version number.")
 
 data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PublicKey } deriving (Show, Generic)
+
 
 instance ToJSON AddressAndKey where
   toJSON (AddressAndKey a k) = object

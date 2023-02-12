@@ -56,7 +56,6 @@ library:
   - time
   - transformers
   - unliftio
-  - util
   - vm-tools
   - x509-certs
 
@@ -106,13 +105,14 @@ tests:
       - strato-model
       - vm-runner
       - vm-tools
-    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic
 
 benchmarks:
   microbench:
     source-dirs: bench/
     main: Microbench.hs
     other-modules: []
+    ghc-options: -dynamic
     dependencies:
       - bytestring
       - containers
@@ -125,6 +125,7 @@ benchmarks:
   extractbench:
     source-dirs: bench/
     main: ExtractBench.hs
+    ghc-options: -dynamic
     other-modules: []
     dependencies:
       - bytestring

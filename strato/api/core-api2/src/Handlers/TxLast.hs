@@ -1,10 +1,11 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds                          #-}
+{-# LANGUAGE FlexibleContexts                   #-}
+{-# LANGUAGE FlexibleInstances                  #-}
+{-# LANGUAGE TypeApplications                   #-}
+{-# LANGUAGE TypeFamilies                       #-}
+{-# LANGUAGE TypeOperators                      #-}
+{-# LANGUAGE UndecidableInstances               #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module Handlers.TxLast
   ( API
@@ -13,7 +14,6 @@ module Handlers.TxLast
   ) where
 
 import           Data.Int
-import           Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
 import           Servant
 import           Servant.Client
@@ -51,7 +51,7 @@ instance (Monad m, HasSQL m) => GetLastTransactions m where
       E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
         E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)
         E.on (btx E.^. BlockTransactionTransaction E.==. rawTX E.^. RawTransactionId)
-        E.where_ (rawTX E.^. RawTransactionChainId E.==. E.val (fromMaybe 0 $ fmap chainIdToWord256 mChainId))
+        E.where_ (rawTX E.^. RawTransactionChainId E.==. E.val (maybe 0 chainIdToWord256 mChainId))
         E.limit $ max 1 $ min (fromIntegral num :: Int64) appFetchLimit
         E.orderBy [E.desc $ b E.^. BlockDataRefId]
         return rawTX

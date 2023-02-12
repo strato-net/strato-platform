@@ -204,7 +204,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
       sh './strato --wipe'
       sh './run.sh'
     }
-
     // This is to identify the Root node later on
     def nodeAddress = sh(
         returnStdout: true,

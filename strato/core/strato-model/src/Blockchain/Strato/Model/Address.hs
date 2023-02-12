@@ -28,6 +28,7 @@ import           Control.Monad
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
+import qualified Data.Aeson.Key                       as DAK 
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
@@ -100,10 +101,11 @@ fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.d
 -}
 instance PathPiece Address where
   toPathPiece (Address x) = T.pack $ showHex  (fromIntegral $ x :: Integer) ""
-  fromPathPiece t = Just (Address wd160)
-    where
-      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
+  fromPathPiece t = case readHex (T.unpack t) of
+    ((wd160, _):_) -> Just (Address wd160)
+    [] -> Nothing
 
+      
 {-
  make into a string rather than an object
 -}
@@ -111,8 +113,9 @@ instance AS.ToJSON Address where
   toJSON = String . T.pack . formatAddressWithoutColor
 
 instance AS.ToJSONKey Address where
-  toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . formatAddressWithoutColor
+  toJSONKey = ToJSONKeyText f (Enc.text . t)
+          where f = DAK.fromText . T.pack . formatAddressWithoutColor
+                t = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s

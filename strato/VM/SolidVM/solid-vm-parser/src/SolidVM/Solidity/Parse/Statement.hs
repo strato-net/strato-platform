@@ -6,6 +6,7 @@ import           Control.Monad
 import           Data.Foldable (asum, foldl')
 import           Data.Functor.Identity
 import           Data.Source
+import           Data.Maybe      (fromMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Text.Parsec
@@ -402,6 +403,14 @@ numberUnit = do
 
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep literal
+
+parseDelegateCallArgs :: SolidityParser (SolidString, [SVMType.Type])
+parseDelegateCallArgs = do
+  ~(fname, args) <-  do
+      name <- fromMaybe "fallback" <$> optionMaybe identifier
+      args <-  parens $ commaSep  simpleType
+      return (name, args)
+  return (fname, args)
 
 literal :: SolidityParser Expression
 literal = asum

@@ -15,13 +15,40 @@ import qualified Data.BloomFilter.Hash as BF
 import qualified Data.BloomFilter.Easy as BF
 import Prelude hiding (elem)
 
+
+-- import qualified Haskoin.Network.Bloom as HBF
+
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 
+
 instance BF.Hashable ChainId where
   hashIO32 (ChainId n) = BF.hashIO32 (toInteger n)
   hashIO64 (ChainId n) = BF.hashIO64 (toInteger n)
+
+-- class Hashable a where
+--     -- | Compute a 32-bit hash of a value.  The salt value perturbs
+--     -- the result.
+--     hashIO32 :: a               -- ^ value to hash
+--              -> Word32          -- ^ salt
+--              -> IO Word32
+
+--     -- | Compute a 64-bit hash of a value.  The first salt value
+--     -- perturbs the first element of the result, and the second salt
+--     -- perturbs the second.
+--     hashIO64 :: a               -- ^ value to hash
+--              -> Word64           -- ^ salt
+--              -> IO Word64
+--     hashIO64 v salt = do
+--                    let s1 = fromIntegral (salt `shiftR` 32) .&. maxBound
+--                        s2 = fromIntegral salt
+--                    h1 <- hashIO32 v s1
+--                    h2 <- hashIO32 v s2
+--                    return $ (fromIntegral h1 `shiftL` 32) .|. fromIntegral h2
+
+
+
 
 instance BF.Hashable Address where
   hashIO32 (Address n) = BF.hashIO32 (toInteger n)

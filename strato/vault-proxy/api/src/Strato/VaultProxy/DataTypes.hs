@@ -1,17 +1,22 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Strato.VaultProxy.DataTypes (
     VaultToken(..),
     VaultConnection(..),
-    RawOauth(..)
+    RawOauth(..),
+    Version(..)
 ) where
 
 -- import           Control.Lens
 import           Control.Concurrent.Lock as L
 import           Data.Aeson
 import           Data.Aeson.Types
+import qualified Data.Aeson.Key as DAK
 import           Data.Cache
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
+import           GHC.Generics
 
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken {
@@ -28,14 +33,14 @@ data VaultToken = VaultToken {
 
 instance FromJSON VaultToken where
   parseJSON (Object o) = do
-    ao  <- o .: T.pack "access_token"
-    ei  <- o .: T.pack "expires_in"
-    rei <- o .: T.pack "refresh_expires_in"
-    rt  <- o .: T.pack "refresh_token"
-    tt  <- o .: T.pack "token_type"
-    nbp <- o .: T.pack "not-before-policy"
-    ss  <- o .: T.pack "session_state"
-    sc  <- o .: T.pack "scope"
+    ao  <- o .: DAK.fromString "access_token"
+    ei  <- o .: DAK.fromString "expires_in"
+    rei <- o .: DAK.fromString "refresh_expires_in"
+    rt  <- o .: DAK.fromString "refresh_token"
+    tt  <- o .: DAK.fromString "token_type"
+    nbp <- o .: DAK.fromString "not-before-policy"
+    ss  <- o .: DAK.fromString "session_state"
+    sc  <- o .: DAK.fromString "scope"
     --Ensure the correct data types are coming into the system
     access_token <- case ao of
         (String s) -> pure s
@@ -101,8 +106,8 @@ data RawOauth = RawOauth {
 
 instance FromJSON RawOauth where
   parseJSON (Object o) = do
-    aue  <- o .: T.pack "authorization_endpoint"
-    ton  <- o .: T.pack "token_endpoint"
+    aue  <- o .: DAK.fromString "authorization_endpoint"
+    ton  <- o .: DAK.fromString "token_endpoint"
 
     authend <- case aue of
         (String s) -> pure s
@@ -113,4 +118,30 @@ instance FromJSON RawOauth where
         (Object _) -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
     return $ RawOauth authend tokend 
+  parseJSON wat = typeMismatch "Spec" wat
+
+data Version = Version {
+    version :: Int
+} deriving (Show, Eq, Generic)
+
+instance ToJSON Version where
+  toJSON = genericToJSON defaultOptions
+
+instance FromJSON Version where
+  parseJSON (Object o) = do
+    ver  <- o .: DAK.fromString "version"
+
+    vers <- case ver of
+        (Number ver1) -> do 
+            ver2 <- if isInteger ver1 then 
+                case toBoundedInteger ver1 of 
+                    Nothing -> error "The Integer returned by the server was outside of expect/normal bounds. Will stop talking to server to prevent system crash."
+                    Just i -> pure (fromIntegral (i :: Int))
+            else 
+                error $ "Expected an Integer for the version number, got a float instead"
+            pure ver2
+        (Object _) -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+        _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
+    
+    return $ Version vers
   parseJSON wat = typeMismatch "Spec" wat

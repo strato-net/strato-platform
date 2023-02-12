@@ -91,7 +91,10 @@ instance Format CodeInfo where
 
 instance FromJSON CodeInfo where
   parseJSON (Array v) = do
-    let [a',b',c'] = V.toList v
+    -- [a',b',c']
+
+    let (a',b',c') =  case V.toList v of [a,b,c] -> (a,b,c)
+                                         _       -> error "tried to parse JSON for CodeInfo as an array with too many elements"
     a <- parseJSON a'
     b <- parseJSON b'
     c <- parseJSON c'
@@ -167,7 +170,10 @@ instance Format AccountInfo where
 
 instance FromJSON AccountInfo where
   parseJSON (Array v) = do
-    let (a':i':xs) = V.toList v
+    -- (a':i':xs)
+    
+    let (a', i', xs) = case V.toList v of (a:i:xs') -> (a,i,xs'); _        -> error "parseJSON for AccountInfo as an Array failed";
+
     a <- parseJSON a'
     i <- parseJSON i'
     case xs of
@@ -398,7 +404,10 @@ instance RLPSerializable UnsignedChainInfo where
 
 instance RLPSerializable ChainInfo where
   rlpEncode (ChainInfo uci sig) =
-    let RLPArray xs = rlpEncode uci
+    -- RLPArray xs
+    let xs = case rlpEncode uci of 
+          RLPArray xs' -> xs'
+          _ -> error "rlpEncode ChainInfo: Expected RLPArray"
      in RLPArray (xs ++ [rlpEncode sig])
   rlpDecode (RLPArray xs) =
     ChainInfo

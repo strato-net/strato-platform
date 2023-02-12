@@ -1,0 +1,20 @@
+^(?:dist|benchmarks/dist)$
+^.cabal-sandbox/
+cabal.sandbox.config
+~$
+
+syntax: glob
+
+*.[aos]
+*.hi
+*.p_hi
+*.p_o
+.*.swp
+.\#*
+Setup
+examples/spellchecker
+examples/words
+tests/HashTime
+tests/QC
+tests/hash_time
+tests/test-1000.out

@@ -469,6 +469,40 @@ instance ToSchema PostUsersContractMethodListResponse where
          , SolidityValueAsString "buckleMyShoe"
          ]
 
+instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToJSON MethodCall where
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
+
+instance FromJSON MethodCall where
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
+
+instance ToSchema MethodCall where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Method Call"
+    & mapped.schema.description ?~ "Everything you'll need for a method call"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex ::MethodCall
+      ex = MethodCall
+        { _methodcallTxParams = Nothing
+        , methodcallValue = Strung 1000000000
+        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
+        , methodcallMethodName = "getHoroscope"
+        , methodcallContractAddress = Address 0xdeadbeef
+        , _methodcallChainid = Nothing
+        , methodcallMetadata = Nothing
+        }
+
+data FunctionListParameters = FunctionListParameters
+  { fromAddr :: Address
+  , txs      :: [MethodCall]
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
+  } deriving (Show, Eq)
+
+
+
 data MethodErrored = MethodErrored { erroredMethodCall :: MethodCall
                                    , errorMessage      :: Text
                                    }
@@ -519,34 +553,4 @@ data MethodCall = MethodCall
   } deriving (Eq,Show,Generic)
 makeLenses ''MethodCall
 
-instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
 
-instance ToJSON MethodCall where
-  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
-
-instance FromJSON MethodCall where
-  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
-
-instance ToSchema MethodCall where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "Method Call"
-    & mapped.schema.description ?~ "Everything you'll need for a method call"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex ::MethodCall
-      ex = MethodCall
-        { _methodcallTxParams = Nothing
-        , methodcallValue = Strung 1000000000
-        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
-        , methodcallMethodName = "getHoroscope"
-        , methodcallContractAddress = Address 0xdeadbeef
-        , _methodcallChainid = Nothing
-        , methodcallMetadata = Nothing
-        }
-
-data FunctionListParameters = FunctionListParameters
-  { fromAddr :: Address
-  , txs      :: [MethodCall]
-  , chainId  :: Maybe ChainId
-  , resolve  :: Bool
-  } deriving (Show, Eq)

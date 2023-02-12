@@ -17,6 +17,8 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS -fno-warn-missing-methods #-}
+
+
 module Blockchain.Context
     ( All
     , All2
@@ -82,6 +84,7 @@ import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
 import           Data.Default
+import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
@@ -140,19 +143,19 @@ import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
 --       but merging in the latest monad-alter will take some additional work
-type family All' (k :: * -> (* -> *) -> Constraint) (ts :: [*]) (m :: * -> *) :: Constraint where
+type family All' (k :: DK.Type -> (DK.Type -> DK.Type) -> Constraint) (ts :: [DK.Type]) (m :: DK.Type -> DK.Type) :: Constraint where
   All' k (t : '[]) m = k t m
   All' k (t ': ts) m = (k t m, All' k ts m)
 
-type family All (ks :: [* -> (* -> *) -> Constraint]) (ts :: [*]) (m :: * -> *) :: Constraint where
+type family All (ks :: [DK.Type -> (DK.Type -> DK.Type) -> Constraint]) (ts :: [DK.Type]) (m :: DK.Type -> DK.Type) :: Constraint where
   All (k ': '[]) ts m = All' k ts m
   All (k ': ks) ts m = (All' k ts m, All ks ts m)
 
-type family All2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+type family All2' (k :: DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint) (ts :: [(DK.Type,DK.Type)]) (m :: DK.Type -> DK.Type) :: Constraint where
   All2' k ('(t1, t2) : '[]) m = k t1 t2 m
   All2' k ('(t1, t2) ': ts) m = (k t1 t2 m, All2' k ts m)
 
-type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+type family All2 (ks :: [DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint]) (ts :: [(DK.Type,DK.Type)]) (m :: DK.Type -> DK.Type) :: Constraint where
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
 
@@ -370,8 +373,7 @@ instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessa
   delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $
     outboundWireMessages %= S.delete k
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          ) => Mod.Accessible GenesisBlockHash (ReaderT Config m) where
   access _ = GenesisBlockHash <$> getGenesisBlockHash
 
@@ -460,7 +462,7 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
 instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
 
-instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
+instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"

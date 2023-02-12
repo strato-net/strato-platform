@@ -88,8 +88,7 @@ governanceAddress = Address 0x100
 --           TypeArrayDynamic (SimpleType TypeAccount) -> m'
 --           _ -> m
 
-createChainInfo :: ( MonadIO m
-                   , A.Selectable Account AddressState m
+createChainInfo :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasBlocSQL m
@@ -166,7 +165,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
       chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
 
-withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>
+withLastBlockHash :: (HasSQL m) =>
                      (Keccak256 -> m b) -> m b
 withLastBlockHash f = do
   maybeBlkHash <- getLastBlockHash
@@ -174,7 +173,7 @@ withLastBlockHash f = do
     Just blkHash -> f blkHash
     _ -> throwIO . UserError $ Text.pack "STRATO has not been initialized yet"
 
-getLastBlockHash :: (MonadIO m, HasSQL m) => m (Maybe Keccak256)
+getLastBlockHash :: (HasSQL m) => m (Maybe Keccak256)
 getLastBlockHash = do
     blks <- fmap (map (E.entityVal)) . sqlQuery $ E.select $
         E.from $ \a -> do
@@ -185,8 +184,7 @@ getLastBlockHash = do
     return $ fmap blockDataRefHash $ listToMaybe blks
 
 
-postChainInfo :: ( MonadIO m
-                 , A.Selectable Account AddressState m
+postChainInfo :: ( A.Selectable Account AddressState m
                  , (Keccak256 `A.Alters` SourceMap) m
                  , MonadLogger m
                  , HasBlocSQL m
@@ -212,8 +210,7 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
             "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
         pure chainId
 
-postChainInfos :: ( MonadIO m
-                  , A.Selectable Account AddressState m
+postChainInfos :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m

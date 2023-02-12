@@ -18,7 +18,7 @@ pipeline {
         stage('Prep') {
             steps {
                 sh "sudo rm -rf strato-getting-started"
-                sh "git clone https://github.com/blockapps/strato-getting-started"
+                sh "git clone https://github.com/blockapps/strato-getting-started -b STRATO-2852-shv"
                 dir('strato-getting-started') {
                     script {
                         if (env.STRATO_BUILD == 'latest') {

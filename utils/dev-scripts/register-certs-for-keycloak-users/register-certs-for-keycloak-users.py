@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
     processed_users = []
     for user in users_to_update:
-        print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=v_user['uuid']))
+        print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=user['uuid']))
         try:
             subject_json = {
               "commonName": user['fullname'],
@@ -136,8 +136,7 @@ if __name__ == '__main__':
             with open('subject/subject.json', 'w', encoding='utf-8') as f:
                 json.dump(subject_json, f, ensure_ascii=False, indent=2)
             subprocess.check_call([
-                # TODO: `sudo`
-                'docker run --rm -v $(pwd)/cert:/x509scripts/cert -v $(pwd)/subject:/x509scripts/subject registry-aws.blockapps.net:5000/blockapps/x509-tools:2 sh -c "'
+                'sudo docker run --rm -v $(pwd)/cert:/x509scripts/cert -v $(pwd)/subject:/x509scripts/subject registry-aws.blockapps.net:5000/blockapps/x509-tools:2 sh -c "'
                 './x509-generator --issuer=cert/rootCert.pem --subject=subject/subject.json --key=cert/rootPriv.pem > /dev/null && '
                 'mv OutputCert.pem subject/" &> /dev/null'
             ], shell=True)
@@ -163,10 +162,11 @@ if __name__ == '__main__':
                 }]
             }
             headers = {
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer %s' % mercata_testnet_token
             }
-            resp = requests.request("POST", m.node_url, headers=headers, json={'json_payload': data})
+            resp = requests.request("POST", m.node_url + '/strato/v2.3/transaction?resolve=true', headers=headers, json=data)
             # curl 'https://node1.mercata-testnet.blockapps.net/strato/v2.3/transaction?resolve=true' \
             # -X 'POST' \
             # -H 'Accept: application/json' \
@@ -178,7 +178,8 @@ if __name__ == '__main__':
             # -H 'Accept-Encoding: gzip, deflate, br' \
             # -H 'Connection: keep-alive' \
             # --data-binary "{\"txs\":[{\"payload\":{\"contractName\":\"OfficialCertificateRegistry\",\"contractAddress\":\"24c6003021471df20530ba4ae973527a8d2f4385\",\"method\":\"registerCertificate\",\"args\":{\"newCertificateString\":\"${CERT_ESCAPED}\"},\"metadata\":{}},\"type\":\"FUNCTION\"}]}"
-
+            print('### STRATO API response:', resp.content)
+            print('-----')
             processed_users.append(user)
         except Exception as e:
             err_msg = 'Failed to process user cert issuance or registration with the exception: %s' % e

@@ -213,10 +213,15 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames = do
   let reorderedArgs = case argNames of
         Nothing -> args
         Just a -> let zipped = M.fromList $ zip a $ productTypes args
-                      newOrder = map (\(Just x) -> case M.lookup x zipped of
-                                                      Nothing -> error "Argument name does not exist" x
-                                                      Just y -> y
-                                      ) funcArgNames
+                      -- newOrder = map (\(Just x) -> case M.lookup x zipped of
+                      --                                 Nothing -> error "Argument name does not exist" x
+                      --                                 Just y -> y
+                      --                 ) funcArgNames
+                      newOrder = map (\case Nothing -> error "Argument name does not exist"
+                                            Just x -> case M.lookup x zipped of
+                                                        Nothing -> error "Argument name does not exist" x
+                                                        Just y -> y
+                              ) funcArgNames
                   in flip Product (productContext args) newOrder
   p <- case argNames of
     Nothing -> typecheck funcArgTypes args
@@ -1166,12 +1171,13 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
   cc <- asks codeCollection
   cntrct <- asks contract
   let errorParams = concatMap (\y -> case M.lookup y $ _errors cntrct of
-                                  Just z -> pure $ z
-                                  Nothing -> case M.lookup y $ _flErrors cc of
-                                    Just z -> pure $ z
-                                    Nothing -> []
+                                  Just z -> pure z
+                                  Nothing -> maybe [] pure (M.lookup y $ _flErrors cc)
                                 ) $ M.keys catchMap
-      zipped = map (\(y, Just z) -> zip y z) $ zip errorParams $ map (fst . snd) (M.toList catchMap)
+      zipped = zipWith
+                (curry (\case (y, Just z) -> zip y z; _ -> error "errorParams and catchMap don't match")) errorParams
+                (map (fst . snd) (M.toList catchMap))
+                
       paramsToDefs :: [((String, IndexedType, a), String)] -> [Annotated VarDefEntryF]
       paramsToDefs [] = []
       paramsToDefs (((_, a, _), b):xs) = (VarDefEntry (Just $ indexedTypeType a) Nothing b x) : (paramsToDefs xs)
@@ -1415,6 +1421,14 @@ tcExpr (FunctionCall x (Variable _ "type") args) =
   pure $ case args  of 
     (OrderedArgs _) ->  Static (SVMType.UnknownLabel "type" Nothing) x
     _ -> bottom $ "Improper use of type function" <$ x
+
+tcExpr (FunctionCall x (MemberAccess _ var "delegatecall" )  args ) = do
+  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
+  case (args, res) of
+    (_, Bottom _ )             ->  pure $ bottom $ "Can only call delegatecall as a method on an account or address" <$ x 
+    ((OrderedArgs []), _)      ->  pure $ bottom $ "Delegatecall needs arguements" <$ x
+    ((OrderedArgs (a: _ )), _) ->  (stringType' x)  ~> tcExpr a !>  (pure $ topType' x)
+    _ -> pure $ bottom $ "DelegateCall does not take named arguements" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of

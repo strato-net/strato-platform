@@ -18,7 +18,7 @@ import           Test.QuickCheck.Instances ()
 import           SolidVM.Model.SolidString
 
 typeAesonOptions::Options
-typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+typeAesonOptions=defaultOptions
 
 
 data Type
