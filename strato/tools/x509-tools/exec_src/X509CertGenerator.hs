@@ -17,7 +17,6 @@ import           Data.Maybe
 import           Time.Types
 import           Data.Hourglass
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Foldable                      (foldlM)
 import           System.Console.GetOpt
@@ -76,8 +75,8 @@ options =
   , Option ['s'] ["subject"]
       (ReqArg
        (\s opts -> do
-          subStr <- readFile s
-          let eSub = Ae.eitherDecodeStrict (C8.pack subStr) :: Either String Subject
+          subStr <- B.readFile s
+          let eSub = Ae.eitherDecodeStrict subStr :: Either String Subject
               !sub = fromRight (error "invalid subject JSON") eSub
           return opts{optSubjectInfo = sub}
        ) "Subject")
