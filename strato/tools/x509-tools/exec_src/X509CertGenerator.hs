@@ -13,7 +13,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 
 import qualified Data.Aeson                         as Ae
-import           Data.Maybe
+import           Data.Maybe     
+import           Data.Foldable                      (for_)
 import           Time.Types
 import           Data.Hourglass
 import qualified Data.ByteString                    as B
@@ -45,7 +46,7 @@ instance HasVault CertGenM where
 
 data Options = Options 
   { optIssuerCert    :: Maybe X509Certificate
-  , optSubjectInfo   :: Subject
+  , optSubjectInfo   :: [Subject]
   , optKey           :: PrivateKey
   , optOutputName    :: String
   , optDateTime      :: Maybe DateTime
@@ -54,7 +55,7 @@ data Options = Options
 defaultOptions :: Options
 defaultOptions = Options
   { optIssuerCert  = Nothing
-  , optSubjectInfo = throw $ userError "Give me a subject JSON file"
+  , optSubjectInfo = throw $ userError "Give me a subject JSON file(s)"
   , optKey         = throw $ userError "Give me a private key PEM file"
   , optOutputName  = "OutputCert.pem" 
   , optDateTime    = Nothing
@@ -77,11 +78,11 @@ options =
       (ReqArg
        (\s opts -> do
           subStr <- readFile s
-          let eSub = Ae.eitherDecodeStrict (C8.pack subStr) :: Either String Subject
-              !sub = fromRight (error "invalid subject JSON") eSub
+          let eSub = Ae.eitherDecodeStrict (C8.pack subStr) :: Either String [Subject]
+              !sub = fromRight (error "invalid subject JSON list") eSub
           return opts{optSubjectInfo = sub}
-       ) "Subject")
-    "The .json filepath of the subject information. Must be a valid JSON object with \
+       ) "[Subject]")
+    "The .json filepath of a list of subject information. Must be a valid JSON list with \
     \ commonName, country, organization, organizationUnit, and pubKey fields"
   , Option ['k'] ["key"]
       (ReqArg
@@ -108,7 +109,8 @@ options =
            Nothing -> return opts
            Just fileName -> return opts{optOutputName = fileName}
        ) "OutputName")
-   "The .pem filepath to write the created cert to. If not provided, this will be written to ./outputCert.pem"
+   "The base .pem filepath to write the created certs to. If not provided, it will use outputCert.pem\
+    \ and every file will be prefixed with a nonce (ex: 01-outputCert.pem)"
   ]
 
 helpMessage :: String
@@ -132,24 +134,26 @@ main = do
 --------------------------------------------------------------------------------------------
 -------------------------------------- GENERATE CERT ---------------------------------------
 --------------------------------------------------------------------------------------------
-
-  let issuer = case (optIssuerCert, getCertSubject =<< optIssuerCert) of
-        (Nothing, _) -> Issuer
-          { issCommonName = subCommonName optSubjectInfo
-          , issCountry    = subCountry optSubjectInfo
-          , issOrg        = subOrg optSubjectInfo
-          , issUnit       = subUnit optSubjectInfo
-          }
-        (Just _, Just (Subject{..})) -> Issuer
-          { issCommonName = subCommonName
-          , issCountry    = subCountry
-          , issOrg        = subOrg
-          , issUnit       = subUnit
-          } 
-        _ -> error "missing commonName or orgName in issuer cert"
-  
-  -- generate and write cert
-  flip runReaderT optKey $ do
-    cert <- makeSignedCert optDateTime optIssuerCert issuer optSubjectInfo
-    liftIO $ B.writeFile optOutputName $ certToBytes $ cert
-    liftIO $ putStrLn $ "Done. Cert was written to " ++ optOutputName
+  let optSubjectInfo' = zip [1..] optSubjectInfo :: [(Int, Subject)]
+  for_ optSubjectInfo' (\(i, subInfo) -> do  
+    let issuer = case (optIssuerCert, getCertSubject =<< optIssuerCert) of
+          (Nothing, _) -> Issuer
+            { issCommonName = subCommonName subInfo
+            , issCountry    = subCountry subInfo
+            , issOrg        = subOrg subInfo
+            , issUnit       = subUnit subInfo
+            }
+          (Just _, Just (Subject{..})) -> Issuer
+            { issCommonName = subCommonName
+            , issCountry    = subCountry
+            , issOrg        = subOrg
+            , issUnit       = subUnit
+            } 
+          _ -> error "missing commonName or orgName in issuer cert"
+        newOutputName = show i ++ "-" ++ optOutputName
+      
+    -- generate and write certs
+    flip runReaderT optKey $ do
+      cert <- makeSignedCert optDateTime optIssuerCert issuer subInfo
+      liftIO $ B.writeFile newOutputName $ certToBytes cert
+      liftIO $ putStrLn $ "Done. Cert was written to " ++ newOutputName) 
