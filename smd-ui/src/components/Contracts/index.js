@@ -7,6 +7,7 @@ import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import { Button } from '@blueprintjs/core';
+import ReactGA from 'react-ga4';
 
 const tourSteps = [
   /*  {
@@ -38,6 +39,10 @@ class Contracts extends Component {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+  }
+
+  componentDidMount() {
+    ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
   }
 
   componentWillReceiveProps(nextProps) {

@@ -33,12 +33,12 @@ ReactGA.initialize("G-PWGS3Z6YNQ");
 // version 2: uses `useLocation` webhook from react-router-dom
 // pros: cleaner
 // cons: lots of dependency updates -> break anything?
-function Test(props) {
-  const location = useLocation();
-  alert(location.pathname);
-  ReactGA.send({hitType: "pageview", page: location.pathname, title: "Hellloooo"});
-  return null;
-}
+// function Test(props) {
+//   const location = useLocation();
+//   alert(location.pathname);
+//   ReactGA.send({hitType: "pageview", page: location.pathname, title: "Hellloooo"});
+//   return null;
+// }
 
 
 
@@ -62,7 +62,7 @@ class App extends Component {
   render() {
     return (
       <div className="App" >
-        <Test></Test>
+        {/* <Test></Test> */}
         <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
         <MenuBar />
         <SideBar />

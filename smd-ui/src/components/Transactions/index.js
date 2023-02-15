@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import TransactionTable from './components/TransactionTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
+import ReactGA from 'react-ga4';
 
 const tourSteps = [
   {
@@ -23,6 +24,7 @@ const tourSteps = [
 class Transactions extends Component {
   componentDidMount() {
     mixpanelWrapper.track("transactions_loaded");
+    ReactGA.send({hitType: "pageview", page: "/transactions", title: "Transactions"});
   }
 
   render() {
