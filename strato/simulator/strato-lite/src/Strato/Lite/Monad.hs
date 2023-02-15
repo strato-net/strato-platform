@@ -26,6 +26,7 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import qualified Control.Monad.State                   as State
+import qualified Control.Monad.Trans.State             as StateT
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Crypto.Types.PubKey.ECC
@@ -691,6 +692,11 @@ instance MonadIO m => HasMemAddressStateDB (MonadTest m) where
   getAddressStateBlockDBMap = gets $ Lens.view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
+instance MonadIO m => HasMemAddressStateDB (StateT.StateT s (MonadTest m) ) where
+  getAddressStateTxDBMap = lift . gets $ Lens.view $ memDBs . stateTxMap 
+  putAddressStateTxDBMap theMap =lift .  modify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = lift .   gets $ Lens.view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = lift .    modify $ memDBs . stateBlockMap .~ theMap
 
 instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
   lookup _ sr    = dbsGets $ Lens.view (stateDB . at sr)
@@ -887,7 +893,7 @@ instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance (MonadIO m, MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
+instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
     myIP@(IPAsText ip) <- lift $ asks _p2pMyIPAddress
@@ -964,8 +970,7 @@ instance ( MonadIO m
             Nothing -> pure ()
             Just myAddr -> atomically $ writeTQueue s (msg, myAddr)
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          , MonadLogger m
          , MonadReader P2PPeer m
          ) => A.Selectable () (B.ByteString, SockAddr) (MonadP2PTest m) where
@@ -974,8 +979,7 @@ instance ( MonadIO m
     mMsg <- timeout 10000000 . atomically $ readTQueue s
     pure mMsg
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          , MonadLogger m
          , MonadReader P2PPeer m
          ) => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (MonadP2PTest m) where
@@ -1096,6 +1100,26 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
       stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
 
 instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where
+  replace _ peer' d = do
+    currentTime <- liftIO getCurrentTime
+    case d of
+      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
+      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+      ResetPeerUdpDisable ->
+          stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
+
+instance (Monad m, A.Replaceable PPeer PeerUdpDisable m) => A.Replaceable PPeer PeerUdpDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable T.Text PPeer (MonadTest m) where
+  replace _ message peer' = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerLastMsg = message})
+
+instance (Monad m, A.Replaceable T.Text PPeer m) => A.Replaceable T.Text PPeer (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
@@ -1567,7 +1591,10 @@ mkSignedTx privKey utx md =
       Wei val = U.unsignedTransactionValue utx
       (r', s', v') = getSigVals . signMsg privKey $ U.rlpHash utx
    in if isJust $ U.unsignedTransactionTo utx
-        then let Code c = U.unsignedTransactionInitOrData utx
+        -- then let Code c = U.unsignedTransactionInitOrData utx
+        then let c = case U.unsignedTransactionInitOrData utx of
+                        Code c' -> c'
+                        _ -> error "mkSignedTx: impossible"
               in MessageTX
                    { transactionNonce    = fromIntegral n
                    , transactionGasPrice = fromIntegral gp

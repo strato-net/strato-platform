@@ -1,13 +1,15 @@
 import React, { Component } from 'react';
 import { fetchContracts, changeContractFilter } from './contracts.actions';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import { Button } from '@blueprintjs/core';
 import ReactGA from 'react-ga4';
+import { Field, reduxForm } from 'redux-form';
+import { selectChain, fetchChainIds } from '../Chains/chains.actions';
+import { withRouter } from 'react-router-dom';
 
 const tourSteps = [
   /*  {
@@ -39,6 +41,7 @@ class Contracts extends Component {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    this.props.fetchChainIds();
   }
 
   componentDidMount() {
@@ -114,7 +117,33 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-          <div className="col-sm-4 text-right smd-pad-8">
+          <div className="col-sm-2 chain-wrapper text-right smd-pad-8" style={{paddingLeft: '50px'}}>
+            {this.props.chainIds && this.props.chainIds.length ?
+              <div className="pt-select">
+                <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => {
+                      const data = e.target.value === 'Main Chain' ? null : e.target.value;
+                      this.props.selectChain(data);
+                    }
+                  }
+                  required
+                >
+                  <option> Main Chain </option>
+                  {
+                    this.props.chainIds.map((label, i) => {
+                      return (
+                        <option key={label.id} value={label.id}>{label.label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div> : ''}
+          </div>
+          <div className="col-sm-2 text-right smd-pad-8">
             <CreateContract />
           </div>
         </div>
@@ -176,8 +205,17 @@ export function mapStateToProps(state) {
     contracts: state.contracts.contracts,
     filter: state.contracts.filter,
     selectedChain: state.chains.selectedChain,
-    isLoading: state.contracts.isLoading
+    isLoading: state.contracts.isLoading,
+    chainIds: state.chains.chainIds,
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchContracts, changeContractFilter })(Contracts));
+const formed = reduxForm({ form: 'Contracts' })(Contracts);
+const connected = connect(mapStateToProps, {
+  selectChain,
+  fetchChainIds,
+  fetchContracts, 
+  changeContractFilter
+})(formed);
+
+export default withRouter(connected);

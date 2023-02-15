@@ -114,7 +114,7 @@ entryPoint (Options privPath certPaths nonce) = do
 -- servant client for the endpoint
 postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
                    -> ClientM BlocChainOrTransactionResult
-postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
+postRawTransaction = client (Proxy @PostBlocTransactionRaw)
 
 
 -- Convert the parsed and retrieved options into a raw transaction request

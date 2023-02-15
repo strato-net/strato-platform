@@ -18,10 +18,10 @@ import           BlockApps.Bloc22.API.TypeWrappers
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
   describe "Strung" $
-    prop "has inverse JSON decode/encode" $ jsonProp @ (Strung Integer)
+    prop "has inverse JSON decode/encode" $ jsonProp @(Strung Integer)
   describe "Hex" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
-    prop "has inverse read/show" $ readShowProp @ (Hex Word)    
+    prop "has inverse JSON decode/encode" $ jsonProp @(Hex Word)
+    prop "has inverse read/show" $ readShowProp @(Hex Word)    
 
 -- helpers
 

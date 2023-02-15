@@ -17,7 +17,8 @@ import           Data.List
 import           Data.Maybe
 import qualified Database.Esqueleto.Legacy            as E
 import           Servant
-import           Servant.Swagger.Tags
+-- import           Servant.Swagger.Tags
+import           Tags
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json          ()

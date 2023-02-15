@@ -62,7 +62,7 @@ import qualified Data.Map.Strict                    as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
-import           MonadUtils
+import           GHC.Utils.Monad
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB

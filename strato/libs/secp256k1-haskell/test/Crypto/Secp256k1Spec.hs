@@ -282,13 +282,15 @@ negateTweakTest :: Assertion
 negateTweakTest =
     assertEqual "can recover secret key 1 after adding tweak 1" oneKey subtracted
   where
-    Just oneKey = secKey $ LabeledError.b16Decode "negateTweakTest" $ B8.pack
-        "0000000000000000000000000000000000000000000000000000000000000001"
-    Just oneTwk = tweak $ LabeledError.b16Decode "negateTweakTest" $ B8.pack
-        "0000000000000000000000000000000000000000000000000000000000000001"
-    Just minusOneTwk = tweakNegate oneTwk
-    Just twoKey = tweakAddSecKey oneKey oneTwk
-    Just subtracted = tweakAddSecKey twoKey minusOneTwk
+    oneKey = case secKey $ LabeledError.b16Decode "negateTweakTest" $ B8.pack "0000000000000000000000000000000000000000000000000000000000000001" of
+        Nothing -> error "negateTweakTest: failed to decode key"
+        Just k -> k
+    oneTwk = case tweak $ LabeledError.b16Decode "negateTweakTest" $ B8.pack "0000000000000000000000000000000000000000000000000000000000000001" of
+        Nothing -> error "negateTweakTest: failed to decode tweak"
+        Just t -> t
+    minusOneTwk = case tweakNegate oneTwk of Nothing -> error "negateTweakTest: failed to negate tweak"; Just t -> t
+    twoKey = case tweakAddSecKey oneKey oneTwk of Nothing -> error "negateTweakTest: failed to add tweak"; Just k -> k
+    subtracted = case tweakAddSecKey twoKey minusOneTwk of Nothing -> error "negateTweakTest: failed to subtract tweak"; Just k -> k
 
 #ifdef ECDH
 computeDhSecret :: Assertion

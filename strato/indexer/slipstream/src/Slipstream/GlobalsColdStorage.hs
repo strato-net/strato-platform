@@ -13,7 +13,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans        #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 
 module Slipstream.GlobalsColdStorage
   ( initStorage

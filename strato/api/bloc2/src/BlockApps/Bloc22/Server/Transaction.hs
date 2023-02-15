@@ -865,7 +865,7 @@ constructArgValuesAndSource args argNamesTypes = do
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
-getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasSQL m) =>
+getAccountTxParams :: (MonadLogger m, HasBlocEnv m, HasSQL m) =>
                       Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> m TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
@@ -891,14 +891,14 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
     Cache.insertSTM cacheKey (newNonce + 1) nonceCache expTime
     pure params{ txparamsNonce = Just newNonce }
 
-cacheLookup :: (Eq k, Hashable k)
+cacheLookup :: (Hashable k)
             => Cache.Cache k v
             -> TimeSpec
             -> k
             -> STM (Maybe v)
 cacheLookup c t k = Cache.lookupSTM True k c t
 
-genNonces :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasSQL m) =>
+genNonces :: (MonadLogger m, HasBlocEnv m, HasSQL m) =>
              Show a
           => Should CacheNonce
           -> Address
@@ -952,7 +952,7 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
     pure (chainId, txs)
 
 
-getAccountNonce :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
+getAccountNonce :: (MonadLogger m, HasSQL m, HasBlocEnv m) =>
                    Address -> S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce)
 getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
@@ -1052,7 +1052,7 @@ getResultAndRespond txHashes resolve = do
     (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
     (Pending, _, _) -> return result
 
-checkIsSynced :: (Monad m, HasSQL m) => m ()
+checkIsSynced :: (HasSQL m) => m ()
 checkIsSynced = do
   status         <- runStratoRedisIO getSyncStatus
   nodeBestBlock  <- runStratoRedisIO getBestBlockInfo

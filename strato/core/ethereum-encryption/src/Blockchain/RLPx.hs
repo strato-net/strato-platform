@@ -103,7 +103,9 @@ ethCryptAccept otherPoint = do
   case maybeResult of
    Just x -> return x
    Nothing -> do
-     let (first:second:_) = BL.unpack hsBytes
+     let (first,second) = case BL.unpack hsBytes of 
+                            (x:y:_) -> (x,y)
+                            _ -> error "Malformed handshake sent from peer"
          fullSize = fromIntegral first*256 + fromIntegral second
          remainingSize = fullSize - 307 + 2 
      remainingBytes <- CB.take remainingSize
@@ -120,7 +122,10 @@ ethCryptAcceptEIP8 :: (MonadIO m, HasVault m)
                    -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAcceptEIP8 _ hsBytes eciesMsgIBytes = do
 
-  let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
+  --let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
+  let (signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP) = case rlpSplit eciesMsgIBytes of
+                                                              (RLPArray [a,b,c,d],_) -> (a,b,c,d)
+                                                              _ -> error "malformed packet sent to ethCryptAcceptEIP8"
       otherNonce = rlpDecode otherNonceRLP
       pubKey = rlpDecode pubKeyRLP::B.ByteString
       extSig = rlpDecode signatureRLP

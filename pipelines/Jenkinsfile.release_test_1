@@ -35,6 +35,16 @@ pipeline {
                                     target: '.',
                                     optional: false
                             ])
+                            step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/develop",
+                                    selector: [$class: 'StatusBuildSelector'],
+                                    filter: "docker-compose.vault.yml",
+                                    target: '.',
+                                    optional: false
+                            ])
                         }
                         else {
                             if (env.STRATO_BUILD.contains(".") && !env.STRATO_BUILD.contains("/")) {
@@ -56,6 +66,16 @@ pipeline {
                                     projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
                                     selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
                                     filter: "docker-compose.yml",
+                                    target: '.',
+                                    optional: false
+                                ])
+                                step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
+                                    selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
+                                    filter: "docker-compose.vault.yml",
                                     target: '.',
                                     optional: false
                                 ])
@@ -249,113 +269,113 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, "namespaced-contracts", null, 'beanstalk')
                 }
             }
         }
 
-        stage ('Beanstalk Load Test - Vote in secondary nodes') {
-        // agent { label "multinode101" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script{
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node2Address} --nonce=100 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node3Address} --nonce=150 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node4Address} --nonce=200 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node5Address} --nonce=250 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node6Address} --nonce=300 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node7Address} --nonce=350 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT} --https"
-                        sleep(time:10,unit:"SECONDS")
-                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node8Address} --nonce=400 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT},${NODE_DATA.NODE7.HOST}:${NODE_DATA.NODE7.PORT} --https"
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "8" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
-                    }
-                }
-            }
-        }
+        // stage ('Beanstalk Load Test - Vote in secondary nodes') {
+        // // agent { label "multinode101" } // is default
+        //     steps {
+        //         dir('strato-getting-started') {
+        //             script{
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node2Address} --nonce=100 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node3Address} --nonce=150 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node4Address} --nonce=200 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node5Address} --nonce=250 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node6Address} --nonce=300 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node7Address} --nonce=350 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT} --https"
+        //                 sleep(time:10,unit:"SECONDS")
+        //                 sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node8Address} --nonce=400 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT},${NODE_DATA.NODE7.HOST}:${NODE_DATA.NODE7.PORT} --https"
+        //                 sh '''
+        //                 set -x
+        //                 counter=0
+        //                 until [ "$counter" -eq "8" ]
+        //                 do
+        //                     voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
+        //                     counter=$(echo "$voteList" | jq ". | length")
+        //                     echo $counter
+        //                 done
+        //                 '''
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage ('Beanstalk Load Test - Run app on secondary nodes') {
-            parallel {
-                stage('Run app on multinode102') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null)
-                        }
-                    }
-                }
-                stage('Run app on multinode103') {
-                agent { label "multinode103" }
-                steps {
-                    script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null)
-                    }
-                }
-                }
-                stage('Run app on multinode104') {
-                agent { label "multinode104" }
-                steps {
-                    script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null)
-                    }
-                }
-                }
-                stage('Run app on multinode301') {
-                agent { label "multinode301" }
-                steps {
-                    script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null)
-                    }
-                }
-                }
-                stage('Run app on multinode302') {
-                agent { label "multinode302" }
-                    steps {
-                        script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null)
-                        }
-                    }
-                }
-                stage('Run app on multinode303') {
-                    agent { label "multinode303" }
-                    steps {
-                        script { 
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null)
-                        }
-                    }
-                }
-                stage('Run app on multinode304') {
-                    agent { label "multinode304" }
-                    steps {
-                        script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null)
-                        }
-                    }
-                }
-            }
-        }
+        // stage ('Beanstalk Load Test - Run app on secondary nodes') {
+        //     parallel {
+        //         stage('Run app on multinode102') {
+        //             agent { label "multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.runAppSecondaryNode(NODE_DATA.NODE2, null, "namespaced-contracts", null)
+        //                 }
+        //             }
+        //         }
+        //         stage('Run app on multinode103') {
+        //         agent { label "multinode103" }
+        //         steps {
+        //             script{
+        //             lib.runAppSecondaryNode(NODE_DATA.NODE3, null, "namespaced-contracts", null)
+        //             }
+        //         }
+        //         }
+        //         stage('Run app on multinode104') {
+        //         agent { label "multinode104" }
+        //         steps {
+        //             script {
+        //             lib.runAppSecondaryNode(NODE_DATA.NODE4, null, "namespaced-contracts", null)
+        //             }
+        //         }
+        //         }
+        //         stage('Run app on multinode301') {
+        //         agent { label "multinode301" }
+        //         steps {
+        //             script {
+        //             lib.runAppSecondaryNode(NODE_DATA.NODE5, null, "namespaced-contracts", null)
+        //             }
+        //         }
+        //         }
+        //         stage('Run app on multinode302') {
+        //         agent { label "multinode302" }
+        //             steps {
+        //                 script {
+        //                     lib.runAppSecondaryNode(NODE_DATA.NODE6, null, "namespaced-contracts", null)
+        //                 }
+        //             }
+        //         }
+        //         stage('Run app on multinode303') {
+        //             agent { label "multinode303" }
+        //             steps {
+        //                 script { 
+        //                     lib.runAppSecondaryNode(NODE_DATA.NODE7, null, "namespaced-contracts", null)
+        //                 }
+        //             }
+        //         }
+        //         stage('Run app on multinode304') {
+        //             agent { label "multinode304" }
+        //             steps {
+        //                 script {
+        //                     lib.runAppSecondaryNode(NODE_DATA.NODE8, null, "namespaced-contracts", null)
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage ('Beanstalk Load Test - Approve memberships of secondary nodes') {
-            // agent { label "multinode101" } // is default
-            steps {
-                script {
-                    lib.approveAllMemberships()
-                }
-            }
-        }
+        // stage ('Beanstalk Load Test - Approve memberships of secondary nodes') {
+        //     // agent { label "multinode101" } // is default
+        //     steps {
+        //         script {
+        //             lib.approveAllMemberships()
+        //         }
+        //     }
+        // }
 
         stage ('Beanstalk load test') {
             // agent { label "multinode101" } // is default
@@ -416,155 +436,155 @@ pipeline {
         //     }
         // }
 
-        /* SINGLE NODE SYNC WITH DEVNET TESTS */
-        stage ('Single Node Sync with Devnet - Clean Node') {
-             // agent { label "multinode101" } // is default
-            steps { 
-                script {
-                    lib.cleanNode()
-                }
-            }
-        }
+        // /* SINGLE NODE SYNC WITH DEVNET TESTS */
+        // stage ('Single Node Sync with Devnet - Clean Node') {
+        //      // agent { label "multinode101" } // is default
+        //     steps { 
+        //         script {
+        //             lib.cleanNode()
+        //         }
+        //     }
+        // }
 
-        stage ('Single Node Sync with Devnet - Deploy Node') {
-            steps {
-                script {
-                    lib.deployStrato(NODE_DATA.NODE1)
-                    sh "docker system prune -fa --volumes"
-                }
-            }
-        }
+        // stage ('Single Node Sync with Devnet - Deploy Node') {
+        //     steps {
+        //         script {
+        //             lib.deployStrato(NODE_DATA.NODE1)
+        //             sh "docker system prune -fa --volumes"
+        //         }
+        //     }
+        // }
 
-        stage('Single Node Sync with Devnet - Deploy Monitor') {
-            steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
-                ]) {
-                    script {
-                        lib.runMonitor(NODE_DATA.NODE1, null)
-                        sh "docker system prune -fa --volumes"
-                    }
-                }
-            }
-        }
+        // stage('Single Node Sync with Devnet - Deploy Monitor') {
+        //     steps {
+        //         withCredentials([
+        //             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+        //         ]) {
+        //             script {
+        //                 lib.runMonitor(NODE_DATA.NODE1, null)
+        //                 sh "docker system prune -fa --volumes"
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Single Node Sync with Devnet - Wait for Healthy Network') {
-            steps {
-                script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
-                }
-            }
-        }
+        // stage('Single Node Sync with Devnet - Wait for Healthy Network') {
+        //     steps {
+        //         script {
+        //             lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
+        //         }
+        //     }
+        // }
 
         /* NETWORK OF NODES SYNC WITH DEVNET TESTS*/
         /* Stability Test - Restart Node */
-        stage('Restart Node after Devnet Sync') {
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato --stop'
-                        sh 'sudo ./strato --start'
-                        sh 'PASSWORD=123 ./strato --set-password'
-                    }
-                }
-            }
-        }
+        // stage('Restart Node after Devnet Sync') {
+        //     steps {
+        //         dir('strato-getting-started') {
+        //             script {
+        //                 sh 'sudo ./strato --stop'
+        //                 sh 'sudo ./strato --start'
+        //                 sh 'PASSWORD=123 ./strato --set-password'
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Wait For Restarted Node to Sync') {
-            steps {
-                script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
-                }
-            }
-        }
+        // stage('Wait For Restarted Node to Sync') {
+        //     steps {
+        //         script {
+        //             lib.waitForHealthySync(NODE_DATA.MONITOR.DEVNET_SYNC_HEALTH_URL)
+        //         }
+        //     }
+        // }
 
         /* Performance Test - Sync Network to Devnet */
-        stage('Clean 4 nodes') {
-            parallel {
-                stage('Clean test-multinode101') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode102') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode103') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-                stage('Clean test-multinode104') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            lib.cleanNode()
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Clean 4 nodes') {
+        //     parallel {
+        //         stage('Clean test-multinode101') {
+        //             // agent { label "test-multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode102') {
+        //             agent { label "test-multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode103') {
+        //             agent { label "test-multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //         stage('Clean test-multinode104') {
+        //             agent { label "test-multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.cleanNode()
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
-            agent { label "multinode305" }
-            steps {
-                script {
-                    lib.runMonitor(NODE_DATA.NODE1, 'networkSynctoDevnet')
-                }                
-            }
-        }
+        // stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
+        //     agent { label "multinode305" }
+        //     steps {
+        //         script {
+        //             lib.runMonitor(NODE_DATA.NODE1, 'networkSynctoDevnet')
+        //         }                
+        //     }
+        // }
 
-        stage('Sync Network To Devnet') {
-            parallel {
-                stage('Sync multinode101') {
-                    // agent { label "multinode101" } // is default
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE1)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    } 
-                }
-                stage('Sync multinode102') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE2)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-                stage('Sync multinode103') {
-                    agent { label "multinode103" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE3)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-                stage('Sync multinode104') {
-                    agent { label "multinode104" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE4)
-                            sh "docker system prune -fa --volumes"
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Sync Network To Devnet') {
+        //     parallel {
+        //         stage('Sync multinode101') {
+        //             // agent { label "multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE1)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             } 
+        //         }
+        //         stage('Sync multinode102') {
+        //             agent { label "multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE2)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //         stage('Sync multinode103') {
+        //             agent { label "multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE3)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //         stage('Sync multinode104') {
+        //             agent { label "multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.deployStrato(NODE_DATA.NODE4)
+        //                     sh "docker system prune -fa --volumes"
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         // stage('Performance Test - Wait for Network to Sync with Devnet') {
         //     agent { label "multinode305" }
@@ -575,42 +595,42 @@ pipeline {
         //     }
         // }
 
-        stage('Performance Test - Wait for Network to Sync with Devnet') {
-            parallel {
-                stage('Restart multinode101 after sync') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode102 after sync') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode103 after sync') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-                stage('Restart multinode104 after sync') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Performance Test - Wait for Network to Sync with Devnet') {
+        //     parallel {
+        //         stage('Restart multinode101 after sync') {
+        //             // agent { label "test-multinode101" } // is default
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode102 after sync') {
+        //             agent { label "test-multinode102" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode103 after sync') {
+        //             agent { label "test-multinode103" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //         stage('Restart multinode104 after sync') {
+        //             agent { label "test-multinode104" }
+        //             steps {
+        //                 script {
+        //                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
     }
 }

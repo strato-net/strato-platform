@@ -61,7 +61,7 @@ library:
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
-  - strato-p2p
+  # - strato-p2p
   - temporary
   - text
   - transformers
@@ -126,6 +126,7 @@ tests:
   strato-init-test:
     source-dirs: test/
     main: Main.hs
+    ghc-options: -dynamic
     dependencies:
       - aeson
       - base16-bytestring

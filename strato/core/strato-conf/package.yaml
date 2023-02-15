@@ -4,8 +4,16 @@ author:              Jamshid
 category:            Web
 build-type:          Simple
 
+
+
+
 library:
   source-dirs:      src
+  # ghc-options: -Wall -Werror
+
+  # -fsimpl-tick-factor=800 -funfolding-case-threshold=140 -funfolding-case-scaling=8 
+  # # 
+
   dependencies:
     - base
     - bytestring

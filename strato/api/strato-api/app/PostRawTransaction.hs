@@ -175,7 +175,9 @@ options =
             Nothing -> return opts
             Just metadata -> do
               let mp = M.fromList $ map (\el ->
-                          let (k:xs) = splitOn ":" el
+                          let (k,xs) = case splitOn ":" el of
+                                         (k':xs') -> (k',xs')
+                                         [] -> ("",[])
                           in
                             (T.pack k, T.pack $ head xs)
                         ) $ splitOn "," metadata
@@ -229,7 +231,7 @@ parseArgs = do
 -- servant client for the endpoint
 postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
                    -> ClientM BlocChainOrTransactionResult
-postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
+postRawTransaction = client (Proxy @PostBlocTransactionRaw)
 
 
 makeArgs :: [String] -> String

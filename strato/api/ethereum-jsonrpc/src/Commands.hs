@@ -6,12 +6,12 @@ module Commands (
 
 import           Control.Monad.Except
 import qualified Data.Aeson                  as JSON
+import qualified Data.Aeson.KeyMap           as KM
 import           Data.Binary
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
 import qualified Data.ByteString.Lazy.Char8  as BLC
-import qualified Data.HashMap.Strict         as H
 import qualified Data.Map                    as M
 import qualified Data.Text                   as T
 import qualified Data.Vector                 as V
@@ -193,9 +193,9 @@ getBlockNumber::JSON.Value->Maybe Integer
 getBlockNumber (JSON.Array val) =
   case V.toList val of
    [JSON.Object o] ->
-     case H.lookup "blockData" o of
+     case KM.lookup "blockData" o of
       Just (JSON.Object v) ->
-        case H.lookup "number" v of
+        case KM.lookup "number" v of
          Just (JSON.Number n) -> Just $ round n
          _                    -> Nothing
       _ -> Nothing

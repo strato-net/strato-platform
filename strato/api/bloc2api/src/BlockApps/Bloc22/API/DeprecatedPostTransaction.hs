@@ -56,7 +56,7 @@ instance ToSample PostTransaction where
 -}
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
 defaultPostTx = PostTransaction
-    { posttransactionHash = hash $ BL.toStrict (Binary.encode @ Integer 1)
+    { posttransactionHash = hash $ BL.toStrict (Binary.encode @Integer 1)
     , posttransactionGasLimit = 21000
     , posttransactionCodeOrData = ""
     , posttransactionGasPrice = 50000000000

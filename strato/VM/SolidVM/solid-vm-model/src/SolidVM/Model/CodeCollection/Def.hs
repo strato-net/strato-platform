@@ -23,7 +23,7 @@ import           SolidVM.Model.SolidString
 
 
 defAesonOptions :: Options
-defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+defAesonOptions = defaultOptions
 
 data DefF a = Enum { names::[SolidString], bytes::Word, context :: a}
             | Error { params :: [(SolidString, SolidVM.IndexedType)], bytes::Word, context :: a }

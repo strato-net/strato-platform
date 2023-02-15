@@ -68,7 +68,7 @@ runWorker kaddr = do
       void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
       $logInfoS "runWorker" "Processing genesis block"
       initializeGenesisBlock tf
-    $logInfoS "runWorker" "done."
+    $logInfoS "runWorker" "done. here I am once again"
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo . fromText . T.pack

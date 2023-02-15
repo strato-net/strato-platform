@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
     processed_users = []
     for user in users_to_update:
-        print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=v_user['uuid']))
+        print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=user['uuid']))
         try:
             subject_json = {
               "commonName": user['fullname'],
@@ -162,10 +162,11 @@ if __name__ == '__main__':
                 }]
             }
             headers = {
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer %s' % mercata_testnet_token
             }
-            resp = requests.request("POST", m.node_url, headers=headers, json={'json_payload': data})
+            resp = requests.request("POST", m.node_url + '/strato/v2.3/transaction?resolve=true', headers=headers, json=data)
             # curl 'https://node1.mercata-testnet.blockapps.net/strato/v2.3/transaction?resolve=true' \
             # -X 'POST' \
             # -H 'Accept: application/json' \
@@ -177,7 +178,8 @@ if __name__ == '__main__':
             # -H 'Accept-Encoding: gzip, deflate, br' \
             # -H 'Connection: keep-alive' \
             # --data-binary "{\"txs\":[{\"payload\":{\"contractName\":\"OfficialCertificateRegistry\",\"contractAddress\":\"24c6003021471df20530ba4ae973527a8d2f4385\",\"method\":\"registerCertificate\",\"args\":{\"newCertificateString\":\"${CERT_ESCAPED}\"},\"metadata\":{}},\"type\":\"FUNCTION\"}]}"
-
+            print('### STRATO API response:', resp.content)
+            print('-----')
             processed_users.append(user)
         except Exception as e:
             err_msg = 'Failed to process user cert issuance or registration with the exception: %s' % e

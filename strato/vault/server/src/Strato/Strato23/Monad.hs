@@ -29,8 +29,10 @@ import           Database.PostgreSQL.Simple      (Connection, withTransaction)
 import           GHC.Stack
 import           Network.HTTP.Client
 import           Opaleye
+import           Opaleye.Internal.QueryArr
 import           Servant
 import           Strato.Strato23.Crypto
+
 
 import           UnliftIO                        hiding (Handler(..))
 
@@ -190,7 +192,7 @@ formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
 vaultQuery
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y)
   => Query x
   -> VaultM [y]
 vaultQuery q = do
@@ -199,7 +201,7 @@ vaultQuery q = do
   withResource pool $ (\conn -> liftIO $ runSelect conn q)
 
 vaultQueryMaybe
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y)
   => Query x
   -> VaultM (Maybe y)
 vaultQueryMaybe q = vaultQuery q >>= \case
@@ -208,7 +210,7 @@ vaultQueryMaybe q = vaultQuery q >>= \case
     _:_:_ -> throwIO $ DBError "vaultQueryMaybe: Multiple results, expected one row"
 
 vaultQuery1
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y)
   => Query x
   -> VaultM y
 vaultQuery1 q = vaultQuery q >>= \case
@@ -217,7 +219,7 @@ vaultQuery1 q = vaultQuery q >>= \case
     _:_:_ -> throwIO $ DBError "vaultQuery1: Multiple results, expected one row"
 
 vaultQueryMany
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default FromFields x y)
   => Query x
   -> VaultM [y]
 vaultQueryMany q = vaultQuery q >>= \case

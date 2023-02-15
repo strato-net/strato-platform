@@ -1,6 +1,10 @@
-module Strato.Strato23.Server.Ping where
+{-# LANGUAGE DeriveGeneric #-}
 
-  import           Strato.Strato23.Monad
+module Strato.Strato23.Server.Ping (getPing) where
 
-  getPing :: VaultM String
-  getPing = return "pingDetail"
+import           Strato.Strato23.Monad
+import           Strato.Strato23.API.Types
+
+-- getPing will return a version number, this is the version of the vault that is wanted to be used
+getPing :: VaultM Version
+getPing = return $ Version 1

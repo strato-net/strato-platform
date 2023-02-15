@@ -9,7 +9,10 @@ module Handlers.UUID (
   ) where
 
 import           Servant
-import           Servant.Swagger.Tags
+-- import           Servant.Swagger.Tags
+import          Tags
+
+
 
 import           Blockchain.EthConf
 

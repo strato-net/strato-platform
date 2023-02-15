@@ -95,8 +95,10 @@ tests:
 benchmarks:
   word256:
     source-dirs: bench/
+    ghc-options: -dynamic
     main: Word256Bench.hs
     dependencies:
       - strato-model
+      - criterion
 
 

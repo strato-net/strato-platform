@@ -6,13 +6,14 @@ import Criterion.Main
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base16 as B16
+import Data.Either (fromRight)
 
 import Blockchain.Data.RLP
 
 main :: IO ()
 main = do
   input <- BL.toStrict . decompress <$> BL.readFile "./bench/vm_100_txs.gz"
-  let rlps = map (rlpDeserialize . fst . B16.decode)
+  let rlps = map (rlpDeserialize . fromRight (C8.pack "A") . B16.decode)
            . filter (not . C8.null)
            $ C8.split '\n' input
   defaultMain [ bench "bytestring based rlp" $ nf (map rlpSerialize) rlps

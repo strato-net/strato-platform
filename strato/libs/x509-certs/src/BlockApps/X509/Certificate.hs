@@ -414,7 +414,7 @@ ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, S
 ecdsaWithSHA256 = ecdsaWithSHA256F sign
 
 makeSignedCertSigF 
-  :: (Monad m, MonadIO m) 
+  :: (MonadIO m) 
   => (B.ByteString -> m Signature)  -- Signature function
   -> Maybe DateTime                 -- Expiry date
   -> Maybe X509Certificate          -- Parent certificate to append

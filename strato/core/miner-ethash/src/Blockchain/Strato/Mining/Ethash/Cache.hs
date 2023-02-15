@@ -42,8 +42,10 @@ getIOUArrayWidth mx = do
 
 getCacheWidth::Cache->Word32
 getCacheWidth array =
-  let ((0, _), (n, _)) = A.bounds array
-  in n + 1
+  case A.bounds array of
+    ((0, _), (n, _)) -> n + 1
+    _ -> error "getCacheWidth: impossible"
+
 
 
 mix::MA.IOUArray (Word32, Word32) Word32->IO ()

@@ -60,6 +60,7 @@ library:
     - hflags
     - http-client
     - iproute
+    # - json-rpc
     - json-rpc-server
     - json-rpc-client
     - lens
