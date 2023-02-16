@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import TransactionTable from './components/TransactionTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
+import ReactGA from 'react-ga4';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 import { connect } from 'react-redux';
@@ -27,6 +28,7 @@ class Transactions extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("transactions_loaded");
+    ReactGA.send({hitType: "pageview", page: "/transactions", title: "Transactions"});
     this.props.fetchChainIds();
   }
 

@@ -12,7 +12,8 @@ import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/File
 import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
-import debounce from 'lodash/debounce'
+import debounce from 'lodash/debounce';
+import ReactGA from 'react-ga4';
 class CodeEditor extends Component {
   constructor() {
     super()
@@ -22,6 +23,7 @@ class CodeEditor extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
+    ReactGA.send({hitType: "pageview", page: "/code_editor", title: "Contract Editor"});
     this.saveLocalState = debounce(this.saveToLocalStorage, 500)
     window.onbeforeunload = (e) => {
       this.saveToLocalStorage()
