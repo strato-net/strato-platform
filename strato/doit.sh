@@ -187,17 +187,17 @@ function newnode {
   if [ -n "${seqMaxUsPerIter}" ]; then
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
-  if [ -n "${certInfo}" ]; then
-    ciFlag="--certInfo=${certInfo}"
-  fi
-
+  
+  onFlag="--myOrgName=${myOrgName}"
+  ouFlag="--myOrgUnit=${myOrgUnit}"
+  cnFlag="--myCommonName=${myCommonName}"
   vbFlag="--validatorBehavior=${validatorBehavior}"
 
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${vbFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" "${ciFlag}"  --genesisBlockName=$genesis \
+    "${networkFlag}" "${onFlag}" "${ouFlag}" "${cnFlag}" --genesisBlockName=$genesis \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"

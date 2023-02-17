@@ -9,10 +9,8 @@ import           Control.Concurrent         (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
-import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import           Data.ByteString.Base64
-import           Data.Either.Extra
+import qualified Data.Text                  as T
 import           HFlags
 import           Safe
 
@@ -57,7 +55,7 @@ main = do
   putStrLn $ "strato-sequencer validators: " ++ show validators
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
-  putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
+  putStrLn $ "strato-sequencer node cert info: " ++ flags_myOrgName ++ "-" ++ flags_myOrgUnit ++ "-" ++ flags_myCommonName
 
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -77,11 +75,11 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
-  --  Allow these flags to accept base64-encoded JSONs optionally
-  let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
-      eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
-      !self = fromRight (error "invalid self cert info") eSelf
-
+  let !self = case T.pack <$> [flags_myOrgName, flags_myOrgUnit, flags_myCommonName] of
+        ["", _, _] -> error "Missing required organization name"
+        [_, _, ""] -> error "Missing required common name"
+        [o, u, c]  -> CommonName o u c True
+        _          -> error "???"
 
   mCtx <- if not flags_blockstanbul
              then return Nothing

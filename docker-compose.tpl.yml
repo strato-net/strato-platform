@@ -83,7 +83,9 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - cacheTransactionResults=${cacheTransactionResults}
-    - certInfo=${certInfo}
+    - myOrgName=${myOrgName}
+    - myOrgUnit=${myOrgUnit}
+    - myCommonName=${myCommonName}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}

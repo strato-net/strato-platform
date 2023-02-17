@@ -7,7 +7,7 @@ synopsis: A tool to setup the DBs for a Strato instance
 category: Data Structures
 description: A tool to setup the DBs for a Strato instance
 
-ghc-options: -Wall -O2 -threaded
+ghc-options: -Wall -O2 -threaded -dynamic
 
 dependencies:
   - base

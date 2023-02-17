@@ -27,7 +27,9 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 -- TODO(tim): We may need to specify a starting view, or catch up from the network
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
 defineFlag "network" ("" :: String) "The network that strato will join"
-defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
+defineFlag "myOrgName" ("" :: String) "This node's organization name corresponding to their X.509 certificate"
+defineFlag "myOrgUnit" ("" :: String) "This node's organization unit corresponding to their X.509 certificate"
+defineFlag "myCommonName" ("" :: String) "This node's common name corresponding to their X.509 certificate"
 defineFlag "genesisBlockName" ("livenet" :: String) "use the alternate stablenet genesis block"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)

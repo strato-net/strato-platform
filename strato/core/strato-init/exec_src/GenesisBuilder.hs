@@ -75,12 +75,14 @@ options =
     "The .json filepath containing admin information. Must be a valid array of JSON object with \
     \ commonName, org, and orgUnit fields"
   , Option ['f'] ["faucets"]
-      (ReqArg
-       (\s opts -> do
-          faucetsStr <- readFile s
-          let eFaucets = Ae.eitherDecodeStrict (C8.pack faucetsStr) :: Either String [Address]
-              !faucets = either error id eFaucets
-          return opts{optFaucets = faucets}
+      (OptArg
+       (\mOut opts -> case mOut of
+          Nothing -> return opts
+          Just s -> do
+            faucetsStr <- readFile s
+            let eFaucets = Ae.eitherDecodeStrict (C8.pack faucetsStr) :: Either String [Address]
+                !faucets = either error id eFaucets
+            return opts{optFaucets = faucets}
        ) "Faucets")
     "The .json filepath containing faucet account information. Must be a valid array of JSON strings containing \
     \ 40 ASCII hex characters"
