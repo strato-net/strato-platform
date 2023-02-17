@@ -11,6 +11,7 @@ import BlocAccounts from './components/BlocAccounts';
 import OauthAccounts from './components/OauthAccounts';
 import './accounts.css';
 import { isOauthEnabled } from '../../lib/checkMode';
+import ReactGA from 'react-ga4';
 
 const tourSteps = [/* {
     title: 'Create User',
@@ -45,7 +46,8 @@ class Accounts extends Component {
     } else {
       this.props.fetchAccounts(true, true, this.props.selectedChain);
     }
-    mixpanelWrapper.track('accounts_page_load')
+    mixpanelWrapper.track('accounts_page_load');
+    ReactGA.send({hitType: "pageview", page: "/accounts", title: "Accounts"});
   }
 
   render() {

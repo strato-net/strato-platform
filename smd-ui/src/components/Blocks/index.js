@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import BlockTable from './components/BlockTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import ReactGA from 'react-ga4';
 import { connect } from 'react-redux';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 import { Field, reduxForm } from 'redux-form';
@@ -8,6 +9,7 @@ import { Field, reduxForm } from 'redux-form';
 class Blocks extends Component {
   componentDidMount() {
     mixpanelWrapper.track('blocks_loaded');
+    ReactGA.send({hitType: "pageview", page: "/blocks", title: "Blocks"});
     this.props.fetchChainIds();
   }
 
