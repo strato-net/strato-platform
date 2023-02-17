@@ -7,7 +7,7 @@ synopsis: A tool to setup the DBs for a Strato instance
 category: Data Structures
 description: A tool to setup the DBs for a Strato instance
 
-ghc-options: -Wall -O2 -threaded -dynamic
+ghc-options: -Wall -O2 -threaded
 
 dependencies:
   - base
@@ -84,6 +84,7 @@ executables:
   tabula-rasa:
     source-dirs: exec_src/
     main: TabulaRasa.hs
+    # ghc-options: -dynamic
     dependencies:
       - common-log
       - hflags
