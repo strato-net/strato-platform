@@ -10,7 +10,15 @@ kubectl delete service nginx-service
 **Note that** *strato* above is the name of the deployment.
 
 # Create New Deployment
-**Note:** Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+**Note:**
+Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+Replace volume id place holders
+* *prometheus-data-volume-id* is *vol-0334b826317434504*
+* *kafka-data-volume-id* is *vol-0334b826317434504*
+* *redis-data-volume-id* is *vol-0fd90c145c88224d2*
+* *zookeeper-data-volume-id* is *vol-09a78def133bc911c*
+* *strato-data-volume-id* is *vol-01c298651694dcfce*
+* *postgres-data-volume-id* is *vol-0a4ac71b70905f806*
 cp eks-strato-deployment.tpl.yaml eks-strato-deployment.yaml
 kubectl apply -f eks-strato-deployment.yaml
 

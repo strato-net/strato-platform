@@ -245,25 +245,25 @@ spec:
       volumes:
         - name: prometheus-data
           awsElasticBlockStore:
-            volumeID: vol-0334b826317434504
+            volumeID: <prometheus-data-volume-id>
             fsType: ext4
         - name: kafka-data
           awsElasticBlockStore:
-            volumeID: vol-0334b826317434504
+            volumeID: <kafka-data-volume-id>
             fsType: ext4
         - name: redis-data
           awsElasticBlockStore:
-            volumeID: vol-0fd90c145c88224d2
+            volumeID: <redis-data-volume-id>
             fsType: ext4
         - name: zookeeper-data
           awsElasticBlockStore:
-            volumeID: vol-09a78def133bc911c
+            volumeID: <zookeeper-data-volume-id>
             fsType: ext4
         - name: strato-data
           awsElasticBlockStore:
-            volumeID: vol-01c298651694dcfce
+            volumeID: <strato-data-volume-id>
             fsType: ext4
         - name: postgres-data
           awsElasticBlockStore:
-            volumeID: vol-0a4ac71b70905f806
+            volumeID: <postgres-data-volume-id>
             fsType: ext4
