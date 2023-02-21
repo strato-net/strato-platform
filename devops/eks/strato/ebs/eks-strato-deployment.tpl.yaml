@@ -244,19 +244,26 @@ spec:
           value: "/strato-api/eth/v1.2/swagger.json"
       volumes:
         - name: prometheus-data
-          hostPath:
+          awsElasticBlockStore:
+            volumeID: <prometheus-data-volume-id>
+            fsType: ext4
         - name: kafka-data
-          persistentVolumeClaim:
-            claimName: kafka-pvc
+          awsElasticBlockStore:
+            volumeID: <kafka-data-volume-id>
+            fsType: ext4
         - name: redis-data
-          persistentVolumeClaim:
-            claimName: redis-pvc
+          awsElasticBlockStore:
+            volumeID: <redis-data-volume-id>
+            fsType: ext4
         - name: zookeeper-data
-          persistentVolumeClaim:
-            claimName: zookeeper-pvc
+          awsElasticBlockStore:
+            volumeID: <zookeeper-data-volume-id>
+            fsType: ext4
         - name: strato-data
-          persistentVolumeClaim:
-            claimName: strato-pvc
+          awsElasticBlockStore:
+            volumeID: <strato-data-volume-id>
+            fsType: ext4
         - name: postgres-data
-          persistentVolumeClaim:
-            claimName: postgres-pvc
+          awsElasticBlockStore:
+            volumeID: <postgres-data-volume-id>
+            fsType: ext4
