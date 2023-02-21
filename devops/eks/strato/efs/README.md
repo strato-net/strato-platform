@@ -1,5 +1,5 @@
-# What is EKS
-Amazon Elastic Kubernetes Service (Amazon EKS) is a managed service that we can use to run Kubernetes on AWS without needing to install, operate, and maintain our own Kubernetes control panel. More detailed information can be found [here](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)
+# EKS template using AWS Elastic FileSystem (EFS) for volumes
+This directory contains the additional templates required for deploying persistent volume using AWS EFS (elastic file system)
 
 # Installing kubectl
 Follow steps from [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
