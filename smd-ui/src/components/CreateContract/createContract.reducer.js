@@ -11,7 +11,8 @@ import {
   CONTRACT_FORM_CHANGE,
   CONTRACT_NAME_CHANGE,
   UPDATE_TOAST,
-  RESET_ERROR
+  RESET_ERROR,
+  UPDATE_USING_SAMPLE_CONTRACT
 } from './createContract.actions';
 
 const initialState = {
@@ -26,7 +27,8 @@ const initialState = {
   filename: undefined,
   isToasts: false,
   toastsMessage: '',
-  error: ''
+  error: '',
+  usingSampleContract: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -42,6 +44,7 @@ const reducer = function (state = initialState, action) {
         filename: '',
         username: '',
         // createDisabled: true,
+        usingSampleContract: false,
       };
 
     case USERNAME_FORM_CHANGE:
@@ -127,6 +130,11 @@ const reducer = function (state = initialState, action) {
         ...state,
         isToasts: null,
         toastsMessage: null
+      }
+    case UPDATE_USING_SAMPLE_CONTRACT:
+      return {
+        ...state,
+        usingSampleContract: action.usingSampleContract
       }
     default:
       return state;
