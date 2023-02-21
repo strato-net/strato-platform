@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE BangPatterns          #-}
 
 
 module Blockchain.SolidVM.SM (
@@ -61,6 +62,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
+import           Control.DeepSeq (($!!))
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -689,7 +691,7 @@ getXabiValueType (AccountPath loc path) = do
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $ loop ccs' (tail $ MS.toList path) v
+    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
  where loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
        loop _ [] = id
        loop ccs [x] = \case
