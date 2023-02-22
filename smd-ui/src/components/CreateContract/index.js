@@ -434,8 +434,11 @@ class CreateContract extends Component {
                         }}
                       >
                         <option key={0} value="default">Choose a sample contract to upload.</option>
-                        <option key={1} value="SimpleStorage">SimpleStorage</option>
-                        <option key={2} value="SimpleStorageV2">SimpleStorage V2</option>
+                        <option key={1} value="HelloWorld">Hello World</option>
+                        <option key={2} value="SimpleStorage">Simple Storage</option>
+                        <option key={3} value="ERC20">ERC20 - Tokens</option>
+                        <option key={4} value="ERC721">ERC721 - NFT</option>
+                        <option key={5} value="PermissionManager">Permission Manager</option>
                       </Field>
                     </div>
                   </div>
