@@ -13,18 +13,18 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 
 import qualified Data.Aeson                         as Ae
-import           Data.Maybe     
+import           Data.Maybe
 import           Data.Foldable                      (for_)
 import           Time.Types
 import           Data.Hourglass
 import qualified Data.ByteString                    as B
-import           Data.Either
 import           Data.Foldable                      (foldlM)
 import           System.Console.GetOpt
 import           System.Environment
+import           System.Directory
+import           System.IO.Unsafe
 
-
-import           BlockApps.X509 
+import           BlockApps.X509
 
 
 
@@ -35,7 +35,7 @@ type CertGenM = ReaderT PrivateKey IO
 instance HasVault CertGenM where
   getPub = error "we never call getPub with this tool"
   getShared _ = error "we never call getShared with this tool"
-  sign bs = ask >>= return . flip signMsg bs 
+  sign bs = ask >>= return . flip signMsg bs
 
 
 
@@ -43,11 +43,11 @@ instance HasVault CertGenM where
 ----------------------------------------- ARGS ---------------------------------------------
 --------------------------------------------------------------------------------------------
 
-data Options = Options 
+data Options = Options
   { optIssuerCert    :: Maybe X509Certificate
   , optSubjectInfo   :: [Subject]
   , optKey           :: PrivateKey
-  , optOutputName    :: String
+  , optOutputDir    :: String
   , optDateTime      :: Maybe DateTime
   } deriving Show
 
@@ -56,15 +56,22 @@ defaultOptions = Options
   { optIssuerCert  = Nothing
   , optSubjectInfo = throw $ userError "Give me a subject JSON file(s)"
   , optKey         = throw $ userError "Give me a private key PEM file"
-  , optOutputName  = "OutputCert.pem" 
+  , optOutputDir  = "/"
   , optDateTime    = Nothing
   }
 
+decodeSubject :: FilePath -> IO [Subject]
+decodeSubject f = do
+  json <- B.readFile f
+  return $ case Ae.eitherDecodeStrict json of
+    Left err -> error $ "JSON Parsing " ++ err
+    Right a  -> a
+
 options :: [OptDescr (Options -> IO Options)]
-options = 
+options =
   [Option ['i'] ["issuer"]
       (OptArg
-       (\mIs opts -> case mIs of 
+       (\mIs opts -> case mIs of
            Nothing -> return opts
            Just is -> do
              certBS <- B.readFile is
@@ -76,12 +83,13 @@ options =
   , Option ['s'] ["subject"]
       (ReqArg
        (\s opts -> do
-          subStr <- B.readFile s
-          let eSub = Ae.eitherDecodeStrict subStr :: Either String [Subject]
-              !sub = fromRight (error "invalid subject JSON list") eSub
+          let cwd = s ++ "/"
+          sub <- if unsafePerformIO $ doesDirectoryExist s 
+            then do dir <- listDirectory s; return (concatMap (unsafePerformIO . decodeSubject . (cwd ++)) dir)
+            else if unsafePerformIO $ doesFileExist s then decodeSubject s else error "WTF"
           return opts{optSubjectInfo = sub}
        ) "[Subject]")
-    "The .json filepath of a list of subject information. Must be a valid JSON list with \
+    "The .json filepath of the subject(s) information. Must be a valid JSON file or directory of JSON files with \
     \ commonName, country, organization, organizationUnit, and pubKey fields"
   , Option ['k'] ["key"]
       (ReqArg
@@ -104,12 +112,11 @@ options =
   "The certificate expiration date"
   , Option ['o'] ["output"]
       (OptArg
-       (\mOut opts -> case mOut of 
+       (\mOut opts -> case mOut of
            Nothing -> return opts
-           Just fileName -> return opts{optOutputName = fileName}
+           Just dir -> return opts{optOutputDir = dir <> "/"}
        ) "OutputName")
-   "The base .pem filepath to write the created certs to. If not provided, it will use outputCert.pem\
-    \ and every file will be prefixed with a nonce (ex: 01-outputCert.pem)"
+   "The base directory to write the certificate(s) to. If not provided, this will default to 'outputCerts'"
   ]
 
 helpMessage :: String
@@ -133,26 +140,28 @@ main = do
 --------------------------------------------------------------------------------------------
 -------------------------------------- GENERATE CERT ---------------------------------------
 --------------------------------------------------------------------------------------------
-  let optSubjectInfo' = zip [1..] optSubjectInfo :: [(Int, Subject)]
-  for_ optSubjectInfo' (\(i, subInfo) -> do  
+  cwd <- getCurrentDirectory
+  createDirectoryIfMissing True optOutputDir
+  for_ optSubjectInfo (\si -> do
     let issuer = case (optIssuerCert, getCertSubject =<< optIssuerCert) of
           (Nothing, _) -> Issuer
-            { issCommonName = subCommonName subInfo
-            , issCountry    = subCountry subInfo
-            , issOrg        = subOrg subInfo
-            , issUnit       = subUnit subInfo
+            { issCommonName = subCommonName si
+            , issCountry    = subCountry si
+            , issOrg        = subOrg si
+            , issUnit       = subUnit si
             }
           (Just _, Just (Subject{..})) -> Issuer
             { issCommonName = subCommonName
             , issCountry    = subCountry
             , issOrg        = subOrg
             , issUnit       = subUnit
-            } 
+            }
           _ -> error "missing commonName or orgName in issuer cert"
-        newOutputName = show i ++ "-" ++ optOutputName
-      
+        -- | OrgName-OrgUnit-CommonName.pem
+        newOutputName = concat [cwd, "/", optOutputDir, subOrg si, "-", fromJust (subUnit si), "-", subCommonName si, ".pem"]
+    
     -- generate and write certs
     flip runReaderT optKey $ do
-      cert <- makeSignedCert optDateTime optIssuerCert issuer subInfo
+      cert <- makeSignedCert optDateTime optIssuerCert issuer si
       liftIO $ B.writeFile newOutputName $ certToBytes cert
-      liftIO $ putStrLn $ "Done. Cert was written to " ++ newOutputName) 
+      liftIO $ putStrLn $ "Done. Cert was written to " ++ newOutputName)

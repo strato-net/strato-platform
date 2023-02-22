@@ -84,7 +84,6 @@ executables:
   tabula-rasa:
     source-dirs: exec_src/
     main: TabulaRasa.hs
-    # ghc-options: -dynamic
     dependencies:
       - common-log
       - hflags

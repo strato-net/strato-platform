@@ -20,6 +20,7 @@ dependencies:
   - bytestring
   - containers
   - cryptonite
+  - directory
   - hourglass
   - http-client
   - optparse-applicative
