@@ -1097,8 +1097,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCert.pem
-      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
+          --output=/x509-generator/OutputCerts
+      echo """myCert=\\$(cat /x509-generator/OutputCerts/BlockApps-Test-Engineering.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
       sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
       sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
       sudo docker exec strato_strato_1 genesis-builder \\
@@ -1126,7 +1126,7 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCert.pem
+          --output=/x509-generator/OutputCerts
       sudo docker exec -e pubkey="${userPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
       sudo docker exec strato_strato_1 bash -c 'sed -i "s/Engineering/Marketing/g" /x509-generator/subject.json'
       sudo docker exec strato_strato_1 bash -c 'sed -i "s/BlockApps/AppsBlock/g"   /x509-generator/subject.json'
@@ -1135,8 +1135,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCertUser.pem
-      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; myUserCert=\\$(cat /x509-generator/OutputCertUser.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\",\\\\\\"\\$(echo \\$myUserCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
+          --output=/x509-generator/OutputCerts
+      echo """myCert=\\$(cat /x509-generator/BlockApps-Test-Engineering.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; myUserCert=\\$(cat /x509-generator/AppsBlock-Marketing-User.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\",\\\\\\"\\$(echo \\$myUserCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
       echo "[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"},{"orgName":"AppsBlock","orgUnit":"Marketing","commonName":"User"}]" > admins.json
       sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
       sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
