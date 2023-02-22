@@ -162,7 +162,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           VAULT_URL=https://${nodeData.BOOT_HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
-          certInfo='${nodeData.CERT_INFO}' \\
+          myOrgName='${nodeData.ORG_NAME}' \\
+          myOrgUnit='${nodeData.ORG_UNIT}' \\
+          myCommonName='${nodeData.COMMON_NAME}' \\
           ./strato 
       """
       sh 'chmod +x run.sh'

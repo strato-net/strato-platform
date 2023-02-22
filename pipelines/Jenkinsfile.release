@@ -98,7 +98,9 @@ pipeline {
               VAULT_URL=https://\$(</host):8093 \\
               VAULT_PROXY_DEBUG=true \\
               requireCerts=false \\
-              certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
+              myOrgName='BlockApps' \\
+              myOrgUnit='Engineering' \\
+              myCommonName='Test' \\
               ./strato --single
           """
           sh 'chmod +x run.sh'
