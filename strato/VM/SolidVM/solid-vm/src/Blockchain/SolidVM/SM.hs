@@ -62,7 +62,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
-import           Control.DeepSeq (($!!))
+import           Control.DeepSeq (($!!), force)
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -703,7 +703,7 @@ getXabiValueType (AccountPath loc path) = do
            _ -> typeError "non-length or array index attribute of array" x
          SVMType.String{} -> case x of
            MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
-           _ -> typeError "non-length attribute of string" x
+           _ -> force (typeError "non-length attribute of string" x)
          SVMType.UnknownLabel s _->
            let t' = getTypeOfName' s ccs
             in case (x, t') of
