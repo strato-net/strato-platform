@@ -1,6 +1,5 @@
 const SimpleStorage = `
 contract SimpleStorage {
-<<<<<<< HEAD
   uint storedData;
   constructor() {
     storedData = 1;
@@ -40,20 +39,3 @@ export default {
     SimpleStorage,
     SimpleStorageV2
   }
-=======
-    //Storage. Persists in between transactions
-    uint x;
-    //Allows the unsigned integer stored to be changed
-    function set(uint newValue) {
-        x = newValue;
-    }
-    //Returns the currently stored unsigned integer
-    function get() returns (uint) {
-        return x;
-    }
-}
-`
-export default {
-    SimpleStorage
-}
->>>>>>> 553c86e2fe3c9fafa7e975e2bcef1328f1acf274
