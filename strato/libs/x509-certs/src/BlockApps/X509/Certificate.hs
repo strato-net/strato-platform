@@ -235,7 +235,7 @@ instance ToJSON Subject where
   toJSON (Subject cn o ou c pub) =
     object [ "commonName"       .= cn
            , "organization"     .= o
-           , "organizationUnit" .= ou
+           , "orgUnit" .= ou
            , "country"          .= c
            , "pubKey"           .= pub
            ]
@@ -244,7 +244,7 @@ instance FromJSON Subject where
   parseJSON (Object obj) = do
     cn  <- obj .: "commonName"
     o   <- obj .: "organization"
-    ou  <- obj .:? "organizationUnit"
+    ou  <- obj .:? "orgUnit"
     c   <- obj .:? "country"
     pub <- obj .: "pubKey"
     return $ Subject cn o ou c pub

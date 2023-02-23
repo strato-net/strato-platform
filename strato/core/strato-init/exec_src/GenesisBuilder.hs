@@ -53,7 +53,7 @@ options =
           return opts{optCerts = certs}
        ) "Certs")
     "The .json filepath of the X509 certificate information. Must be a valid array of JSON object with \
-    \ commonName, country, organization, organizationUnit, and pubKey fields"
+    \ commonName, country, organization, orgUnit, and pubKey fields"
   , Option ['v'] ["validators"]
       (ReqArg
        (\s opts -> do

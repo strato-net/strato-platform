@@ -1,7 +1,7 @@
 [{ 
     "commonName": "Test",
     "organization": "BlockApps",
-    "organizationUnit": "Engineering",
+    "orgUnit": "Engineering",
     "country": "USA",
     "pubKey": "<PUBKEY>"
 }]

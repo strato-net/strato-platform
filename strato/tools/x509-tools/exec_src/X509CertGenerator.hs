@@ -90,7 +90,7 @@ options =
           return opts{optSubjectInfo = sub}
        ) "[Subject]")
     "The .json filepath of the subject(s) information. Must be a valid JSON file or directory of JSON files with \
-    \ commonName, country, organization, organizationUnit, and pubKey fields"
+    \ commonName, country, organization, orgUnit, and pubKey fields"
   , Option ['k'] ["key"]
       (ReqArg
        (\k opts -> do
