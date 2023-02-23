@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import moneyLogo from './money.png';
-import traceCarbonLogo from './TraceCarbon.png';
-
+import oneLogo from './1.png';
+import twoLogo from './2.png';
 import ReactGA from "react-ga4";
 // import Tour from '../Tour';
 // import { connect } from 'react-redux';
@@ -29,29 +29,30 @@ class AppStore extends Component {
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
           description: 'A place to store your money',
-          image: moneyLogo
+          image: twoLogo
         } ,  {
           appName: "Trace Carbon", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
           description: 'A place to buy your carbon credits',
-          image: traceCarbonLogo
+          image: oneLogo
       }, {
         appName: "TCommerce", 
         urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
         description: 'Better than Ebay and Amazon combined',
-        image: moneyLogo
+        image: oneLogo
       }, {
         appName: "HomePage", 
         urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
         description: 'Better than Ebay and Amazon combined',
-        image: moneyLogo
+        image: oneLogo
       }
     ];
 
       function cardProducer(name, redirect, description, image) { return (
       // <React.Fragment key={`${name}-${name}`}>
-      <div className="row pt-card">
-        <div className="col-sm-4 font-weight-bold">
+      <div className="row col-md-6">
+      <div className="card-sl">
+        <div className="card-heading">
         <a href={redirect} target="_black" rel="noopener noreferrer">
           <h3>{name}</h3>
           </a>
@@ -63,12 +64,12 @@ class AppStore extends Component {
                 src={image}
                 alt="Blockapps Logo"
                 height="60"
-                className="col-md-2"
+                className="card-image card-button"
           />
           </a>
         </div>
-        <div className="text-right" ><p> {description}</p></div>
-    </div>
+        <div className="card-text" ><p> {description}</p></div>
+    </div></div>    
     // </React.Fragment>
     )}
 
