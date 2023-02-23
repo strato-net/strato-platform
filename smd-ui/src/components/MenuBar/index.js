@@ -56,10 +56,10 @@ class MenuBar extends Component {
   }
 
   sendInvite = () => {
-    const customInviteLink = "https://bit.ly/BensBuilderXTest";
+    const customInviteLink = "https://bit.ly/MercataSignUp";
     const subject = "Invitation to join Mercata";
     // check to see if the user is logged in and has a common name
-    const userName = (this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "Your friend";
+    const userName = (this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "_______";
 
 
 
@@ -72,8 +72,8 @@ class MenuBar extends Component {
 
   copyTextToClipboard = () => {
     const textField = document.createElement('textarea');
-    const customInviteLink = "https://bit.ly/BensBuilderXTest";
-    const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "Your friend"} would like to invite you to join Mercata. Please follow this link to sign up: ${customInviteLink}  Thank you!`;
+    const customInviteLink = "https://bit.ly/MercataSignUp";
+    const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "_______"} would like to invite you to join Mercata. Please follow this link to sign up: ${customInviteLink}  Thank you!`;
 
     // const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "Your friend"} would like to invite you to join Mercata. Please follow this link to sign up: <a href="${customInviteLink}">${customInviteLink}</a> Thank you!`;
     textField.innerText = body;
@@ -85,9 +85,9 @@ class MenuBar extends Component {
 
   render() {
     const { isModalOpen } = this.state;
-    const customInviteLink = "https://bit.ly/BensBuilderXTest";
+    const customInviteLink = "https://bit.ly/MercataSignUp";
     const subject = "Invitation to join Mercata";
-    const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "Your friend"} would like to invite you to join Mercata. Please follow this link to sign up: ${customInviteLink} Thank you!`;
+    const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "________"} would like to invite you to join Mercata. Please follow this link to sign up: ${customInviteLink} Thank you!`;
 
     
     return (
