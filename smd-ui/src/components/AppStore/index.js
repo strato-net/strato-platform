@@ -1,15 +1,9 @@
 import React, { Component } from 'react';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import moneyLogo from './money.png';
-import traceCarbonLogo from './TraceCarbon.png';
-
-import ReactGA from "react-ga4";
-// import Tour from '../Tour';
-// import { connect } from 'react-redux';
-// import { withRouter } from 'react-router-dom';
-// import { Button, Tab2, Tabs2, Popover, Position, Icon} from '@blueprintjs/core';
-// import { useHistory } from 'react-router-dom';
-
+import mixpanelWrapper      from '../../lib/mixpanelWrapper';
+import moneyLogo            from './money.png';
+import ReactGA              from 'react-ga4';
+import traceCarbonLogo      from './TraceCarbon.png';
+import blockAppsLogo        from './BlockAppsLogo.png';
 
 
 class AppStore extends Component {
@@ -28,18 +22,18 @@ class AppStore extends Component {
       const appsList = [{ 
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
-          description: 'A place to store your money',
-          image: moneyLogo
+          description: 'Better than Money. The official stable currency of Mercata.',
+          image: blockAppsLogo
         } ,  {
           appName: "Trace Carbon", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
-          description: 'A place to buy your carbon credits',
+          description: 'A place to buy/trade/sell your carbon credits',
           image: traceCarbonLogo
       }, {
         appName: "TCommerce", 
         urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
         description: 'Better than Ebay and Amazon combined',
-        image: moneyLogo
+        image: blockAppsLogo
       }, {
         appName: "HomePage", 
         urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
