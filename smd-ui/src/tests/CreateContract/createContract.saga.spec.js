@@ -56,7 +56,7 @@ describe('CreateContract: saga', () => {
       expect(gen.next().value).toEqual(call(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments, payload.chainId, payload.metadata));
       expect(gen.next([createContractResponse]).value).toEqual(put(createContractSuccess(createContractResponse)));
       expect(gen.next().value).toEqual(put(updateToast()));
-      expect(gen.next().value).toEqual(put(fetchContracts()));
+      expect(gen.next().value).toEqual(put(fetchContracts(payload.chainId, 10, 0)));
       expect(gen.next().value).toEqual(put(fetchCirrusInstances('GreeterC', payload.chainId)));
       expect(gen.throw().value).toEqual(put(createContractFailure()))
       expect(gen.next().done).toBe(true);

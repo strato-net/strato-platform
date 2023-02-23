@@ -7,7 +7,8 @@ import {
   contractFormChange,
   usernameChange,
   contractNameChange,
-  resetError
+  resetError,
+  updateUsingSampleContract
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
@@ -21,6 +22,7 @@ import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
+import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
 
 // TODO: use solc instead of /contracts/xabi for compile
@@ -47,7 +49,7 @@ class CreateContract extends Component {
             if (isDragActive) {
               return (<p className="pt-intent-success">Drop to Upload!</p>);
             }
-            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+            return (<p className="pt-intent-success">{acceptedFiles.length > 0 && !this.props.usingSampleContract ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
@@ -88,14 +90,35 @@ class CreateContract extends Component {
       );
     };
     reader.readAsText(contract);
+    if (this.props.usingSampleContract) {
+      this.props.updateUsingSampleContract(false);
+    }
   };
 
+  handleSampleContract = (contractName) => {
+    this.props.touch('contract');
+    let contractSrc = SampleContracts[contractName];
+    const self = this;
+    mixpanelWrapper.track("sample_contract_select");
+    self.props.contractFormChange(contractSrc);
+    self.props.compileContract(
+      contractName,
+      contractSrc,
+      self.props.solidvm
+    );
+    if (!this.props.usingSampleContract) {
+      this.props.updateUsingSampleContract(true);
+    }
+  }
+
   isValidFileType = (files) => {
-    if (!files || !files[0])
-      return 'Please add contract source file'
-    const contractSource = files[0];
-    if (!contractSource.name.includes('.sol'))
-      return 'It should be an .sol extention file';
+    if (files && !this.props.usingSampleContract) {
+      if (!files || !files[0])
+        return 'Please add contract source file'
+      const contractSource = files[0];
+      if (!contractSource.name.includes('.sol'))
+        return 'It should be an .sol extention file';
+    }
   };
 
   submit = (values) => {
@@ -393,24 +416,50 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>}
-              {!this.props.sourceFromEditor &&
-                <div className="row">
+              {!this.props.sourceFromEditor && <div className="row">
                   <div className="col-sm-3 text-right">
                     <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
-                      Source file
+                      Source files
                     </label>
                   </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <Field
-                      id="input-b"
-                      className="form-width pt-input"
-                      name="contract"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Contract Source"
-                      validate={this.isValidFileType}
-                      required
-                    />
+                  <div className="col-sm-9 smd-scrollable smd-pad-4">
+                    <div className='pt-select'>
+                      <Field
+                        className="pt-select"
+                        component="select"
+                        name="sampleContract"
+                        onChange={(e) => {
+                          if (e.target.value !== "default")
+                            this.handleSampleContract(e.target.value);
+                        }}
+                      >
+                        <option key={0} value="default">Choose a sample contract to upload.</option>
+                        <option key={1} value="HelloWorld">Hello World</option>
+                        <option key={2} value="SimpleStorage">Simple Storage</option>
+                        <option key={3} value="ERC20">ERC20 - Tokens</option>
+                        <option key={4} value="ERC721">ERC721 - NFT</option>
+                        <option key={5} value="PermissionManager">Permission Manager</option>
+                      </Field>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="text-center smd-pad-4">
+                      Or
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-12 smd-pad-4">
+                      <Field
+                        id="input-b"
+                        className="form-width pt-input"
+                        name="contract"
+                        component={this.renderDropzoneInput}
+                        dir="auto"
+                        title="Contract Source"
+                        validate={this.isValidFileType}
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
               }
@@ -542,6 +591,7 @@ export function mapStateToProps(state) {
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
     toastsError: state.createContract.error,
+    usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
       commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
@@ -568,7 +618,8 @@ const connected = connect(mapStateToProps, {
   contractNameChange,
   resetError,
   fetchChainIds,
-  getLabelIds
+  getLabelIds,
+  updateUsingSampleContract
 })(formed);
 
 export default withRouter(connected);

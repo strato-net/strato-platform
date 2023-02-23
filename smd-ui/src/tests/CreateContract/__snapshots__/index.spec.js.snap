@@ -229,6 +229,7 @@ Object {
   "toastsError": undefined,
   "toastsMessage": "message",
   "username": "",
+  "usingSampleContract": undefined,
 }
 `;
 
