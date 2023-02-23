@@ -187,10 +187,15 @@ function newnode {
   if [ -n "${seqMaxUsPerIter}" ]; then
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
-  
-  onFlag="--myOrgName=${myOrgName}"
-  ouFlag="--myOrgUnit=${myOrgUnit}"
-  cnFlag="--myCommonName=${myCommonName}"
+  if [ -n "${myOrgName}" ]; then
+    onFlag="--myOrgName=${myOrgName}"
+  fi
+  if [ -n "${myOrgUnit}" ]; then
+    ouFlag="--myOrgUnit=${myOrgUnit}"
+  fi
+  if [ -n "${myCommonName}" ]; then
+    cnFlag="--myCommonName=${myCommonName}"
+  fi
   vbFlag="--validatorBehavior=${validatorBehavior}"
 
 

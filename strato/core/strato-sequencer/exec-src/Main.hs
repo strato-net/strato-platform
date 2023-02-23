@@ -38,7 +38,7 @@ waitOnVault action = do
   putStrLn "asking vault-proxy for the node address"
   res <- action
   case res of
-    Left err -> do 
+    Left err -> do
       putStrLn $ "failed to get node address from vault-proxy... got this error: " ++ show err
       threadDelay 2000000 -- 2 seconds
       waitOnVault action
@@ -55,7 +55,7 @@ main = do
   putStrLn $ "strato-sequencer validators: " ++ show validators
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
-  putStrLn $ "strato-sequencer node cert info: " ++ flags_myOrgName ++ "-" ++ flags_myOrgUnit ++ "-" ++ flags_myCommonName
+  putStrLn $ "strato-sequencer node cert info: " ++ flags_myOrgName ++ "-" ++ (if flags_myOrgUnit == "" then "<>" else flags_myOrgUnit) ++ "-" ++ flags_myCommonName
 
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -69,7 +69,7 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-  
+
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
