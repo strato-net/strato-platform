@@ -1,6 +1,8 @@
 import React, { Component } from 'react';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import moneyLogo from './money.png';
+import traceCarbonLogo from './TraceCarbon.png';
+
 import ReactGA from "react-ga4";
 // import Tour from '../Tour';
 // import { connect } from 'react-redux';
@@ -22,7 +24,7 @@ class AppStore extends Component {
 
 
     render() {
-      
+      ReactGA.send({hitType: "pageview", page: "/dashboard/appstore", title: "  Appstore"});
       const appsList = [{ 
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
@@ -32,7 +34,7 @@ class AppStore extends Component {
           appName: "Trace Carbon", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
           description: 'A place to buy your carbon credits',
-          image: moneyLogo
+          image: traceCarbonLogo
       }, {
         appName: "TCommerce", 
         urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
