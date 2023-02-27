@@ -1,9 +1,10 @@
 import React, { Component } from 'react';
 import mixpanelWrapper      from '../../lib/mixpanelWrapper';
-import moneyLogo            from './money.png';
 import ReactGA              from 'react-ga4';
 import traceCarbonLogo      from './TraceCarbon.png';
-import blockAppsLogo        from './BlockAppsLogo.png';
+import blockAppsLogo        from './BlockAppsLogos_DarkBG-Horizontal.png';
+import veriFactorLogo        from './vveriFactorLogo.png';
+import collectXLogo        from './collectXX.png';
 
 
 class AppStore extends Component {
@@ -15,30 +16,33 @@ class AppStore extends Component {
         offset: 0,
       }
     }
+    componentDidMount() {
+      ReactGA.send({hitType: "pageview", page: "/appstore", title: "  Appstore"});
+    }
 
 
     render() {
-      ReactGA.send({hitType: "pageview", page: "/dashboard/appstore", title: "  Appstore"});
+      
       const appsList = [{ 
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
-          description: 'Better than Money. The official stable currency of Mercata.',
+          description: 'STRATO Mercata is home to a wide range of applications to help you complete your business faster, easier, and more securely. Transact with trusted partners for all of your business needs with real, fiat currency - no speculation and no gimmicks. Start using STRATO Mercata with one of the apps below.',
           image: blockAppsLogo
         } ,  {
-          appName: "Trace Carbon", 
-          urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
-          description: 'A place to buy/trade/sell your carbon credits',
+          appName: "TraceCarbon", 
+          urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+          description: 'TraceCarbon is a comprehensive and versatile traceable commerce d\'app, aimed at accelerating the world\'s journey towards carbon neutrality by providing transparency to the Voluntary Carbon Markets, allowing corporate and individual buyers to explore and transact on high quality carbon credits in order to offset their emissions.',
           image: traceCarbonLogo
       }, {
-        appName: "TCommerce", 
-        urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
-        description: 'Better than Ebay and Amazon combined',
-        image: blockAppsLogo
+        appName: "CollectX", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=collectx#collectx', 
+        description: 'CollectX is a blockchain-powered collectibles platform. The short-term goal is to sell authenticated/graded sports cards in a simple and transparent manner. CollectX allows buyers to not worry about shipping costs. CollectX aims to ensure the original seller receives a royalty every time the product is resold. CollectX improves collectible traceability over time and gives the creator/original seller access to the secondary market.',
+        image: collectXLogo
       }, {
-        appName: "HomePage", 
-        urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ', 
-        description: 'Better than Ebay and Amazon combined',
-        image: oneLogo
+        appName: "VeriFactor", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=verifactor#verifactor', 
+        description: 'VeriFactor is a receivables financing platform that brings end-to-end automation to a previously manual funding ecosystem. SMBs on the VeriFactor platform have access to a rich selection of flexible working capital solutions at cost-effective rates. Lenders on VeriFactor experience higher yields and lower administrative costs thanks to our technology-driven loan origination processes.',
+        image: veriFactorLogo
       }
     ];
 
@@ -54,7 +58,9 @@ class AppStore extends Component {
         <div>
           <a href={redirect} target="_black" rel="noopener noreferrer">
           <img
-                onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}
+                onClick={() => { 
+                  ReactGA.send({hitType: "pageview", page: ("/appstore/".concat(name)).replace(/\s/g, ""), title: "  Appstore"});
+                  mixpanelWrapper.track("contact_blockapps_support_click") }}
                 src={image}
                 alt="Blockapps Logo"
                 height="60"
@@ -77,7 +83,7 @@ class AppStore extends Component {
         <div className="container-fluid pt-dark">    
           <div className="row">
             <div className="col-sm-4 text-left">
-              <h3>AppStore</h3>
+              <h3>STRATO Mercata Apps</h3>
             </div>
           </div>
           {cards}
