@@ -354,7 +354,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="appstore"
+  id="app_store"
   onClick={[Function]}
   to="/appstore"
 >

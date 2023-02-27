@@ -62,13 +62,13 @@ describe('SideBar: index', () => {
       wrapper.find('NavLink').at(6).simulate('click');
       expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
     });
-
-    test('eighth position /appstore', () => {
+    
+    test('ninth position /external-storage', () => {
       wrapper.find('NavLink').at(7).simulate('click');
       expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
     });
-    
-    test('ninth position /external-storage', () => {
+
+    test('eighth position /appstore', () => {
       wrapper.find('NavLink').at(7).simulate('click');
       expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
     });
