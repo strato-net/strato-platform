@@ -158,6 +158,15 @@ exports[`SideBar: index render component for public mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
+        <NavLink id=\\"appstore\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-code\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        AppStore
+      </span>
+    </NavLink>
   </div>
   <div className=\\"smd-sidebar-logo\\">
     <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
@@ -338,6 +347,27 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode third pos
   >
      
     Blocks
+  </span>
+</NavLink>
+`;
+exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /appstore 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="appstore"
+  onClick={[Function]}
+  to="/appstore"
+>
+  <i
+    className="fa fa-window-restore"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    AppStore
   </span>
 </NavLink>
 `;
