@@ -66,12 +66,12 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
-    <NavLink id="app_store" to="/appstore" className="menu-item" activeClassName="active-menu-item" onClick={[Function: onClick]}>
-      <i className="fa fa-window-restore">
-
+    <NavLink id=\\"appstore\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-code\\">
+         
       </i>
-      <span className="menu-text">
-
+      <span className=\\"menu-text\\">
+         
         AppStore
       </span>
     </NavLink>
