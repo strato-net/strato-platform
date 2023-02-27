@@ -160,7 +160,7 @@ setVal (STuple dstVector) (STuple srcVector) =
 setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  t <- getXabiValueType addressedPath   -- IMPORTANT: t is not evaulated until it is used
+  !t <- getXabiValueType addressedPath   -- IMPORTANT: t is not evaulated until it is used, so we use bang pattern to force it to WHNF
   let basicSrc = case src of
                         SString s ->
                             case t of   -- t is evaluated here because Haskell is lazy
