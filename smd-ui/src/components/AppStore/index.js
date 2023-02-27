@@ -1,10 +1,11 @@
-import React, { Component } from 'react';
+import blockAppsLogo        from './BlockAppsLogos_DarkBG-Horizontal.png';
+import collectXLogo         from './collectX.png';
 import mixpanelWrapper      from '../../lib/mixpanelWrapper';
+import React, { Component } from 'react';
 import ReactGA              from 'react-ga4';
 import traceCarbonLogo      from './TraceCarbon.png';
-import blockAppsLogo        from './BlockAppsLogos_DarkBG-Horizontal.png';
-import veriFactorLogo        from './vveriFactorLogo.png';
-import collectXLogo        from './collectXX.png';
+import veriFactorLogo       from './vveriFactorLogo.png';
+
 
 
 class AppStore extends Component {
@@ -47,7 +48,6 @@ class AppStore extends Component {
     ];
 
       function cardProducer(name, redirect, description, image) { return (
-      // <React.Fragment key={`${name}-${name}`}>
       <div className="row col-md-6">
       <div className="card-sl">
         <div className="card-heading">
@@ -74,7 +74,6 @@ class AppStore extends Component {
         </div>
         <div className="card-text" ><p> {description}</p></div>
     </div></div>    
-    // </React.Fragment>
     )}
 
       const cards = appsList.map((obj, index) => {
