@@ -1,5 +1,5 @@
 import blockAppsLogo        from './BlockAppsLogos_DarkBG-Horizontal.png';
-import collectXLogo         from './collectX.png';
+// import collectXLogo         from './collectX.png';
 import mixpanelWrapper      from '../../lib/mixpanelWrapper';
 import React, { Component } from 'react';
 import ReactGA              from 'react-ga4';
@@ -34,12 +34,14 @@ class AppStore extends Component {
           urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
           description: 'TraceCarbon is a comprehensive and versatile traceable commerce d\'app, aimed at accelerating the world\'s journey towards carbon neutrality by providing transparency to the Voluntary Carbon Markets, allowing corporate and individual buyers to explore and transact on high quality carbon credits in order to offset their emissions.',
           image: traceCarbonLogo
-      }, {
-        appName: "CollectX", 
-        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=collectx#collectx', 
-        description: 'CollectX is a blockchain-powered collectibles platform. The short-term goal is to sell authenticated/graded sports cards in a simple and transparent manner. CollectX allows buyers to not worry about shipping costs. CollectX aims to ensure the original seller receives a royalty every time the product is resold. CollectX improves collectible traceability over time and gives the creator/original seller access to the secondary market.',
-        image: collectXLogo
-      }, {
+      }, 
+      // {
+      //   appName: "CollectX", 
+      //   urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=collectx#collectx', 
+      //   description: 'CollectX is a blockchain-powered collectibles platform. The short-term goal is to sell authenticated/graded sports cards in a simple and transparent manner. CollectX allows buyers to not worry about shipping costs. CollectX aims to ensure the original seller receives a royalty every time the product is resold. CollectX improves collectible traceability over time and gives the creator/original seller access to the secondary market.',
+      //   image: collectXLogo
+      // }, 
+      {
         appName: "VeriFactor", 
         urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=verifactor#verifactor', 
         description: 'VeriFactor is a receivables financing platform that brings end-to-end automation to a previously manual funding ecosystem. SMBs on the VeriFactor platform have access to a rich selection of flexible working capital solutions at cost-effective rates. Lenders on VeriFactor experience higher yields and lower administrative costs thanks to our technology-driven loan origination processes.',
