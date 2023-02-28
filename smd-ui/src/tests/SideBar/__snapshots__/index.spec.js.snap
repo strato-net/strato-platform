@@ -67,7 +67,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-code\\">
+      <i className=\\"fa fa-window-restore\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -158,8 +158,8 @@ exports[`SideBar: index render component for public mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
-        <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-code\\">
+    <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-window-restore\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -177,27 +177,6 @@ exports[`SideBar: index render component for public mode 1`] = `
 `;
 
 exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /appstore 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="external_storage"
-  onClick={[Function]}
-  to="/external_storage"
->
-  <i
-    className="fa fa-cloud-upload"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-    External Storage
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /external-storage 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -324,28 +303,6 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode secound p
   >
      
     Shards
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /appstore 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="app_store"
-  onClick={[Function]}
-  to="/appstore"
->
-  <i
-    className="fa fa-window-restore"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    AppStore
   </span>
 </NavLink>
 `;
