@@ -18,7 +18,7 @@ class AppStore extends Component {
       }
     }
     componentDidMount() {
-      ReactGA.send({hitType: "pageview", page: "/appstore", title: "  Appstore"});
+      ReactGA.send({hitType: "pageview", page: "/appstore", title: "Appstore"});
     }
 
 
@@ -60,13 +60,6 @@ class AppStore extends Component {
         <div>
           <a href={redirect} target="_black" rel="noopener noreferrer">
           <img
-                onClick={() => { 
-                  ReactGA.send({hitType: "pageview", page: ("/appstore/".concat(name)).replace(/\s/g, ""), title: ("  Appstore").concat(name)});
-                  ReactGA.event({
-                    category: name,
-                    action: 'Click on app from appStore'
-                  });
-                  mixpanelWrapper.track("contact_blockapps_support_click") }}
                 src={image}
                 alt="Blockapps Logo"
                 height="60"
