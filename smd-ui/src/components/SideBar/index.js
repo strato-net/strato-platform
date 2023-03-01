@@ -16,7 +16,8 @@ class SideBar extends Component {
     const navLinksData = (
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        { path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
+        { path: '/home', label: 'Dapplets', id: 'dapplets', icon: "fa-arrow-circle-right" },
+        { path: '/stats', label: 'Network Stats', id: 'network_stats', icon: "fa-rocket" },
         { path: '/shards', label: 'Shards', id: 'shards', icon: "fa-user-secret" },
         { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
