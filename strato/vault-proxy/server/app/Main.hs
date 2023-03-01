@@ -83,7 +83,7 @@ main = do
   initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
 
   let minimumVersion :: Int
-      minimumVersion = 1
+      minimumVersion = 0
 
     --Check the version of the foreign shared vault
   traceM "Checking the version of the foreign vault"
