@@ -17,6 +17,7 @@ class SideBar extends Component {
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
         { path: '/home', label: 'Dapplets', id: 'dapplets', icon: "fa-arrow-circle-right" },
+        { path: '/appstore', label: 'AppStore', id: 'app_store', icon: "fa-window-restore" },
         { path: '/stats', label: 'Network Stats', id: 'network_stats', icon: "fa-rocket" },
         { path: '/shards', label: 'Shards', id: 'shards', icon: "fa-user-secret" },
         { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
@@ -24,7 +25,6 @@ class SideBar extends Component {
         { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
         { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
         { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" },
-        { path: '/appstore', label: 'AppStore', id: 'app_store', icon: "fa-window-restore" }
       ]
     );
 

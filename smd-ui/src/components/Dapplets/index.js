@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import ReactGA from 'react-ga4';
+import { Popover } from '@blueprintjs/core';
 import './Dapplets.css'
 
 /* 
@@ -21,38 +22,39 @@ class Dapplets extends Component {
 
     render() {
       return (
-        <div className="container-lg pt-dark">
-            <div className="row">
-                <div className="col-sm-4 text-left">
-                    <h3>Dapplets</h3>
-                </div>
-            </div>
-            <div className="col-sm-3">
+        <div className="container-lg pt-dark" >
+            <div className="col-md-6 smd-margin-8">
                 <DappletCard
                     name="Invoicing"
-                    description="Coming soon"
+                    description="Send, pay, and manage your invoices"
                     iconClass="fa-envelope-o"
                 />
             </div>
-            <div className="col-sm-3">
+            <div className="col-md-6 smd-margin-8">
                 <DappletCard
-                    name="Vault"
-                    description="Coming soon"
-                    iconClass="fa-unlock-alt"
+                    name="Multi-account Wallet"
+                    description="Control and trade assets with your peers"
+                    iconClass="fa-users"
                 />
             </div>
-            <div className="col-sm-3">
+            <div className="col-md-6 smd-margin-8">
                 <DappletCard
                     name="Escrow"
-                    description="Coming soon"
+                    description="Manage the secure transactions of your assets"
                     iconClass="fa-handshake-o"
                 />
             </div>
-            <div className="col-sm-3">
+            <div className="col-md-6 smd-margin-8">
                 <DappletCard
                     name="Auction"
-                    description="Coming soon"
+                    description="Bid for assets and manage your postings"
                     iconClass="fa-line-chart" />
+            </div>
+            <div className="col-md-6 smd-margin-8">
+                <DappletCard
+                    name="Asset Authenticator"
+                    description="Create certificates of authenticity for your assets"
+                    iconClass="fa-certificate" />
             </div>
         </div>
       );
@@ -62,21 +64,27 @@ class Dapplets extends Component {
 
 
 class DappletCard extends Component {
+  componentDidMount() {
+    ReactGA.send({hitType: "pageview", page: "/dapplets", title: this.props.name});
+  }
+
   render() {
     let classes = 'pt-card pt-dark pt-elevation-2 ';
     classes += this.props.mode ? this.props.mode : 'neutral';
 
     return (
-      <div className={classes} onClick={() => alert('hiiiiiiiiii')}>
+      <div className={classes} onClick={() => {
+        
+      }}>
         <div className="row">
-          <div className="col-xs-4 text-center">
+          <div className="col-xs-3 text-center">
             <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>
           </div>
           <div className="col-xs-8">
-            <div className="h2 text-right">
+            <div className="h2 text-left">
               <strong>{this.props.name}</strong>
             </div>
-            <div className="h4 text-right desc">
+            <div className="h4 text-left desc">
               {this.props.description}
             </div>
           </div>
