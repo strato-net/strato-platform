@@ -18,7 +18,7 @@ library:
     - Blockchain.BlockChain
     - Blockchain.Event
     - Executable.EthereumVM
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -eventlog -rtsopts -O2 -finfo-table-map -fdistinct-constructor-tables
   dependencies:
   - ansi-wl-pprint
   - base16-bytestring
@@ -81,7 +81,7 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+    ghc-options: -Wall -eventlog -rtsopts -O2 -finfo-table-map -fdistinct-constructor-tables -threaded -fprof-auto
 
 tests:
   ethereum-vm-test:
