@@ -233,7 +233,7 @@ function newnode {
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
-                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+                         --gasOn=$gasOn +RTS -l -hi -i0.5 "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
