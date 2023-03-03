@@ -48,6 +48,17 @@ class CreateChain extends Component {
   }
 
   submit = (values) => {
+    if (this.props.oauthUser && !this.state.members.some(e => e.orgName === this.props.oauthUser.organization 
+      && e.orgUnit === this.props.oauthUser.organizationUnit
+      && e.commonName === this.props.oauthUser.commonName)) {
+        let newMembers = this.state.members.push(
+          { orgName: this.props.oauthUser.organization,
+            orgUnit: this.props.oauthUser.organizationalUnit,
+            commonName: this.props.oauthUser.commonName,
+            access: true
+          })
+        this.setState({ members: newMembers })
+    }
     values.members = this.state.members;
     values.integrations = this.state.integrations;
     values.governanceContract = this.state.governanceContract;
@@ -203,7 +214,7 @@ class CreateChain extends Component {
     else {
       return (
         <div className="pt-dialog-header no-member">
-          <span className="pt-dialog-header-title">No Members</span>
+          <span className="pt-dialog-header-title">No Addtional Members</span>
         </div>
       );
     }
