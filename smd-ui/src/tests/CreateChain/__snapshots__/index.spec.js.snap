@@ -190,7 +190,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
             </label>
             <div className=\\"pt-dialog-header no-member\\">
               <span className=\\"pt-dialog-header-title\\">
-                No Members
+                No Addtional Members
               </span>
             </div>
             <span className=\\"error-text\\" />
@@ -341,7 +341,7 @@ exports[`CreateChain: index render component with values 1`] = `
             </label>
             <div className=\\"pt-dialog-header no-member\\">
               <span className=\\"pt-dialog-header-title\\">
-                No Members
+                No Addtional Members
               </span>
             </div>
             <span className=\\"error-text\\" />
