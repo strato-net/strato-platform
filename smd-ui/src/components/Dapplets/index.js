@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import ReactGA from 'react-ga4';
-import { Popover } from '@blueprintjs/core';
+import { Popover } from '@blueprintjs/core'
 import './Dapplets.css'
 
 /* 
@@ -23,7 +23,7 @@ class Dapplets extends Component {
     render() {
       return (
         <div className="container-lg pt-dark" >
-            <div className="col-md-6 smd-margin-8">
+            <div className="col-md-6 smd-margin-8" style={{ marginTop: '20px' }}>
                 <DappletCard
                     name="Invoicing"
                     description="Send, pay, and manage your invoices"
@@ -73,9 +73,7 @@ class DappletCard extends Component {
     classes += this.props.mode ? this.props.mode : 'neutral';
 
     return (
-      <div className={classes} onClick={() => {
-        
-      }}>
+      <div className={classes}>
         <div className="row">
           <div className="col-xs-3 text-center">
             <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>
