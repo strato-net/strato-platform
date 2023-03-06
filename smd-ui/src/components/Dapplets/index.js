@@ -1,8 +1,8 @@
-import React, { Component } from 'react';
+import React, { Component, setState } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import ReactGA from 'react-ga4';
-import { Popover } from '@blueprintjs/core'
+import { toasts } from "../Toasts";
 import './Dapplets.css'
 
 /* 
@@ -64,8 +64,11 @@ class Dapplets extends Component {
 
 
 class DappletCard extends Component {
-  componentDidMount() {
-    ReactGA.send({hitType: "pageview", page: "/dapplets", title: this.props.name});
+  constructor() {
+    super()
+    this.state = {
+      isOpen: false,
+    }
   }
 
   render() {
@@ -73,7 +76,10 @@ class DappletCard extends Component {
     classes += this.props.mode ? this.props.mode : 'neutral';
 
     return (
-      <div className={classes}>
+      <div className={classes} onClick={() => {
+          toasts.show({ message: "Coming soon!" })
+          ReactGA.send({ hitType: "pageview", page: "/dapplets", title: this.props.name });
+        }}>
         <div className="row">
           <div className="col-xs-3 text-center">
             <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>
