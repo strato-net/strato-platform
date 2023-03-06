@@ -18,12 +18,23 @@ class Chain extends Component {
     if (chain && chain.info && chain.info.members && chain.info.members.length > 0) { 
       const members = chain.info.members;
       return members.map((member, index) => {
+        const { orgName, orgUnit, commonName, access } = member
+        if (orgName == "" && orgUnit == "" && commonName == "") {
           return (
             <tr key={index}>
-              <td>{member.orgName}</td>
-              <td>{member.orgUnit}</td>
-              <td>{member.commonName}</td>
-              <td>{member.access.toString()}</td>
+              <td>Everyone</td>
+              <td></td>
+              <td></td>
+              <td>{access.toString()}</td>
+            </tr>
+          )
+        }
+          return (
+            <tr key={index}>
+              <td>{orgName}</td>
+              <td>{orgUnit}</td>
+              <td>{commonName}</td>
+              <td>{access.toString()}</td>
             </tr>
           )
         })
@@ -54,6 +65,22 @@ class Chain extends Component {
             <h5>
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h5>
+          </div>
+        </div>
+        <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
+          <div className="col-sm-10">
+            <h5>
+              Parent Chains: 
+            </h5>
+              {
+                Object.entries(this.props.chain.info.parentChains).map(([label, chainId]) => {
+                  return <div className="col-sm-10">&nbsp; &nbsp;
+                          <strong>{label}</strong>:
+                          <HexText value={chainId} classes="smd-pad-2" />
+                        </div> 
+
+                }) 
+              }
           </div>
         </div>
 
