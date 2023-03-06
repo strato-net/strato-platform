@@ -15,6 +15,7 @@ import Chain from '../Chain';
 import './chains.css';
 import HexText from '../HexText';
 import { Button } from '@blueprintjs/core';
+import ReactGA from 'react-ga4';
 
 const tourSteps = [
   {
@@ -38,7 +39,8 @@ class Chains extends Component {
 
   componentDidMount() {
     this.props.fetchChains(this.state.limit, this.state.offset);
-    mixpanelWrapper.track('chains_page_load')
+    mixpanelWrapper.track('chains_page_load');
+    ReactGA.send({hitType: "pageview", page: "/shards", title: "Shards"});
   }
 
   updateFilter(filter) {

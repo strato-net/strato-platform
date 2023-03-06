@@ -83,7 +83,7 @@ class MercataManager:
         if not token:
             token = MercataManager.get_keycloak_mercata_token()
 
-        url = '{vault_url}/strato/v2.3/key?user={username}'.format(vault_url=MercataManager.vault_url, username=username)
+        url = '{vault_url}/strato/v2.3/key?username={username}'.format(vault_url=MercataManager.vault_url, username=username)
         headers = {
             'Authorization': 'Bearer %s' % token
         }
@@ -127,6 +127,8 @@ if __name__ == '__main__':
     processed_users = []
     for user in users_to_update:
         print("Processing user {fullname} (uuid={uuid})...".format(fullname=user['fullname'], uuid=user['uuid']))
+        # if user['pubkey'] != '045577133ac364ebd0387352854eedebfe5c89fa96367d3aa7daaa7e7edb89aeed739a8bc970b0cd34d19a6b0f54362e8bfd8b16adad8c665c8b75207acf539c6c':
+        #     continue
         try:
             subject_json = {
               "commonName": user['fullname'],

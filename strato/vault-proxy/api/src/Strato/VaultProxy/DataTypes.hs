@@ -13,6 +13,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.Aeson.Key as DAK
 import           Data.Cache
+import           Data.List          as Dl
 import           Data.Text          as T
 import           Data.Scientific    as Scientific
 import           Network.HTTP.Client
@@ -81,7 +82,7 @@ instance FromJSON VaultToken where
         expires_in          = Scientific.coefficient exprin
 --   parseJSON wat = typeMismatch "Spec" wat
     return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
-  parseJSON wat = typeMismatch "Spec" wat
+  parseJSON wat = typeMismatch "VaultToken " wat
 
 --TODO: use lenses (not important but would be nice)
 data VaultConnection = VaultConnection {
@@ -118,7 +119,7 @@ instance FromJSON RawOauth where
         (Object _) -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
         _          -> error $ "Expected a JSON String under the key \"token_endpoint\", but got something different."
     return $ RawOauth authend tokend 
-  parseJSON wat = typeMismatch "Spec" wat
+  parseJSON wat = typeMismatch "RawOauth " wat
 
 data Version = Version {
     version :: Int
@@ -144,4 +145,8 @@ instance FromJSON Version where
         _          -> error $ "Expected a JSON Number under the key \"version\", but got something different."
     
     return $ Version vers
-  parseJSON wat = typeMismatch "Spec" wat
+  --TODO remove this after shared-vault gets updated 
+  parseJSON (String o) = if Dl.isInfixOf "pingDetail"  (T.unpack o) --NOTE THIS SHOULD be removed and is just a hack to get the user-x and builder-x node working.
+    then  return $ Version 0 -- Remove this once vault version is 
+    else  typeMismatch "Version" (String o)
+  parseJSON wat = typeMismatch "Version " wat

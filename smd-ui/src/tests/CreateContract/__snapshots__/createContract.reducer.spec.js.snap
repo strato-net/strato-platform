@@ -141,6 +141,7 @@ Object {
   "isOpen": true,
   "response": "Status: Upload Contract",
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 
@@ -334,6 +335,7 @@ Object {
   "response": "Status: Upload Contract",
   "toastsMessage": "",
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 

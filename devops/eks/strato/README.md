@@ -4,45 +4,25 @@ Amazon Elastic Kubernetes Service (Amazon EKS) is a managed service that we can 
 # Installing kubectl
 Follow steps from [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
 
+# AWS EBS for volumes
+This template uses AWS EBS volumes for container volumes. For AWS EFS volumes see the ./efs subfolder
+
 # Delete Existing Resources (Deployement, EFS Storage Class, Persistent Volume Claims and Persistent Volumes)
 kubectl delete deployment strato
-kubectl delete sc efs-sc
-kubectl delete pvc kafka-pvc
-kubectl delete pvc prometheus-pvc
-kubectl delete pvc redis-pvc
-kubectl delete pvc strato-pvc
-kubectl delete pvc zookeeper-pvc
-kubectl delete pvc postgres-pvc
-kubectl delete pv kafka-pv
-kubectl delete pv prometheus-pv
-kubectl delete pv redis-pv
-kubectl delete pv strato-pv
-kubectl delete pv zookeeper-pv
-kubectl delete pv postgres-pv
-
+kubectl delete service nginx-service
 **Note that** *strato* above is the name of the deployment.
 
-# Create EFS Storage Class
-kubectl apply -f efs-sc.yaml
-
-# Create Persistence Volumes
-kubectl apply -f kafka-pv.yaml
-kubectl apply -f prometheus-pv.yaml
-kubectl apply -f redis-pv.yaml
-kubectl apply -f strato-pv.yaml
-kubectl apply -f zookeeper-pv.yaml
-kubectl apply -f postgres-pv.yaml
-
-# Create Persistence Volume Claims
-kubectl apply -f kafka-pvc.yaml
-kubectl apply -f prometheus-pvc.yaml
-kubectl apply -f redis-pvc.yaml
-kubectl apply -f strato-pvc.yaml
-kubectl apply -f zookeeper-pvc.yaml
-kubectl apply -f postgres-pvc.yaml
-
 # Create New Deployment
-**Note:** Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+**Note:**
+Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+Replace volume id place holders
+* *prometheus-data-volume-id* is *vol-0334b826317434504*
+* *kafka-data-volume-id* is *vol-0334b826317434504*
+* *redis-data-volume-id* is *vol-0fd90c145c88224d2*
+* *zookeeper-data-volume-id* is *vol-09a78def133bc911c*
+* *strato-data-volume-id* is *vol-01c298651694dcfce*
+* *postgres-data-volume-id* is *vol-0a4ac71b70905f806*
+cp eks-strato-deployment.tpl.yaml eks-strato-deployment.yaml
 kubectl apply -f eks-strato-deployment.yaml
 
 # Create nginx Service

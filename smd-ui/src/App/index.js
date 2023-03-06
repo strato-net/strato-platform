@@ -15,7 +15,9 @@ import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
 import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
 import { getUserFromLocal } from '../lib/localStorage';
+import ReactGA from "react-ga4";
 
+ReactGA.initialize("G-PWGS3Z6YNQ");
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
 mixpanelWrapper.identify(env.NODE_NAME);
 

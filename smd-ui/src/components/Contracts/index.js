@@ -6,6 +6,7 @@ import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import { Button } from '@blueprintjs/core';
+import ReactGA from 'react-ga4';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 import { withRouter } from 'react-router-dom';
@@ -41,6 +42,10 @@ class Contracts extends Component {
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
     this.props.fetchChainIds();
+  }
+
+  componentDidMount() {
+    ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
   }
 
   componentWillReceiveProps(nextProps) {

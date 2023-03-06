@@ -68,8 +68,10 @@ spec:
           value: "true"
       volumes:
         - name: vault-idpconfig-data
-          persistentVolumeClaim:
-            claimName: vault-idpconfig-data-pvc
+          awsElasticBlockStore:
+            volumeID: vol-0b4772e3dfa5ead6d
+            fsType: ext4
         - name: vault-postgres-data
-          persistentVolumeClaim:
-            claimName: vault-postgres-data-pvc
+          awsElasticBlockStore:
+            volumeID: vol-0c7bf0878de7863d8
+            fsType: ext4

@@ -31,6 +31,7 @@ import {
   GET_SYSTEM_INFO
 } from '../../sockets/rooms'
 import {sec2Date} from "../../lib/formatSeconds";
+import ReactGA from "react-ga4";
 
 const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 // TODO: these should be part of a reducer state. Do the same for other global variables.
@@ -74,6 +75,7 @@ class Dashboard extends Component {
     this.props.subscribeRoom(GET_SYSTEM_INFO)
 
     mixpanelWrapper.track('dashboard_page_load');
+    ReactGA.send({hitType: "pageview", page: "/dashboard", title: "Dashboard"});
 
     socket.on('disconnect', () => {
       this.props.changeHealthStatus(false);
