@@ -73,8 +73,8 @@ createAccount blockNumber accountDiffs =
   where
     tryCreates = do
       let newAccounts = map (uncurry addrRef) accountDiffs
-      $logInfoS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
-      addrIDs <- SQL.insertMany newAccounts
+      $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
+      addrIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) newAccounts
 
       newStorage <-
         forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
@@ -85,7 +85,7 @@ createAccount blockNumber accountDiffs =
             SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
                                     | (k, Value v) <- Map.toList m]
 
-      $logInfoS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
+      $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
       SQL.insertMany_ (concat newStorage)
     addrRef account diff = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
