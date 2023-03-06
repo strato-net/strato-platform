@@ -281,70 +281,70 @@ class CreateContract extends Component {
     }
   }
 
-  renderChainFields() {
-    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+  // renderChainFields() {
+  //   const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
 
-    if (chainLabel.length) {
-      return (
-        <div>
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select">
-                <Field
-                  className="pt-input chain-field"
-                  component="select"
-                  name="chainLabel"
-                  onChange={
-                    (e) => this.props.getLabelIds(e.target.value)
-                  }
-                >
-                  <option />
-                  {
-                    chainLabel.map((label, i) => {
-                      return (
-                        <option key={label + i} value={label}>{label}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
+  //   if (chainLabel.length) {
+  //     return (
+  //       <div>
+  //         <div className="row">
+  //           <div className="col-sm-3 text-right">
+  //             <label className="pt-label smd-pad-4">
+  //               Chain
+  //             </label>
+  //           </div>
+  //           <div className="col-sm-9 smd-pad-4">
+  //             <div className="pt-select">
+  //               <Field
+  //                 className="pt-input chain-field"
+  //                 component="select"
+  //                 name="chainLabel"
+  //                 onChange={
+  //                   (e) => this.props.getLabelIds(e.target.value)
+  //                 }
+  //               >
+  //                 <option />
+  //                 {
+  //                   chainLabel.map((label, i) => {
+  //                     return (
+  //                       <option key={label + i} value={label}>{label}</option>
+  //                     )
+  //                   })
+  //                 }
+  //               </Field>
+  //             </div>
+  //           </div>
+  //         </div>
 
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain IDs
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select smd-max-width">
-                <Field
-                  className="pt-input smd-max-width"
-                  component="select"
-                  name="chainId"
-                >
-                  <option />
-                  {
-                    this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                      return (
-                        <option key={id + i} value={id}>{id}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    }
-  }
+  //         <div className="row">
+  //           <div className="col-sm-3 text-right">
+  //             <label className="pt-label smd-pad-4">
+  //               Chain IDs
+  //             </label>
+  //           </div>
+  //           <div className="col-sm-9 smd-pad-4">
+  //             <div className="pt-select smd-max-width">
+  //               <Field
+  //                 className="pt-input smd-max-width"
+  //                 component="select"
+  //                 name="chainId"
+  //               >
+  //                 <option />
+  //                 {
+  //                   this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+  //                     return (
+  //                       <option key={id + i} value={id}>{id}</option>
+  //                     )
+  //                   })
+  //                 }
+  //               </Field>
+  //             </div>
+  //           </div>
+  //         </div>
+  //       </div>
+  //     )
+  //   }
+  // }
 
   render() {
     const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
@@ -374,7 +374,29 @@ class CreateContract extends Component {
             className="pt-dark create-contract-dialog"
           >
             <div className="pt-dialog-body">
-              {this.renderChainFields()}
+              <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Chain
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain ? this.props.selectedChain.label : "Main Chain"}
+                </div>
+              </div>
+              {
+                this.props.selectedChain &&
+                <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Chain ID
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain.id}
+                </div>
+              </div>
+              }
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -600,7 +622,8 @@ export function mapStateToProps(state) {
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
+    chainLabelIds: state.chains.listLabelIds,
+    selectedChain: state.chains.selectedChain,
   };
 }
 

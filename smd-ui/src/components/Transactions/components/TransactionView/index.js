@@ -46,6 +46,36 @@ class TransactionView extends Component {
                 </thead>
                 <tbody>
                   <tr>
+                    <td><strong>Type</strong></td>
+                    <td>{tx.type}</td>
+                  </tr>
+                  {tx.metadata.name &&
+                    <tr>
+                      <td><strong>Contract Name</strong></td>
+                      <td>{tx.metadata.name}</td>
+                    </tr>
+                  }
+                  {tx.metadata.funcName &&
+                    <tr>
+                      <td><strong>Function Name</strong></td>
+                      <td>{tx.metadata.funcName}</td>
+                    </tr>
+                  }
+                  {tx.metadata.args &&
+                    <tr>
+                      <td><strong>Arguments</strong></td>
+                      <td>{tx.metadata.args.substring(1, tx.metadata.args.length - 1).split(",").map((arg) => {
+                        <span className="smd-pad-2">{arg},</span>
+                      })}</td>
+                    </tr>
+                  }
+                  {tx.metadata.VM &&
+                    <tr>
+                      <td><strong>VM</strong></td>
+                      <td>{tx.metadata.VM}</td>
+                    </tr>
+                  }
+                  <tr>
                     <td><strong>Value</strong></td>
                     <td>{tx.value === undefined ? '' : tx.value}</td>
                   </tr>
@@ -70,12 +100,12 @@ class TransactionView extends Component {
                     <td>{Object.keys(tx).length ? <HexText value={tx.s} classes="smd-pad-2" /> : ''}</td>
                   </tr>
                   <tr>
-                    <td><strong>Timestamp</strong></td>
-                    <td>{Object.keys(tx).length ? parseDateFromString(tx.timestamp) : ''}</td>
-                  </tr>
-                  <tr>
                     <td><strong>V</strong></td>
                     <td>{tx.v}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Timestamp</strong></td>
+                    <td>{Object.keys(tx).length ? parseDateFromString(tx.timestamp) : ''}</td>
                   </tr>
                   <tr>
                     <td><strong>Nonce</strong></td>

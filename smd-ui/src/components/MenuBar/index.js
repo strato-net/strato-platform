@@ -56,7 +56,7 @@ class MenuBar extends Component {
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
+          <div className="pt-navbar-heading">STRATO Mercata Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
           <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>

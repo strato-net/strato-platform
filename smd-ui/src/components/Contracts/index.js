@@ -5,11 +5,12 @@ import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import { Button } from '@blueprintjs/core';
+import { Button, Popover, PopoverInteractionKind, Position, Switch, Tooltip} from '@blueprintjs/core';
 import ReactGA from 'react-ga4';
 import { Field, reduxForm } from 'redux-form';
-import { selectChain, fetchChainIds } from '../Chains/chains.actions';
+import { selectChain, fetchChainIds, fetchChainDetailSelect } from '../Chains/chains.actions';
 import { withRouter } from 'react-router-dom';
+import HexText from '../HexText';
 
 const tourSteps = [
   /*  {
@@ -33,7 +34,12 @@ class Contracts extends Component {
     super(props);
     this.state = {
       limit: 10,
-      offset: 0
+      offset: 0,
+      chainLimit: 25,
+      chainOffset: 0,
+      useSearch: true,
+      chainSearchQueryField: "chainid",
+      chainQuery: "",
     }
   }
 
@@ -41,7 +47,7 @@ class Contracts extends Component {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
-    this.props.fetchChainIds();
+    this.props.fetchChainIds(this.chainLimit, this.chainOffset);
   }
 
   componentDidMount() {
@@ -49,12 +55,18 @@ class Contracts extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.selectedChain !== this.props.selectedChain)
+    if (nextProps.selectedChain !== this.props.selectedChain) {
       this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset);
+
+    }
   }
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
+  }
+
+  onChainSearch = () => {
+    this.props.fetchChainDetailSelect(this.state.chainQuery, this.state.chainSearchQueryField)
   }
 
   onNextClick = () => {
@@ -72,6 +84,26 @@ class Contracts extends Component {
       this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
     });
   };
+
+  onNextChainClick = () => {
+    const { chainOffset, chainLimit } = this.state;
+    const newOffset = chainOffset + chainLimit;
+    this.setState({ chainOffset: newOffset }, () => {
+      this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
+  };
+
+  onPrevChainClick = () => {
+    const { chainOffset, chainLimit } = this.state;
+    const newOffset = Math.max(0, chainOffset - chainLimit);
+    this.setState({ chainOffset: newOffset }, () => {
+      this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
+  };
+
+  toggleChainQueryType = (e) => {
+    this.setState({ useSearch : !this.state.useSearch })
+  }
 
   render() {
     const contracts = this.props.contracts;
@@ -98,28 +130,44 @@ class Contracts extends Component {
       });
 
     const isPaginationDisplay = cards.length ? true : Boolean(this.state.offset);
-
-    return (
-      <div className="container-fluid">
-        <Tour steps={tourSteps} name="contracts" finalStepSelector='#transactions' nextPage='transactions' />
-        <div className="row pt-dark">
-          <div className="col-sm-3 text-left">
-            <h3>Contracts</h3>
-          </div>
-          <div className="col-sm-5 smd-pad-16">
-            <div className="pt-input-group pt-dark pt-large">
-              <span className="pt-icon pt-icon-search"></span>
-              <input
-                className="pt-input"
-                type="search"
-                placeholder="Search contracts"
-                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
-                dir="auto" />
-            </div>
-          </div>
-          <div className="col-sm-2 chain-wrapper text-right smd-pad-8" style={{paddingLeft: '50px'}}>
-            {this.props.chainIds && this.props.chainIds.length ?
-              <div className="pt-select">
+    const chainSelector = this.state.useSearch ? (
+      <div className="row smd-margin-16" style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
+        <h4 className="text-left" style={{margin: '0 8px 0 0'}}>Chain {this.state.chainSearchQueryField == "chainid" ? "ID" : "Label"}:</h4>
+        <input 
+          className='pt-input smd-pad-4 pt-icon-search' 
+          type="search" 
+          name="chainQuery" 
+          placeholder={this.state.chainSearchQueryField == "chainid" ? "Chain ID" : "Chain Label"}
+          onChange={(e) => {
+            this.setState({chainQuery: e.target.value})
+          }}
+          value={this.state.chainQuery}
+        />
+        <div className="pt-select" style={{margin: '0 5px'}}>
+          <Field
+            className="pt-input"
+            component="select"
+            name="searchByChainId"
+            defaultValue={"chainid"}
+            onChange={
+              (e) => {
+                this.setState({chainSearchQueryField: e.target.value});
+              }
+            }
+            required
+            >
+            <option key={"chainid"} value={"chainid"}>Chain ID</option>
+            {/* get chains api does not accept this query param :( <option key={"label"} value={"label"}>Chain Label</option> */}
+          </Field>
+        </div>
+        <div>
+          <button className="pt-button pt-icon-search" onClick={(e) => this.onChainSearch(this.state.chainQuery)}>Search</button>
+        </div>
+      </div>) : 
+      
+          <div className='row' style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Chain Selection:</h4>
+              <div className="pt-select" style={{margin: '0 5px'}}>
                 <Field
                   className="pt-input select-chain"
                   component="select"
@@ -131,23 +179,78 @@ class Contracts extends Component {
                     }
                   }
                   required
-                >
-                  <option> Main Chain </option>
+                  >
+                  <option>Main Chain </option>
                   {
                     this.props.chainIds.map((label, i) => {
                       return (
                         <option key={label.id} value={label.id}>{label.label}</option>
-                      )
-                    })
-                  }
+                        )
+                      })
+                    }
                 </Field>
-              </div> : ''}
+              </div>
+            <div className="smd-pad-2 text-left">
+              <Button
+                onClick={this.onPrevChainClick}
+                className="pt-icon-arrow-left"
+                text="Previous"
+                disabled={!(this.state.chainOffset > 0)}
+                />
+            </div>
+            <div className="smd-pad-2 text-right">
+              <Button
+                onClick={this.onNextChainClick}
+                className="pt-icon-arrow-right"
+                text="Next"
+                disabled={this.props.chainIds.length < this.state.chainLimit}
+                />
+            </div>
+
           </div>
-          <div className="col-sm-2 text-right smd-pad-8">
+    return (
+      <div className="container-fluid">
+        <Tour steps={tourSteps} name="contracts" finalStepSelector='#transactions' nextPage='transactions' />
+        <div className="row pt-dark" >
+          <div className="col-sm-2 text-left">
+            <h2>Contracts</h2>
+          </div>
+        <div className="col-sm-6 smd-pad-16">
+            <div className="pt-input-group pt-dark pt-large">
+              <span className="pt-icon pt-icon-search"></span>
+              <input
+                className="pt-input"
+                type="search"
+                placeholder="Search contracts"
+                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                dir="auto" />
+            </div>
+          </div>
+          <div className="col-sm-4 text-right smd-pad-8">
             <CreateContract />
           </div>
+    
         </div>
+        <div className='row pt-dark' style={{ display: 'flex', alignItems: 'center'}}>
+            <div className=" chain-wrapper text-right smd-pad-8 col-sm-8" style={{paddingLeft: '50px'}}>
+              {this.props.chainIds && this.props.chainIds ?
+                    <div className='row'  style={{ display: 'flex', alignItems: 'center'}}>
+                      {chainSelector}
+                      <div className="smd-pad-8 col-sm-2" style={{display: 'flex', alignItems: 'center'}}>
+                        <Switch
+                          checked={this.state.useSearch}
+                          onChange={this.toggleChainQueryType}
+                          label="Use Chain Search"
+                        />
+                        </div>
+                      <div className='col-sm-4'>
+                        <strong>Chain ID:</strong> { this.props.selectedChain ? <HexText>{this.props.selectedChain}</HexText> : 'Main Chain'}
+                      </div>
+                    </div>
+              : ''}
+            </div>
 
+        </div>
         {!cards.length && !this.props.isLoading &&
           <div className="row pt-dark" key={'contract-card-'}>
             <div className="col-sm-12">
@@ -214,6 +317,7 @@ const formed = reduxForm({ form: 'Contracts' })(Contracts);
 const connected = connect(mapStateToProps, {
   selectChain,
   fetchChainIds,
+  fetchChainDetailSelect,
   fetchContracts, 
   changeContractFilter
 })(formed);
