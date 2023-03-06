@@ -1,46 +1,48 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`Test PieChart index should render component properly 1`] = `
-LoadedCheerio {
-  "0": Element {
+initialize {
+  "0": Object {
     "attribs": Object {
       "class": "pt-card pt-dark",
     },
     "children": Array [
-      Element {
+      Object {
         "attribs": Object {
           "class": "row",
         },
         "children": Array [
-          Element {
+          Object {
             "attribs": Object {
               "class": "col-sm-12 text-center",
             },
             "children": Array [
-              Element {
+              Object {
                 "attribs": Object {},
                 "children": Array [
-                  Transaction Type,
+                  Object {
+                    "data": "Transaction Type",
+                    "next": null,
+                    "parent": [Circular],
+                    "prev": null,
+                    "type": "text",
+                  },
                 ],
-                "endIndex": null,
                 "name": "h4",
                 "namespace": "http://www.w3.org/1999/xhtml",
                 "next": null,
                 "parent": [Circular],
                 "prev": null,
-                "startIndex": null,
                 "type": "tag",
                 "x-attribsNamespace": Object {},
                 "x-attribsPrefix": Object {},
               },
             ],
-            "endIndex": null,
             "name": "div",
             "namespace": "http://www.w3.org/1999/xhtml",
             "next": null,
             "parent": [Circular],
             "prev": null,
-            "startIndex": null,
             "type": "tag",
             "x-attribsNamespace": Object {
               "class": undefined,
@@ -50,32 +52,29 @@ LoadedCheerio {
             },
           },
         ],
-        "endIndex": null,
         "name": "div",
         "namespace": "http://www.w3.org/1999/xhtml",
-        "next": Element {
+        "next": Object {
           "attribs": Object {
             "class": "row",
           },
           "children": Array [
-            Element {
+            Object {
               "attribs": Object {
                 "class": "col-sm-12",
               },
               "children": Array [
-                Element {
+                Object {
                   "attribs": Object {
                     "id": "pc",
                     "style": "height:189px;",
                   },
                   "children": Array [],
-                  "endIndex": null,
                   "name": "div",
                   "namespace": "http://www.w3.org/1999/xhtml",
                   "next": null,
                   "parent": [Circular],
                   "prev": null,
-                  "startIndex": null,
                   "type": "tag",
                   "x-attribsNamespace": Object {
                     "id": undefined,
@@ -87,13 +86,11 @@ LoadedCheerio {
                   },
                 },
               ],
-              "endIndex": null,
               "name": "div",
               "namespace": "http://www.w3.org/1999/xhtml",
               "next": null,
               "parent": [Circular],
               "prev": null,
-              "startIndex": null,
               "type": "tag",
               "x-attribsNamespace": Object {
                 "class": undefined,
@@ -103,13 +100,11 @@ LoadedCheerio {
               },
             },
           ],
-          "endIndex": null,
           "name": "div",
           "namespace": "http://www.w3.org/1999/xhtml",
           "next": null,
           "parent": [Circular],
           "prev": [Circular],
-          "startIndex": null,
           "type": "tag",
           "x-attribsNamespace": Object {
             "class": undefined,
@@ -120,7 +115,6 @@ LoadedCheerio {
         },
         "parent": [Circular],
         "prev": null,
-        "startIndex": null,
         "type": "tag",
         "x-attribsNamespace": Object {
           "class": undefined,
@@ -129,29 +123,27 @@ LoadedCheerio {
           "class": undefined,
         },
       },
-      Element {
+      Object {
         "attribs": Object {
           "class": "row",
         },
         "children": Array [
-          Element {
+          Object {
             "attribs": Object {
               "class": "col-sm-12",
             },
             "children": Array [
-              Element {
+              Object {
                 "attribs": Object {
                   "id": "pc",
                   "style": "height:189px;",
                 },
                 "children": Array [],
-                "endIndex": null,
                 "name": "div",
                 "namespace": "http://www.w3.org/1999/xhtml",
                 "next": null,
                 "parent": [Circular],
                 "prev": null,
-                "startIndex": null,
                 "type": "tag",
                 "x-attribsNamespace": Object {
                   "id": undefined,
@@ -163,13 +155,11 @@ LoadedCheerio {
                 },
               },
             ],
-            "endIndex": null,
             "name": "div",
             "namespace": "http://www.w3.org/1999/xhtml",
             "next": null,
             "parent": [Circular],
             "prev": null,
-            "startIndex": null,
             "type": "tag",
             "x-attribsNamespace": Object {
               "class": undefined,
@@ -179,45 +169,46 @@ LoadedCheerio {
             },
           },
         ],
-        "endIndex": null,
         "name": "div",
         "namespace": "http://www.w3.org/1999/xhtml",
         "next": null,
         "parent": [Circular],
-        "prev": Element {
+        "prev": Object {
           "attribs": Object {
             "class": "row",
           },
           "children": Array [
-            Element {
+            Object {
               "attribs": Object {
                 "class": "col-sm-12 text-center",
               },
               "children": Array [
-                Element {
+                Object {
                   "attribs": Object {},
                   "children": Array [
-                    Transaction Type,
+                    Object {
+                      "data": "Transaction Type",
+                      "next": null,
+                      "parent": [Circular],
+                      "prev": null,
+                      "type": "text",
+                    },
                   ],
-                  "endIndex": null,
                   "name": "h4",
                   "namespace": "http://www.w3.org/1999/xhtml",
                   "next": null,
                   "parent": [Circular],
                   "prev": null,
-                  "startIndex": null,
                   "type": "tag",
                   "x-attribsNamespace": Object {},
                   "x-attribsPrefix": Object {},
                 },
               ],
-              "endIndex": null,
               "name": "div",
               "namespace": "http://www.w3.org/1999/xhtml",
               "next": null,
               "parent": [Circular],
               "prev": null,
-              "startIndex": null,
               "type": "tag",
               "x-attribsNamespace": Object {
                 "class": undefined,
@@ -227,13 +218,11 @@ LoadedCheerio {
               },
             },
           ],
-          "endIndex": null,
           "name": "div",
           "namespace": "http://www.w3.org/1999/xhtml",
           "next": [Circular],
           "parent": [Circular],
           "prev": null,
-          "startIndex": null,
           "type": "tag",
           "x-attribsNamespace": Object {
             "class": undefined,
@@ -242,7 +231,6 @@ LoadedCheerio {
             "class": undefined,
           },
         },
-        "startIndex": null,
         "type": "tag",
         "x-attribsNamespace": Object {
           "class": undefined,
@@ -252,23 +240,25 @@ LoadedCheerio {
         },
       },
     ],
-    "endIndex": null,
     "name": "div",
     "namespace": "http://www.w3.org/1999/xhtml",
     "next": null,
-    "parent": Document {
+    "parent": null,
+    "prev": null,
+    "root": Object {
+      "attribs": Object {},
       "children": Array [
         [Circular],
       ],
-      "endIndex": null,
+      "name": "root",
+      "namespace": "http://www.w3.org/1999/xhtml",
       "next": null,
       "parent": null,
       "prev": null,
-      "startIndex": null,
       "type": "root",
+      "x-attribsNamespace": Object {},
+      "x-attribsPrefix": Object {},
     },
-    "prev": null,
-    "startIndex": null,
     "type": "tag",
     "x-attribsNamespace": Object {
       "class": undefined,
@@ -277,97 +267,12 @@ LoadedCheerio {
       "class": undefined,
     },
   },
-  "_root": LoadedCheerio {
-    "0": Document {
-      "children": Array [
-        Element {
-          "attribs": Object {},
-          "children": Array [
-            Element {
-              "attribs": Object {},
-              "children": Array [],
-              "endIndex": null,
-              "name": "head",
-              "namespace": "http://www.w3.org/1999/xhtml",
-              "next": Element {
-                "attribs": Object {},
-                "children": Array [],
-                "endIndex": null,
-                "name": "body",
-                "namespace": "http://www.w3.org/1999/xhtml",
-                "next": null,
-                "parent": [Circular],
-                "prev": [Circular],
-                "startIndex": null,
-                "type": "tag",
-                "x-attribsNamespace": Object {},
-                "x-attribsPrefix": Object {},
-              },
-              "parent": [Circular],
-              "prev": null,
-              "startIndex": null,
-              "type": "tag",
-              "x-attribsNamespace": Object {},
-              "x-attribsPrefix": Object {},
-            },
-            Element {
-              "attribs": Object {},
-              "children": Array [],
-              "endIndex": null,
-              "name": "body",
-              "namespace": "http://www.w3.org/1999/xhtml",
-              "next": null,
-              "parent": [Circular],
-              "prev": Element {
-                "attribs": Object {},
-                "children": Array [],
-                "endIndex": null,
-                "name": "head",
-                "namespace": "http://www.w3.org/1999/xhtml",
-                "next": [Circular],
-                "parent": [Circular],
-                "prev": null,
-                "startIndex": null,
-                "type": "tag",
-                "x-attribsNamespace": Object {},
-                "x-attribsPrefix": Object {},
-              },
-              "startIndex": null,
-              "type": "tag",
-              "x-attribsNamespace": Object {},
-              "x-attribsPrefix": Object {},
-            },
-          ],
-          "endIndex": null,
-          "name": "html",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": null,
-          "parent": [Circular],
-          "prev": null,
-          "startIndex": null,
-          "type": "tag",
-          "x-attribsNamespace": Object {},
-          "x-attribsPrefix": Object {},
-        },
-      ],
-      "endIndex": null,
-      "next": null,
-      "parent": null,
-      "prev": null,
-      "startIndex": null,
-      "type": "root",
-      "x-mode": "quirks",
-    },
-    "_root": [Circular],
-    "length": 1,
-    "options": Object {
-      "decodeEntities": true,
-      "xml": false,
-    },
-  },
+  "_root": [Circular],
   "length": 1,
   "options": Object {
     "decodeEntities": true,
+    "normalizeWhitespace": false,
+    "withDomLvl1": true,
     "xml": false,
   },
 }

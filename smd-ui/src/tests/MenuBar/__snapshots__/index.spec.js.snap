@@ -33,7 +33,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
         </button>
       </a>
       <span className=\\"pt-navbar-divider\\" />
-      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function (anonymous)]}>
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
         Invite Colleague
       </button>
       <span>
@@ -88,7 +88,7 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
         </button>
       </a>
       <span className=\\"pt-navbar-divider\\" />
-      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function (anonymous)]}>
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
         Invite Colleague
       </button>
       <span>
