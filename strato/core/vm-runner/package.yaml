@@ -81,7 +81,7 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-    ghc-options: -Wall -eventlog -rtsopts -O2 -finfo-table-map -fdistinct-constructor-tables -threaded -fprof-auto
+    ghc-options: -Wall -eventlog -rtsopts -O2 -finfo-table-map -fdistinct-constructor-tables -threaded
 
 tests:
   ethereum-vm-test:
