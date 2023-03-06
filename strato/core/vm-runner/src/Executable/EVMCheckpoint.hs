@@ -50,19 +50,18 @@ instance RLPSerializable ContextBestBlockInfo where
         0 -> Unspecified
         1 -> case body of
             RLPArray [sha, header, tdiff, txCount, uncleCount] ->
-                ContextBestBlockInfo (rlpDecode sha,
-                                      rlpDecode header,
-                                      rlpDecode tdiff,
-                                      rlpDecodeInt txCount,
-                                      rlpDecodeInt uncleCount
-                                     )
+                ContextBestBlockInfo (rlpDecode sha)
+                                     (rlpDecode header)
+                                     (rlpDecode tdiff)
+                                     (rlpDecodeInt txCount)
+                                     (rlpDecodeInt uncleCount)
                 where rlpDecodeInt x = let y :: Integer = rlpDecode x in fromIntegral y
             x -> error $ "unexpected shape in rlpDecode ContextBestBlockInfo/body :: " ++ show x
         x -> error $ "Unexpected tag for ContextBestBlockInfo `" ++ show x ++ "`"
     rlpDecode x = error $ "unexpected shape in rlpDecode ContextBestBlockInfo :: " ++ show x
     rlpEncode input = case input of
         Unspecified -> RLPArray [rlpEncodeInt 0, RLPArray []]
-        ContextBestBlockInfo (sha, header, tdiff, txCount, uncleCount) ->
+        ContextBestBlockInfo sha header tdiff txCount uncleCount ->
             RLPArray [rlpEncodeInt 1,
                   RLPArray [rlpEncode sha, rlpEncode header, rlpEncode tdiff, rlpEncodeInt txCount, rlpEncodeInt uncleCount]]
 
