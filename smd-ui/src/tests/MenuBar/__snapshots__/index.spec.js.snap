@@ -32,6 +32,10 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
           Dev Docs
         </button>
       </a>
+      <span className=\\"pt-navbar-divider\\" />
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
+        Invite Colleague
+      </button>
       <span>
         <span className=\\"pt-navbar-divider\\" />
         <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
@@ -83,6 +87,10 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
           Dev Docs
         </button>
       </a>
+      <span className=\\"pt-navbar-divider\\" />
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
+        Invite Colleague
+      </button>
       <span>
         <span className=\\"pt-navbar-divider\\" />
         <a href=\\"https://support.blockapps.net \\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
