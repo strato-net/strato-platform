@@ -172,7 +172,7 @@ class CreateContract extends Component {
       solidvm: values.solidvm,
       fileText: fileText,
       arguments: args,
-      chainId: values.chainId,
+      chainId: this.props.chains.selectedChain.id,
       metadata: metadata
     };
 
