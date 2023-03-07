@@ -27,7 +27,19 @@ import './createContract.css';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
+
 class CreateContract extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      value: "default",
+      dropzone: 'Drop a file here, or click to select files to upload.',
+      dropfile: false
+    };
+
+    this.handleSampleContract = this.handleSampleContract.bind(this);
+    this.handleFileDrop = this.handleFileDrop.bind(this);
+  }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
@@ -43,13 +55,19 @@ class CreateContract extends Component {
         <Dropzone
           className="dropzone"
           name={field.name}
-          onDrop={(filesToUpload, e) => this.handleFileDrop(filesToUpload, field)}
+          onDrop={(filesToUpload, e) => {
+              this.handleFileDrop(filesToUpload, field);
+            }
+          }
         >
           {({ isDragActive, isDragReject, acceptedFiles }) => {
             if (isDragActive) {
               return (<p className="pt-intent-success">Drop to Upload!</p>);
             }
-            return (<p className="pt-intent-success">{acceptedFiles.length > 0 && !this.props.usingSampleContract ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+            if (!this.props.usingSampleContract && acceptedFiles.length > 0){
+              return (<p className="pt-intent-success">{this.state.dropzone}</p>);//acceptedFiles[0].name}</p>);
+            }
+            return (<p className="pt-intent-success">{this.state.dropzone}</p>);
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
@@ -90,24 +108,34 @@ class CreateContract extends Component {
       );
     };
     reader.readAsText(contract);
-    if (this.props.usingSampleContract) {
+    if (this.props.usingSampleContract){
       this.props.updateUsingSampleContract(false);
     }
+    this.setState({value: "default", dropzone: contract.name});
   };
 
   handleSampleContract = (contractName) => {
-    this.props.touch('contract');
-    let contractSrc = SampleContracts[contractName];
-    const self = this;
-    mixpanelWrapper.track("sample_contract_select");
-    self.props.contractFormChange(contractSrc);
-    self.props.compileContract(
-      contractName,
-      contractSrc,
-      self.props.solidvm
-    );
-    if (!this.props.usingSampleContract) {
-      this.props.updateUsingSampleContract(true);
+    if (contractName == "default"){
+      if (this.props.usingSampleContract){
+        this.props.updateUsingSampleContract(false);
+      }
+      this.setState({value: "default", dropfile: false});
+    }
+    else{
+      this.props.touch('contract');
+      let contractSrc = SampleContracts[contractName];
+      const self = this;
+      mixpanelWrapper.track("sample_contract_select");
+      self.props.contractFormChange(contractSrc);
+      self.props.compileContract(
+        contractName,
+        contractSrc,
+        self.props.solidvm
+      );
+      if (!this.props.usingSampleContract){
+        this.props.updateUsingSampleContract(true);
+      }
+      this.setState({value: contractName, dropzone: 'Drop a file here, or click to select files to upload.', dropFile: false});
     }
   }
 
@@ -416,41 +444,67 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>}
-              {!this.props.sourceFromEditor && <div className="row">
+              {!this.props.sourceFromEditor && 
+                <div className="row">
                   <div className="col-sm-3 text-right">
                     <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
                       Source files
                     </label>
                   </div>
-                  <div className="col-sm-9 smd-scrollable smd-pad-4">
-                    <div className='pt-select'>
-                      <Field
-                        className="pt-select"
-                        component="select"
-                        name="sampleContract"
-                        onChange={(e) => {
-                          if (e.target.value !== "default")
-                            this.handleSampleContract(e.target.value);
-                        }}
-                      >
-                        <option key={0} value="default">Choose a sample contract to upload.</option>
-                        <option key={1} value="HelloWorld">Hello World</option>
-                        <option key={2} value="SimpleStorage">Simple Storage</option>
-                        <option key={3} value="ERC20">ERC20 - Tokens</option>
-                        <option key={4} value="ERC721">ERC721 - NFT</option>
-                        <option key={5} value="PermissionManager">Permission Manager</option>
-                      </Field>
+                  <div className="col-sm-9 smd-pad-4">
+                      <div className="pt-select">
+                        <select
+                          id='status'
+                          className="pt-select"
+                          component="select"
+                          name="sampleContract"
+                          value={this.state.value}
+                          onChange={(e) => {
+                              this.handleSampleContract(e.target.value);
+                          }}
+                        >
+                          <option key={0} value="default">Choose a sample contract to upload.</option>
+                          <option key={1} value="HelloWorld">Hello World</option>
+                          <option key={2} value="SimpleStorage">Simple Storage</option>
+                          <option key={3} value="ERC20">ERC20 - Tokens</option>
+                          <option key={4} value="ERC721">ERC721 - NFT</option>
+                          <option key={5} value="PermissionManager">Permission Manager</option>
+                        </select>
+                      </div>
+                  </div>
+
+                  <div className="col-sm-3 text-right"/>
+                  <div className="col-sm-9 smd-pad-4">
+                    <div style={{ fontWeight: 'bold' }}>
+                      or
                     </div>
                   </div>
-                  <div className="row">
-                    <div className="text-center smd-pad-4">
-                      Or
-                    </div>
+
+                  <div className="col-sm-3 text-right"/>
+                  <div className="col-sm-9 smd-pad-4">
+                    <Field
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={0}
+                      checked={this.state.dropFile === true}
+                      onClick={
+                        () => {
+                          this.setState((prevState) => {
+                            return {
+                              dropFile: true
+                            };
+                          });
+                        }
+                      }
+                    /> Upload file
                   </div>
-                  <div className="row">
-                    <div className="col-sm-12 smd-pad-4">
+
+                  <div className="col-sm-3 text-right" />
+                  <div className="col-sm-9 smd-pad-4">
+                    { this.state.dropFile === true &&
                       <Field
-                        id="input-b"
+                        id="input-Drop"
                         className="form-width pt-input"
                         name="contract"
                         component={this.renderDropzoneInput}
@@ -459,7 +513,7 @@ class CreateContract extends Component {
                         validate={this.isValidFileType}
                         required
                       />
-                    </div>
+                    }
                   </div>
                 </div>
               }
