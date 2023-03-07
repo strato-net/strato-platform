@@ -59,7 +59,7 @@ class OauthAccounts extends Component {
                 this.setState({ selected: position });
                 this.onUserClick(user, position);
               }}>
-                {user.commonName}
+                {user.commonName} - {user.organization}
               </div>
             </div>
           </div>
