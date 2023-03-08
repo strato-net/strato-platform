@@ -14,7 +14,7 @@ import CreateChain from '../CreateChain';
 import Chain from '../Chain';
 import './chains.css';
 import HexText from '../HexText';
-import { Button } from '@blueprintjs/core';
+import { Button, Switch } from '@blueprintjs/core';
 import ReactGA from 'react-ga4';
 
 const tourSteps = [
@@ -32,8 +32,10 @@ class Chains extends Component {
     super()
     this.state = {
       selected: null,
-      limit: 10,
+      limit: 25,
       offset: 0,
+      useChainIdSearch: false,
+      chainId: "",
     }
   }
 
@@ -43,9 +45,13 @@ class Chains extends Component {
     ReactGA.send({hitType: "pageview", page: "/shards", title: "Shards"});
   }
 
-  updateFilter(filter) {
+  updateLabelFilter(filter) {
     this.props.changeChainFilter(filter);
   };
+
+  searchByChainId() {
+    this.props.fetchChains(0, 0, this.state.chainId)
+  }
 
   onUserClick(label, chainIds, index) {
     let uniqueKey = `${label}-${index}`
@@ -138,18 +144,36 @@ class Chains extends Component {
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row" style={{display: 'flex', alignItems: 'center'}}>
           <div className="col-sm-4">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input
                 className="pt-input"
                 type="search"
-                placeholder="Search shards"
-                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                placeholder={`Search Shards (${this.state.useChainIdSearch ? "Shard ID" : "Label"})`}
+                onChange={e => {
+                  this.state.useChainIdSearch ?
+                    this.setState({chainId : e.target.value}) :
+                    this.updateLabelFilter(e.target.value.toLowerCase())
+                }}
                 dir="auto" />
             </div>
+          </div >
+          <div className="col-sm-2">
+            {
+              this.state.useChainIdSearch ?
+              <button className='pt-button pt-icon-search' >Search</button> : undefined
+            }
           </div>
+          <div className='col-sm-2'>
+            <Switch
+              checked={this.state.useChainIdSearch}
+              onChange={() => this.setState({useChainIdSearch: !this.state.useChainIdSearch})}
+              label="Search by Shard ID"
+              />
+          </div>
+          
         </div>
         <div className="container-fluid pt-dark">
           <div className="row">

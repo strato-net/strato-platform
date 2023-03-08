@@ -25,8 +25,14 @@ import { createUrl } from '../../lib/url';
 const stratoChainUrl = env.STRATO_URL + "/chain";
 // const blocChainUrl = env.BLOC_URL + "/chain";
 
-export function getChainsApi(limit, offset) {
-  const url = limit ? `${stratoChainUrl}?limit=${limit}&offset=${offset}` : `${stratoChainUrl}`;
+export function getChainsApi(limit, offset, chainid) {
+  const url = createUrl(stratoChainUrl, { 
+    query: { 
+      limit, 
+      offset: limit ? offset : undefined, 
+      chainid
+    }
+  })
   
   return fetch(
     url,
@@ -95,7 +101,7 @@ export function getChainDetailApiWithQuery(query, queryField) {
 
 export function* getChains(action) {
   try {
-    const response = yield call(getChainsApi, action.limit, action.offset);
+    const response = yield call(getChainsApi, action.limit, action.offset, action.chainid);
     yield put(fetchChainsSuccess(response));
   }
   catch (err) {
