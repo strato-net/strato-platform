@@ -48,6 +48,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -180,6 +181,7 @@ stratoP2PClient runner = runner $ \_ -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                     lengthenPeerDisable thePeer
                    e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just TimeoutException <- fromException e' -> lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                    e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do
