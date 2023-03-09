@@ -447,9 +447,14 @@ processTheMessages env sqlEnv conn g messages = do
 
               deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
                 let n = labelToText nameString
+                    a' = if a /= ""
+                           then a
+                           else case cp of
+                            SolidVMCode n' _ | nameString /= n' -> T.pack n'
+                            _ -> a
 
-                let htn = historyTableName o a n
-                    historyTableNames = map (historyTableName o a) hl
+                let htn = historyTableName o a' n
+                    historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
@@ -458,8 +463,8 @@ processTheMessages env sqlEnv conn g messages = do
                   -- creates a history table for all contracts in the CodeCollection
                   setHistoryTable g htn True
 
-                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
-                let nameParts = (o, a, n)
+                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
+                let nameParts = (o, a', n)
 
                 deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
