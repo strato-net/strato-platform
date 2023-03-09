@@ -51,5 +51,5 @@ runTCPClientWithConnectTimeout settings secs cont = do
        Left e  -> throw (e::SomeException)
        Right x -> return x
     else do
-      _ <- throwIO $ TimeoutException
       liftIO $ killThread clientThreadID
+      throwIO $ TimeoutException
