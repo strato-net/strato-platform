@@ -102,7 +102,13 @@ class Contracts extends Component {
   };
 
   toggleChainQueryType = (e) => {
-    this.setState({ useSearch : !this.state.useSearch })
+    this.setState({ useSearch : !this.state.useSearch }, () => {
+      if (!this.state.useSearch) {
+        this.setState({chainQuery : ""})
+        this.props.fetchChainIds(this.chainLimit, this.chainOffset);
+      }
+
+    })
   }
 
   render() {
@@ -128,16 +134,15 @@ class Contracts extends Component {
           </div>
         );
       });
-
     const isPaginationDisplay = cards.length ? true : Boolean(this.state.offset);
     const chainSelector = this.state.useSearch ? (
-      <div className="row smd-margin-16" style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
-        <h4 className="text-left" style={{margin: '0 8px 0 0'}}>Chain {this.state.chainSearchQueryField == "chainid" ? "ID" : "Label"}:</h4>
+      <div className="row smd-margin-16" style={{ display: 'flex', alignItems: 'center', marginRight: '8px'}}>
+        <h4 className="text-left" style={{margin: '0 8px 0 0'}}>Shard {this.state.chainSearchQueryField == "chainid" ? "ID" : "Label"}:</h4>
         <input 
           className='pt-input smd-pad-4 pt-icon-search' 
           type="search" 
           name="chainQuery" 
-          placeholder={this.state.chainSearchQueryField == "chainid" ? "Chain ID" : "Chain Label"}
+          placeholder={this.state.chainSearchQueryField == "chainid" ? "Shard ID" : "Shard Label"}
           onChange={(e) => {
             this.setState({chainQuery: e.target.value})
           }}
@@ -156,17 +161,17 @@ class Contracts extends Component {
             }
             required
             >
-            <option key={"chainid"} value={"chainid"}>Chain ID</option>
-            {/* get chains api does not accept this query param :( <option key={"label"} value={"label"}>Chain Label</option> */}
+            <option key={"chainid"} value={"chainid"}>Shard ID</option>
+            {/* get chains api does not accept this query param :( <option key={"label"} value={"label"}>Shard Label</option> */}
           </Field>
         </div>
         <div>
-          <button className="pt-button pt-icon-search" onClick={(e) => this.onChainSearch(this.state.chainQuery)}>Search</button>
+          <button className="pt-button" onClick={(e) => this.onChainSearch(this.state.chainQuery)}>Select Shard</button>
         </div>
       </div>) : 
       
-          <div className='row smd-margin-8' style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
-              <h4 className="text-left" style={{margin: '0 auto'}}>Chain Selection:</h4>
+          <div className='row smd-margin-16' style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Shard Selection:</h4>
               <div className="pt-select" style={{margin: '0 5px'}}>
                 <Field
                   className="pt-input select-chain"
@@ -232,19 +237,19 @@ class Contracts extends Component {
     
         </div>
         <div className='row pt-dark' style={{ display: 'flex', alignItems: 'center'}}>
-            <div className=" chain-wrapper text-right smd-pad-8 col-sm-8" style={{paddingLeft: '50px'}}>
+            <div className=" chain-wrapper text-right smd-pad-8 col-sm-12" style={{paddingLeft: '50px'}}>
               {this.props.chainIds && this.props.chainIds ?
                     <div className='row'  style={{ display: 'flex', alignItems: 'center'}}>
                       {chainSelector}
-                      <div className="smd-pad-8 col-sm-2" style={{display: 'flex', alignItems: 'center'}}>
+                      <div className="smd-pad-8 col-sm-4" style={{display: 'flex', alignItems: 'center'}}>
                         <Switch
                           checked={this.state.useSearch}
                           onChange={this.toggleChainQueryType}
-                          label="Use Chain Search"
+                          label="Use Shard Search"
                         />
                         </div>
-                      <div className='col-sm-4'>
-                        <strong>Chain ID:</strong> { this.props.selectedChain ? <HexText>{this.props.selectedChain}</HexText> : 'Main Chain'}
+                      <div className='col-sm-4 text-left'>
+                        <strong>Shard ID:</strong> { this.props.selectedChain ? <HexText value={this.props.selectedChain}></HexText> : 'Main Chain'}
                       </div>
                     </div>
               : ''}

@@ -51,6 +51,7 @@ class Chains extends Component {
 
   searchByChainId() {
     this.props.fetchChains(0, 0, this.state.chainId)
+    
   }
 
   onUserClick(label, chainIds, index) {
@@ -163,13 +164,26 @@ class Chains extends Component {
           <div className="col-sm-2">
             {
               this.state.useChainIdSearch ?
-              <button className='pt-button pt-icon-search' >Search</button> : undefined
+              <button 
+                className='pt-button pt-icon-search' 
+                onClick={() => this.searchByChainId()}
+                >
+                  Search
+                </button> : undefined
             }
           </div>
           <div className='col-sm-2'>
             <Switch
               checked={this.state.useChainIdSearch}
-              onChange={() => this.setState({useChainIdSearch: !this.state.useChainIdSearch})}
+              onChange={() => {
+                this.setState({useChainIdSearch: !this.state.useChainIdSearch}, () => {
+                  if (!this.state.useChainIdSearch) {
+                    console.log('set to label')
+                    this.props.fetchChains(this.state.limit, this.state.offset)
+                    this.setState({chainId : ""})
+                  }
+
+                })}}
               label="Search by Shard ID"
               />
           </div>

@@ -31,52 +31,52 @@ class ChainSelector extends Component {
         });
     };
     render() {
-        <Tooltip content={this.props.selectedChain || 'Main Chain'} position={Position.BOTTOM} interactionKind={PopoverInteractionKind.HOVER}>
+        // <Tooltip content={this.props.selectedChain || 'Main Chain'} position={Position.BOTTOM} interactionKind={PopoverInteractionKind.HOVER}>
 
-              <div className='row' style={{ display: 'flex', alignItems: 'center'}}>
-                <h5 className='col-sm-3' style={{margin: '0 auto'}}>Chain Selection:</h5>
-                <div className="pt-select" style={{margin: '0 5px'}}>
-                  <Field
-                    className="pt-input select-chain"
-                    component="select"
-                    name="chainLabel"
-                    onChange={
-                      (e) => {
-                        const data = e.target.value === 'Main Chain' ? null : e.target.value;
-                        this.props.selectChain(data);
-                      }
-                    }
-                    required
-                    >
-                    <option>Main Chain </option>
-                    {
-                      sampleChainIds.map((label, i) => {
-                        return (
-                          <option key={label.id} value={label.id}>{label.label}</option>
-                          )
-                        })
-                      }
-                  </Field>
-                </div>
-              <div className="col-sm-2 text-left">
-                <Button
-                  onClick={this.onPrevChainClick}
-                  className="pt-icon-arrow-left"
-                  text="Previous"
-                  disabled={!(this.state.offset > 0)}
-                  />
-              </div>
-              <div className="col-sm-2 text-right">
-                <Button
-                  onClick={this.onNextChainClick}
-                  className="pt-icon-arrow-right"
-                  text="Next"
-                  disabled={sampleChainIds.length < this.state.limit}
-                  />
-              </div>
+        //       <div className='row' style={{ display: 'flex', alignItems: 'center'}}>
+        //         <h5 className='col-sm-3' style={{margin: '0 auto'}}>Chain Selection:</h5>
+        //         <div className="pt-select" style={{margin: '0 5px'}}>
+        //           <Field
+        //             className="pt-input select-chain"
+        //             component="select"
+        //             name="chainLabel"
+        //             onChange={
+        //               (e) => {
+        //                 const data = e.target.value === 'Main Chain' ? null : e.target.value;
+        //                 this.props.selectChain(data);
+        //               }
+        //             }
+        //             required
+        //             >
+        //             <option>Main Chain </option>
+        //             {
+        //               sampleChainIds.map((label, i) => {
+        //                 return (
+        //                   <option key={label.id} value={label.id}>{label.label}</option>
+        //                   )
+        //                 })
+        //               }
+        //           </Field>
+        //         </div>
+        //       <div className="col-sm-2 text-left">
+        //         <Button
+        //           onClick={this.onPrevChainClick}
+        //           className="pt-icon-arrow-left"
+        //           text="Previous"
+        //           disabled={!(this.state.offset > 0)}
+        //           />
+        //       </div>
+        //       <div className="col-sm-2 text-right">
+        //         <Button
+        //           onClick={this.onNextChainClick}
+        //           className="pt-icon-arrow-right"
+        //           text="Next"
+        //           disabled={sampleChainIds.length < this.state.limit}
+        //           />
+        //       </div>
                   
-            </div>
-        </Tooltip>
+        //     </div>
+        // </Tooltip>
     }
 }
 export function mapStateToProps(state) {
