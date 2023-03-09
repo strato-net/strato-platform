@@ -14,13 +14,15 @@ import CodeEditor from './components/CodeEditor';
 import ExternalStorage from './components/ExternalStorage';
 import Chains from './components/Chains'
 import AppStore from './components/AppStore'
+import Dapplets from './components/Dapplets'
 
 export const routes =
   <Switch>
     <Route exact path="/" component={App}>
       <Redirect to="/home" />
     </Route>
-    <Route exact path="/home" component={Dashboard} />
+    <Route exact path="/home" component={Dapplets} />
+    <Route exact path="/stats" component={Dashboard} />
     <Route exact path="/accounts" component={Accounts} />
     <Route exact path="/external_storage" component={ExternalStorage} />
     <Route exact path="/nodes" component={Nodes} />

@@ -13,6 +13,7 @@ exports[`App: index componentDidMount1 1`] = `
         <Redirect to=\\"/home\\" push={false} />
       </Route>
       <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
@@ -41,6 +42,7 @@ exports[`App: index componentDidMount2 1`] = `
         <Redirect to=\\"/home\\" push={false} />
       </Route>
       <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
@@ -69,6 +71,7 @@ exports[`App: index render component 1`] = `
         <Redirect to=\\"/home\\" push={false} />
       </Route>
       <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
