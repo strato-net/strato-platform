@@ -96,17 +96,13 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         chains: {
-          ...state.chains,
           [action.detail[0].label]: {
-            ...state.chains[action.detail[0].label],
             [action.detail[0].id]: {
               ...action.detail[0]
             }
           }
         },
-        labelIds: state.labelIds,
-        filter: state.filter,
-        error: state.error
+        selectedChain: action.detail[0].id
       }
     case RESET_CHAIN_ID:
       return {

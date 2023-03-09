@@ -28,7 +28,7 @@ const stratoChainUrl = env.STRATO_URL + "/chain";
 export function getChainsApi(limit, offset, chainid) {
   const url = createUrl(stratoChainUrl, { 
     query: { 
-      limit, 
+      limit : limit ? limit : undefined, 
       offset: limit ? offset : undefined, 
       chainid
     }

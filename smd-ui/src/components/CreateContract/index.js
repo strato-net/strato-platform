@@ -24,6 +24,7 @@ import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
+import HexText from '../HexText';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -172,7 +173,7 @@ class CreateContract extends Component {
       solidvm: values.solidvm,
       fileText: fileText,
       arguments: args,
-      chainId: this.props.chains.selectedChain.id,
+      chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
       metadata: metadata
     };
 
@@ -355,7 +356,6 @@ class CreateContract extends Component {
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
-          this.props.fetchChainIds();
           this.props.contractOpenModal();
           this.props.initialize(this.props.initialValues);
           this.props.getLabelIds(this.props.initialValues.chainLabel)
@@ -377,26 +377,13 @@ class CreateContract extends Component {
               <div className='row'>
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Chain
+                    Shard
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.props.selectedChain ? this.props.selectedChain.label : "Main Chain"}
+                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
                 </div>
               </div>
-              {
-                this.props.selectedChain &&
-                <div className='row'>
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Chain ID
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  {this.props.selectedChain.id}
-                </div>
-              </div>
-              }
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">

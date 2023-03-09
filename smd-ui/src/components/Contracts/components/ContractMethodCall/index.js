@@ -63,7 +63,7 @@ class ContractMethodCall extends Component {
           password: isOauthEnabled() ? '' : values.modalPassword,
           value: values.modalValue,
           args: parsedArgs,
-          chainId: this.props.chainId
+          chainId: this.props.selectedChain ? this.props.selectedChain : undefined
         }
         mixpanelWrapper.track("method_call_submit");
         this.props.methodCall(this.props.lookup, payload);
@@ -136,7 +136,7 @@ class ContractMethodCall extends Component {
           <div className="row">
             <div className="col-sm-3 text-right">
               <label className="pt-label label-margin">
-                Chain
+                Shard
               </label>
             </div>
             <div className="col-sm-9">
@@ -165,7 +165,7 @@ class ContractMethodCall extends Component {
           <div className="row">
             <div className="col-sm-3 text-right">
               <label className="pt-label label-margin">
-                Chain Ids
+                Shard Ids
               </label>
             </div>
             <div className="col-sm-9">
@@ -235,7 +235,6 @@ class ContractMethodCall extends Component {
             e.stopPropagation();
             e.preventDefault();
             this.handleOpenModal();
-            this.props.fetchChainIds();
           }}
         >
           Call Method
@@ -250,11 +249,25 @@ class ContractMethodCall extends Component {
           >
             <div className="pt-dialog-body">
               <div className="row">
-                <div className="col-sm-12">
-                  <h5>Address: {this.props.contractAddress}</h5>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Contract Address
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.contractAddress}
                 </div>
               </div>
-              {this.renderChainFields()}
+              <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Shard
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain || "Main Chain"}
+                </div>
+              </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
@@ -268,7 +281,7 @@ class ContractMethodCall extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
-                    Address
+                    Caller Address
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
@@ -376,7 +389,8 @@ export function mapStateToProps(state, ownProps) {
     modalUsername: selector(state, 'modalUsername'),
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
-    oAuthUser: state.user.oauthUser
+    oAuthUser: state.user.oauthUser,
+    selectedChain: state.chains.selectedChain,
   };
 }
 
