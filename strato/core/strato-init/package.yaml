@@ -127,7 +127,6 @@ tests:
   strato-init-test:
     source-dirs: test/
     main: Main.hs
-    ghc-options: -dynamic
     dependencies:
       - aeson
       - base16-bytestring
