@@ -14,6 +14,8 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
 import HexText from '../../../HexText';
 import { Tooltip, Position } from '@blueprintjs/core';
+import tlogo from './twitterLogo.png';
+import llogo from './LILogo1.png';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -196,7 +198,64 @@ class ContractCard extends Component {
                   >
                     {this.state.isOpen ? "Hide" : "Show"} Contracts
                   </Button>
+                  <div class="linkedIn" id="logo">
+                    <a
+                      target='_blank'
+                      href="https://www.linkedin.com/shareArticle?mini=true&url=https://bit.ly/MercataSignUp">
+                    <img title="Share on linkedIn"
+                        src={llogo} 
+                        width="20" 
+                        height="20"
+                        onClick={async () => {
 
+                          var currentdate = new Date(); 
+                          var datetime = currentdate.getDate() + "/"
+                                          + (currentdate.getMonth()+1)  + "/" 
+                                          + currentdate.getFullYear() + " @ "  
+                                          + currentdate.getHours() + ":"  
+                                          + currentdate.getMinutes() + ":" 
+                                          + currentdate.getSeconds();
+
+                          fetch("https://hooks.slack.com/services/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", {
+                            method: 'POST',
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded"
+                            },
+                            body: JSON.stringify({"text":`Share Contract on LinkedIn (${datetime}) --> User: ${this.props.oauthUser.commonName} | Shared Contract: ${name}`})
+                            });
+                        }}
+                      />
+                    </a>
+                  </div>
+                  <div class="twitter" id="logo">
+                    <a
+                      target='_blank'
+                      href="http://twitter.com/intent/tweet?text=Sign%20up%20on%20Mercata%20to%20look%20at%20their%20contracts!&url=https://bit.ly/MercataSignUp">
+                    <img title="Share on twitter"
+                        src={tlogo} 
+                        width="20" 
+                        height="20"
+                        onClick={async () => {
+
+                          var currentdate = new Date(); 
+                          var datetime = currentdate.getDate() + "/"
+                                          + (currentdate.getMonth()+1)  + "/" 
+                                          + currentdate.getFullYear() + " @ "  
+                                          + currentdate.getHours() + ":"  
+                                          + currentdate.getMinutes() + ":" 
+                                          + currentdate.getSeconds();
+
+                          fetch("https://hooks.slack.com/services/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", {
+                            method: 'POST',
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded"
+                            },
+                            body: JSON.stringify({"text":`Share Contract on Twitter (${datetime}) --> User: ${this.props.oauthUser.commonName} | Shared Contract: ${name}`})
+                            });
+                        }}
+                      />
+                    </a>
+                  </div>
                 </div>
 
               </div>
@@ -229,7 +288,8 @@ class ContractCard extends Component {
 
 export function mapStateToProps(state) {
   return {
-    selectedChain: state.chains.selectedChain
+    selectedChain: state.chains.selectedChain,
+    oauthUser: state.user.oauthUser
   };
 }
 
