@@ -66,14 +66,17 @@ import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
-
+//import { fetchUserPubkey } from "./components/User/user.actions";
 const rootReducer = combineReducers({
   form: formReducer.plugin({
     'create-user': (state, action) => {
+      //fetchUserPubkey();
       switch (action.type) {
         case CREATE_BLOC_USER_SUCCESS:
+          console.log("Whehn does this happen? CREATE_BLOC_USER_SUCCESS in smd-ui/src/index.js", CREATE_BLOC_USER_SUCCESS)
           return undefined;
         default:
+          console.log("Whehn does this happen?state in smd-ui/src/index.js", state);
           return state;
       }
     }

@@ -2,17 +2,23 @@ import React, { Component } from 'react';
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 import logo from './BlockAppsLogos_DarkBG-Horizontal.png';
-
+import { connect } from 'react-redux';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { isS3Available } from '../../lib/checkS3Credentials';
+import { withRouter, Link } from 'react-router-dom';
+import { isOauthEnabled } from '../../lib/checkMode';
 
 class SideBar extends Component {
 
   // noOverlay
   // TODO: customCrossIcon={<div><div className="pt-icon-standard pt-icon-chevron-left"/></div>}
   render() {
+    console.log("What is going on here Garrett isOauthEnabled", isOauthEnabled());
+    console.log("What is going on here Garrett localStorage", localStorage);
+    console.log("What is going on here Garrett oauthUser", this.props.oauthUser);
+    
     const navLinksData = (
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
@@ -72,4 +78,15 @@ class SideBar extends Component {
   }
 }
 
-export default SideBar;
+
+export function mapStateToProps(state) {
+  return {
+    oauthUser: state.user.oauthUser
+  };
+}
+
+const connected = connect(mapStateToProps, {})(SideBar);
+
+export default withRouter(connected);
+
+// export default SideBar;

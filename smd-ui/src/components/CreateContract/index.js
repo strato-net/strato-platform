@@ -12,7 +12,7 @@ import {
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, Alert } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -30,12 +30,26 @@ import HexText from '../HexText';
 
 class CreateContract extends Component {
 
+
+  constructor() {
+    super()
+    //this.props.isOpenAlert = false;
+    this.state = { isOpenAlert: false };
+  }
+  // let state = 
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
       toasts.show({ message: nextProps.toastsMessage });
       this.props.resetError();
     }
   }
+
+  // handleErrorOpen = () =>  this.props.isOpenAlert = true ;// this.setState({ isOpen: true });
+  // handleMoveCancel = () =>  this.props.isOpenAlert = false;
+
+  handleErrorOpen = () =>  this.setState({ isOpenAlert: true });
+  handleMoveCancel = () => this.setState({ isOpenAlert: false });
+
 
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
@@ -286,7 +300,7 @@ class CreateContract extends Component {
     const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const isModeOauth = isOauthEnabled();
-
+    //console.log("Garrett Props createContract", this.props);
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
@@ -483,11 +497,23 @@ class CreateContract extends Component {
                 }} />
                 <Button
                   type="submit"
-                  onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting || !valid}
+                  onClick={ this.props.oauthUser.isLoggedIn ?  handleSubmit(this.submit) : this.handleErrorOpen }
+                  disabled={(pristine || submitting || !valid) && this.props.oauthUser.isLoggedIn }
                   text="Create Contract"
                 />
-
+                <Alert
+                    className="Garrett was here"
+                    cancelButtonText="Back"
+                    confirmButtonText="Login/Register"
+                    icon="trash"
+                    isOpen={this.state.isOpenAlert}
+                    onCancel={this.handleMoveCancel}
+                    onConfirm={() => {window.location.replace("https://keycloak.blockapps.net/auth/realms/mercata-testnet/protocol/openid-connect/auth?client_id=mercata-beta-userx&state=e83fa2c9a7bb03ed1985c10d5e9e4679&nonce=71a5e2b940f1d0f79ddc7eebfb9cadae&scope=openid%20email%20profile&response_type=code&redirect_uri=https%3A%2F%2Fuserx1.mercata-beta.blockapps.net%2Fauth%2Fopenidc%2Freturn");}}
+                >
+                    <p>
+                    Great job! But to use this feature, you need to be a logged-in user! Not a registered user? Become one for <b> free</b>!
+                    </p>
+                </Alert>
               </div>
             </div>
 
@@ -537,6 +563,8 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
+    oauthUser : state.user.oauthUser,
+    isOpenAlert : true,
     initialValues: {
       commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
       address: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending',

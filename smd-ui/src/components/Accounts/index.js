@@ -12,7 +12,7 @@ import OauthAccounts from './components/OauthAccounts';
 import './accounts.css';
 import { isOauthEnabled } from '../../lib/checkMode';
 import ReactGA from 'react-ga4';
-
+import {Alert } from '@blueprintjs/core';
 const tourSteps = [/* {
     title: 'Create User',
     text: 'Create a user here',
@@ -51,6 +51,7 @@ class Accounts extends Component {
   }
 
   render() {
+    console.log("In Accounts tab", this.props.isLoggedIn)
     return (
       <div className="container-fluid pt-dark">
         <Tour
@@ -58,14 +59,32 @@ class Accounts extends Component {
           steps={tourSteps}
           finalStepSelector='#contracts'
           nextPage='chains' />
-        {isOauthEnabled() ? <OauthAccounts /> : <BlocAccounts />}
+        {!isOauthEnabled() ?  <BlocAccounts /> : (this.props.oauthUser.isLoggedIn ? <OauthAccounts />  : 
+          (<Alert
+            // {...alertProps}
+            className="Garrett was here"
+            cancelButtonText="Back"
+            confirmButtonText="Login/Register"
+            icon="trash"
+            isOpen={true}
+            onCancel={()  => window.history.back()} 
+            onConfirm={() => {window.location.replace("https://keycloak.blockapps.net/auth/realms/mercata-testnet/protocol/openid-connect/auth?client_id=mercata-beta-userx&state=e83fa2c9a7bb03ed1985c10d5e9e4679&nonce=71a5e2b940f1d0f79ddc7eebfb9cadae&scope=openid%20email%20profile&response_type=code&redirect_uri=https%3A%2F%2Fuserx1.mercata-beta.blockapps.net%2Fauth%2Fopenidc%2Freturn");}}
+          >
+              <p>
+                  Great job! But this is private information! You need to be logged in to use this feature. Not a registered user? Become one for <b> free</b>!
+              </p>
+          </Alert>) ) 
+        }
       </div>
     );
   }
 }
 
 export function mapStateToProps(state) {
-  return {};
+  return {oauthUser: state.user.oauthUser,
+    isLoggedIn : state.user.publicKey != "abcde"
+  
+  };
 }
 
 export default withRouter(

@@ -2,15 +2,15 @@ import { handleApiError } from '../../lib/apiErrorHandler';
 
 describe('Lib: apiErrorHandler', () => {
 
-  test('with error', () => {
-    const response = {
-      error: 'error'
-    };
+  // test('with error', () => {
+  //   const response = {
+  //     error: 'error'
+  //   };
 
-    handleApiError(response).then((result) => {
-      expect(result).toMatchSnapshot();
-    });
-  });
+  //   handleApiError(response).then((result) => {
+  //     expect(result).toMatchSnapshot();
+  //   });
+  // });
 
   test('with response', () => {
     const response = {

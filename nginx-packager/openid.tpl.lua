@@ -78,10 +78,10 @@ else
   else
     -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
     authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
-    if (authenticate_res == authenticate_err and authenticate_res == nil) then
-      ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    end
+    -- if (authenticate_res == authenticate_err and authenticate_res == nil) then
+    --   ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
+    --   ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    -- end
   end
 
   -- in case if authentication failed (case unhandled - server error)

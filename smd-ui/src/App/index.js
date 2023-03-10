@@ -24,6 +24,8 @@ mixpanelWrapper.identify(env.NODE_NAME);
 class App extends Component {
 
   componentDidMount() {
+    console.log("Does Mount in App print first getUserFromLocal()", getUserFromLocal() )
+    console.log("Does Mount in App print first state", this.state )
     if (isOauthEnabled() && !getUserFromLocal()) {
       this.props.getOrCreateOauthUserRequest();
     }
@@ -43,7 +45,8 @@ class App extends Component {
   }
 }
 
-export function mapStateToProps() {
+export function mapStateToProps(state) {
+  console.log("mapStateToProps   in APP", state);
   return ({})
 }
 

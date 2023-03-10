@@ -14,7 +14,13 @@ class MenuBar extends Component {
     window.location.href = '/auth/logout';
   }
 
+  login() {
+      window.location.replace("https://keycloak.blockapps.net/auth/realms/mercata-testnet/protocol/openid-connect/auth?client_id=mercata-beta-userx&state=e83fa2c9a7bb03ed1985c10d5e9e4679&nonce=71a5e2b940f1d0f79ddc7eebfb9cadae&scope=openid%20email%20profile&response_type=code&redirect_uri=https%3A%2F%2Fuserx1.mercata-beta.blockapps.net%2Fauth%2Fopenidc%2Freturn");
+  }
+
   afterLoggedIn() {
+    console.log("Garrett checking props", this.props.oauthUser );
+    
     return (
       <div>
         <span className="pt-navbar-divider" />
@@ -34,7 +40,7 @@ class MenuBar extends Component {
           }
           <span className="pt-navbar-divider" />
           <a target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={this.logout}>Logout</button>
+            <button className="pt-button pt-minimal pt-small" onClick={this.props.isLoggedIn ? this.logout : this.login }>{ this.props.isLoggedIn ? "Logout" : "Login" }</button>
           </a></span>}
       </div>
     );
@@ -68,8 +74,10 @@ class MenuBar extends Component {
 }
 
 export function mapStateToProps(state) {
+  console.log("What is intial state", state);
   return {
-    oauthUser: state.user.oauthUser
+    oauthUser: state.user.oauthUser,
+    isLoggedIn : state.user.publicKey != "abcde"
   };
 }
 

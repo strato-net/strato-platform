@@ -5,9 +5,12 @@ import React, { Component } from 'react';
 import ReactGA              from 'react-ga4';
 import traceCarbonLogo      from './TraceCarbon.png';
 import veriFactorLogo       from './vveriFactorLogo.png';
+import someArt              from './Mr__Brainwash_Home_Hero.jpg'
+
+import someFootball              from './1aba70e23c5947f59ae54af5e24b816e.webp'
 
 
-
+//import { isOauthEnabled } from '../../lib/checkMode';
 class AppStore extends Component {
     constructor() {
       super()
@@ -23,7 +26,7 @@ class AppStore extends Component {
 
 
     render() {
-      
+      console.log("What happens here (localStorage test)", localStorage.getItem('user'))
       const appsList = [{ 
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
@@ -34,7 +37,7 @@ class AppStore extends Component {
           urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
           description: 'TraceCarbon is a comprehensive and versatile traceable commerce d\'app, aimed at accelerating the world\'s journey towards carbon neutrality by providing transparency to the Voluntary Carbon Markets, allowing corporate and individual buyers to explore and transact on high quality carbon credits in order to offset their emissions.',
           image: traceCarbonLogo
-      }, 
+      },  
       // {
       //   appName: "CollectX", 
       //   urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=collectx#collectx', 
@@ -46,7 +49,64 @@ class AppStore extends Component {
         urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=verifactor#verifactor', 
         description: 'VeriFactor is a receivables financing platform that brings end-to-end automation to a previously manual funding ecosystem. SMBs on the VeriFactor platform have access to a rich selection of flexible working capital solutions at cost-effective rates. Lenders on VeriFactor experience higher yields and lower administrative costs thanks to our technology-driven loan origination processes.',
         image: veriFactorLogo
-      }
+      }, 
+      {
+        appName: "DAO Start", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'An application to help you deploy your own decentralized autonomous organization (DAO) on Mercata. Here you can provide the rules that will be encoded in smart contracts to ensure the rules of your organization. DAO Start also provides information to help you decide if a DAO is right for your situation. \nWondering whether a DAO is for you? Discover',
+        image: someArt
+      },
+      {
+        appName: "NFT factory", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+      {
+        appName: "Fanatsy Football", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someFootball
+      },
+
+      {
+        appName: "Art brokage", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+      {
+        appName: "Sell land on the blockchain", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+      {
+        appName: "Poker", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+
+      {
+        appName: "Lottery", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+      {
+        appName: "Vote", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+      {
+        appName: "Supply Chain Management", 
+        urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
+        description: 'Buy art, sell art, trade art.',
+        image: someArt
+      },
+
     ];
 
       function cardProducer(name, redirect, description, image) { return (
@@ -91,5 +151,10 @@ class AppStore extends Component {
 
 }
 
+// export function mapStateToProps(state) {
+//   return {
+//     oauthUser: state.user.oauthUser
+//   };
+// }
 
 export default AppStore;
