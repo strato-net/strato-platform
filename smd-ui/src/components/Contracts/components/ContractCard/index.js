@@ -201,7 +201,7 @@ class ContractCard extends Component {
                   <div class="linkedIn" id="logo">
                     <a
                       target='_blank'
-                      href="https://www.linkedin.com/shareArticle?mini=true&url=https://bit.ly/MercataSignUp">
+                      href="https://www.linkedin.com/shareArticle?mini=true&url=https://bit.ly/MercataShare">
                     <img title="Share on linkedIn"
                         src={llogo} 
                         width="20" 
@@ -230,7 +230,7 @@ class ContractCard extends Component {
                   <div class="twitter" id="logo">
                     <a
                       target='_blank'
-                      href="http://twitter.com/intent/tweet?text=Sign%20up%20on%20Mercata%20to%20look%20at%20their%20contracts!&url=https://bit.ly/MercataSignUp">
+                      href="http://twitter.com/intent/tweet?text=Sign%20up%20on%20Mercata%20to%20look%20at%20their%20contracts!&url=https://bit.ly/MercataShare">
                     <img title="Share on twitter"
                         src={tlogo} 
                         width="20" 
