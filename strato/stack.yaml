@@ -105,7 +105,7 @@ flags:
     ecdh: true
     recovery: true
 
-resolver: lts-20.12 #also duplicated in docker section below
+resolver: lts-20.13 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -130,7 +130,7 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-20.12"
+  image: "strato-buildbase:lts-20.13"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
 
