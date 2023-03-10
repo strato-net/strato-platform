@@ -35,27 +35,6 @@ class OauthAccounts extends Component {
   }
 
   render() {
-    // if ( this.props.oauthAccount == null) {
-  //     <Alert
-  //     // {...alertProps}
-  //     className="Garrett was here"
-  //     cancelButtonText="Back"
-  //     confirmButtonText="Login/Register"
-  //     icon="trash"
-  //     // intent={Intent.DANGER}
-  //     isOpen={true}
-  //     // loading={isLoading}
-  //     // onCancel={this.handleMoveCancel}
-  //     onConfirm={() => {window.location.replace("https://keycloak.blockapps.net/auth/realms/mercata-testnet/protocol/openid-connect/auth?client_id=mercata-beta-userx&state=e83fa2c9a7bb03ed1985c10d5e9e4679&nonce=71a5e2b940f1d0f79ddc7eebfb9cadae&scope=openid%20email%20profile&response_type=code&redirect_uri=https%3A%2F%2Fuserx1.mercata-beta.blockapps.net%2Fauth%2Fopenidc%2Freturn");}}
-  // >
-  //     <p>
-  //         Great job! But to use this feature you need to be a logged in user! Not a registered user? Become one for <b> free</b>!
-  //     </p>
-  // </Alert>
-      console.log("Bingo")
-    //   // window.location.replace("https://keycloak.blockapps.net/auth/realms/strato-devel/protocol/openid-connect/auth?nonce=9e543014e3592b08e2b3f72a03ee386e&scope=openid%20email%20profile&state=0ec9d0fca305934214ce253f3979f752&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fopenidc%2Freturn&response_type=code&client_id=dev");
-    //   }
-    // else {
     const filter = this.props.filter;
 
     const rows = this.props.oauthAccounts.filter(user => {
@@ -140,7 +119,6 @@ class OauthAccounts extends Component {
     );
   }
 }
-// }
 
 export function mapStateToProps(state) {
   return {
