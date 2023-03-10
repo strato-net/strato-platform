@@ -1,11 +1,13 @@
 import {
     SEARCH_QUERY_SUCCESS,
     SEARCH_QUERY_REQUEST,
+    SEARCH_QUERY_FAILURE,
   } from './searchresults.actions';
   
 const initialState = {
     searchQuery: '',
-    searchResult: undefined,
+    searchResults: undefined,
+    searchError: undefined,
   };
 
   const reducer = function (state = initialState, action) {
@@ -17,10 +19,16 @@ const initialState = {
           searchQuery: searchQuery,
         };
     case SEARCH_QUERY_SUCCESS:
-        const searchResult = action.searchResult;
+        const searchResults = action.searchResults;
         return {
           ...state,
-          searchResult: searchResult,
+          searchResults: searchResults,
+        };
+    case SEARCH_QUERY_FAILURE:
+        const error = action.error;
+        return {
+          ...state,
+          searchError: error,
         };
       default:
         return state;

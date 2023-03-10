@@ -88,14 +88,11 @@ class MenuBar extends Component {
         </div>
 
         {/* <div className="pt-navbar-group pt-align-left"> */}
-        <div className="col-sm-5 ">
+        <div className="col-sm-5 smd-pad-4">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
-              <div 
-              // onSubmit={e => this.updateSearch(e.target.value.toLowerCase())} 
-              >
                 <input
-                  className="pt-input pt-search"
+                  className="pt-input"
                   type="search"
                   value={this.state.searchQuery}
                   onChange={(e) => this.setState({searchQuery: e.target.value})}
@@ -103,8 +100,6 @@ class MenuBar extends Component {
                   onKeyDown={this.handleKeyDown}
                   dir="auto" />
                   {/* <input type="submit"></input> */}
-
-              </div>
      
             </div>
             
