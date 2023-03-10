@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import SendTokens from '../SendTokens';
 import AccountDetail from '../../../AccountDetail';
-import {Alert } from '@blueprintjs/core';
 import {
   fetchOauthAccountDetail,
   resetOauthUserAccount,
