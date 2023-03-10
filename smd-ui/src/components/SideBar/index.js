@@ -2,18 +2,18 @@ import React, { Component } from 'react';
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 import logo from './BlockAppsLogos_DarkBG-Horizontal.png';
+
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { isS3Available } from '../../lib/checkS3Credentials';
-import { isOauthEnabled } from '../../lib/checkMode';
+
 
 class SideBar extends Component {
 
   // noOverlay
   // TODO: customCrossIcon={<div><div className="pt-icon-standard pt-icon-chevron-left"/></div>}
   render() {
-    
     const navLinksData = (
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},

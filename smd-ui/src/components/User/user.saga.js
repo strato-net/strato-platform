@@ -18,18 +18,6 @@ const oauthUserUrl = env.APEX_URL + "/user";
 
 
 
-// export function isUserLoggedIn() {
-//   try {
-//     const user_query = yield call(getOrCreateOauthUserApi);
-//     if (user_query.error) { return false}
-//     else {return true}
-//   }
-//  catch (e) {
-//   return false;
-// }
-
-// }
-
 function getOrCreateOauthUserApi() {
   const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
   return fetch(
@@ -106,17 +94,15 @@ export function* getOrCreateOauthUser() {
         organizationalUnit: user_query[0].organizationalUnit,
         country: user_query[0].country,
         address: user_query[0].userAddress,
-        isLoggedIn: true,
+        isLoggedIn: true, //TODO since making SMD to be veiwed be non-logged on users, check if this works? 
       }
 
       localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));
     }
   } catch (e) {
-    const user = {  isLoggedIn: false}
+    const user = {  isLoggedIn: false} //TODO make sure this works
     localStorage.setItem('user', JSON.stringify(user));
-    console.log("GOTCHA");
-
     yield put(getOrCreateOauthUserFailure(e));
   }
 }
@@ -126,19 +112,6 @@ export function* getUserPubKey() {
     const response = yield call(fetchUserPubKeyRequest);
     console.log("response to user pubkey", response);
     yield put(fetchUserPubKeySuccess(response.pubkey));
-  }
-  catch (err) {
-    yield put(fetchUserPubKeyFailure(err));
-  }
-}
-
-
-export function* getUserPubKey2() {
-  try {
-    const response = yield call(fetchUserPubKeyRequest);
-    console.log("response to user pubkey2", response);
-    
-    // yield put(fetchUserPubKeySuccess(response.pubkey));
   }
   catch (err) {
     yield put(fetchUserPubKeyFailure(err));

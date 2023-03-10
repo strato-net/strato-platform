@@ -66,6 +66,7 @@ import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
+
 const rootReducer = combineReducers({
   form: formReducer.plugin({
     'create-user': (state, action) => {

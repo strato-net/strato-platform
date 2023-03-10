@@ -17,8 +17,6 @@ import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
 import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions';
 import { changeHealthStatus } from './dashboard.action'
-import {parseJwt} from '../../lib/parsejwt.js'
-
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
@@ -121,7 +119,6 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
-    console.log();
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
