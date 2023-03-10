@@ -6,13 +6,41 @@ import './menubar.css';
 import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
+import {
+  searchQueryRequest,
+} from '../SearchResults/searchresults.actions';
 
 class MenuBar extends Component {
+  constructor() {
+    super()
+    this.state = {
+     searchQuery:""
+    }
+  }
 
   logout() {
     localStorage.removeItem('user');
     window.location.href = '/auth/logout';
   }
+
+  updateSearch = (searchQuery) => {
+    // Update local state instead
+    this.props.searchQuerySuccess(searchQuery);
+    this.setState({ searchQuery: searchQuery });
+    console.log("hello?", searchQuery);
+  }
+
+
+  handleKeyDown = (e) => {
+
+    if(e.keyCode === 13) {
+      this.props.searchQueryRequest(this.state.searchQuery);
+      this.props.history.push('/searchresults')
+    }
+  }
+  
+  // on-submit search function calls searchQueryRequest
+
 
   afterLoggedIn() {
     return (
@@ -56,8 +84,31 @@ class MenuBar extends Component {
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading">STRATO Mercata Dashboard</div>
+          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
+
+        {/* <div className="pt-navbar-group pt-align-left"> */}
+        <div className="col-sm-5 ">
+            <div className="pt-input-group pt-dark pt-large">
+              <span className="pt-icon pt-icon-search"></span>
+              <div 
+              // onSubmit={e => this.updateSearch(e.target.value.toLowerCase())} 
+              >
+                <input
+                  className="pt-input pt-search"
+                  type="search"
+                  value={this.state.searchQuery}
+                  onChange={(e) => this.setState({searchQuery: e.target.value})}
+                  placeholder="Search anything on Mercata"
+                  onKeyDown={this.handleKeyDown}
+                  dir="auto" />
+                  {/* <input type="submit"></input> */}
+
+              </div>
+     
+            </div>
+            
+          </div>
         <div className="pt-navbar-group pt-align-right">
           <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
@@ -69,10 +120,11 @@ class MenuBar extends Component {
 
 export function mapStateToProps(state) {
   return {
-    oauthUser: state.user.oauthUser
+    oauthUser: state.user.oauthUser,
+    searchQuery: state.search.searchQuery
   };
 }
 
-const connected = connect(mapStateToProps, {})(MenuBar);
+const connected = connect(mapStateToProps, {searchQueryRequest})(MenuBar);
 
 export default withRouter(connected);
