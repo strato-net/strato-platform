@@ -33,10 +33,9 @@ class CreateContract extends Component {
 
   constructor() {
     super()
-    //this.props.isOpenAlert = false;
     this.state = { isOpenAlert: false };
   }
-  // let state = 
+  
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
       toasts.show({ message: nextProps.toastsMessage });
@@ -44,12 +43,8 @@ class CreateContract extends Component {
     }
   }
 
-  // handleErrorOpen = () =>  this.props.isOpenAlert = true ;// this.setState({ isOpen: true });
-  // handleMoveCancel = () =>  this.props.isOpenAlert = false;
-
   handleErrorOpen = () =>  this.setState({ isOpenAlert: true });
   handleMoveCancel = () => this.setState({ isOpenAlert: false });
-
 
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
@@ -300,7 +295,6 @@ class CreateContract extends Component {
     const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const isModeOauth = isOauthEnabled();
-    //console.log("Garrett Props createContract", this.props);
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {

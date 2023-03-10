@@ -16,8 +16,6 @@ import { env } from '../../env';
 
 const oauthUserUrl = env.APEX_URL + "/user";
 
-
-
 function getOrCreateOauthUserApi() {
   const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
   return fetch(

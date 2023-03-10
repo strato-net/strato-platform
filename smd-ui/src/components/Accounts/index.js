@@ -51,7 +51,6 @@ class Accounts extends Component {
   }
 
   render() {
-    console.log("In Accounts tab", this.props.isLoggedIn)
     return (
       <div className="container-fluid pt-dark">
         <Tour

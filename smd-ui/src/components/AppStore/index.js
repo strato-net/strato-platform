@@ -10,7 +10,6 @@ import someArt              from './Mr__Brainwash_Home_Hero.jpg'
 import someFootball              from './1aba70e23c5947f59ae54af5e24b816e.webp'
 
 
-//import { isOauthEnabled } from '../../lib/checkMode';
 class AppStore extends Component {
     constructor() {
       super()
@@ -26,7 +25,6 @@ class AppStore extends Component {
 
 
     render() {
-      console.log("What happens here (localStorage test)", localStorage.getItem('user'))
       const appsList = [{ 
           appName: "BlockApps Bucks", 
           urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ' ,
@@ -151,10 +149,5 @@ class AppStore extends Component {
 
 }
 
-// export function mapStateToProps(state) {
-//   return {
-//     oauthUser: state.user.oauthUser
-//   };
-// }
 
 export default AppStore;

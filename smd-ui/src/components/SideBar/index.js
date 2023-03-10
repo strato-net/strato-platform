@@ -8,7 +8,6 @@ import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { isS3Available } from '../../lib/checkS3Credentials';
 
-
 class SideBar extends Component {
 
   // noOverlay
@@ -72,6 +71,5 @@ class SideBar extends Component {
     );
   }
 }
-
 
 export default SideBar;

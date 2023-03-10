@@ -391,15 +391,9 @@ class CreateChain extends Component {
 
   render() {
     const contracts = this.props.abi ? Object.keys(this.props.abi.src) : [];
-    // const { isOpen } = this.state;
-    // console.log("this.props.isLoggedIn ", this.props.isLoggedIn );
-    // console.log("this.props.isSpinning ", this.props.isSpinning);
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
-          // if (this.props.isLoggedIn) {
-          //   window.location.replace("https://keycloak.blockapps.net/auth/realms/strato-devel/protocol/openid-connect/auth?nonce=9e543014e3592b08e2b3f72a03ee386e&scope=openid%20email%20profile&state=0ec9d0fca305934214ce253f3979f752&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fopenidc%2Freturn&response_type=code&client_id=dev");
-          // }
           mixpanelWrapper.track('create_chain_open_click');
           this.props.reset();
           this.props.openCreateChainOverlay();
@@ -544,8 +538,7 @@ class CreateChain extends Component {
                     label='Governance'
                     checked={this.state.form.contractSelected === 'Governance'}
                     onClick={
-                      () => {    // console.log("this.props.isLoggedIn ", this.props.isLoggedIn );
-                        // console.log("this.props.isSpinning ", this.props.isSpinning);
+                      () => {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'Governance' },
