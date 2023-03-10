@@ -2,10 +2,10 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import {
-  searchQuerySuccess,
+  searchQueryRequest,
 } from './searchresults.actions';
 import {
-  fetchAccounts,
+  fetchOauthAccounts,
 } from '../Accounts/accounts.actions';
 import Account from '../Account';
 
@@ -20,42 +20,33 @@ class SearchResults extends Component {
      searchQuery2: this.setState.searchQuery
     }
   }
-
+  componentDidMount() {
+    this.props.searchQueryRequest(this.props.searchQuery)
+  }
     render() {
-
-      const accounts = this.props.accounts;
-      const filter = this.props.filter;
-      const users = Object.getOwnPropertyNames(accounts);
+      console.log(this.props)
+      const users = this.props.searchResults;
       const rows = [];
       const selectedAddresses = [];
       // const isModeOauth = isOauthEnabled();
-  
-      users.filter(user => {
-        if (!filter) {
-          return true;
-        }
-        return user
-          .toLowerCase()
-          .indexOf(filter) > -1
-      })
-        .forEach(function (user, index) {
-          const addresses = Object.getOwnPropertyNames(accounts[user]);
+      users && users.forEach(function (user, index) {
+          const { userAddress, commonName, organization } = user
           let userClasseName = '';
-          if (this.state.selected === index && addresses.length > 0) {
-            userClasseName = ' selected';
-            addresses.map(address =>
-              selectedAddresses.push(<Account name={user} address={address} key={address} />)
-            );
-          }
+          // if (this.state.selected === index && userAddress.length > 0) {
+          //   userClasseName = ' selected';
+          //   addresses.map(address =>
+          //     selectedAddresses.push(<Account name={user} address={address} key={address} />)
+          //   );
+          // }
   
           rows.push(
-            <div className="smd-margin-8" key={user}>
+            <div className="smd-margin-8" key={userAddress}>
               <div className="row">
                 <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={index} onClick={(e) => {
-                  this.setState({ selected: index });
-                  this.onUserClick(user, addresses, index);
+                  // this.setState({ selected: index });
+                  // this.onUserClick(user, addresses, index);
                 }}>
-                  {user}
+                  {commonName} - {organization}
                 </div>
               </div>
             </div>
@@ -177,14 +168,15 @@ class SearchResults extends Component {
 export function mapStateToProps(state) {
   return {
     searchQuery: state.search.searchQuery,
-    accounts:    state.accounts.accounts,
+    searchResults: state.search.searchResults,
+    accounts:    state.accounts.oauthAccounts,
   };
 }
 
 export default withRouter(
   connect(mapStateToProps,
     {
-      searchQuerySuccess,
-      fetchAccounts
+      searchQueryRequest,
+      fetchOauthAccounts
     }
   )(SearchResults));
