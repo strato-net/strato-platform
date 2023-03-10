@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
-import { Button, Tab2, Tabs2, Popover, Position, Icon} from '@blueprintjs/core';
+import { Button, Tab2, Tabs2, Popover, Position, Icon, Switch } from '@blueprintjs/core';
 import { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
@@ -14,17 +14,29 @@ import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
 import debounce from 'lodash/debounce';
 import ReactGA from 'react-ga4';
+import { fetchChainDetailSelect, selectChain, fetchChainIds } from "../Chains/chains.actions"
+import HexText from '../HexText';
+import { Field, reduxForm } from 'redux-form';
+
 class CodeEditor extends Component {
   constructor() {
     super()
     this.timeout = null;
     this.saveLocalState = null
+    this.state = {
+      chainLimit: 25,
+      chainOffset: 0,
+      useSearch: true,
+      chainSearchQueryField: "chainid",
+      chainQuery: "",
+    }
   }
 
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
     ReactGA.send({hitType: "pageview", page: "/code_editor", title: "Contract Editor"});
     this.saveLocalState = debounce(this.saveToLocalStorage, 500)
+    this.props.fetchChainIds(this.chainLimit, this.chainOffset);
     window.onbeforeunload = (e) => {
       this.saveToLocalStorage()
     };
@@ -33,6 +45,34 @@ class CodeEditor extends Component {
   componentDidUpdate() {
       this.saveLocalState && this.saveLocalState()
   }
+
+  onChainSearch = () => {
+    if (this.state.useSearch) {
+      this.setState({chainQuery : ""})
+      this.props.fetchChainIds(this.chainLimit, this.chainOffset);
+    }
+    this.props.fetchChainDetailSelect(this.state.chainQuery, this.state.chainSearchQueryField)
+  }
+
+  toggleChainQueryType = (e) => {
+    this.setState({ useSearch : !this.state.useSearch })
+  }
+
+  onNextChainClick = () => {
+    const { chainOffset, chainLimit } = this.state;
+    const newOffset = chainOffset + chainLimit;
+    this.setState({ chainOffset: newOffset }, () => {
+      this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
+  };
+
+  onPrevChainClick = () => {
+    const { chainOffset, chainLimit } = this.state;
+    const newOffset = Math.max(0, chainOffset - chainLimit);
+    this.setState({ chainOffset: newOffset }, () => {
+      this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
+  };
 
   saveToLocalStorage() {
     try {
@@ -188,10 +228,90 @@ class CodeEditor extends Component {
       </Tab2>
     })
 
+    const chainSelector = this.state.useSearch ? (
+      <div className="row smd-margin-16 col-sm-8" style={{ display: 'flex', alignItems: 'center', marginRight: '8px'}}>
+        <h4 className="text-left" style={{margin: '0 8px 0 0'}}>Shard {this.state.chainSearchQueryField == "chainid" ? "ID" : "Label"}:</h4>
+        <input 
+          className='pt-input smd-pad-4 pt-icon-search' 
+          type="search" 
+          name="chainQuery" 
+          placeholder={this.state.chainSearchQueryField == "chainid" ? "Shard ID" : "Shard Label"}
+          onChange={(e) => {
+            this.setState({chainQuery: e.target.value})
+          }}
+          value={this.state.chainQuery}
+        />
+        <div className="pt-select" style={{margin: '0 5px'}}>
+          <Field
+            className="pt-input"
+            component="select"
+            name="searchByChainId"
+            defaultValue={"chainid"}
+            onChange={
+              (e) => {
+                this.setState({chainSearchQueryField: e.target.value});
+              }
+            }
+            required
+            >
+            <option key={"chainid"} value={"chainid"}>Shard ID</option>
+            {/* get chains api does not accept this query param :( <option key={"label"} value={"label"}>Shard Label</option> */}
+          </Field>
+        </div>
+        <div>
+          <button className="pt-button" onClick={(e) => this.onChainSearch(this.state.chainQuery)}>Select Shard</button>
+        </div>
+      </div>) : 
+      
+          <div className='row smd-margin-16 col-sm-8' style={{ display: 'flex', alignItems: 'center', margin: '16px 0'}}>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Chain:</h4>
+              <div className="pt-select" style={{margin: '0 5px'}}>
+                <Field
+                  className="pt-input select-chain"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => {
+                      const data = e.target.value === 'Main Chain' ? null : e.target.value;
+                      this.props.selectChain(data);
+                    }
+                  }
+                  required
+                  >
+                  <option>Main Chain </option>
+                  {
+                    this.props.chainIds.map((label, i) => {
+                      return (
+                        <option key={label.id} value={label.id}>{label.label}</option>
+                        )
+                      })
+                    }
+                </Field>
+              </div>
+            <div className="smd-pad-2 text-left">
+              <Button
+                onClick={this.onPrevChainClick}
+                className="pt-icon-arrow-left"
+                text="Previous"
+                disabled={!(this.state.chainOffset > 0)}
+                />
+            </div>
+            <div className="smd-pad-2 text-right">
+              <Button
+                onClick={this.onNextChainClick}
+                className="pt-icon-arrow-right"
+                text="Next"
+                disabled={this.props.chainIds.length < this.state.chainLimit}
+                />
+            </div>
+              <div className='col-sm-6'>
+                    &nbsp;
+              </div>
+          </div>
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
-          <div className="col-md-4 text-left">
+          <div className="col-md-2 text-left">
             <h3>Contract Editor</h3>
           </div>
           <div className="text-right">
@@ -216,6 +336,7 @@ class CodeEditor extends Component {
                   <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
               </Button>
             </Popover>
+          
             <DeployDapp
               onChangeEditorContractName={this.props.contractNameChange}
               contractNameFromEditor={this.props.codeEditorData.contractName}
@@ -228,8 +349,25 @@ class CodeEditor extends Component {
               enableCreateContract={this.props.codeEditorData.enableCreateAction}
               textFromEditor={sourceCode}
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
-            </div>
-          </div>
+        </div>
+        </div>
+        <div className='row'>
+            {this.props.chainIds && this.props.chainIds ?
+                  <div className='row pt-dark chain-wrapper smd-pad-8' style={{ display: 'flex', alignItems: 'center', marginLeft: '8px'}}>
+                    {chainSelector}
+                    <div className="smd-pad-8 col-sm-6" style={{display: 'flex', alignItems: 'center'}}>
+                      <Switch
+                        checked={this.state.useSearch}
+                        onChange={this.toggleChainQueryType}
+                        label="Use Shard Search"
+                        />
+                      </div>
+                    <div className='col-sm-4 text-left'>
+                      <strong>Shard ID:</strong> { this.props.selectedChain ? <HexText value={this.props.selectedChain}></HexText> : 'Main Chain'}
+                    </div>
+                  </div>
+            : ''}
+        </div>
         {this.renderFileHandlerButtons()}
         <div className="row">
           <div className="col-md-12">
@@ -262,8 +400,23 @@ class CodeEditor extends Component {
 export function mapStateToProps(state) {
   return {
     selectedTabContent: getSelectedTabContent(state.codeEditor),
-    codeEditorData: state.codeEditor
+    codeEditorData: state.codeEditor,
+    selectedChain: state.chains.selectedChain,
+    chainIds: state.chains.chainIds,
   };
 }
 
-export default withRouter(connect(mapStateToProps, { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange })(CodeEditor));
+const formed = reduxForm({ form: 'CodeEditor' })(CodeEditor);
+export default withRouter(connect(mapStateToProps, 
+  { onCompileFileLocally, 
+    onChangeFileName, 
+    contractNameChange, 
+    compileCodeFromEditor, 
+    changeCreateActionState, 
+    addNewFileTab, 
+    removeTab, 
+    onTabChange,
+    fetchChainDetailSelect,
+    selectChain,
+    fetchChainIds,
+  })(formed));

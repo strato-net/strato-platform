@@ -10,7 +10,8 @@ import {
   FETCH_CHAINS_IDS_SUCCESS,
   GET_LABEL_IDS,
   SELECT_CHAIN,
-  FETCH_CHAINS_FAILURE
+  FETCH_CHAINS_FAILURE,
+  FETCH_SELECT_CHAIN_DETAIL_SUCCESS
 } from './chains.actions';
 
 const initialState = {
@@ -90,6 +91,18 @@ const reducer = function (state = initialState, action) {
         labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
+      }
+    case FETCH_SELECT_CHAIN_DETAIL_SUCCESS:
+      return {
+        ...state,
+        chains: {
+          [action.detail[0].label]: {
+            [action.detail[0].id]: {
+              ...action.detail[0]
+            }
+          }
+        },
+        selectedChain: action.detail[0].id
       }
     case RESET_CHAIN_ID:
       return {
