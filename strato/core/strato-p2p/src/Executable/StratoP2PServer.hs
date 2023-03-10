@@ -36,6 +36,7 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 
@@ -84,6 +85,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                   $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                  lengthenPeerDisable p
                 e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable p
+                e' | Just TimeoutException <- fromException e' -> lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                 e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                  case ioErrType of
                    NoSuchThing -> do

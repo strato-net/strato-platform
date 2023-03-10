@@ -178,7 +178,7 @@ handleEvents peer = awaitForever $ \case
       -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
-      let count = (1 + skip') * max mrh max'
+      let count = (1 + skip') * min mrh max'
       chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $

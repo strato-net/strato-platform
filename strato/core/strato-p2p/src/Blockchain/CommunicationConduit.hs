@@ -90,8 +90,8 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
---  tid <- myThreadId
---  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+  tid <- myThreadId
+  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
     [ peerSourceConduit
         .| ethDecrypt inCtx
@@ -99,7 +99,7 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
---        .| CL.iterM (const $ petWatchdog recvWatchdog)
+        .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
@@ -308,7 +308,7 @@ bytesToMessages = forever $ do
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
 maxMessageSize :: Int
-maxMessageSize = 1 `shiftL` 24
+maxMessageSize = 1 `shiftL` 25
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = mapC $ \msg ->
