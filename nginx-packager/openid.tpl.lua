@@ -53,6 +53,9 @@ local authenticate_opts = {
 }
 
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
+
+
+-- if ngx.var.is_key == "true" then
 if ngx.req.get_headers()["Authorization"] then
   local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
@@ -66,7 +69,13 @@ if ngx.req.get_headers()["Authorization"] then
   local header = ngx.req.get_headers()["Authorization"]
   local divider = header:find(' ')
   user_access_token = header:sub(divider + 1)
-else
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+  -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
+  ngx.req.clear_header("Authorization")
+
+
+elseif not ngx.req.get_headers()["Authorization"] then
+  
   -- Else - use the openidc authenticate flow
 
   local authenticate_res, authenticate_err
@@ -86,15 +95,39 @@ else
 
   -- in case if authentication failed (case unhandled - server error)
   if authenticate_err then
-    ngx.status = 500
-    ngx.say(authenticate_err)
-    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+    ngx.status = 200
+    -- ngx.say(authenticate_err)
+    -- ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+    -- ngx.req.clear_header("Authorization")
+  else 
+    user_access_token = authenticate_res.access_token
+    ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+    -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
+    ngx.req.clear_header("Authorization")
   end
 
-  user_access_token = authenticate_res.access_token
+  
+
+
+else
+  local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
+
+  if verify_err or not verify_res then
+    ngx.status = 403
+    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
+    ngx.exit(ngx.HTTP_FORBIDDEN)
+  end
+
+  -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
+  local header = ngx.req.get_headers()["Authorization"]
+  local divider = header:find(' ')
+  user_access_token = header:sub(divider + 1)
+
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+  --removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
+  ngx.req.clear_header("Authorization")
+
+
 end
 
 
-ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
--- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
-ngx.req.clear_header("Authorization")
