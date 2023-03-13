@@ -114,6 +114,7 @@ executables:
   genesis-builder:
     source-dirs: exec_src/
     main: GenesisBuilder.hs
+    ghc-options: -dynamic
     dependencies:
       - aeson
       - bytestring
