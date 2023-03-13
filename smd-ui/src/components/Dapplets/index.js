@@ -1,4 +1,4 @@
-import React, { Component, setState } from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import ReactGA from 'react-ga4';
@@ -78,7 +78,7 @@ class DappletCard extends Component {
     return (
       <div className={classes} onClick={() => {
           toasts.show({ message: "Coming soon!" })
-          ReactGA.send({ hitType: "pageview", page: "/dapplets", title: this.props.name });
+          ReactGA.event({ category: "dapplets", action: "clicked dApplet service", label: this.props.name })
         }}>
         <div className="row">
           <div className="col-xs-3 text-center">
