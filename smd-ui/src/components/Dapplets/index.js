@@ -78,7 +78,7 @@ class DappletCard extends Component {
     return (
       <div className={classes} onClick={() => {
           toasts.show({ message: "Coming soon!" })
-          ReactGA.event({ category: "dapplets", action: "clicked dApplet service", label: this.props.name })
+          ReactGA.event("click", { page_title: "dapplets", event_category: this.props.name })
         }}>
         <div className="row">
           <div className="col-xs-3 text-center">
