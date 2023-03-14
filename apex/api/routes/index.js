@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 
 const oAuthController = require('../controllers/oAuth');
+const searchController = require('../controllers/search');
 const healthHandler = require('../controllers/health');
 // const apiCounterHandler = require('../controllers/apiCounter');
 
 // Endpoint called by SMD to create key for smd user logged in with oauth
 router.post('/user', oAuthController.createUserKey);
+
+// Temporary endpoint called by SMD to perform Mercata Search
+router.get('/search', searchController.search);
 
 // Health
 router.get('/status', healthHandler.nodeStatus);
