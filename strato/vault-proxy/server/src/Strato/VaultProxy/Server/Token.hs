@@ -6,21 +6,18 @@
 
 module Strato.VaultProxy.Server.Token where
 
-import           Control.Concurrent.STM
-import           Control.Concurrent.Lock  as L
+
+import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.ByteString.Base64   as B64
-import           Data.Cache               as C
-import           Data.Cache.Internal      as C
 import           Data.Maybe
 import qualified Data.Text               as T
 import           Data.Text.Encoding      as TE
 import           Debug.Trace
 import           Network.HTTP.Client     as HTC hiding (Proxy)
 import           Network.HTTP.Req        as R
-import           Strato.VaultProxy.RawOauth
 import           System.Clock
 import           Text.URI                as URI
 
@@ -45,48 +42,35 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
     --Convert the server response to the VaultToken type
     pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
---This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
-getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
-    --Get the current STM time and the check if the item in memory needs to be cleared, clear it if needed
-    cache <- liftIO . atomically $ do 
-        now <- C.nowSTM
-        cash <- lookupSTM True clientId squirrel now
-        pure cash
+-- --This will get the correct token and will get a cached token if it is still valid
 
-    --If the cache is up to date, then just return the VaultToken
-    vaultToken <- case cache of 
-        Just c -> do
-            vaultProxyDebug debuggingOn "Got my token from the cache, not from the remote server."
-            pure c
-        --If the token was old destroy the old token and get a new one, block all threads except one to update the token
-        Nothing -> do 
-            --Create a locking mechanism that can prevent other threads from trying to request information from the thread simultaneously
-            traceM "Try and acquire a lock to change the token"
-            doIHaveControl <- liftIO $ L.tryAcquire awesomeLock
-            if doIHaveControl then do
-                traceM "One thread got control and is getting the new token"
-                
-                traceM "Trying to get a new token from OAuth provider"
-                -- Get the virgin token from the provider
-                virToken <- getVirginToken clientId clientSecret additionalOauth
-                --Calculate the time that the token will expire
-                vaultProxyDebug debuggingOn  "Trying to calculate the expry time of the token"
-                exTime <- makeExpry virToken reserveTime
-                --Insert the new token into the STM cache
-                vaultProxyDebug debuggingOn "Trying to insert the new token into the cache"
-                liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
-                traceM "Successfully inserted the new token into the cache, releasing lock and notifiying other threads"
-                liftIO $ L.release awesomeLock
-                pure virToken
-              else do
-                traceM "Waiting until my neighbor thread updates the token"
-                liftIO $ L.wait awesomeLock
-                traceM "Lock is released, will try to get the token again."
-                checkTokenAgain <- getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth
-                pure checkTokenAgain
+-- getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+-- getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
+getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> MVar VaultToken -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+--         debuggingOn :: Bool
+getAwesomeToken _ tokenMVar clientId clientSecret reserveTime additionalOauth = do
+    -- Try to take the token from the MVar
+    maybeToken <- liftIO $ tryTakeMVar tokenMVar
+    case maybeToken of
+        Just token -> do
+            -- If we got a token, check if it's still valid
+            currentTime <- liftIO $ getTime Monotonic
+            expiryTime <- makeExpry token reserveTime
+            if currentTime < expiryTime then do
+                -- If the token is valid, put it back and return it
+                liftIO $ putMVar tokenMVar token
+                pure token
+            else do
+                -- If the token is not valid, get a new one and update the MVar
+                newToken <- getVirginToken clientId clientSecret additionalOauth
+                liftIO $ putMVar tokenMVar newToken
+                pure newToken
+        Nothing -> do
+            -- If there was no token, get a new one and update the MVar
+            newToken <- getVirginToken clientId clientSecret additionalOauth
+            liftIO $ putMVar tokenMVar newToken
+            pure newToken
 
-    pure vaultToken
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
 makeExpry :: MonadIO m => VaultToken -> Int -> m TimeSpec 
@@ -104,15 +88,16 @@ makeExpry token reserveTime = do
 
 --Get the vault token more easily
 vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
-vaulty vaultConn = getAwesomeToken db ll tc cid csec rs ao
+vaulty vaultConn = getAwesomeToken db tmvar cid csec rs ao
     where
         cid = oauthClientId vaultConn
         csec = oauthClientSecret vaultConn
         ao = additionalOauth vaultConn
         rs = oauthReserveSeconds vaultConn
-        tc = tokenCache vaultConn
-        ll = superLock vaultConn
+        tmvar = tokenMVar vaultConn
         db = debuggingOn vaultConn
 
 vaultProxyDebug :: Applicative f => Bool -> String -> f()
 vaultProxyDebug debug msg  = when debug $ traceM msg
+
+
