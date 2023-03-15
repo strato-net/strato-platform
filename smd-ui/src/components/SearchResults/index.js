@@ -4,23 +4,13 @@ import { withRouter } from 'react-router-dom';
 import {
   searchQueryRequest,
 } from './searchresults.actions';
-import {
-  fetchOauthAccounts,
-} from '../Accounts/accounts.actions';
 import Dapplets from '../Dapplets';
 
 class SearchResults extends Component {
-  constructor() {
-    super()
-    this.state = {
-      searchQuery2: this.setState.searchQuery
-    }
-  }
   componentDidMount() {
     this.props.searchQueryRequest(this.props.searchQuery)
   }
   render() {
-    console.log(this.props)
     const users = this.props.searchResults;
     const rows = [];
     const selectedAddresses = [];
@@ -148,7 +138,6 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps,
     {
-      searchQueryRequest,
-      fetchOauthAccounts
+      searchQueryRequest
     }
   )(SearchResults));

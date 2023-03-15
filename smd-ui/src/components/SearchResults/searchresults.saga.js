@@ -1,7 +1,7 @@
 import {
     put,
     call,
-    takeEvery
+    takeLatest
   } from 'redux-saga/effects';
 import {
     SEARCH_QUERY_REQUEST,
@@ -64,10 +64,8 @@ export function* getsearchQuery(action) {
     //apex?
     try {
       const response = yield call(searchQueryApi, action.searchQuery);
-      console.log("david1+++++++++++++",response);
       yield put(searchQuerySuccess(response));
       const response2 = yield call(storeApexApi, action.searchQuery);
-      console.log("davidAPEX2+++++++++++++",response2);
       // yield put(searchQuerySuccess(response));
     }
     catch (err) {
@@ -77,5 +75,5 @@ export function* getsearchQuery(action) {
 
 export default function* watchSearchQuery() {
     yield [
-        takeEvery(SEARCH_QUERY_REQUEST, getsearchQuery)
+        takeLatest(SEARCH_QUERY_REQUEST, getsearchQuery)
     ];}
