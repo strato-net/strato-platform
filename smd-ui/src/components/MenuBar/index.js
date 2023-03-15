@@ -33,7 +33,7 @@ class MenuBar extends Component {
 
   handleKeyDown = (e) => {
 
-    if(e.keyCode === 13) {
+    if(e.keyCode === 13 && this.state.searchQuery!=="") {
       this.props.searchQueryRequest(this.state.searchQuery);
       this.props.history.push('/searchresults')
     }

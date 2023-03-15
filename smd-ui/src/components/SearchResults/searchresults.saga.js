@@ -1,7 +1,7 @@
 import {
     put,
     call,
-    takeEvery
+    takeLatest
   } from 'redux-saga/effects';
 import {
     SEARCH_QUERY_REQUEST,
@@ -15,9 +15,31 @@ import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
+export function storeApexApi(searchQuery) {
+  const apexUrl = env.APEX_URL + "/search?q=" + searchQuery;
+  return fetch (apexUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(searchQuery)
+    }
+  )
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    })
+}
+
 export function searchQueryApi(searchQuery) {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?commonName=ilike.*" + searchQuery + "*";
-  fetch (cirrusUrl,
+  // const cirrusUrl = env.CIRRUS_URL + "/Certificate?commonName=ilike.*" + searchQuery + "*";
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?or=(commonName.ilike.*" + searchQuery + "*" + ",organization.ilike.*" + searchQuery + "*" + ",userAddress.ilike.*" + searchQuery + "*)";
+
+  return fetch (cirrusUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -40,8 +62,9 @@ export function* getsearchQuery(action) {
     //apex?
     try {
       const response = yield call(searchQueryApi, action.searchQuery);
-      // const response = ["999"];
       yield put(searchQuerySuccess(response));
+      const response2 = yield call(storeApexApi, action.searchQuery);
+      // yield put(searchQuerySuccess(response));
     }
     catch (err) {
       yield put(searchQueryFailure(err));
@@ -50,5 +73,5 @@ export function* getsearchQuery(action) {
 
 export default function* watchSearchQuery() {
     yield [
-        takeEvery(SEARCH_QUERY_REQUEST, getsearchQuery)
+        takeLatest(SEARCH_QUERY_REQUEST, getsearchQuery)
     ];}
