@@ -308,7 +308,7 @@ bytesToMessages = forever $ do
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
 maxMessageSize :: Int
-maxMessageSize = 1 `shiftL` 24
+maxMessageSize = 1 `shiftL` 25
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = mapC $ \msg ->

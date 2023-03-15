@@ -45,7 +45,6 @@ module Blockchain.VMContext
     , bestBlockInfo
     , hasBlockstanbul
     , blockRequested
-    , coinbaseQueue
     , txRunResultsCache
     , debugSettings
     , dbs
@@ -82,8 +81,6 @@ import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
-import qualified Data.Sequence                      as Q
-import           Data.Word
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
@@ -124,7 +121,6 @@ import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
@@ -150,7 +146,7 @@ newtype IsBlockstanbul = IsBlockstanbul { unIsBlockstanbul :: Bool }
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
     deriving (Eq, Read, Show, Generic, NFData)
 
 data ContextDBs = ContextDBs
@@ -165,12 +161,12 @@ data ContextDBs = ContextDBs
 makeLenses ''ContextDBs
 
 data MemDBs = MemDBs
-  { _stateTxMap      :: M.Map Account AddressStateModification
-  , _stateBlockMap   :: M.Map Account AddressStateModification
-  , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
-  , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
-  , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
-  , _currentBlock    :: Maybe CurrentBlockHash
+  { _stateTxMap      :: !(M.Map Account AddressStateModification)
+  , _stateBlockMap   :: !(M.Map Account AddressStateModification)
+  , _storageTxMap    :: !(M.Map (Account, B.ByteString) B.ByteString)
+  , _storageBlockMap :: !(M.Map (Account, B.ByteString) B.ByteString)
+  , _stateRoots      :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot)
+  , _currentBlock    :: !(Maybe CurrentBlockHash)
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -185,14 +181,13 @@ instance Default MemDBs where
     }
 
 data ContextState = ContextState
-  { _memDBs            :: MemDBs
+  { _memDBs            :: !MemDBs
   , _baggerState       :: !BaggerState
-  , _bestBlockInfo     :: ContextBestBlockInfo
-  , _hasBlockstanbul   :: Bool
-  , _blockRequested    :: Bool
-  , _coinbaseQueue     :: Q.Seq ((ChainMemberParsedSet,Word64), ChainMemberParsedSet)
+  , _bestBlockInfo     :: !ContextBestBlockInfo
+  , _hasBlockstanbul   :: !Bool
+  , _blockRequested    :: !Bool
   , _txRunResultsCache :: TRC.Cache
-  , _debugSettings     :: Maybe DebugSettings
+  , _debugSettings     :: !(Maybe DebugSettings)
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -203,7 +198,6 @@ instance Default ContextState where
     , _bestBlockInfo     = Unspecified
     , _hasBlockstanbul   = True
     , _blockRequested    = False
-    , _coinbaseQueue     = Q.empty
     , _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache"
     , _debugSettings     = Nothing
     }
@@ -564,7 +558,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _bestBlockInfo     = Unspecified
             , _hasBlockstanbul   = False
             , _blockRequested    = False
-            , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
             }
