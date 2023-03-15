@@ -28,7 +28,6 @@ class MenuBar extends Component {
     // Update local state instead
     this.props.searchQuerySuccess(searchQuery);
     this.setState({ searchQuery: searchQuery });
-    console.log("hello?", searchQuery);
   }
 
 
