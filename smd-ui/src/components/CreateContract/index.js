@@ -451,60 +451,36 @@ class CreateContract extends Component {
                       Source files
                     </label>
                   </div>
-                  <div className="col-sm-9 smd-pad-4">
-                      <div className="pt-select">
-                        <select
-                          id='status'
-                          className="pt-select"
-                          component="select"
-                          name="sampleContract"
-                          value={this.state.value}
-                          onChange={(e) => {
-                              this.handleSampleContract(e.target.value);
-                          }}
-                        >
-                          <option key={0} value="default">Choose a sample contract to upload.</option>
-                          <option key={1} value="HelloWorld">Hello World</option>
-                          <option key={2} value="SimpleStorage">Simple Storage</option>
-                          <option key={3} value="ERC20">ERC20 - Tokens</option>
-                          <option key={4} value="ERC721">ERC721 - NFT</option>
-                          <option key={5} value="PermissionManager">Permission Manager</option>
-                        </select>
-                      </div>
-                  </div>
-
-                  <div className="col-sm-3 text-right"/>
-                  <div className="col-sm-9 smd-pad-4">
-                    <div style={{ fontWeight: 'bold' }}>
-                      or
+                  <div className="col-sm-9 smd-scrollable smd-pad-4">
+                    <div className='pt-select'>
+                      <Field
+                        className="pt-select"
+                        component="select"
+                        name="sampleContract"
+                        onChange={(e) => {
+                          if (e.target.value !== "default")
+                            this.handleSampleContract(e.target.value);
+                        }}
+                      >
+                        <option key={0} value="default">Choose a sample contract to upload.</option>
+                        <option key={1} value="HelloWorld">Hello World</option>
+                        <option key={2} value="SimpleStorage">Simple Storage</option>
+                        <option key={3} value="ERC20">ERC20 - Tokens</option>
+                        <option key={4} value="ERC721">ERC721 - NFT</option>
+                        <option key={5} value="PermissionManager">Permission Manager</option>
+                      </Field>
                     </div>
                   </div>
-
-                  <div className="col-sm-3 text-right"/>
-                  <div className="col-sm-9 smd-pad-4">
-                    <Field
-                      name="radio"
-                      component="input"
-                      type="radio"
-                      value={0}
-                      checked={this.state.dropFile === true}
-                      onClick={
-                        () => {
-                          this.setState((prevState) => {
-                            return {
-                              dropFile: true
-                            };
-                          });
-                        }
-                      }
-                    /> Upload file
+                  <div className="row">
+                    <div className="text-center smd-pad-4">
+                      Or
+                    </div>
                   </div>
-
-                  <div className="col-sm-3 text-right" />
-                  <div className="col-sm-9 smd-pad-4">
-                    { this.state.dropFile === true &&
+                  
+                  <div className="row">
+                    <div className="col-sm-12 smd-pad-4">
                       <Field
-                        id="input-Drop"
+                        id="input-b"
                         className="form-width pt-input"
                         name="contract"
                         component={this.renderDropzoneInput}
@@ -513,7 +489,7 @@ class CreateContract extends Component {
                         validate={this.isValidFileType}
                         required
                       />
-                    }
+                    </div>
                   </div>
                 </div>
               }
