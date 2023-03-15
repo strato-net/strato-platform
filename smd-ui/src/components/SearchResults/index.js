@@ -13,7 +13,6 @@ class SearchResults extends Component {
   render() {
     const users = this.props.searchResults;
     const rows = [];
-    const selectedAddresses = [];
     users && users.forEach(function (user, index) {
       const { userAddress, commonName, organization } = user
       let userClasseName = '';
@@ -114,11 +113,6 @@ class SearchResults extends Component {
                       }
                     </div>)}
 
-          </div>
-          <div className="col-sm-8 account-details">
-            <div>
-              {selectedAddresses.length ? selectedAddresses : null}
-            </div>
           </div>
         </div>
       </div>

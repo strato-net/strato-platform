@@ -17,7 +17,6 @@ import { createUrl } from '../../lib/url';
 
 export function storeApexApi(searchQuery) {
   const apexUrl = env.APEX_URL + "/search?q=" + searchQuery;
-  console.log("davidAPEX+++++++++++++",apexUrl);
   return fetch (apexUrl,
     {
       method: 'POST',
@@ -40,7 +39,6 @@ export function searchQueryApi(searchQuery) {
   // const cirrusUrl = env.CIRRUS_URL + "/Certificate?commonName=ilike.*" + searchQuery + "*";
   const cirrusUrl = env.CIRRUS_URL + "/Certificate?or=(commonName.ilike.*" + searchQuery + "*" + ",organization.ilike.*" + searchQuery + "*" + ",userAddress.ilike.*" + searchQuery + "*)";
 
-  console.log("david0+++++++++++++",cirrusUrl);
   return fetch (cirrusUrl,
     {
       method: 'GET',
