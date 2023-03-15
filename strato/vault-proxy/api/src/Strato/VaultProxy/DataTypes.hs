@@ -7,8 +7,6 @@ module Strato.VaultProxy.DataTypes (
     Version(..)
 ) where
 
--- import           Control.Lens
--- import           Control.Concurrent.Lock as L
 import           Control.Concurrent.MVar
 import           Data.Aeson
 import           Data.Aeson.Types

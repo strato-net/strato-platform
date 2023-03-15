@@ -9,17 +9,13 @@
 
 module Main where
 
--- import           Control.Concurrent.Lock                as L
 import           Control.Concurrent.MVar
 import           Control.Monad
--- import           Control.Monad.IO.Class
 import           Data.ByteString                        as B hiding (map, filter)
--- import qualified Data.Cache                             as Cache
 import           Data.Text                              as T hiding (unlines, map, filter)   
 import           Data.Text.Encoding                     as TE
 import           Debug.Trace
 import           HFlags
--- import           GHC.Conc
 import qualified Network.HTTP.Client                    as HCLI
 import           Network.HTTP.Conduit                   as HCON hiding (Request)
 import           Network.HTTP.ReverseProxy
@@ -105,13 +101,7 @@ main = do
 
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Setting up persistence in the vault-proxy"
 
-  -- traceM  "Setting up the locking mechanism"
-  -- --Initialize a new locking mechanism, this will be shared among all threads that are currently using the vault proxy
-  -- --and will prevent multiple threads from attempting to reach the OAUTH provider at the same time.
-  -- -- vaultLock <- liftIO $ L.new
-  -- --Initialize the token cache
-  -- traceM "Setting up the caching service"
-  -- tokenCash <- atomically $ Cache.newCacheSTM Nothing
+
 
   --Setup the vault connection
   let vaultConnection = VaultConnection {
@@ -123,11 +113,8 @@ main = do
       oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
-      -- make new MVar for token
       tokenMVar = initalTokenMvar,
-      -- tokenCache = tokenCash,
       additionalOauth = noErrorOauth,
-      -- superLock = vaultLock,
       debuggingOn = flags_VAULT_PROXY_DEBUG
   }
   --Create the proxy server

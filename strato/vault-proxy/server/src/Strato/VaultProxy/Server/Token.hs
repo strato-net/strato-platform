@@ -36,16 +36,12 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
         contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server
-    makeHttpCall <- runReq defaultHttpConfig $ do
-        response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
-        pure response
+    makeHttpCall <- runReq defaultHttpConfig $ do R.req
+      R.POST url urlEncodedPart jsonResponse (authHeadr <> contType)
     --Convert the server response to the VaultToken type
     pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 -- --This will get the correct token and will get a cached token if it is still valid
-
--- getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
--- getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
 getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> MVar VaultToken -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
 --         debuggingOn :: Bool
 getAwesomeToken _ tokenMVar clientId clientSecret reserveTime additionalOauth = do
