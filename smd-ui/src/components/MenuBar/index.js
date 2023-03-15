@@ -18,7 +18,7 @@ class MenuBar extends Component {
   afterLoggedIn() {
     const userDropdown =
       <Menu>
-        <MenuItem className="pt-button pt-minimal pt-small" onClick={this.logout} target="_blank" rel="noopener noreferrer" iconName="log-out" text="Logout" /> 
+        <MenuItem className="pt-button pt-minimal" onClick={this.logout} target="_blank" rel="noopener noreferrer" iconName="log-out" text="Logout" /> 
       </Menu>
 
     return (
