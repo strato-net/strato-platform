@@ -12,7 +12,7 @@ describe('App: index', () => {
     expect(wrapper.debug()).toMatchSnapshot();
   });
 
-  test('componentDidMount', () => {
+  test('componentDidMount1', () => {
     checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
 
@@ -23,7 +23,7 @@ describe('App: index', () => {
     expect(wrapper.debug()).toMatchSnapshot();
   })
 
-  test('componentDidMount', () => {
+  test('componentDidMount2', () => {
     checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
 

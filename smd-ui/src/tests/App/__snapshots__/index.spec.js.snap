@@ -2,7 +2,7 @@
 
 exports[` 1`] = `Object {}`;
 
-exports[`App: index componentDidMount 1`] = `
+exports[`App: index componentDidMount1 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(MenuBar)) />
@@ -24,12 +24,13 @@ exports[`App: index componentDidMount 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"
 `;
 
-exports[`App: index componentDidMount 2`] = `
+exports[`App: index componentDidMount2 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(MenuBar)) />
@@ -51,6 +52,7 @@ exports[`App: index componentDidMount 2`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"
@@ -78,6 +80,7 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"

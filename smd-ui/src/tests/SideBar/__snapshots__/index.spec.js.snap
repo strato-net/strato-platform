@@ -66,6 +66,15 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
+    <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-window-restore\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        AppStore
+      </span>
+    </NavLink>
     <NavLink id=\\"external_storage\\" to=\\"/external_storage\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-cloud-upload\\">
          
@@ -150,6 +159,15 @@ exports[`SideBar: index render component for public mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
+    <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-window-restore\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        AppStore
+      </span>
+    </NavLink>
   </div>
   <VSCode />
   <div className=\\"smd-sidebar-logo\\">
@@ -160,7 +178,7 @@ exports[`SideBar: index render component for public mode 1`] = `
 </aside>"
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /external-storage 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /appstore 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -243,6 +261,28 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth po
   >
      
     Transactions
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode ninth position /external-storage 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="app_store"
+  onClick={[Function]}
+  to="/appstore"
+>
+  <i
+    className="fa fa-window-restore"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    AppStore
   </span>
 </NavLink>
 `;
