@@ -13,8 +13,9 @@ import App from './App';
 import CodeEditor from './components/CodeEditor';
 import ExternalStorage from './components/ExternalStorage';
 import Chains from './components/Chains'
-import AppStore from './components/AppStore'
-import Dapplets from './components/Dapplets'
+import SearchResults from './components/SearchResults';
+import AppStore from './components/AppStore';
+import Dapplets from './components/Dapplets';
 
 export const routes =
   <Switch>
@@ -35,4 +36,5 @@ export const routes =
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
     <Route exact path="/code_editor" component={CodeEditor} />
     <Route exact path="/appstore" component={AppStore} />
+    <Route exact path="/searchresults" component={SearchResults} />
   </Switch>
