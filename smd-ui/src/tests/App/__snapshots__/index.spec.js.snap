@@ -12,7 +12,8 @@ exports[`App: index componentDidMount1 1`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: DevDash]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
@@ -24,7 +25,6 @@ exports[`App: index componentDidMount1 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"
@@ -40,7 +40,8 @@ exports[`App: index componentDidMount2 1`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: DevDash]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
@@ -52,7 +53,6 @@ exports[`App: index componentDidMount2 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"
@@ -68,7 +68,8 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: DevDash]} />
+      <Route exact={true} path=\\"/stats\\" component={[Function: C]} />
       <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
@@ -80,7 +81,6 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/appstore\\" component={[Function: AppStore]} />
     </Switch>
   </main>
 </div>"
