@@ -104,7 +104,7 @@ class SearchResults extends Component {
                 this.props.searchQuery.includes("carbon") ?
                   cardProducer(appsList[2]['appName'], appsList[2]['urlToApp'], appsList[2]['description'], appsList[2]['icon']) :
                   (this.props.searchQuery.includes("buck") || this.props.searchQuery.includes("pay")) ?
-                    cardProducer(appsList[0]['appName'], appsList[0]['urlToApp'], appsList[0]['description'], appsList[0]['icon']) :
+                    cardProducer(appsList[0]['appName'], appsList[0]['urlToApp'], appsList[0]['description'], appsList[0]['icon']) :(
                     <div >
                       {(rows.length === 0 && this.props.searchQuery
                         ?
@@ -122,7 +122,7 @@ class SearchResults extends Component {
                         </div>
                         : rows)
                       }
-                    </div>}
+                    </div>)}
 
           </div>
           <div className="col-sm-8 account-details">
