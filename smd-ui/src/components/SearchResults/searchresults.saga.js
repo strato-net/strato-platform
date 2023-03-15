@@ -15,9 +15,33 @@ import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
+export function storeApexApi(searchQuery) {
+  const apexUrl = env.APEX_URL + "/search?q=" + searchQuery;
+  console.log("davidAPEX+++++++++++++",apexUrl);
+  return fetch (apexUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(searchQuery)
+    }
+  )
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    })
+}
+
 export function searchQueryApi(searchQuery) {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?commonName=ilike.*" + searchQuery + "*";
-  fetch (cirrusUrl,
+  // const cirrusUrl = env.CIRRUS_URL + "/Certificate?commonName=ilike.*" + searchQuery + "*";
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?or=(commonName.ilike.*" + searchQuery + "*" + ",organization.ilike.*" + searchQuery + "*" + ",userAddress.ilike.*" + searchQuery + "*)";
+
+  console.log("david0+++++++++++++",cirrusUrl);
+  return fetch (cirrusUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -40,8 +64,11 @@ export function* getsearchQuery(action) {
     //apex?
     try {
       const response = yield call(searchQueryApi, action.searchQuery);
-      // const response = ["999"];
+      console.log("david1+++++++++++++",response);
       yield put(searchQuerySuccess(response));
+      const response2 = yield call(storeApexApi, action.searchQuery);
+      console.log("davidAPEX2+++++++++++++",response2);
+      // yield put(searchQuerySuccess(response));
     }
     catch (err) {
       yield put(searchQueryFailure(err));
