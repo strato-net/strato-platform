@@ -171,14 +171,14 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
       lift stampActionTimestamp
-      start' <- case dir of
-        Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
-        Forward -> return start
       mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
+      let count = (1 + skip') * min mrh max'
+      start' <- case dir of
+        Reverse -> return $ if start > fromIntegral count then start - (fromIntegral count) else 1
+        Forward -> return start
       -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
-      let count = (1 + skip') * max mrh max'
       chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
@@ -192,17 +192,17 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       lift stampActionTimestamp
       maybeHeader <- lift $ lookup (Proxy @BlockData) start
+      mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
+      let count = (1 + skip') * min mrh (fromIntegral max')
       case maybeHeader of
         Nothing    -> yieldR (BlockBodies [])
         Just head' -> do
           let num = blockHeaderBlockNumber head'
               start' = case dir of
                 Forward -> num
-                Reverse -> if num > fromIntegral max'
-                             then num - fromIntegral max'
+                Reverse -> if num > fromIntegral count
+                             then num - fromIntegral count
                              else 1
-          mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-          let count = (1 + skip') * min mrh (fromIntegral num)
           chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
           yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 

@@ -92,7 +92,6 @@ createChainInfo :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasBlocSQL m
-                   , HasBlocEnv m
                    , HasVault m
                    )
                 => Text -> Keccak256 -> ChainInput -> m ChainInfo
@@ -215,7 +214,6 @@ postChainInfos :: ( A.Selectable Account AddressState m
                   , MonadLogger m
                   , HasBlocSQL m
                   , HasSQL m
-                  , HasBlocEnv m
                   , HasVault m
                   )
                => Maybe Text -> [ChainInput] -> m [ChainId]

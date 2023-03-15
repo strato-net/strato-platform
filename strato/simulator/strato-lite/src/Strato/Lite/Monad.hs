@@ -1414,7 +1414,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         for_ (M.toList mpMap) $ \(k,v) -> A.insert (A.Proxy @MP.NodeData) k v
         for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
-        putContextBestBlockInfo $ ContextBestBlockInfo (genHash, genesisBlock, 0, 0, 0)
+        putContextBestBlockInfo $ ContextBestBlockInfo genHash genesisBlock 0 0 0
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
         processNewBestBlock genHash genesisBlock [] -- bootstrap Bagger with genesis block
         runConduit $ sourceTQueue seqVmSource

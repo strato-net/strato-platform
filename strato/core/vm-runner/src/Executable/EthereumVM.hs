@@ -26,7 +26,6 @@ import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BC
-import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
 --import           Data.List.Split                       (chunksOf)
@@ -122,12 +121,11 @@ ethereumVM d = void . execContextM d $ do
         logEventSummaries seqEvents
 
         let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        outBatch <- runConduit $ yield vmInEventBatch
-                              .| handleVmEvents flags_useSyncMode
-                              .| fold (flip insertOutBatch) newOutBatch
+        runConduit $ yield vmInEventBatch
+                  .| handleVmEvents flags_useSyncMode
+                  .| mapM_C sendOutEvent
         
         loopTimeit "compactContextM" $ compactContextM
-        sendOutEvents outBatch
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -188,18 +186,16 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
       else pure Nothing
   traverse_ (yield . OutBlock) mNewBlock
 
-spanLeft :: [Either a b] -> ([a], [Either a b])
-spanLeft (Left x:xs') = let (ys,zs) = spanLeft xs' in (x:ys,zs)
-spanLeft xs = ([], xs)
-
-spanRight :: [Either a b] -> ([b], [Either a b])
-spanRight (Right x:xs') = let (ys,zs) = spanRight xs' in (x:ys,zs)
-spanRight xs = ([], xs)
-
 groupEithers :: [Either a b] -> [Either [a] [b]]
-groupEithers [] = []
-groupEithers (Left x:xs) = let (ys,zs) = spanLeft xs in Left (x:ys) : groupEithers zs
-groupEithers (Right x:xs) = let (ys,zs) = spanRight xs in Right (x:ys) : groupEithers zs
+groupEithers = foldr f []
+  where f (Left l)   b = let ~(ls, es) = case b of
+                               (Left ls'):es' -> (ls', es')
+                               es' -> ([], es')
+                          in (Left $ l : ls) : es
+        f (Right r)  b = let ~(rs, es) = case b of
+                               (Right rs'):es' -> (rs', es')
+                               es' -> ([], es')
+                          in (Right $ r : rs) : es
 
 processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                           => [Either OutputGenesis OutputBlock]
@@ -478,7 +474,7 @@ outputBlockToEvmCheckpoint block =
       td     = obTotalDifficulty block
       txL    = length txs
       uncL   = length (obBlockUncles block)
-      cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
+      cbbi   = ContextBestBlockInfo sha header td txL uncL
       sr     = blockDataStateRoot header
    in EVMCheckpoint sha header cbbi sr 
 
@@ -540,75 +536,121 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvents :: VmOutEventBatch -> ContextM ()
-sendOutEvents OutBatch{..} = do
-  let
-    filterOutEvents :: Action -> Action
-    filterOutEvents x = x{Action._events=Seq.empty}
---    filterOutMetadata :: Action -> Action
---    filterOutMetadata x = x{Action._metadata=Nothing}
+sendOutEvent :: VmOutEvent -> ContextM ()
+sendOutEvent (OutAction act) =
+  let filterOutEvents :: Action -> Action
+      filterOutEvents x = x{Action._events=Seq.empty}
+      extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
+      extractCodeCollectionAddedMessages a =
+        case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
+              join $ fmap (M.lookup "name") $ a^.Action.metadata,
+              M.toList $ a^.Action.actionData) of
+          (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
+              ccString = c,
+              codePtr =
+                  case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
+                    Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+                    Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                    Just v -> error $ "Unknown VM: " ++ show v
+                    Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
+              organization = first^._2.Action.actionDataOrganization,
+              application = n,
+              historyList=
+                  case join $ fmap (M.lookup "history") (a^.Action.metadata) of
+                    Nothing -> []
+                    Just v -> T.splitOn "," v
+            }
+          _ -> Nothing
+      ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
+      eventEvents = map EventEmitted . toList $ Action._events act
+      actionEvents = [NewAction $ filterOutEvents act]
+   in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
+sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
+  void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
+sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
+sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
+sendOutEvent (OutTXR tr) = void $ produceVMEvents [NewTransactionResult tr]
+sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
+  timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
+    updateSQLBalanceAndNonce $
+      [ (theAccount,
+         (addressStateBalance asMod, addressStateNonce asMod))
+      | (theAccount, Mem.ASModification asMod) <- M.toList asm
+      ]
+sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
 
-    extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
-    extractCodeCollectionAddedMessages a =
-      case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
-            join $ fmap (M.lookup "name") $ a^.Action.metadata,
-            M.toList $ a^.Action.actionData) of
-        (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
-            ccString = c,
-            codePtr =
-                case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
-            organization = first^._2.Action.actionDataOrganization,
-            application = n,
-            historyList=
-                case join $ fmap (M.lookup "history") (a^.Action.metadata) of
-                  Nothing -> []
-                  Just v -> T.splitOn "," v
-          }
-        _ -> Nothing
-  
-  for_ outJSONRPCs $ liftIO . uncurry produceResponse
-  for_ outToStateDiffs $ \(cId, cInfo, bHash, org, app) ->
-    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-  traverse_ commitSqlDiffs outStateDiffs
-  when (not flags_sqlDiff) $
-    timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-      forM_ outASMs $ \asm -> do
-        updateSQLBalanceAndNonce $
-          [ (theAccount,
-             (addressStateBalance asMod, addressStateNonce asMod))
-          | (theAccount, Mem.ASModification asMod) <- M.toList asm
-          ]
-
-  let ccEvents = concat (map (maybeToList . extractCodeCollectionAddedMessages) (toList outActions))
-      eventEvents = concat (map (map EventEmitted . toList . Action._events) (toList outActions))
-      actionEvents = map (NewAction . filterOutEvents) (toList outActions)
-      --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
-      trEvents = map NewTransactionResult $ toList outTXRs
-          
-  loopTimeit "produceVMEvents" $ do
-    $logInfoS "sendOutEvents" $ "outputting VMEvents"
-    _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
-    return ()
-  
-  loopTimeit "produceUnminedBlocksM" $
-    void . K.withKafkaRetry1s . produceUnminedBlocksM $
-      outputBlockToBlock <$> toList outBlocks
-  void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
-  loopTimeit "flushLogEntries" $ do
-    void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
-  loopTimeit "flushEventEntries" $ do
-    void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
--- I've moved the transaction result indexing to slipstream and the VMEvent stream, above
--- I'll keep the old code commented out below until we verify that the changes all work.
---  loopTimeit "flushTransactionResults" $ do
---    let q = toList outTXRs
---        toWrite = chunksOf 2000 $ TxResult <$> q
---    recordTxrFlush $ length q
---    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
+-- sendOutEvents :: VmOutEventBatch -> ContextM ()
+-- sendOutEvents OutBatch{..} = do
+--   let
+--     filterOutEvents :: Action -> Action
+--     filterOutEvents x = x{Action._events=Seq.empty}
+-- --    filterOutMetadata :: Action -> Action
+-- --    filterOutMetadata x = x{Action._metadata=Nothing}
+-- 
+--     extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
+--     extractCodeCollectionAddedMessages a =
+--       case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
+--             join $ fmap (M.lookup "name") $ a^.Action.metadata,
+--             M.toList $ a^.Action.actionData) of
+--         (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
+--             ccString = c,
+--             codePtr =
+--                 case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
+--                   Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+--                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+--                   Just v -> error $ "Unknown VM: " ++ show v
+--                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
+--             organization = first^._2.Action.actionDataOrganization,
+--             application = n,
+--             historyList=
+--                 case join $ fmap (M.lookup "history") (a^.Action.metadata) of
+--                   Nothing -> []
+--                   Just v -> T.splitOn "," v
+--           }
+--         _ -> Nothing
+--   
+--   for_ outJSONRPCs $ liftIO . uncurry produceResponse
+--   for_ outToStateDiffs $ \(cId, cInfo, bHash, org, app) ->
+--     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+--   traverse_ commitSqlDiffs outStateDiffs
+--   when (not flags_sqlDiff) $
+--     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
+--       forM_ outASMs $ \asm -> do
+--         updateSQLBalanceAndNonce $
+--           [ (theAccount,
+--              (addressStateBalance asMod, addressStateNonce asMod))
+--           | (theAccount, Mem.ASModification asMod) <- M.toList asm
+--           ]
+-- 
+--   let ccEvents = concat (map (maybeToList . extractCodeCollectionAddedMessages) (toList outActions))
+--       eventEvents = concat (map (map EventEmitted . toList . Action._events) (toList outActions))
+--       actionEvents = map (NewAction . filterOutEvents) (toList outActions)
+--       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+--       trEvents = map NewTransactionResult $ toList outTXRs
+--           
+--   loopTimeit "produceVMEvents" $ do
+--     $logInfoS "sendOutEvents" $ "outputting VMEvents"
+--     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
+--     return ()
+--   
+--   loopTimeit "produceUnminedBlocksM" $
+--     void . K.withKafkaRetry1s . produceUnminedBlocksM $
+--       outputBlockToBlock <$> toList outBlocks
+--   void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
+--   loopTimeit "flushLogEntries" $ do
+--     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
+--   loopTimeit "flushEventEntries" $ do
+--     void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
+-- -- I've moved the transaction result indexing to slipstream and the VMEvent stream, above
+-- -- I'll keep the old code commented out below until we verify that the changes all work.
+-- --  loopTimeit "flushTransactionResults" $ do
+-- --    let q = toList outTXRs
+-- --        toWrite = chunksOf 2000 $ TxResult <$> q
+-- --    recordTxrFlush $ length q
+-- --    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
