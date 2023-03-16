@@ -43,7 +43,6 @@ function getOrCreateOauthUserApi() {
         throw error;
       });
   } else {
-    console.log('got user from local')
     return user
   }
     
@@ -95,8 +94,6 @@ export function* getOrCreateOauthUser() {
       console.error('Failed to create account for OAuth user. Error:', oauthUser.error)
       // Admin: refer to strato nginx and apex logs for details
     } else {
-      //TODO figure out what should be serialized
-      console.log(oauthUser)
 
       const user = oauthUser
 
@@ -109,11 +106,10 @@ export function* getOrCreateOauthUser() {
 }
 export function* getUserCertificate(action) {
   try {
-    console.log('hERE')
     const userCert = yield call(fetchUserCertificateApi, action.userAddress);
     const user = userCert[0]
 
-    if (userCert.length == 0) {
+    if (userCert.length === 0) {
       yield put(getUserCertificateFailure(new Error("No User Certificate found")));
       
     }
