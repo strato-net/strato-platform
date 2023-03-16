@@ -6,7 +6,7 @@ import './menubar.css';
 import logo from './BlockAppsLogos_DarkBG-Stacked.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
-import { Popover, Button, Menu, Position, MenuItem } from '@blueprintjs/core';
+import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent } from '@blueprintjs/core';
 import {
   searchQueryRequest,
 } from '../SearchResults/searchresults.actions';
@@ -15,7 +15,8 @@ class MenuBar extends Component {
   constructor() {
     super()
     this.state = {
-     searchQuery:""
+     searchQuery:"",
+     isUserMenuOpen: false
     }
   }
 
@@ -41,15 +42,41 @@ class MenuBar extends Component {
   
   // on-submit search function calls searchQueryRequest
 
+  toggleDialog = () => {
+    this.setState({ isUserMenuOpen: !this.state.isUserMenuOpen })
+  }
 
   afterLoggedIn() {
     const userDropdown =
       <Menu>
+        <MenuItem className="pt-button pt-minimal" onClick={this.toggleDialog} target="_blank" rel="noopener noreferrer" iconName="mugshot" text="My Profile" /> 
         <MenuItem className="pt-button pt-minimal" onClick={this.logout} target="_blank" rel="noopener noreferrer" iconName="log-out" text="Logout" /> 
       </Menu>
 
     return (
       <div>
+        <Dialog
+          className="pt-dark"
+          iconName="mugshot"
+          isOpen={this.state.isUserMenuOpen}
+          onClose={this.toggleDialog}
+          title="My Profile"
+        >
+          <div className="pt-dialog-body">
+              Some content
+          </div>
+          <div className="pt-dialog-footer">
+              <div className="pt-dialog-footer-actions">
+                  <Button
+                      className="pt-minimal"
+                      intent={Intent.DANGER}
+                      onClick={this.toggleDialog}
+                      text="Close"
+                  />
+              </div>
+          </div>
+        </Dialog>
+
         <Popover content={userDropdown} position={Position.BOTTOM_RIGHT}>
           <Button 
             className={"pt-large pt-minimal " + (this.props.oauthUser ? 'pt-intent-primary' : 'pt-intent-warning')} 
