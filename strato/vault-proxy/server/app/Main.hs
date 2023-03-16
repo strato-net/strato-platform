@@ -10,6 +10,7 @@
 module Main where
 
 import           Control.Concurrent.MVar
+import           GHC.Conc
 import           Control.Monad
 import           Data.ByteString                        as B hiding (map, filter)
 import           Data.Text                              as T hiding (unlines, map, filter)   
@@ -26,7 +27,7 @@ import           Servant.Client.Core                    (addHeader)
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
-
+import           System.Clock
 import           BlockApps.Init
 import           Servant.Client                           as S
 import           Strato.VaultProxy.DataTypes              as VaultProxy
@@ -78,7 +79,14 @@ main = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "First call is used to see if everything is alive, then if everything is working it will store it in cache."
   --make an initial call to see if the vault is working
   initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
-  initalTokenMvar <- newMVar initialToken
+  whatTimeIsIt <- getTime Monotonic
+
+  let nanoTime = toNanoSecs whatTimeIsIt
+      tokenExpry =  expiresIn initialToken
+      expry = fromNanoSecs ( nanoTime + (tokenExpry - toInteger flags_OAUTH_RESERVE_SECONDS) * 1000000000)
+  initalTokenTvar <- newTVarIO (Just (initialToken, expry))
+
+  initalTokenLock <- newMVar ()
 
   let minimumVersion :: Int
       minimumVersion = 0
@@ -113,7 +121,8 @@ main = do
       oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
       vaultProxyUrl = flags_VAULT_PROXY_URL,
       vaultProxyPort = flags_VAULT_PROXY_PORT,
-      tokenMVar = initalTokenMvar,
+      tokenTVar = initalTokenTvar,
+      updateLock = initalTokenLock,
       additionalOauth = noErrorOauth,
       debuggingOn = flags_VAULT_PROXY_DEBUG
   }

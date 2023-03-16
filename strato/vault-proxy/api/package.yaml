@@ -29,6 +29,7 @@ library:
   - bytestring
   - cache
   - cryptonite
+  - clock
   - http-client
   - labeled-error
   - lens

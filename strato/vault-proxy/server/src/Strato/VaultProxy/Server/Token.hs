@@ -8,6 +8,7 @@ module Strato.VaultProxy.Server.Token where
 
 
 import           Control.Concurrent.MVar
+import           GHC.Conc
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -36,36 +37,37 @@ getVirginToken clientId clientSecret additionalOauth = do --virginToken
         contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server
-    makeHttpCall <- runReq defaultHttpConfig $ do R.req
-      R.POST url urlEncodedPart jsonResponse (authHeadr <> contType)
+    makeHttpCall <- runReq defaultHttpConfig $ do 
+        R.req R.POST url urlEncodedPart jsonResponse (authHeadr <> contType)
     --Convert the server response to the VaultToken type
     pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 -- --This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> MVar VaultToken -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
---         debuggingOn :: Bool
-getAwesomeToken _ tokenMVar clientId clientSecret reserveTime additionalOauth = do
-    -- Try to take the token from the MVar
-    maybeToken <- liftIO $ tryTakeMVar tokenMVar
-    case maybeToken of
-        Just token -> do
-            -- If we got a token, check if it's still valid
-            currentTime <- liftIO $ getTime Monotonic
-            expiryTime <- makeExpry token reserveTime
-            if currentTime < expiryTime then do
-                -- If the token is valid, put it back and return it
-                liftIO $ putMVar tokenMVar token
-                pure token
-            else do
-                -- If the token is not valid, get a new one and update the MVar
+getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> TVar (Maybe (VaultToken, TimeSpec)) -> MVar () -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+getAwesomeToken debuggingOn tokenTVar updateLock clientId clientSecret reserveTime additionalOauth = do
+    -- Read the current token and expiry time from the TVar
+    maybeTokenExpiry <- liftIO . atomically $ readTVar tokenTVar
+    currentTime <- liftIO $ getTime Monotonic
+    case maybeTokenExpiry of
+        Just (token, expiryTime) | currentTime < expiryTime -> do
+            -- If there is a valid token, return it
+            pure token
+        _ -> do
+            -- If there is no valid token, try to acquire the lock to update it
+            gotLock <- liftIO $ tryPutMVar updateLock ()
+            if gotLock then do
+                -- If we got the lock, get a new token and update the TVar
                 newToken <- getVirginToken clientId clientSecret additionalOauth
-                liftIO $ putMVar tokenMVar newToken
+                newExpiryTime <- makeExpry newToken reserveTime
+                liftIO . atomically $ writeTVar tokenTVar (Just (newToken, newExpiryTime))
+                -- Release the lock
+                liftIO $ takeMVar updateLock
                 pure newToken
-        Nothing -> do
-            -- If there was no token, get a new one and update the MVar
-            newToken <- getVirginToken clientId clientSecret additionalOauth
-            liftIO $ putMVar tokenMVar newToken
-            pure newToken
+            else do
+                -- If we didn't get the lock, wait for the lock to be released and try again
+                liftIO $ readMVar updateLock
+                getAwesomeToken debuggingOn tokenTVar updateLock clientId clientSecret reserveTime additionalOauth
+
 
 
 --This is the standard expry time for the token, it is 13 seconds less than the expry time from the OAuth provider
@@ -84,13 +86,14 @@ makeExpry token reserveTime = do
 
 --Get the vault token more easily
 vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
-vaulty vaultConn = getAwesomeToken db tmvar cid csec rs ao
+vaulty vaultConn = getAwesomeToken db ttvar tlock cid csec rs ao
     where
         cid = oauthClientId vaultConn
         csec = oauthClientSecret vaultConn
         ao = additionalOauth vaultConn
         rs = oauthReserveSeconds vaultConn
-        tmvar = tokenMVar vaultConn
+        ttvar = tokenTVar vaultConn
+        tlock = updateLock vaultConn
         db = debuggingOn vaultConn
 
 vaultProxyDebug :: Applicative f => Bool -> String -> f()

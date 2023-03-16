@@ -8,6 +8,8 @@ module Strato.VaultProxy.DataTypes (
 ) where
 
 import           Control.Concurrent.MVar
+import           GHC.Conc
+import           System.Clock 
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.Aeson.Key as DAK
@@ -92,10 +94,9 @@ data VaultConnection = VaultConnection {
     oauthReserveSeconds :: Int,
     vaultProxyUrl :: T.Text,
     vaultProxyPort :: Int,
-    -- tokenCache :: Cache T.Text VaultToken,
-    tokenMVar :: MVar VaultToken,
+    tokenTVar :: TVar (Maybe (VaultToken, TimeSpec)),
+    updateLock :: MVar (),
     additionalOauth :: RawOauth,
-    -- superLock :: L.Lock,
     debuggingOn :: Bool
 }
 
