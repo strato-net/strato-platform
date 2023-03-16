@@ -14,7 +14,6 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
 import { getOrCreateOauthUserRequest, getUserCertificateRequest } from '../components/User/user.actions';
-import { getUserFromLocal } from '../lib/localStorage';
 import ReactGA from "react-ga4";
 
 ReactGA.initialize("G-PWGS3Z6YNQ");
@@ -30,7 +29,7 @@ class App extends Component {
   }
 
   componentWillReceiveProps(newProps) {
-    if (newProps.oauthUser.address && !this.props.userCertificate) {
+    if (newProps.oauthUser && newProps.oauthUser.address && !this.props.userCertificate) {
       this.props.getUserCertificateRequest(newProps.oauthUser.address)
     }
   }

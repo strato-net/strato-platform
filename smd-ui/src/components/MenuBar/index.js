@@ -3,9 +3,8 @@ import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
-import logo from './BlockAppsLogos_DarkBG-Stacked.png';
+import logo from './strato-mercata-beta-white.png';
 import { env } from '../../env';
-import { isOauthEnabled } from '../../lib/checkMode';
 import { Popover, Button, Menu, Position, MenuItem } from '@blueprintjs/core';
 import {
   searchQueryRequest,
@@ -52,9 +51,10 @@ class MenuBar extends Component {
       <div>
         <Popover content={userDropdown} position={Position.BOTTOM_RIGHT}>
           <Button 
-            className={"pt-large pt-minimal " + (this.props.oauthUser ? 'pt-intent-primary' : 'pt-intent-warning')} 
-            iconName={this.props.oauthUser ? "user" : "social-media"} 
-            text={this.props.oauthUser ? (this.props.oauthUser.commonName + ', ' + this.props.oauthUser.organization + ' ' + this.props.oauthUser.organizationalUnit) : 'Verification Pending'} />
+            className={"pt-large pt-minimal " + (this.props.userCertificate ? 'pt-intent-primary' : 'pt-intent-warning')} 
+            iconName={this.props.userCertificate ? "user" : "social-media"} 
+            text={this.props.userCertificate ? (this.props.userCertificate.commonName + ', ' + this.props.userCertificate.organization + 
+              (this.props.userCertificate.organizationalUnit ? ': ' + this.props.userCertificate.organizationalUnit : '')) : 'Verification Pending'} />
         </Popover>
       </div>
     );
@@ -84,21 +84,21 @@ class MenuBar extends Component {
 
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
-        <div className="pt-navbar-group pt-align-left">
+        <div className="pt-navbar-group pt-align-left col-sm-2 ">
           <div>
             <Link to="/home">
               <img
                 src={logo}
                 alt="Blockapps Logo"
-                height="50"
-                className="smd-menu-logo"
+                height="45"
+                className="smd-menu-logo smd-pad-4"
               />
             </Link>
           </div>
         </div>
-        <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
-        </div>
+        {/* <div className="pt-navbar-group pt-align-left"> */}
+          {/* <div className="pt-navbar-heading">STRATO Mercata Dashboard</div> */}
+        {/* </div> */}
 
         {/* <div className="pt-navbar-group pt-align-left"> */}
         <div className="col-sm-5 smd-pad-4">
@@ -131,6 +131,7 @@ class MenuBar extends Component {
 export function mapStateToProps(state) {
   return {
     oauthUser: state.user.oauthUser,
+    userCertificate: state.user.userCertificate,
     searchQuery: state.search.searchQuery
   };
 }
