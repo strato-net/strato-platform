@@ -13,7 +13,7 @@ import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
-import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
+import { getOrCreateOauthUserRequest, getUserCertificateRequest } from '../components/User/user.actions';
 import { getUserFromLocal } from '../lib/localStorage';
 import ReactGA from "react-ga4";
 
@@ -24,8 +24,14 @@ mixpanelWrapper.identify(env.NODE_NAME);
 class App extends Component {
 
   componentDidMount() {
-    if (isOauthEnabled() && !getUserFromLocal()) {
+    if (isOauthEnabled()) {
       this.props.getOrCreateOauthUserRequest();
+    }
+  }
+
+  componentWillReceiveProps(newProps) {
+    if (newProps.oauthUser.address && !this.props.userCertificate) {
+      this.props.getUserCertificateRequest(newProps.oauthUser.address)
     }
   }
 
@@ -43,10 +49,15 @@ class App extends Component {
   }
 }
 
-export function mapStateToProps() {
-  return ({})
+// connect user cert state to props
+export function mapStateToProps(state) {
+  return ({
+    oauthUser: state.user.oauthUser,
+    userCertificate: state.user.userCertificate
+  })
 }
 
 export default withRouter(connect(mapStateToProps, {
-  getOrCreateOauthUserRequest
+  getOrCreateOauthUserRequest,
+  getUserCertificateRequest,
 })(App));

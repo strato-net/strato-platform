@@ -40,7 +40,7 @@ class MenuBar extends Component {
   }
   
   // on-submit search function calls searchQueryRequest
-
+  // TODO move this to userCertificate state/props
 
   afterLoggedIn() {
     return (
