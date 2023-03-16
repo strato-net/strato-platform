@@ -8,53 +8,65 @@ import {
   getOrCreateOauthUserFailure,
   GET_OR_CREATE_OAUTH_USER_REQUEST,
   FETCH_USER_PUBLIC_KEY_REQUEST,
+  FETCH_USER_CERT_REQUEST,
   fetchUserPubKeySuccess,
-  fetchUserPubKeyFailure
+  fetchUserPubKeyFailure,
+  getUserCertificateSuccess,
+  getUserCertificateFailure,
 } from './user.actions';
 import { handleErrors } from '../../lib/handleErrors'; 
 import { env } from '../../env';
+import { getUserFromLocal } from '../../lib/localStorage';
 
 const oauthUserUrl = env.APEX_URL + "/user";
 
 function getOrCreateOauthUserApi() {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
+  let user = getUserFromLocal() 
+  if (!user) {
+
+    return fetch(
+      oauthUserUrl,
+      {
+        method: 'POST',
+        credentials: "include",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      })
+      .then(handleErrors)
+      .then(function (res) {
+        return res.json();
+      })
+      .catch(function (error) {
+        throw error;
+      });
+  } else {
+    return user
+  }
+    
+}
+
+function fetchUserCertificateApi(address) {
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq." + address;
   return fetch(
-    oauthUserUrl,
+    cirrusUrl,
     {
-      method: 'POST',
+      method: 'GET',
       credentials: "include",
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({})
-    })
-    .then(function (res) {
-      return res.json();
-    })
-    .then(function (user) {
-      const url = cirrusUrl + user.address;
-      return fetch(
-        url,
-        {
-          method: 'GET',
-          credentials: "include",
-          headers: {
-            'Accept': 'application/json'
-          },
-        }
-      )
-        .then(handleErrors)
-        .then(function (response) {
-          return response.json();
-        })
-        .catch(function (error) {
-          throw error;
-        })
-    })
-    .catch(function (error) {
-      throw error;
-    });
+    }
+  )
+  .then(handleErrors)
+  .then(function (response) {
+    return response.json();
+  })
+  .catch(function (error) {
+    throw error;
+  })
 }
 
 function fetchUserPubKeyRequest() {
@@ -76,26 +88,34 @@ function fetchUserPubKeyRequest() {
 
 export function* getOrCreateOauthUser() {
   try {
-    const user_query = yield call(getOrCreateOauthUserApi);
-    if (user_query.error) {
+    const oauthUser = yield call(getOrCreateOauthUserApi);
+    if (oauthUser.error) {
       // We only get the non-401 errors here (401 is handled inside of getOrCreateOauthUserApi)
-      console.error('Failed to create account for OAuth user. Error:', user_query.error)
+      console.error('Failed to create account for OAuth user. Error:', oauthUser.error)
       // Admin: refer to strato nginx and apex logs for details
     } else {
-      const user = {
-        username: user_query[0].commonName,
-        commonName: user_query[0].commonName,
-        organization: user_query[0].organization,
-        organizationalUnit: user_query[0].organizationalUnit,
-        country: user_query[0].country,
-        address: user_query[0].userAddress,
-      }
+
+      const user = oauthUser
 
       localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));
     }
   } catch (e) {
     yield put(getOrCreateOauthUserFailure(e));
+  }
+}
+export function* getUserCertificate(action) {
+  try {
+    const userCert = yield call(fetchUserCertificateApi, action.userAddress);
+    const user = userCert[0]
+
+    if (userCert.length === 0) {
+      yield put(getUserCertificateFailure(new Error("No User Certificate found")));
+      
+    }
+    yield put(getUserCertificateSuccess(user));
+  } catch (e) {
+    yield put(getUserCertificateFailure(e));
   }
 }
 
@@ -115,4 +135,7 @@ export function* watchFetchUser() {
 
 export function* watchFetchPubKey() {
   yield takeEvery(FETCH_USER_PUBLIC_KEY_REQUEST, getUserPubKey);
+}
+export function* watchuserCert() {
+  yield takeEvery(FETCH_USER_CERT_REQUEST, getUserCertificate);
 }
