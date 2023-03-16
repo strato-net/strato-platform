@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -87,8 +87,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}
+        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}>
+          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}
         </option>
         {
           users.map((user, i) => {
@@ -113,8 +113,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}
+        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
+          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -229,16 +229,28 @@ class ContractMethodCall extends Component {
 
     return (
       <div>
-        <Button
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
+        >
+        <AnchorButton
           className="pt-minimal pt-small pt-intent-primary"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             this.handleOpenModal();
           }}
-        >
-          Call Method
-        </Button>
+          disabled={!this.props.userCertificate}
+          text={"Call Method"}
+          />
+        </Popover>
         <form>
           <Dialog
             iconName="exchange"
@@ -390,6 +402,7 @@ export function mapStateToProps(state, ownProps) {
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
     oAuthUser: state.user.oauthUser,
+    userCertificate: state.user.userCertificate,
     selectedChain: state.chains.selectedChain,
   };
 }
