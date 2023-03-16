@@ -28,11 +28,7 @@ class App extends Component {
     }
   }
 
-  componentWillReceiveProps(newProps) {
-    if (newProps.oauthUser && newProps.oauthUser.address && !this.props.userCertificate) {
-      this.props.getUserCertificateRequest(newProps.oauthUser.address)
-    }
-  }
+  
 
   render() {
     return (
@@ -58,5 +54,4 @@ export function mapStateToProps(state) {
 
 export default withRouter(connect(mapStateToProps, {
   getOrCreateOauthUserRequest,
-  getUserCertificateRequest,
 })(App));
