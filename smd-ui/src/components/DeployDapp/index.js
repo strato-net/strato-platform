@@ -377,7 +377,7 @@ class DeployDapp extends Component {
           id="tour-deploy-dapp-button"
           className="pt-intent-primary pt-icon-add"
           text={"Deploy DApp"}
-          disabled={!this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
           />
         </Popover>
         <form>

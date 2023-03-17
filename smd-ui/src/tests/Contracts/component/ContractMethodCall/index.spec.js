@@ -125,13 +125,14 @@ describe('ContractMethodCall: index', () => {
       methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
+      userCertificate: { userAddress: "345678"},
     }
     const wrapper = mount(
       <Provider store={store}>
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     );
-    wrapper.find('Button').simulate('click');
+    wrapper.find('AnchorButton').simulate('click');
     expect(props.methodCallOpenModal).toHaveBeenCalled();
   });
 
@@ -154,14 +155,15 @@ describe('ContractMethodCall: index', () => {
       methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
-      store: store
+      store: store,
+      userCertificate: { userAddress: "567890"}
     }
     const wrapper = shallow(
       <Provider store={store}>
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     ).dive().dive().dive().dive();
-    wrapper.find('Button').at(1).simulate('click', { preventDefault() { }, stopPropagation() { } })
+    wrapper.find('Button').at(0).simulate('click', { preventDefault() { }, stopPropagation() { } })
     expect(props.methodCallCloseModal).toHaveBeenCalled();
   });
 

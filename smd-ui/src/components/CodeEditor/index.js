@@ -35,8 +35,8 @@ class CodeEditor extends Component {
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
     ReactGA.send({hitType: "pageview", page: "/code_editor", title: "Contract Editor"});
+    // this.props.fetchChainIds(this.chainLimit, this.chainOffset);
     this.saveLocalState = debounce(this.saveToLocalStorage, 500)
-    this.props.fetchChainIds(this.chainLimit, this.chainOffset);
     window.onbeforeunload = (e) => {
       this.saveToLocalStorage()
     };
@@ -259,7 +259,7 @@ class CodeEditor extends Component {
           </Field>
         </div>
         <div>
-          <button className="pt-button" onClick={(e) => this.onChainSearch(this.state.chainQuery)}>Select Shard</button>
+          <button className="pt-button" onClick={(e) => this.onChainSearch()}>Select Shard</button>
         </div>
       </div>) : 
       
@@ -316,27 +316,26 @@ class CodeEditor extends Component {
           </div>
           <div className="text-right col-md-10">
             <div className='smd-pad-16 ' style={{display: "inline-block"}}>
-
-            <Popover
-              position={Position.BOTTOM}
-              content={
-                <div>
-                <Button className="pt-intent-primary smd-margin-8" 
-                  text="SolidVM" 
-                  onClick={() => {this.compileCode("SolidVM")}}/>
-                <Button className="pt-intent-primary smd-margin-8" 
-                  text="EVM" 
-                  onClick={() => {this.compileCode("EVM")}}/>
-                </div>
-              }
-              >
-              <Button
-                className="pt-intent-primary"
-                disabled={false}
-                text="Compile">
-                  <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
-              </Button>
-            </Popover>
+              <Popover
+                position={Position.BOTTOM}
+                content={
+                  <div>
+                  <Button className="pt-intent-primary smd-margin-8" 
+                    text="SolidVM" 
+                    onClick={() => {this.compileCode("SolidVM")}}/>
+                  <Button className="pt-intent-primary smd-margin-8" 
+                    text="EVM" 
+                    onClick={() => {this.compileCode("EVM")}}/>
+                  </div>
+                }
+                >
+                <Button
+                  className="pt-intent-primary"
+                  disabled={false}
+                  text="Compile">
+                    <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
+                </Button>
+              </Popover>
             </div>
           
             <DeployDapp
@@ -351,10 +350,10 @@ class CodeEditor extends Component {
               enableCreateContract={this.props.codeEditorData.enableCreateAction}
               textFromEditor={sourceCode}
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
-        </div>
+          </div>
         </div>
         <div className='row'>
-            {this.props.chainIds && this.props.chainIds ?
+            {this.props.chainIds ?
                   <div className='row pt-dark chain-wrapper smd-pad-8' style={{ display: 'flex', alignItems: 'center', marginLeft: '8px'}}>
                     {chainSelector}
                     <div className="smd-pad-8 col-sm-6" style={{display: 'flex', alignItems: 'center'}}>

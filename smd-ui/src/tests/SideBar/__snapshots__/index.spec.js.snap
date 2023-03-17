@@ -3,15 +3,6 @@
 exports[`SideBar: index render component for non oauth mode 1`] = `
 "<aside>
   <div className=\\"menu\\">
-    <NavLink id=\\"dapplets\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-arrow-circle-right\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Dapplets
-      </span>
-    </NavLink>
     <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-window-restore\\">
          
@@ -19,6 +10,15 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       <span className=\\"menu-text\\">
          
         AppStore
+      </span>
+    </NavLink>
+    <NavLink id=\\"dapplets\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-arrow-circle-right\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Dapplets
       </span>
     </NavLink>
     <NavLink id=\\"network_stats\\" to=\\"/stats\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -30,22 +30,13 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Network Stats
       </span>
     </NavLink>
-    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-user-secret\\">
+    <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-users\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Shards
-      </span>
-    </NavLink>
-    <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-link\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Blocks
+        Accounts
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -57,13 +48,13 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Transactions
       </span>
     </NavLink>
-    <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-users\\">
+    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-user-secret\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Accounts
+        Shards
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -73,6 +64,15 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       <span className=\\"menu-text\\">
          
         Contracts
+      </span>
+    </NavLink>
+    <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-link\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Blocks
       </span>
     </NavLink>
     <NavLink id=\\"code_editor\\" to=\\"/code_editor\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -104,15 +104,6 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
 exports[`SideBar: index render component for public mode 1`] = `
 "<aside>
   <div className=\\"menu\\">
-    <NavLink id=\\"dapplets\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-arrow-circle-right\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Dapplets
-      </span>
-    </NavLink>
     <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-window-restore\\">
          
@@ -120,6 +111,15 @@ exports[`SideBar: index render component for public mode 1`] = `
       <span className=\\"menu-text\\">
          
         AppStore
+      </span>
+    </NavLink>
+    <NavLink id=\\"dapplets\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-arrow-circle-right\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Dapplets
       </span>
     </NavLink>
     <NavLink id=\\"network_stats\\" to=\\"/stats\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -131,22 +131,13 @@ exports[`SideBar: index render component for public mode 1`] = `
         Network Stats
       </span>
     </NavLink>
-    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-user-secret\\">
+    <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-users\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Shards
-      </span>
-    </NavLink>
-    <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-link\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Blocks
+        Accounts
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -158,13 +149,13 @@ exports[`SideBar: index render component for public mode 1`] = `
         Transactions
       </span>
     </NavLink>
-    <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-users\\">
+    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-user-secret\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Accounts
+        Shards
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -174,6 +165,15 @@ exports[`SideBar: index render component for public mode 1`] = `
       <span className=\\"menu-text\\">
          
         Contracts
+      </span>
+    </NavLink>
+    <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-link\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Blocks
       </span>
     </NavLink>
     <NavLink id=\\"code_editor\\" to=\\"/code_editor\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -194,95 +194,7 @@ exports[`SideBar: index render component for public mode 1`] = `
 </aside>"
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode first position /home 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="dapplets"
-  onClick={[Function]}
-  to="/home"
->
-  <i
-    className="fa fa-arrow-circle-right"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Dapplets
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode second position /appstore 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="app_store"
-  onClick={[Function]}
-  to="/appstore"
->
-  <i
-    className="fa fa-window-restore"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    AppStore
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode third position /stats 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="network_stats"
-  onClick={[Function]}
-  to="/stats"
->
-  <i
-    className="fa fa-rocket"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Network Stats
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth position /chains 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="shards"
-  onClick={[Function]}
-  to="/shards"
->
-  <i
-    className="fa fa-user-secret"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Shards
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth position /blocks 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /contracts 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -304,7 +216,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
 </NavLink>
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /transactions 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth position /blocks 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -326,7 +238,29 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth pos
 </NavLink>
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /accounts 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode first position /home 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="app_store"
+  onClick={[Function]}
+  to="/appstore"
+>
+  <i
+    className="fa fa-window-restore"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    AppStore
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth position /chains 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -344,28 +278,6 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
   >
      
     Accounts
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /contracts 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="contracts"
-  onClick={[Function]}
-  to="/contracts"
->
-  <i
-    className="fa fa-gavel"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Contracts
   </span>
 </NavLink>
 `;
@@ -392,6 +304,72 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode ninth pos
 </NavLink>
 `;
 
+exports[`SideBar: index sequence of links for oauth and non-oauth mode second position /appstore 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="dapplets"
+  onClick={[Function]}
+  to="/home"
+>
+  <i
+    className="fa fa-arrow-circle-right"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Dapplets
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /accounts 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="contracts"
+  onClick={[Function]}
+  to="/contracts"
+>
+  <i
+    className="fa fa-gavel"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Contracts
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /transactions 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="shards"
+  onClick={[Function]}
+  to="/shards"
+>
+  <i
+    className="fa fa-user-secret"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Shards
+  </span>
+</NavLink>
+`;
+
 exports[`SideBar: index sequence of links for oauth and non-oauth mode tenth position /external-storage 1`] = `
 <NavLink
   activeClassName="active-menu-item"
@@ -409,6 +387,28 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode tenth pos
     className="menu-text"
   >
     External Storage
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode third position /stats 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="network_stats"
+  onClick={[Function]}
+  to="/stats"
+>
+  <i
+    className="fa fa-rocket"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Network Stats
   </span>
 </NavLink>
 `;
