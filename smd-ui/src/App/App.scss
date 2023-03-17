@@ -1,6 +1,16 @@
 @import "../../node_modules/@blueprintjs/core/dist/variables.scss";
 @import "../../node_modules/plottable/plottable.css";
 
+:root {
+  --blockapps-primary-navy: #001B71;
+  --blockapps-primary-blue: #3452FF;
+  --blockapps-primary-red: #FF3300;
+  --blockapps-secondary-blue: #00AEEF;
+  --blockapps-secondary-purple: #6B36C4;
+  --blockapps-secondary-yellow: #F0C452;
+  --blockapps-secondary-green: #36C487;
+}
+
 html {
   height: 100%;
 }
