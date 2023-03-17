@@ -105,7 +105,7 @@ class MenuBar extends Component {
                 : (
                 <div>
                   <h4>Your account address: <span className='pt-monospace-text'>0x{this.props.oauthUser ? this.props.oauthUser.address : null}</span></h4><br/>
-                  <h4>Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your accont is ready. Welcome to the Block!</h4><br/>
+                  <h4>Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your account is ready. Welcome to the Block!</h4><br/>
                   <MenuDivider />
                   <h5>If your account still hasn't been verified, <a
                       onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}
