@@ -10,6 +10,9 @@ import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent } from '@blue
 import {
   searchQueryRequest,
 } from '../SearchResults/searchresults.actions';
+import {
+  getUserCertificateRequest,
+} from "../User/user.actions"
 
 class MenuBar extends Component {
   constructor() {
@@ -17,6 +20,12 @@ class MenuBar extends Component {
     this.state = {
      searchQuery:"",
      isUserMenuOpen: false
+    }
+  }
+
+  componentWillReceiveProps(newProps) {
+    if (newProps.oauthUser && !newProps.userCertificate) {
+      this.props.getUserCertificateRequest(newProps.oauthUser.address)
     }
   }
 
@@ -39,10 +48,7 @@ class MenuBar extends Component {
       this.props.history.push('/searchresults')
     }
   }
-  
-  // on-submit search function calls searchQueryRequest
-  // TODO move this to userCertificate state/props
-  toggleDialog = () => {
+    toggleDialog = () => {
     this.setState({ isUserMenuOpen: !this.state.isUserMenuOpen })
   }
 
@@ -80,7 +86,7 @@ class MenuBar extends Component {
         <Popover content={userDropdown} position={Position.BOTTOM_RIGHT}>
           <Button 
             className={"pt-large pt-minimal " + (this.props.userCertificate ? 'pt-intent-primary' : 'pt-intent-warning')} 
-            iconName={this.props.userCertificate ? "user" : "social-media"} 
+            iconName={"user"} 
             text={this.props.userCertificate ? (this.props.userCertificate.commonName + ', ' + this.props.userCertificate.organization + 
               (this.props.userCertificate.organizationalUnit ? ': ' + this.props.userCertificate.organizationalUnit : '')) : 'Verification Pending'} />
         </Popover>
@@ -164,6 +170,9 @@ export function mapStateToProps(state) {
   };
 }
 
-const connected = connect(mapStateToProps, {searchQueryRequest})(MenuBar);
+const connected = connect(mapStateToProps, {
+  searchQueryRequest, 
+  getUserCertificateRequest,
+})(MenuBar);
 
 export default withRouter(connected);
