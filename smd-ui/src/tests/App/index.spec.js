@@ -35,7 +35,7 @@ describe('App: index', () => {
   })
 
   describe('mapStateToProps', () => {
-    const state = {}
+    const state = { user: {oauthUser: undefined, userCertificate: undefined} }
     expect(mapStateToProps(state)).toMatchSnapshot();
   })
 

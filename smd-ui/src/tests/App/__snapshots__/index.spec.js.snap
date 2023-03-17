@@ -1,6 +1,11 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[` 1`] = `Object {}`;
+exports[` 1`] = `
+Object {
+  "oauthUser": undefined,
+  "userCertificate": undefined,
+}
+`;
 
 exports[`App: index componentDidMount 1`] = `
 "<div className=\\"App\\">
@@ -24,6 +29,7 @@ exports[`App: index componentDidMount 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
     </Switch>
   </main>
 </div>"
@@ -51,6 +57,7 @@ exports[`App: index componentDidMount 2`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
     </Switch>
   </main>
 </div>"
@@ -78,6 +85,7 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
     </Switch>
   </main>
 </div>"

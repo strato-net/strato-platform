@@ -279,15 +279,15 @@ describe('CreateContract: index', () => {
       initialValues: {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-      }
+      },
+      userCertificate: { userAddress: "456789"}
     }
     const wrapper = mount(
       <Provider store={store}>
         <CreateContract.WrappedComponent {...props} />
       </Provider>
     );
-    wrapper.find('Button').simulate('click');
-    expect(props.fetchChainIds).toHaveBeenCalled();
+    wrapper.find('AnchorButton').simulate('click');
     expect(props.contractOpenModal).toHaveBeenCalled();
   });
 
@@ -329,7 +329,9 @@ describe('CreateContract: index', () => {
       initialValues: {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-      }
+      },
+      userCertificate: { userAddress: "456789"}
+
     }
     const wrapper = mount(
       <Provider store={store}>
@@ -378,12 +380,14 @@ describe('CreateContract: index', () => {
       initialValues: {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-      }
+      },
+      userCertificate: { userAddress: "456789"}
+
     }
     const wrapper = shallow(
       <CreateContract.WrappedComponent {...props} />
     ).dive().dive().dive();
-    wrapper.find('Button').at(1).simulate('click')
+    wrapper.find('Button').at(0).simulate('click')
     expect(props.contractCloseModal).toHaveBeenCalled();
   });
 

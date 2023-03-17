@@ -103,7 +103,7 @@ describe('Contracts: index', () => {
       </Provider>
     ).dive().dive().dive().dive();
 
-    wrapper.find('input').simulate('change', { target: { value: "UPDATE" } });
+    wrapper.find('input').at(0).simulate('change', { target: { value: "UPDATE" } });
     expect(props.changeContractFilter).toHaveBeenCalled();
     expect(props.changeContractFilter.mock.calls.length).toBe(2);
     expect(props.changeContractFilter.mock.calls).toMatchSnapshot();

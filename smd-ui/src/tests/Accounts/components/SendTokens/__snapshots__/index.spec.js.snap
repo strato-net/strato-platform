@@ -214,12 +214,15 @@ Object {
   "isOpen": true,
   "result": "On success we get result",
   "toUsername": undefined,
+  "userCertificate": undefined,
 }
 `;
 
 exports[`SendTokens: index render Oauth mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" disabled={true} text=\\"Send Tokens\\" />
+  </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
@@ -405,7 +408,9 @@ exports[`SendTokens: index render Oauth mode with values 1`] = `
 
 exports[`SendTokens: index render Oauth mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" disabled={true} text=\\"Send Tokens\\" />
+  </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
@@ -587,7 +592,9 @@ exports[`SendTokens: index render Oauth mode without values 1`] = `
 
 exports[`SendTokens: index render non oauth mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" disabled={true} text=\\"Send Tokens\\" />
+  </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
@@ -966,7 +973,9 @@ exports[`SendTokens: index render non oauth mode with values 1`] = `
 
 exports[`SendTokens: index render non oauth mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" disabled={true} text=\\"Send Tokens\\" />
+  </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">

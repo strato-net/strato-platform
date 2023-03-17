@@ -218,14 +218,15 @@ describe('DeployDapp: index', () => {
       resetError: jest.fn(),
       touch: jest.fn(),
       reset: jest.fn(),
-      store: store
+      store: store,
+      userCertificate: { userAddress: "456789"}
     };
 
     const wrapper = shallow(
       <DeployDapp.WrappedComponent {...props} />
     ).dive().dive().dive();
 
-    wrapper.find('Button').first().simulate('click');
+    wrapper.find('AnchorButton').first().simulate('click');
     expect(props.deployDappOpenModal).toHaveBeenCalled();
     expect(props.deployDappOpenModal).toHaveBeenCalledTimes(1);
   });
