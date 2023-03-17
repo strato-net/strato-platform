@@ -3,7 +3,7 @@ import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
-import logo from './BlockAppsLogos_DarkBG-Stacked.png';
+import logo from './strato-mercata-beta-white.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
 
@@ -98,15 +98,15 @@ class MenuBar extends Component {
               <img
                 src={logo}
                 alt="Blockapps Logo"
-                height="50"
-                className="smd-menu-logo"
+                height="45"
+                className="smd-menu-logo smd-pad-4"
               />
             </Link>
           </div>
         </div>
-        <div className="pt-navbar-group pt-align-left">
+        {/* <div className="pt-navbar-group pt-align-left">
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
-        </div>
+        </div> */}
         <div className="pt-navbar-group pt-align-right">
           <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
