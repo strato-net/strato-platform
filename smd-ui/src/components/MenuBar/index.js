@@ -6,7 +6,7 @@ import './menubar.css';
 import logo from './strato-mercata-beta-white.png';
 import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
-import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent } from '@blueprintjs/core';
+import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent, MenuDivider } from '@blueprintjs/core';
 import {
   searchQueryRequest,
 } from '../SearchResults/searchresults.actions';
@@ -22,7 +22,6 @@ class MenuBar extends Component {
      isUserMenuOpen: false
     }
   }
-
   componentWillReceiveProps(newProps) {
     if (newProps.oauthUser && !newProps.userCertificate) {
       this.props.getUserCertificateRequest(newProps.oauthUser.address)
@@ -38,6 +37,35 @@ class MenuBar extends Component {
     // Update local state instead
     this.props.searchQuerySuccess(searchQuery);
     this.setState({ searchQuery: searchQuery });
+  }
+
+  renderUserProfileInfo = () => {
+    const { 
+      certificateString, 
+      organization, 
+      organizationalUnit, 
+      commonName,
+      address
+    } = this.props.userCertificate
+
+    return (
+      <div className='pt-dark'>
+        <h3>Organization</h3>
+        <h4>{organization} {organizationalUnit}</h4>
+        <MenuDivider />
+
+        <h3>Common Name</h3>
+        <h4>{commonName}</h4>
+        <MenuDivider />
+
+        <h3>User Address</h3>
+        <h4 className='pt-monospace-text'>0x{address}</h4>
+        <MenuDivider />
+
+        <h3>Certificate <span className='pt-monospace-text'>.pem</span></h3>
+        <pre>{certificateString}</pre>
+      </div>      
+    )
   }
 
 
@@ -69,7 +97,25 @@ class MenuBar extends Component {
           title="My Profile"
         >
           <div className="pt-dialog-body">
-              Some content
+            {
+              this.props.userCertificate ? (
+                <div>
+                  {this.renderUserProfileInfo()}
+                </div> ) 
+                : (
+                <div>
+                  <h4>Your account address: <span className='pt-monospace-text'>{this.props.oauthUser ? this.props.oauthUser.address : null}</span></h4><br/>
+                  <h4>Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your accont is ready. Welcome to the Block!</h4><br/>
+                  <MenuDivider />
+                  <h5>If your account still hasn't been verified, <a
+                      onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}
+                      href='https://support.blockapps.net' 
+                      target="_blank" 
+                      rel="noopener noreferrer">contact our support channel here.</a>
+                  </h5>
+                </div>
+              )
+            }
           </div>
           <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
