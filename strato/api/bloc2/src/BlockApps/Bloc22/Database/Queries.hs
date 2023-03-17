@@ -368,7 +368,6 @@ instance DefaultFromField PGBytea SecretBox.Nonce where
 instance FromField SecretBox.Nonce where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
     let !decoded = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
     return decoded
 
@@ -386,7 +385,6 @@ instance DefaultFromField PGText StateMutability where
 instance FromField StateMutability where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
     let !decoded = fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
     return decoded
 
@@ -396,7 +394,6 @@ instance DefaultFromField PGBytea Keccak256 where
 instance FromField Keccak256 where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ unsafeCreateKeccak256FromByteString theByteString
     let !decoded = unsafeCreateKeccak256FromByteString theByteString
     return decoded
 
@@ -409,7 +406,6 @@ instance DefaultFromField PGBytea CodePtr where
 instance FromField CodePtr where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
     let !decoded = fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
     return decoded
 
@@ -422,7 +418,6 @@ instance DefaultFromField PGBytea (Maybe ChainId) where
 instance FromField ChainId where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ ChainId $ byteStringToWord256 theByteString
     let !decoded = ChainId $ byteStringToWord256 theByteString
     return decoded
 

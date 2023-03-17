@@ -167,7 +167,6 @@ instance DefaultFromField PGBytea Address where
 instance FromField Address where
   fromField f mdata = do
     !theByteString <- fromField f mdata
-    -- return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
     let !returnVal = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
     return returnVal
 
@@ -180,7 +179,6 @@ instance DefaultFromField PGBytea SecretBox.Nonce where
 instance FromField SecretBox.Nonce where
   fromField f theData = do
     !theByteString <- fromField f theData
-    -- return $ fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
     let !returnVal = fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
     return returnVal
 
