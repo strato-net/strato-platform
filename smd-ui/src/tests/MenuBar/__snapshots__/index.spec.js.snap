@@ -5,13 +5,8 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
       <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"45\\" className=\\"smd-menu-logo smd-pad-4\\" />
       </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
@@ -60,13 +55,8 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
       <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"50\\" className=\\"smd-menu-logo\\" />
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"45\\" className=\\"smd-menu-logo smd-pad-4\\" />
       </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
