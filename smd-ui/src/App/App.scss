@@ -113,7 +113,7 @@ $multipliers: 5;
       max-height: 100%;
       max-width: 100%;
       border-radius: 8px 8px 0px 0;
-      object-fit: cover;
+      object-fit: fill;
       
   }
 
@@ -147,7 +147,7 @@ $multipliers: 5;
       background-color: pt-dark-app-background-color;
       color: #fff;
       border-radius: 0 0 8px 8px;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
       margin-left: auto;
       margin-right: auto;
