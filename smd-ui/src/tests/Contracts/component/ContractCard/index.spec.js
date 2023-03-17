@@ -16,7 +16,7 @@ describe('ContractCard: index', () => {
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
       );
-      expect(wrapper).toMatchSnapshot();
+      expect(<div><wrapper /></div>).toMatchSnapshot();
     });
 
     test('mocked values', () => {
@@ -41,7 +41,7 @@ describe('ContractCard: index', () => {
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
       );
-      expect(wrapper).toMatchSnapshot();
+      expect(<div><wrapper /></div>).toMatchSnapshot();
     });
 
   })
@@ -70,7 +70,7 @@ describe('ContractCard: index', () => {
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
       );
-      expect(wrapper).toMatchSnapshot();
+      expect(<div><wrapper /></div>).toMatchSnapshot();
     });
 
     test('instance selection', () => {
@@ -107,7 +107,7 @@ describe('ContractCard: index', () => {
       expect(props.fetchAccount).toHaveBeenCalled();
       expect(props.fetchState).toHaveBeenCalled();
       expect(props.selectContractInstance).toHaveBeenCalled();
-      expect(wrapper).toMatchSnapshot();
+      expect(<div><wrapper /></div>).toMatchSnapshot();
     });
 
   })
@@ -133,6 +133,13 @@ describe('ContractCard: index', () => {
     expect(mapStateToProps({
       chains: {
         selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
+      },
+      user: {
+        oauthUser: {
+          "username": "user",
+          "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+          "commonName": "user"
+        }
       }
     })).toMatchSnapshot();
   });
