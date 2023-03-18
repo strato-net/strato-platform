@@ -28,7 +28,8 @@ const initialState = {
   isToasts: false,
   toastsMessage: '',
   error: '',
-  usingSampleContract: false
+  usingSampleContract: false,
+  sampleContractName: ''
 };
 
 const reducer = function (state = initialState, action) {
@@ -114,6 +115,7 @@ const reducer = function (state = initialState, action) {
         response: "Error Uploading Contract...: " + action.error,
         error: action.error,
         contractCompileErrors: `Unable to compile contract: ${action.error}`,
+        abi: '',
       };
     case COMPILE_CONTRACT_SUCCESS:
       let contracts = action.response && action.response.src && Object.keys(action.response.src);
@@ -124,6 +126,7 @@ const reducer = function (state = initialState, action) {
         createDisabled: false,
         contractName: contracts && contracts[0],
         contractCompileErrors: undefined,
+        error: action.error,
       };
     case RESET_ERROR:
       return {
@@ -134,7 +137,10 @@ const reducer = function (state = initialState, action) {
     case UPDATE_USING_SAMPLE_CONTRACT:
       return {
         ...state,
-        usingSampleContract: action.usingSampleContract
+        usingSampleContract: action.usingSampleContract,
+        sampleContractName: action.sampleContractName,
+        error: action.error,
+        abi: action.usingSampleContract ? state.abi : '',
       }
     default:
       return state;

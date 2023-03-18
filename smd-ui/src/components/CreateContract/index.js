@@ -14,7 +14,7 @@ import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions'
 import { fetchContracts } from '../Contracts/contracts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
-import { Field, reduxForm } from 'redux-form';
+import { Field, reduxForm, change } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
@@ -32,9 +32,9 @@ class CreateContract extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      value: "default",
-      dropzone: 'Drop a file here, or click to select files to upload.',
-      dropfile: false
+      dropZone: 'Drop a file here, or click to select files to upload.',
+      dropFile: false,
+      reset: false,
     };
 
     this.handleSampleContract = this.handleSampleContract.bind(this);
@@ -65,12 +65,12 @@ class CreateContract extends Component {
               return (<p className="pt-intent-success">Drop to Upload!</p>);
             }
             if (!this.props.usingSampleContract && acceptedFiles.length > 0){
-              return (<p className="pt-intent-success">{this.state.dropzone}</p>);//acceptedFiles[0].name}</p>);
+              return (<p className="pt-intent-success">{this.state.dropZone}</p>);//acceptedFiles[0].name}</p>);
             }
-            return (<p className="pt-intent-success">{this.state.dropzone}</p>);
+            return (<p className="pt-intent-success">{this.state.dropZone}</p>);
           }}
         </Dropzone>
-        {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
+        {!this.state.reset && touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
       </div>
     );
   };
@@ -92,6 +92,9 @@ class CreateContract extends Component {
     this.props.touch('contract');
     dropZoneField.input.onChange(files);
     const contract = files[0];
+    this.props.updateUsingSampleContract(false, "default");
+    this.props.change("sampleContract", "default");
+    this.setState({dropZone: contract.name, reset: false});
 
     let reader = new FileReader();
     const self = this;
@@ -109,19 +112,17 @@ class CreateContract extends Component {
     };
     reader.readAsText(contract);
     if (this.props.usingSampleContract){
-      this.props.updateUsingSampleContract(false);
+      this.props.updateUsingSampleContract(false, "default");
     }
-    this.setState({value: "default", dropzone: contract.name});
   };
 
   handleSampleContract = (contractName) => {
-    if (contractName == "default"){
-      if (this.props.usingSampleContract){
-        this.props.updateUsingSampleContract(false);
-      }
-      this.setState({value: "default", dropfile: false});
+    if (contractName === "default"){
+      this.props.updateUsingSampleContract(false, "default");
+      this.setState({dropZone: 'Drop a file here, or click to select files to upload.', dropFile: false});
     }
     else{
+      this.setState({dropZone: 'Drop a file here, or click to select files to upload.', dropFile: false});
       this.props.touch('contract');
       let contractSrc = SampleContracts[contractName];
       const self = this;
@@ -132,10 +133,7 @@ class CreateContract extends Component {
         contractSrc,
         self.props.solidvm
       );
-      if (!this.props.usingSampleContract){
-        this.props.updateUsingSampleContract(true);
-      }
-      this.setState({value: contractName, dropzone: 'Drop a file here, or click to select files to upload.', dropFile: false});
+      this.props.updateUsingSampleContract(true, contractName);
     }
   }
 
@@ -375,8 +373,12 @@ class CreateContract extends Component {
   }
 
   render() {
-    const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
+    const { handleSubmit, submitting, valid, toastsError } = this.props;
+    let { pristine } = this.props
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
+    if (pristine === false && contracts === "") {
+      pristine = true;
+    }
     const isModeOauth = isOauthEnabled();
 
     return (
@@ -453,12 +455,11 @@ class CreateContract extends Component {
                   </div>
                   <div className="col-sm-9 smd-pad-4">
                       <div className="pt-select">
-                        <select
-                          id='status'
-                          className="pt-select"
+                        <Field
                           component="select"
+                          className="pt-select"
                           name="sampleContract"
-                          value={this.state.value}
+                          value={this.props.sampleContractName}
                           onChange={(e) => {
                               this.handleSampleContract(e.target.value);
                           }}
@@ -469,7 +470,7 @@ class CreateContract extends Component {
                           <option key={3} value="ERC20">ERC20 - Tokens</option>
                           <option key={4} value="ERC721">ERC721 - NFT</option>
                           <option key={5} value="PermissionManager">Permission Manager</option>
-                        </select>
+                        </Field>
                       </div>
                   </div>
 
@@ -492,7 +493,8 @@ class CreateContract extends Component {
                         () => {
                           this.setState((prevState) => {
                             return {
-                              dropFile: true
+                              dropFile: true,
+                              reset: true
                             };
                           });
                         }
@@ -511,7 +513,6 @@ class CreateContract extends Component {
                         dir="auto"
                         title="Contract Source"
                         validate={this.isValidFileType}
-                        required
                       />
                     }
                   </div>
@@ -646,6 +647,7 @@ export function mapStateToProps(state) {
     toastsMessage: state.createContract.toastsMessage,
     toastsError: state.createContract.error,
     usingSampleContract: state.createContract.usingSampleContract,
+    sampleContractName: state.createContract.sampleContractName,
     codeType: state.codeEditor.codeType,
     initialValues: {
       commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
