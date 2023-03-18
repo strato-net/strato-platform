@@ -84,7 +84,6 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
   </div>
-  <VSCode />
   <div className=\\"smd-sidebar-logo\\">
     <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
       <img src={{...}} width=\\"120\\" alt=\\"Blockapps Logo\\" />
@@ -169,7 +168,6 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
   </div>
-  <VSCode />
   <div className=\\"smd-sidebar-logo\\">
     <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
       <img src={{...}} width=\\"120\\" alt=\\"Blockapps Logo\\" />

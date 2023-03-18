@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 import logo from './BlockAppsLogos_DarkBG-Horizontal.png';
-import VSCode from '../VSCode';
+// import VSCode from '../VSCode';
 
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
@@ -58,7 +58,7 @@ class SideBar extends Component {
               <span className="menu-text">External Storage</span>
             </NavLink>}
         </div>
-        <VSCode />
+        {/* <VSCode /> */}
         <div className="smd-sidebar-logo">
           <a href="http://blockapps.net" target="_blank" rel="noopener noreferrer">
             <img
