@@ -198,7 +198,7 @@ class ContractCard extends Component {
                   >
                     {this.state.isOpen ? "Hide" : "Show"} Contracts
                   </Button>
-                  <div class="linkedIn" id="logo">
+                  <div className="share-button-logo">
                     <a
                       target='_blank'
                       rel="noopener noreferrer"
@@ -229,7 +229,7 @@ class ContractCard extends Component {
                       />
                     </a>
                   </div>
-                  <div class="twitter" id="logo">
+                  <div className="share-button-logo">
                     <a
                       target='_blank'
                       rel="noopener noreferrer"
