@@ -86,7 +86,7 @@ class MenuBar extends Component {
   render() {
     const { isModalOpen } = this.state;
     const customInviteLink = "https://bit.ly/MercataSignUp";
-    const subject = "Invitation to join Mercata";
+    // const subject = "Invitation to join Mercata";
     const body = `Hi! ${(this.props.oauthUser && this.props.oauthUser.commonName) ? this.props.oauthUser.commonName : "________"} would like to invite you to join Mercata. Please follow this link to sign up: ${customInviteLink} Thank you!`;
 
     

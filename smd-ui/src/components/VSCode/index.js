@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import ReactGA from "react-ga4";
+// import ReactGA from "react-ga4";
 import './vscode.css';
 
 import logo from './BlockApps_Icon.png';
