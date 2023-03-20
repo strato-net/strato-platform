@@ -13,6 +13,7 @@ import {
 import {
   getUserCertificateRequest,
 } from "../User/user.actions"
+import HexText from '../HexText';
 
 class MenuBar extends Component {
   constructor() {
@@ -45,13 +46,16 @@ class MenuBar extends Component {
       organization, 
       organizationalUnit, 
       commonName,
-      address
+      address,
+      block_timestamp
     } = this.props.userCertificate
+
+    const dateCreated = new Date(block_timestamp).toLocaleDateString('en-us', {year:"numeric", month:"short", day:"numeric"}) 
 
     return (
       <div className='pt-dark'>
         <h3>Organization</h3>
-        <h4>{organization} {organizationalUnit}</h4>
+        <h4>{organization} | {organizationalUnit}</h4>
         <MenuDivider />
 
         <h3>Name</h3>
@@ -59,7 +63,10 @@ class MenuBar extends Component {
         <MenuDivider />
 
         <h3>Address</h3>
-        <h3 className='pt-monospace-text'>0x{address}</h3>
+        <HexText value={'0x' + address}/>
+
+        <h3>Date Created</h3>
+        <h4>{dateCreated}</h4>
         <MenuDivider />
 
         <h3>Certificate <span className='pt-monospace-text'>.pem</span></h3>
@@ -83,7 +90,7 @@ class MenuBar extends Component {
   afterLoggedIn() {
     const userDropdown =
       <Menu>
-        <MenuItem className="pt-button pt-minimal" onClick={this.toggleDialog} target="_blank" rel="noopener noreferrer" iconName="mugshot" text="My Profile" /> 
+        <MenuItem className="pt-button pt-minimal" onClick={this.toggleDialog} target="_blank" rel="noopener noreferrer" iconName="mugshot" text={this.props.userCertificate ? "My Profile" : "More Info"}/> 
         <MenuItem className="pt-button pt-minimal" onClick={this.logout} target="_blank" rel="noopener noreferrer" iconName="log-out" text="Logout" /> 
       </Menu>
 
@@ -104,14 +111,14 @@ class MenuBar extends Component {
                 </div> ) 
                 : (
                 <div>
-                  <h4>Your account address: <span className='pt-monospace-text'>0x{this.props.oauthUser ? this.props.oauthUser.address : null}</span></h4><br/>
+                  <h4>Your STRATO Mercata address: <br/><HexText value={this.props.oauthUser ? "0x" + this.props.oauthUser.address : null}/></h4><br/>
                   <h4>Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your account is ready. Welcome to the Block!</h4><br/>
                   <MenuDivider />
                   <h5>If your account still hasn't been verified, <a
                       onClick={() => { mixpanelWrapper.track("contact_blockapps_support_click") }}
                       href='https://support.blockapps.net' 
                       target="_blank" 
-                      rel="noopener noreferrer">contact our support channel here.</a>
+                      rel="noopener noreferrer">contact support here.</a>
                   </h5>
                 </div>
               )
