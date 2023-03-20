@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE BangPatterns         #-}
 
 module Strato.Strato23.Database.Queries where
 
@@ -165,9 +166,10 @@ instance DefaultFromField PGBytea Address where
 
 instance FromField Address where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
- 
+    !theByteString <- fromField f mdata
+    let !returnVal = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
+    return returnVal
+
 instance Default ToFields Address (O.Field PGBytea) where
   def = lmap (C8.pack . formatAddressWithoutColor) def
 
@@ -176,8 +178,9 @@ instance DefaultFromField PGBytea SecretBox.Nonce where
 
 instance FromField SecretBox.Nonce where
   fromField f theData = do
-    theByteString <- fromField f theData
-    return $ fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
+    !theByteString <- fromField f theData
+    let !returnVal = fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
+    return returnVal
 
 instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
