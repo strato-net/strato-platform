@@ -314,9 +314,10 @@ class CodeEditor extends Component {
           <div className="col-md-2 text-left">
             <h3>Contract Editor</h3>
           </div>
-          <div className="text-right">
+          <div className="text-right col-md-10">
+            <div className='smd-pad-16 ' style={{display: "inline-block"}}>
+
             <Popover
-              className="h-align"
               position={Position.BOTTOM}
               content={
                 <div>
@@ -328,14 +329,15 @@ class CodeEditor extends Component {
                   onClick={() => {this.compileCode("EVM")}}/>
                 </div>
               }
-            >
+              >
               <Button
-                className="pt-intent-primary smd-margin-8"
+                className="pt-intent-primary"
                 disabled={false}
                 text="Compile">
                   <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
               </Button>
             </Popover>
+            </div>
           
             <DeployDapp
               onChangeEditorContractName={this.props.contractNameChange}
