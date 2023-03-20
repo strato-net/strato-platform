@@ -11,6 +11,7 @@
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE BangPatterns          #-}
 
 module BlockApps.Bloc22.Database.Queries
   ( contractBySourceHash
@@ -352,8 +353,9 @@ instance DefaultFromField PGBytea Address where
 
 instance FromField Address where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ Address $ bytesToWord160 $ B.unpack theByteString
+    !theByteString <- fromField f mdata
+    let !word160 = bytesToWord160 $ B.unpack theByteString
+    return $ Address word160
 
 instance Default ToFields Address (O.Field PGBytea) where
   def = lmap getBytes def
@@ -365,8 +367,9 @@ instance DefaultFromField PGBytea SecretBox.Nonce where
 
 instance FromField SecretBox.Nonce where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+    return decoded
 
 instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
@@ -381,16 +384,18 @@ instance DefaultFromField PGText StateMutability where
 
 instance FromField StateMutability where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
+    return decoded
 
 instance DefaultFromField PGBytea Keccak256 where
   defaultFromField = fromPGSFromField
 
 instance FromField Keccak256 where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ unsafeCreateKeccak256FromByteString theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = unsafeCreateKeccak256FromByteString theByteString
+    return decoded
 
 instance Default ToFields Keccak256 (O.Field PGBytea) where
   def = lmap keccak256ToByteString def
@@ -400,8 +405,9 @@ instance DefaultFromField PGBytea CodePtr where
 
 instance FromField CodePtr where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
+    return decoded
 
 instance Default ToFields CodePtr (O.Field PGBytea) where
   def = lmap rlpSerialize def
@@ -411,8 +417,9 @@ instance DefaultFromField PGBytea (Maybe ChainId) where
 
 instance FromField ChainId where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ ChainId $ byteStringToWord256 theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = ChainId $ byteStringToWord256 theByteString
+    return decoded
 
 instance Default ToFields (Maybe ChainId) (O.Field PGBytea) where
   def = lmap fromChainId def
