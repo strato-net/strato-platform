@@ -226,6 +226,7 @@ Object {
   },
   "isOpen": true,
   "isToasts": false,
+  "sampleContractName": undefined,
   "toastsError": undefined,
   "toastsMessage": "message",
   "username": "",
