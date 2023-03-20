@@ -55,7 +55,7 @@ class MenuBar extends Component {
     return (
       <div className='pt-dark'>
         <h3>Organization</h3>
-        <h4>{organization}  {organizationalUnit ? "|" + organizationalUnit : ""}</h4>
+        <h4>{organization} {organizationalUnit ? `| ${organizationalUnit}`: ""}</h4>
         <MenuDivider />
 
         <h3>Name</h3>
