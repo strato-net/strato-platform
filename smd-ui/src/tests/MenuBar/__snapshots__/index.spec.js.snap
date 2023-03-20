@@ -17,6 +17,34 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
+      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"mugshot\\" isOpen={false} onClose={[Function]} title=\\"My Profile\\" canOutsideClickClose={true}>
+        <div className=\\"pt-dialog-body\\">
+          <div>
+            <h4>
+              Your STRATO Mercata address: 
+              <br />
+              <HexText value={{...}} shorten={false} />
+            </h4>
+            <br />
+            <h4>
+              Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your account is ready. Welcome to the Block!
+            </h4>
+            <br />
+            <Blueprint.MenuDivider />
+            <h5>
+              If your account still hasn&#39;t been verified, 
+              <a onClick={[Function: onClick]} href=\\"https://support.blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+                contact support here.
+              </a>
+            </h5>
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions\\">
+            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function]} text=\\"Close\\" />
+          </div>
+        </div>
+      </Blueprint.Dialog>
       <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
         <Blueprint.Button className=\\"pt-large pt-minimal pt-intent-warning\\" iconName=\\"user\\" text=\\"Verification Pending\\" />
       </Blueprint.Popover>
@@ -45,6 +73,34 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
+      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"mugshot\\" isOpen={false} onClose={[Function]} title=\\"My Profile\\" canOutsideClickClose={true}>
+        <div className=\\"pt-dialog-body\\">
+          <div>
+            <h4>
+              Your STRATO Mercata address: 
+              <br />
+              <HexText value={{...}} shorten={false} />
+            </h4>
+            <br />
+            <h4>
+              Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your account is ready. Welcome to the Block!
+            </h4>
+            <br />
+            <Blueprint.MenuDivider />
+            <h5>
+              If your account still hasn&#39;t been verified, 
+              <a onClick={[Function: onClick]} href=\\"https://support.blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+                contact support here.
+              </a>
+            </h5>
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions\\">
+            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function]} text=\\"Close\\" />
+          </div>
+        </div>
+      </Blueprint.Dialog>
       <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
         <Blueprint.Button className=\\"pt-large pt-minimal pt-intent-warning\\" iconName=\\"user\\" text=\\"Verification Pending\\" />
       </Blueprint.Popover>
