@@ -14,7 +14,7 @@ import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions'
 import { fetchContracts } from '../Contracts/contracts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
-import { Field, reduxForm, change } from 'redux-form';
+import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
@@ -111,9 +111,6 @@ class CreateContract extends Component {
       );
     };
     reader.readAsText(contract);
-    if (this.props.usingSampleContract){
-      this.props.updateUsingSampleContract(false, "default");
-    }
   };
 
   handleSampleContract = (contractName) => {
@@ -136,16 +133,6 @@ class CreateContract extends Component {
       this.props.updateUsingSampleContract(true, contractName);
     }
   }
-
-  isValidFileType = (files) => {
-    if (files && !this.props.usingSampleContract) {
-      if (!files || !files[0])
-        return 'Please add contract source file'
-      const contractSource = files[0];
-      if (!contractSource.name.includes('.sol'))
-        return 'It should be an .sol extention file';
-    }
-  };
 
   submit = (values) => {
     const args = {};
@@ -204,6 +191,7 @@ class CreateContract extends Component {
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
     this.props.createContract(payload);
+    this.setState({dropZone: 'Drop a file here, or click to select files to upload.', dropFile: false, reset: false});
     this.props.reset();
   };
 
@@ -376,7 +364,7 @@ class CreateContract extends Component {
     const { handleSubmit, submitting, valid, toastsError } = this.props;
     let { pristine } = this.props
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    if (pristine === false && contracts === "") {
+    if (pristine === false && (!contracts || contracts === "")) {
       pristine = true;
     }
     const isModeOauth = isOauthEnabled();
@@ -512,7 +500,6 @@ class CreateContract extends Component {
                         component={this.renderDropzoneInput}
                         dir="auto"
                         title="Contract Source"
-                        validate={this.isValidFileType}
                       />
                     }
                   </div>

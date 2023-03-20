@@ -116,6 +116,7 @@ const reducer = function (state = initialState, action) {
         error: action.error,
         contractCompileErrors: `Unable to compile contract: ${action.error}`,
         abi: '',
+        usingSampleContract: false,
       };
     case COMPILE_CONTRACT_SUCCESS:
       let contracts = action.response && action.response.src && Object.keys(action.response.src);
@@ -127,6 +128,7 @@ const reducer = function (state = initialState, action) {
         contractName: contracts && contracts[0],
         contractCompileErrors: undefined,
         error: action.error,
+        usingSampleContract: false,
       };
     case RESET_ERROR:
       return {
