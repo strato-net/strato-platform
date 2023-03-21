@@ -52,10 +52,12 @@ library:
     - milena-tools
     - monad-alter
     - mtl
+    - path-pieces
     - persistent
     - postgresql-typed
     - prometheus-client
     - QuickCheck
+    - servant
     - solid-vm
     - solid-vm-model
     - scientific

@@ -30,6 +30,7 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import Text.Printf
 import Text.RawString.QQ
+import Text.Regex.Posix
 
 import BlockApps.Bloc22.Monad (BlocEnv(..))
 import BlockApps.Init
