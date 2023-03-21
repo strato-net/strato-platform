@@ -18,6 +18,7 @@ expecting \\"pragma\\", \\"import\\", \\"contract\\", \\"library\\" or end of in
   "toastsMessage": "",
   "toster": false,
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 
@@ -94,6 +95,7 @@ Object {
   "toastsMessage": "",
   "toster": false,
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 

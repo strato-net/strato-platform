@@ -134,6 +134,16 @@ class CreateContract extends Component {
     }
   }
 
+  isValidFileType = (files) => {
+    if (files && !this.props.usingSampleContract) {
+      if (!files || !files[0])
+        return 'Please add contract source file'
+      const contractSource = files[0];
+      if (!contractSource.name.includes('.sol'))
+        return 'It should be an .sol extention file';
+    }
+  };
+
   submit = (values) => {
     const args = {};
     const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName;
