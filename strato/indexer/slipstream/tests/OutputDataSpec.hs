@@ -93,7 +93,7 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals fakeHandle
+      g <- newGlobals M.empty fakeHandle
       [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
       
       vehicleCreate `shouldBe`
@@ -157,7 +157,7 @@ spec = do
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals fakeHandle
+      g <- newGlobals M.empty fakeHandle
       runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
       let hl = ["Vehicle2"]
 
@@ -260,7 +260,7 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals fakeHandle
+      g <- newGlobals M.empty fakeHandle
       [vehicleCreate, vehicleInsert] <-
           runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
@@ -347,7 +347,7 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
@@ -434,7 +434,7 @@ spec = do
           }, createDummyContract [
                      ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                      ])]
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
@@ -475,7 +475,7 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
@@ -526,7 +526,7 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 

@@ -52,8 +52,8 @@ import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
-newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals M.empty M.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals :: MonadIO m => M.Map TableName TableColumns  -> Handle -> m (IORef Globals)
+newGlobals createdTabl = newIORef . Globals createdTabl M.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
