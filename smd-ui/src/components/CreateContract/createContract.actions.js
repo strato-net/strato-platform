@@ -119,9 +119,10 @@ export const resetError = function() {
   }
 }
 
-export const updateUsingSampleContract = function(status) {
+export const updateUsingSampleContract = function(status, contractName) {
   return {
     type: UPDATE_USING_SAMPLE_CONTRACT,
     usingSampleContract: status,
+    sampleContractName: contractName,
   }
 }

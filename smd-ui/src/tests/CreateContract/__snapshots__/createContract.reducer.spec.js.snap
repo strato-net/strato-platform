@@ -2,7 +2,7 @@
 
 exports[`CreateContract: reducer compile contract on failure 1`] = `
 Object {
-  "abi": undefined,
+  "abi": "",
   "contract": "",
   "contractCompileErrors": "Unable to compile contract: [object Object]",
   "contractName": undefined,
@@ -18,6 +18,7 @@ expecting \\"pragma\\", \\"import\\", \\"contract\\", \\"library\\" or end of in
   "toastsMessage": "",
   "toster": false,
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 
@@ -87,13 +88,14 @@ Object {
   "contractCompileErrors": undefined,
   "contractName": "funcs",
   "createDisabled": false,
-  "error": "",
+  "error": undefined,
   "filename": undefined,
   "isOpen": true,
   "response": "Status: Upload Contract",
   "toastsMessage": "",
   "toster": false,
   "username": "",
+  "usingSampleContract": false,
 }
 `;
 
@@ -333,6 +335,7 @@ Object {
   "isOpen": false,
   "isToasts": false,
   "response": "Status: Upload Contract",
+  "sampleContractName": "",
   "toastsMessage": "",
   "username": "",
   "usingSampleContract": false,

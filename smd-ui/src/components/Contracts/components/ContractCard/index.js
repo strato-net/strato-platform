@@ -198,14 +198,16 @@ class ContractCard extends Component {
                   >
                     {this.state.isOpen ? "Hide" : "Show"} Contracts
                   </Button>
-                  <div class="linkedIn" id="logo">
+                  <div className="share-button-logo">
                     <a
                       target='_blank'
+                      rel="noopener noreferrer"
                       href="https://www.linkedin.com/shareArticle?mini=true&url=https://bit.ly/MercataShare">
-                    <img title="Share on linkedIn"
+                    <img title="Share on LinkedIn"
                         src={llogo} 
                         width="20" 
                         height="20"
+                        alt="Share on LinkedIn"
                         onClick={async () => {
 
                           var currentdate = new Date(); 
@@ -227,14 +229,16 @@ class ContractCard extends Component {
                       />
                     </a>
                   </div>
-                  <div class="twitter" id="logo">
+                  <div className="share-button-logo">
                     <a
                       target='_blank'
+                      rel="noopener noreferrer"
                       href="http://twitter.com/intent/tweet?text=Sign%20up%20on%20Mercata%20to%20look%20at%20their%20contracts!&url=https://bit.ly/MercataShare">
-                    <img title="Share on twitter"
+                    <img title="Share on Twitter"
                         src={tlogo} 
                         width="20" 
                         height="20"
+                        alt="Share on Twitter"
                         onClick={async () => {
 
                           var currentdate = new Date(); 
