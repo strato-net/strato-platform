@@ -99,6 +99,7 @@ main = do
     -- The in memory state gets wiped
     -- This causes cirrus issues
     -- Below scrapes the cirrus table names and column names
+    -- converts the information to the proper types
     -- to restore the in memeory state
 
     let getPGValues :: MonadIO m => B.ByteString -> m [PGValues]
@@ -122,10 +123,9 @@ main = do
     -- liftIO $ join $ ( putStrLn   <$> ) $ (concat <$>) $ (map  ( show)) <$> allTableNamesInPGValue -- Print everything we get back from this
     liftIO $  putStrLn "BEFORE SELECT COL STMT"
     
-
-    let sqlStatement x         = (encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'") <> x <> (encodeUtf8 "\';")   :: B.ByteString
-        tableNamesWithPgValues = join $ (sequence <$>) $ (map  (\tableNam -> ((parseStringToTableName $ show tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString)     :: IO [(TableName, [PGValues])]
-        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) <$>)  $ M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
+    let sqlStatement x         = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
+        tableNamesWithPgValues = join $  sequence . map  (\tableNam -> ((parseStringToTableName $ show tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString     :: IO [(TableName, [PGValues])]
+        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
     -- Scrape Finished 
 
     liftIO $ join $ putStrLn . show <$> createdTables     
