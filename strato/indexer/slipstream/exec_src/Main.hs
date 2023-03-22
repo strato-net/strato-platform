@@ -19,7 +19,7 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.Cache
 import qualified Data.Map as M
 import           Data.Maybe
-import qualified Data.Text as T 
+-- import qualified Data.Text as T 
 import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
@@ -99,7 +99,7 @@ main = do
     -- The in memory state gets wiped
     -- This causes cirrus issues
     -- Below scrapes the cirrus table names and column names
-    -- to restore the in memeory information
+    -- to restore the in memeory state
 
     let getPGValues :: MonadIO m => B.ByteString -> m [PGValues]
         getPGValues = liftIO . pgQuery conn
@@ -109,26 +109,23 @@ main = do
 
     liftIO $  putStrLn "HELLO1 GARRETT"
 
+    let convertFromPGTextValueToShowable :: (B.ByteString -> a) -> PGValue -> Maybe a
+        convertFromPGTextValueToShowable f c = case  c of (PGTextValue txt )  -> Just $ f txt ;  _ -> Nothing 
+
     let getAllTableNames :: IO [PGValue]
         getAllTableNames = concat <$> (getPGValues [r|select table_name from information_schema.tables where 
             table_name like '%-%' or 
             table_name like '%Certificate%' or 
             table_name like '%Mercata%' |])
-    allTableNamesInPGValue <- return getAllTableNames
+    allTableNamesInByteString <- return $ (mapMaybe (convertFromPGTextValueToShowable id)) <$> getAllTableNames
 
     -- liftIO $ join $ ( putStrLn   <$> ) $ (concat <$>) $ (map  ( show)) <$> allTableNamesInPGValue -- Print everything we get back from this
-
-    let convertFromPGTextValueToByteString :: PGValue -> Maybe B.ByteString
-        convertFromPGTextValueToByteString c = case  c of (PGTextValue txt )  -> Just $ txt ;  _ -> Nothing 
-
     liftIO $  putStrLn "BEFORE SELECT COL STMT"
-    let convertFromPGTextValueToText :: PGValue -> Maybe T.Text
-        convertFromPGTextValueToText c = case  c of (PGTextValue txt )  -> Just $ decodeUtf8 txt ;  _ -> Nothing 
-        
-        thisListOfTableNames = (mapMaybe convertFromPGTextValueToByteString) <$> allTableNamesInPGValue        :: IO [B.ByteString]
-        sqlStatement x       = (encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'") <> x <> (encodeUtf8 "\';")   :: B.ByteString
-        tableNamesWithPgValues      = join $ (sequence <$>) $ (map  (\tableNam -> ((parseStringToTableName $ show tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> thisListOfTableNames)     :: IO [(TableName, [PGValues])]
-        createdTables        = (M.map ( mapMaybe convertFromPGTextValueToText . concat) <$>)  $ M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
+    
+
+    let sqlStatement x         = (encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'") <> x <> (encodeUtf8 "\';")   :: B.ByteString
+        tableNamesWithPgValues = join $ (sequence <$>) $ (map  (\tableNam -> ((parseStringToTableName $ show tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString)     :: IO [(TableName, [PGValues])]
+        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) <$>)  $ M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
     -- Scrape Finished 
 
     liftIO $ join $ putStrLn . show <$> createdTables     
