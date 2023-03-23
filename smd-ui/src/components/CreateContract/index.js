@@ -310,7 +310,7 @@ class CreateContract extends Component {
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text={"Create Contract"}
-          disabled={!this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
         />
         </Popover>
         <form>
