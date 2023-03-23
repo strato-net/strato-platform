@@ -62,8 +62,8 @@ class MenuBar extends Component {
         <h4>{commonName}</h4>
         <MenuDivider />
 
-        <h3>Address</h3>
-        <HexText value={'0x' + userAddress}/>
+        <h3>STRATO Mercata Address</h3>
+        <HexText value={'0x' + userAddress} shorten={false}/>
 
         <h3>Date Created</h3>
         <h4>{dateCreated}</h4>
@@ -111,7 +111,7 @@ class MenuBar extends Component {
                 </div> ) 
                 : (
                 <div>
-                  <h4>Your STRATO Mercata address: <br/><HexText value={this.props.oauthUser ? "0x" + this.props.oauthUser.address : null}/></h4><br/>
+                  <h4>Your STRATO Mercata address: <br/><HexText value={this.props.oauthUser ? "0x" + this.props.oauthUser.address : null} shorten={false}/></h4><br/>
                   <h4>Your STRATO Mercata account is currently being verified. You should receive an e-mail confirmation when your account is ready. Welcome to the Block!</h4><br/>
                   <MenuDivider />
                   <h5>If your account still hasn't been verified, <a
