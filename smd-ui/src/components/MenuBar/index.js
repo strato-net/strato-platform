@@ -45,7 +45,7 @@ class MenuBar extends Component {
       organization, 
       organizationalUnit, 
       commonName,
-      address,
+      userAddress,
       block_timestamp
     } = this.props.userCertificate
 
@@ -61,8 +61,8 @@ class MenuBar extends Component {
         <h4>{commonName}</h4>
         <MenuDivider />
 
-        <h3>STRATO Mercata Address</h3>
-        <HexText value={'0x' + address} shorten={false}/>
+        <h3>Address</h3>
+        <HexText value={'0x' + userAddress}/>
 
         <h3>Date Created</h3>
         <h4>{dateCreated}</h4>
