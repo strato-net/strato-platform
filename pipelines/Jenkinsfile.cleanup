@@ -30,7 +30,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
       for f in \$(find ../ -maxdepth 1 -type d -mtime +\$((3*$olderThanNumDays))); do 
         (
           if [ "\$f" != "../\${PWD##*/}" ]; then
-            rm -rf "\$f"
+            sudo rm -rf "\$f"
           fi
         ); 
       done
