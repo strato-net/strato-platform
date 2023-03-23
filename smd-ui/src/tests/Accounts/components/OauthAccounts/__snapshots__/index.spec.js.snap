@@ -162,6 +162,8 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
                 clinicaladmin
+                 - 
+                BlockApps
               </div>
             </div>
           </div>
@@ -169,6 +171,8 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
                 clinicalops
+                 - 
+                BlockApps
               </div>
             </div>
           </div>
