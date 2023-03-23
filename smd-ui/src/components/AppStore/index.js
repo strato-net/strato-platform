@@ -32,7 +32,7 @@ class AppStore extends Component {
         } ,  {
           appName: "TraceCarbon", 
           urlToApp: 'https://blockapps.net/apps/?utm_source=SMD&utm_medium=appstore&utm_campaign=tracecarbon#tracecarbon/ ', 
-          description: 'TraceCarbon is a comprehensive and versatile traceable commerce d\'app, aimed at accelerating the world\'s journey towards carbon neutrality by providing transparency to the Voluntary Carbon Markets, allowing corporate and individual buyers to explore and transact on high quality carbon credits in order to offset their emissions.',
+          description: 'TraceCarbon is a carbon credit traceability and transaction network that drives innovation, confidence and scale in voluntary carbon markets. Accelerating the world’s journey to net-zero, TraceCarbon eliminates market barriers for project developers, strengthens data on credit quality, and delivers transparency and automation in carbon credit issuance, ownership transfer and retirement.',
           image: traceCarbonLogo
       }, 
       // {
