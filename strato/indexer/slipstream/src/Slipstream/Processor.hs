@@ -453,15 +453,8 @@ processTheMessages env sqlEnv conn g messages = do
                             SolidVMCode n' _ | nameString /= n' -> T.pack n'
                             _ -> a
 
-                let htn = historyTableName o a' n
-                    historyTableNames = map (historyTableName o a') hl
+                let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
-
-                -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
-                historyStatus <- historyStatusCreated g htn
-                when (not historyStatus) $ do
-                  -- creates a history table for all contracts in the CodeCollection
-                  setHistoryTable g htn True
 
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
                 let nameParts = (o, a', n)
@@ -529,7 +522,7 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
-    outputData conn . insertHistoryTable g $ concatMap historyInserts ins
+    outputData conn . insertHistoryTable $ concatMap historyInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins

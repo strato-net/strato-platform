@@ -14,7 +14,6 @@ module Slipstream.Data.Globals (
 
 import           Control.DeepSeq
 import           Data.Cache.LRU
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict     as M
 import qualified Data.Set            as S
 import qualified Data.Text           as T 
@@ -25,7 +24,6 @@ import           Text.Regex.Posix
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
 
 
@@ -37,9 +35,7 @@ instance NFData (TableName) where
 
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
-                       , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map T.Text CodePtr)
                        , contractStates :: LRU Account [(T.Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

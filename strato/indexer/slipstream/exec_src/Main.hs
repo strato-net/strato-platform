@@ -107,22 +107,28 @@ main = do
     let getPGValues :: MonadIO m => B.ByteString -> m [PGValues]
         getPGValues = liftIO . pgQuery conn
 
-    let getColumnNames ::  B.ByteString -> IO [PGValues]
-        getColumnNames = liftIO . pgQuery conn
+    -- let getColumnNames ::  B.ByteString -> IO [PGValues]
+    --     getColumnNames = liftIO . pgQuery conn
 
     let convertFromPGTextValueToShowable :: (B.ByteString -> a) -> PGValue -> Maybe a
         convertFromPGTextValueToShowable f c = case  c of (PGTextValue txt )  -> Just $ f txt ;  _ -> Nothing
 
-    let getAllTableNames :: IO [PGValue]
-        getAllTableNames = concat <$> (getPGValues [r|select table_name from information_schema.tables where 
-            table_name like '%-%' or 
-            table_name like '%Certificate%' or 
-            table_name like '%Mercata%' |])
-    allTableNamesInByteString <- return $ (mapMaybe (convertFromPGTextValueToShowable id)) <$> getAllTableNames
 
-    let sqlStatement x         = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
-        tableNamesWithPgValues = join $  sequence . map  (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString     :: IO [(TableName, [PGValues])]
-        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)
+    allTableNamesInByteString :: IO [B.ByteString] <- return $
+                        mapMaybe (convertFromPGTextValueToShowable id).
+                        concat <$>
+                        (pgQuery conn ([r|select table_name from information_schema.tables where 
+                            table_name like '%-%' or 
+                            table_name like '%Certificate%' or 
+                            table_name like '%Mercata%' |] :: BC.ByteString) :: IO [PGValues])
+
+    let sqlStatement x     = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
+    
+    tableNamesWithPgValues :: IO [(TableName, [PGValues])] <- return $
+                                join $
+                                mapM 
+                                    (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getPGValues . sqlStatement $ tableNam )  <$> allTableNamesInByteString
+    createdTables          <- return $ (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$> tableNamesWithPgValues -- :: IO (M.Map  TableName TableColumns)
     -- Scrape Finished 
 
     -- There are three permanent connections/pools to postgres:

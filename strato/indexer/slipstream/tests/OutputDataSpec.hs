@@ -49,17 +49,15 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [Text]
               -> [(ProcessedContract, Contract)]
               -> ConduitM () Text m ()
-createInserts globalsIORef historyList' contracts = do
+createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-        hasHistory = contractName (fst contract) `elem` historyList'
     _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
-    when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
-    insertHistoryTable globalsIORef $ map fst contracts
+    insertHistoryTable $ map fst contracts
 
 
 
@@ -94,7 +92,7 @@ spec = do
                   ])]
 
       g <- newGlobals M.empty fakeHandle
-      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
@@ -158,11 +156,9 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals M.empty fakeHandle
-      runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
-      let hl = ["Vehicle2"]
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
+        <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
@@ -262,7 +258,7 @@ spec = do
 
       g <- newGlobals M.empty fakeHandle
       [vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g [] input .| sinkList
+          runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
@@ -349,7 +345,7 @@ spec = do
 
     g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
     address text,
@@ -528,7 +524,7 @@ spec = do
 
     g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
     address text,
