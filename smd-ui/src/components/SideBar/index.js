@@ -17,7 +17,6 @@ class SideBar extends Component {
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
         { path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
-        { path: '/appstore', label: 'AppStore', id: 'app_store', icon: "fa-window-restore" },
         { path: '/accounts', label: 'Users', id: 'accounts', icon: "fa-users" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
         { path: '/shards', label: 'Shards', id: 'shards', icon: "fa-user-secret" },

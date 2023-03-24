@@ -267,7 +267,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
                 description="Contracts"
-                iconClass="fa-gavel"
+                iconClass="fa-file"
                 number={2}
               />
             </Link>
@@ -626,7 +626,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>
@@ -787,7 +787,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>,
@@ -802,7 +802,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />,
                 "replace": false,
@@ -816,7 +816,7 @@ ShallowWrapper {
                 "props": Object {
                   "className": "smd-pointer",
                   "description": "Contracts",
-                  "iconClass": "fa-gavel",
+                  "iconClass": "fa-file",
                   "number": 2,
                 },
                 "ref": null,
@@ -1670,7 +1670,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>
@@ -2029,7 +2029,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />
                 </Link>
@@ -2190,7 +2190,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />
                 </Link>,
@@ -2205,7 +2205,7 @@ ShallowWrapper {
                   "children": <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />,
                   "replace": false,
@@ -2219,7 +2219,7 @@ ShallowWrapper {
                   "props": Object {
                     "className": "smd-pointer",
                     "description": "Contracts",
-                    "iconClass": "fa-gavel",
+                    "iconClass": "fa-file",
                     "number": 2,
                   },
                   "ref": null,
@@ -3411,7 +3411,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
                 description="Contracts"
-                iconClass="fa-gavel"
+                iconClass="fa-file"
                 number={2}
               />
             </Link>
@@ -3770,7 +3770,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>
@@ -3931,7 +3931,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>,
@@ -3946,7 +3946,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />,
                 "replace": false,
@@ -3960,7 +3960,7 @@ ShallowWrapper {
                 "props": Object {
                   "className": "smd-pointer",
                   "description": "Contracts",
-                  "iconClass": "fa-gavel",
+                  "iconClass": "fa-file",
                   "number": 2,
                 },
                 "ref": null,
@@ -4814,7 +4814,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={2}
                 />
               </Link>
@@ -5173,7 +5173,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />
                 </Link>
@@ -5334,7 +5334,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />
                 </Link>,
@@ -5349,7 +5349,7 @@ ShallowWrapper {
                   "children": <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={2}
                   />,
                   "replace": false,
@@ -5363,7 +5363,7 @@ ShallowWrapper {
                   "props": Object {
                     "className": "smd-pointer",
                     "description": "Contracts",
-                    "iconClass": "fa-gavel",
+                    "iconClass": "fa-file",
                     "number": 2,
                   },
                   "ref": null,
@@ -6257,7 +6257,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
                 description="Contracts"
-                iconClass="fa-gavel"
+                iconClass="fa-file"
                 number={undefined}
               />
             </Link>
@@ -6467,7 +6467,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={undefined}
                 />
               </Link>
@@ -6628,7 +6628,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={undefined}
                 />
               </Link>,
@@ -6643,7 +6643,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={undefined}
                 />,
                 "replace": false,
@@ -6657,7 +6657,7 @@ ShallowWrapper {
                 "props": Object {
                   "className": "smd-pointer",
                   "description": "Contracts",
-                  "iconClass": "fa-gavel",
+                  "iconClass": "fa-file",
                   "number": undefined,
                 },
                 "ref": null,
@@ -7074,7 +7074,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
                   description="Contracts"
-                  iconClass="fa-gavel"
+                  iconClass="fa-file"
                   number={undefined}
                 />
               </Link>
@@ -7284,7 +7284,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={undefined}
                   />
                 </Link>
@@ -7445,7 +7445,7 @@ ShallowWrapper {
                   <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={undefined}
                   />
                 </Link>,
@@ -7460,7 +7460,7 @@ ShallowWrapper {
                   "children": <withRouter(Connect(NumberCard))
                     className="smd-pointer"
                     description="Contracts"
-                    iconClass="fa-gavel"
+                    iconClass="fa-file"
                     number={undefined}
                   />,
                   "replace": false,
@@ -7474,7 +7474,7 @@ ShallowWrapper {
                   "props": Object {
                     "className": "smd-pointer",
                     "description": "Contracts",
-                    "iconClass": "fa-gavel",
+                    "iconClass": "fa-file",
                     "number": undefined,
                   },
                   "ref": null,
