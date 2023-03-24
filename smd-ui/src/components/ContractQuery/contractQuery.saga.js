@@ -16,18 +16,12 @@ import { env } from '../../env.js'
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
-const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString:chainid';
+const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString';
 
-export function queryCirrusRequest(name, queryString, chainId) {
-  let chain;
-  if (queryString === '') {
-    chain = chainId ? `chainId=eq.${chainId}` : ``;
-  } else {
-    chain = chainId ? `&chainId=eq.${chainId}` : ``;
-  }
+export function queryCirrusRequest(name, queryString) {
 
   return fetch(
-    cirrusUrl.replace(":contractName", name).replace(':queryString', queryString).replace(':chainid', chain),
+    cirrusUrl.replace(":contractName", name).replace(':queryString', queryString),
     {
       method: 'GET',
       credentials: "include",
@@ -101,7 +95,7 @@ export function* queryCirrusVars(action) {
 
 export function* queryCirrus(action) {
   try {
-    const response = yield call(queryCirrusRequest, action.contractName, action.queryString, action.chainId);
+    const response = yield call(queryCirrusRequest, action.tableName, action.queryString);
     yield put(queryCirrusSuccess(response));
   }
   catch (err) {

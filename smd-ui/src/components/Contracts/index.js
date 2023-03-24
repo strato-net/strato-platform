@@ -218,7 +218,7 @@ class Contracts extends Component {
         <Tour steps={tourSteps} name="contracts" finalStepSelector='#transactions' nextPage='transactions' />
         <div className="row pt-dark" >
           <div className="col-sm-2 text-left">
-            <h2>Contracts</h2>
+            <h3>Contracts</h3>
           </div>
         <div className="col-sm-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
@@ -230,9 +230,6 @@ class Contracts extends Component {
                 onChange={e => this.updateFilter(e.target.value.toLowerCase())}
                 dir="auto" />
             </div>
-          </div>
-          <div className="col-sm-4 text-right smd-pad-8">
-            <CreateContract />
           </div>
     
         </div>
