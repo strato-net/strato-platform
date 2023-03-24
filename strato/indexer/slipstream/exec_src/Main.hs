@@ -19,7 +19,7 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.Cache
 import qualified Data.Map as M
 import           Data.Maybe
--- import qualified Data.Text as T 
+import qualified Data.Text as T
 import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
@@ -124,7 +124,7 @@ main = do
     liftIO $  putStrLn "BEFORE SELECT COL STMT"
     
     let sqlStatement x         = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
-        tableNamesWithPgValues = join $  sequence . map  (\tableNam -> ((parseStringToTableName $ show tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString     :: IO [(TableName, [PGValues])]
+        tableNamesWithPgValues = join $  sequence . map  (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString     :: IO [(TableName, [PGValues])]
         createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
     -- Scrape Finished 
 

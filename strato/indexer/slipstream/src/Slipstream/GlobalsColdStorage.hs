@@ -128,14 +128,19 @@ readStorage :: MonadUnliftIO m
             => Handle -> Account -> m (Either Text [(Text, Value)])
 readStorage FakeHandle _ = recordStorageResult $! Left "fake handle"
 readStorage (Handle _ sql) acct = recordStorageResult =<< do
-  seen <- DBF.elem acct <$> atomically readFilter
-  if not seen
-    then return . Left $ "unseen by bloom filter"
-    else flip runReaderT sql
-       . fmap deserialize
-       . get
-       . ColdStorageKey (acct ^. accountAddress)
-       $ MChainId (fmap ChainId $ acct ^. accountChainId)
+  -- seen <- DBF.elem acct <$> atomically readFilter
+  -- if not seen
+  --   then return . Left $ "unseen by bloom filter"
+  --   else flip runReaderT sql
+      --  . fmap deserialize
+      --  . get
+      --  . ColdStorageKey (acct ^. accountAddress)
+      --  $ MChainId (fmap ChainId $ acct ^. accountChainId)
+  flip runReaderT sql
+    . fmap deserialize
+    . get
+    . ColdStorageKey (acct ^. accountAddress)
+    $ MChainId (fmap ChainId $ acct ^. accountChainId)
 
 recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
 recordStorageResult v = do

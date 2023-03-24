@@ -100,7 +100,7 @@ isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   let h = M.findWithDefault False name historyList
   $logInfoS "isHistoric" $ T.pack $ show name ++ ": " ++ show h
-  return h
+  return True
 
 setHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> Bool -> m ()
 setHistoryTable g tableName b = do

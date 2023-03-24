@@ -84,7 +84,7 @@ stringArrToEventTableName [org, app, contract, eventName] = EventTableName org a
 stringArrToEventTableName _ = error "whoops"
 
 period :: String
-period = "."
+period = "\\."
 
 history :: String         
 history = "history@" 
