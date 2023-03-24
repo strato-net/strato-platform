@@ -121,9 +121,11 @@ ethereumVM d = void . execContextM d $ do
         logEventSummaries seqEvents
 
         let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        runConduit $ yield vmInEventBatch
-                  .| handleVmEvents flags_useSyncMode
-                  .| mapM_C sendOutEvent
+        trs <- runConduit $ yield vmInEventBatch
+                         .| handleVmEvents flags_useSyncMode
+                         .| awaitForever sendOutEvent
+                         .| sinkList
+        void . produceVMEvents $ NewTransactionResult <$> trs
         
         loopTimeit "compactContextM" $ compactContextM
 
@@ -536,7 +538,7 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: VmOutEvent -> ContextM ()
+sendOutEvent :: VmOutEvent ->  ConduitT VmOutEvent TransactionResult ContextM ()
 sendOutEvent (OutAction act) =
   let filterOutEvents :: Action -> Action
       filterOutEvents x = x{Action._events=Seq.empty}
@@ -568,14 +570,14 @@ sendOutEvent (OutAction act) =
 sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
   void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
+sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
-sendOutEvent (OutTXR tr) = void $ produceVMEvents [NewTransactionResult tr]
+sendOutEvent (OutTXR tr) = yield tr
 sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
   timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-    updateSQLBalanceAndNonce $
+    lift . updateSQLBalanceAndNonce $
       [ (theAccount,
          (addressStateBalance asMod, addressStateNonce asMod))
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
