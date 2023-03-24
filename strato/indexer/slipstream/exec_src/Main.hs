@@ -60,14 +60,14 @@ createBlocEnv = liftIO $ do
   codePtrCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
   sourceCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
   return BlocEnv { stateFetchLimit = 0
-                 , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
+                 , gasOn=error ("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
-                 , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
+                 , globalNonceCounter=error ("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , globalSourceCache=sourceCache
                  , globalCodePtrCache=codePtrCache
-                 , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
+                 , txTBQueue=error ("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
-    
+
 
 connectToCirrus :: MonadIO m => m PGConnection
 connectToCirrus = liftIO $ pgConnect cirrusInfo
@@ -76,13 +76,13 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
-  
-  runLoggingT 
+
+  runLoggingT
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
     . runSQLM
     . withPostgresqlConn workerConnStr $ \workerConn -> do
-    
+
     $logInfoS "main" "Welcome to Slipstream!!!!"
     void . liftIO . forkIO . run 10777 $ metricsApp
     $logInfoS "main" "Serving metrics on port 10777"
@@ -98,7 +98,9 @@ main = do
     -- After a ./strato --stop
     -- The in memory state gets wiped
     -- This causes cirrus issues
-    -- Below scrapes the cirrus table names and column names
+    -- like not adding Certs to cirrus
+    -- Below scrapes the cirrus table names 
+    -- and the respective column names
     -- converts the information to the proper types
     -- to restore the in memeory state
 
@@ -108,10 +110,8 @@ main = do
     let getColumnNames ::  B.ByteString -> IO [PGValues]
         getColumnNames = liftIO . pgQuery conn
 
-    liftIO $  putStrLn "HELLO1 GARRETT"
-
     let convertFromPGTextValueToShowable :: (B.ByteString -> a) -> PGValue -> Maybe a
-        convertFromPGTextValueToShowable f c = case  c of (PGTextValue txt )  -> Just $ f txt ;  _ -> Nothing 
+        convertFromPGTextValueToShowable f c = case  c of (PGTextValue txt )  -> Just $ f txt ;  _ -> Nothing
 
     let getAllTableNames :: IO [PGValue]
         getAllTableNames = concat <$> (getPGValues [r|select table_name from information_schema.tables where 
@@ -120,28 +120,21 @@ main = do
             table_name like '%Mercata%' |])
     allTableNamesInByteString <- return $ (mapMaybe (convertFromPGTextValueToShowable id)) <$> getAllTableNames
 
-    -- liftIO $ join $ ( putStrLn   <$> ) $ (concat <$>) $ (map  ( show)) <$> allTableNamesInPGValue -- Print everything we get back from this
-    liftIO $  putStrLn "BEFORE SELECT COL STMT"
-    
     let sqlStatement x         = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
         tableNamesWithPgValues = join $  sequence . map  (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getColumnNames . sqlStatement $ tableNam ) <$> allTableNamesInByteString     :: IO [(TableName, [PGValues])]
-        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)              
+        createdTables          = (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$>  tableNamesWithPgValues :: IO (M.Map  TableName TableColumns)
     -- Scrape Finished 
-
-    liftIO $ join $ putStrLn . show <$> createdTables     
-    liftIO $  putStrLn "HELLO2 GARRETT"
 
     -- There are three permanent connections/pools to postgres:
     -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background
     -- 2. `conn` connects slipstream to the cirrus database
     -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
-      
+
     (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) workerConn
     unless ourBloom . liftIO . die $
       "storage has been previously initialized! This should not happen"
 
-    gref <- join $ liftIO $ (flip newGlobals handle ) <$> createdTables
+    gref <- join $ liftIO $ flip newGlobals handle <$> createdTables
     sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
-      
+
     getAndProcessMessages env sqlEnv conn gref
-    
