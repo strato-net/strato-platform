@@ -21,13 +21,11 @@ class ContractCard extends Component {
     this.state = { isOpen: false };
   }
 
-  componentWillMount() {
-    this.props.fetchCirrusInstances(this.props.contract.name, this.props.selectedChain);
-  }
-
   render() {
     let cardData = [];
     const name = this.props.contract.name;
+    console.log(this.props.contract)
+    console.log(name)
     const contract = this.props.contract.contract;
     const instances = contract && contract.instances ? contract.instances : [];
     const self = this;
@@ -52,14 +50,6 @@ class ContractCard extends Component {
           >
             <td style={{ border: 'none' }}>
               <HexText value={instance.address} classes="small smd-pad-4" />
-            </td>
-            <td style={{ border: 'none' }}>
-              {instance.fromBloc ?
-                <span className="pt-tag pt-intent-success smd-margin-right-4">Bloc</span> : ''
-              }
-              {instance.fromCirrus ?
-                <span className="pt-tag pt-intent-primary">Cirrus</span> : ''
-              }
             </td>
           </tr>
         );
@@ -87,12 +77,27 @@ class ContractCard extends Component {
           const symbolState = instance.state[symbol];
           symbolTable.push(
             <tr key={symbol + ' ' + i}>
+              {
+                typeof symbolState === 'string' && symbolState.startsWith('function') ?
+                <td style={{ verticalAlign: 'middle' }}>
+                  <ContractMethodCall
+                    key={'methodCall' + symbol + instance.address}
+                    lookup={'methodCall' + symbol + instance.address}
+                    contractName={name}
+                    contractAddress={instance.address}
+                    symbolName={symbol}
+                    fromCirrus={instance.fromCirrus}
+                    fromBloc={instance.fromBloc}
+                    chainId={self.props.selectedChain}
+                  />
+                </td>
+                :
               <td
                 style={{
                   verticalAlign: 'middle',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  maxWidth: '90px'
+                  maxWidth: '120px'
                 }}>
                 <Tooltip
                   content={symbol}
@@ -100,7 +105,8 @@ class ContractCard extends Component {
                   {symbol}
                 </Tooltip>
               </td>
-              <td style={{ maxWidth: '300px' }}>
+              }
+              <td style={{ maxWidth: '500px' }}>
                 <pre>
                   {
                     typeof symbolState === 'string' ?
@@ -109,22 +115,7 @@ class ContractCard extends Component {
                   }
                 </pre>
               </td>
-              <td style={{ verticalAlign: 'middle' }}>
-                {
-                  typeof symbolState === 'string' && symbolState.startsWith('function') ?
-                    <ContractMethodCall
-                      key={'methodCall' + symbol + instance.address}
-                      lookup={'methodCall' + symbol + instance.address}
-                      contractName={name}
-                      contractAddress={instance.address}
-                      symbolName={symbol}
-                      fromCirrus={instance.fromCirrus}
-                      fromBloc={instance.fromBloc}
-                      chainId={self.props.selectedChain}
-                    />
-                    : null
-                }
-              </td>
+              
             </tr>
           );
         })
@@ -134,7 +125,7 @@ class ContractCard extends Component {
         <div className="pt-card pt-elevation-2">
           <div className="row">
             <div className="col-sm-12 text-right">
-              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div> : ''} </span>
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Contract Balance: {instance.balance} wei </div> : ''} </span>
             </div>
           </div>
           <div className="row">
@@ -174,21 +165,22 @@ class ContractCard extends Component {
               <div className="col-sm-4"><h4>{name}</h4></div>
               <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
-                  {
-                    showQueryBuilder ?
-                      <Link to={'/contracts/' + name + '/query'}>
-                        <Button type="Button" className="pt-intent-primary">
-                          Query Builder
-                        </Button>
-                      </Link>
-                      : null
-                  }
+                    <Button 
+                      type="Button" 
+                      className="pt-intent-primary pt-icon-th" 
+                      onClick={() => {
+                        this.props.history.push('/contracts/' + name + '/query')
+                      }}
+                    >
+                      Tabular Data
+                    </Button>
                   <Button type="button"
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
                       mixpanelWrapper.track("contracts_toggle_collapse_click");
-                      if(this.state.isOpen)
+                      if(this.state.isOpen) {
                         this.props.selectContractInstance(name, null);
+                      }
                       this.setState({
                         isOpen: !this.state.isOpen
                       })
@@ -208,7 +200,6 @@ class ContractCard extends Component {
                     <thead>
                       <tr>
                         <th>Contract Address</th>
-                        <th></th>
                       </tr>
                     </thead>
                     <tbody>{cardData}</tbody>

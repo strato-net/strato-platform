@@ -164,7 +164,7 @@ class Dashboard extends Component {
               <NumberCard
                 number={contractsCount}
                 description="Contracts"
-                iconClass="fa-gavel"
+                iconClass="fa-file"
                 className="smd-pointer"
               />
             </Link>

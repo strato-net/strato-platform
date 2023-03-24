@@ -15,6 +15,7 @@ import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 import { isOauthEnabled } from '../../../../lib/checkMode';
+import HexText from '../../../HexText';
 
 class ContractMethodCall extends Component {
 
@@ -240,15 +241,15 @@ class ContractMethodCall extends Component {
             </div>
           }
         >
-        <AnchorButton
-          className="pt-minimal pt-small pt-intent-primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            this.handleOpenModal();
-          }}
-          disabled={!this.props.userCertificate}
-          text={"Call Method"}
+          <AnchorButton
+            className="pt-intent-primary pt-icon-send-to-graph"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              this.handleOpenModal();
+            }}
+            disabled={!this.props.userCertificate}
+            text={this.props.symbolName}
           />
         </Popover>
         <form>
@@ -277,7 +278,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.props.selectedChain || "Main Chain"}
+                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
                 </div>
               </div>
               <div className="row">

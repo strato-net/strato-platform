@@ -92,7 +92,7 @@ class MenuBar extends Component {
   afterLoggedIn() {
     const userDropdown =
       <Menu>
-        <MenuItem className="pt-button pt-minimal" onClick={this.toggleDialog} target="_blank" rel="noopener noreferrer" iconName="mugshot" text={this.props.userCertificate ? "My Profile" : "More Info"}/> 
+        <MenuItem className="pt-button pt-minimal" onClick={this.toggleDialog} target="_blank" rel="noopener noreferrer" iconName="user" text={this.props.userCertificate ? "My Profile" : "More Info"}/> 
         <MenuItem className="pt-button pt-minimal" onClick={this.logout} target="_blank" rel="noopener noreferrer" iconName="log-out" text="Logout" /> 
       </Menu>
 
@@ -100,7 +100,7 @@ class MenuBar extends Component {
       <div>
         <Dialog
           className="pt-dark"
-          iconName="mugshot"
+          iconName="user"
           isOpen={this.state.isUserMenuOpen}
           onClose={this.toggleDialog}
           title="My Profile"
@@ -143,7 +143,7 @@ class MenuBar extends Component {
             className={"pt-large pt-minimal " + (this.props.userCertificate ? 'pt-intent-primary' : 'pt-intent-warning')} 
             iconName={"user"} 
             text={this.props.userCertificate ? (this.props.userCertificate.commonName + ', ' + this.props.userCertificate.organization + 
-              (this.props.userCertificate.organizationalUnit ? ': ' + this.props.userCertificate.organizationalUnit : '')) : 'Verification Pending'} />
+              (this.props.userCertificate.organizationalUnit ? ' | ' + this.props.userCertificate.organizationalUnit : '')) : 'Verification Pending'} />
         </Popover>
       </div>
     );
