@@ -26,27 +26,29 @@ import           Text.URI                as URI
 
 import           Strato.VaultProxy.DataTypes
 
+class HasVirginTokenCall m where
+  getVirginToken :: T.Text -> T.Text -> RawOauth -> m VaultToken 
 
---This will get a fresh brand new, minty fresh clean token from the OAuth provider,
---User never really needs to use this function, it is mostly called by getAwesomeToken 
-getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> m VaultToken --OAuth2Token ---Might need to include the discovery URL later
-getVirginToken clientId clientSecret additionalOauth = do --virginToken
-    --Conver the token endpoint to a URI
-    uri <- URI.mkURI $ token_endpoint additionalOauth
-    --Encode all of the parameters, get ready to send to server
-    let (url, _) = fromJust (useHttpsURI $ uri)
-        authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-        contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
-        urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
-    --Connect to the server
-    makeHttpCall <- runReq defaultHttpConfig $ do
-        response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
-        pure response
-    --Convert the server response to the VaultToken type
-    pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
+instance HasVirginTokenCall IO where
+  --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
+  --User never really needs to use this function, it is mostly called by getAwesomeToken 
+  getVirginToken clientId clientSecret additionalOauth = do --virginToken
+      --Conver the token endpoint to a URI
+      uri <- URI.mkURI $ token_endpoint additionalOauth
+      --Encode all of the parameters, get ready to send to server
+      let (url, _) = fromJust (useHttpsURI $ uri)
+          authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+          contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
+          urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
+      --Connect to the server
+      makeHttpCall <- runReq defaultHttpConfig $ do
+          response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
+          pure response
+      --Convert the server response to the VaultToken type
+      pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
 --This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+getAwesomeToken :: (MonadIO m, MonadThrow m, HasVirginTokenCall m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
 getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
     --Get the current STM time and the check if the item in memory needs to be cleared, clear it if needed
     cache <- liftIO . atomically $ do 
@@ -103,7 +105,7 @@ makeExpry token reserveTime = do
     pure expry
 
 --Get the vault token more easily
-vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
+vaulty :: (MonadIO m, MonadThrow m, HasVirginTokenCall m) => VaultConnection -> m VaultToken
 vaulty vaultConn = getAwesomeToken db ll tc cid csec rs ao
     where
         cid = oauthClientId vaultConn

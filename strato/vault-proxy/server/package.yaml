@@ -106,12 +106,16 @@ tests:
     main: Spec.hs
     ghc-options: -dynamic
     dependencies:
+      - async
       - blockapps-data
       - blockapps-vault-proxy-server
       - bytestring
+      - cache
       - clockwork
       - cryptonite
       - hspec
       - labeled-error
+      - mtl
       - secp256k1-haskell
+      - stm
       - strato-model
