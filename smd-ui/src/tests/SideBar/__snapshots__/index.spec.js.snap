@@ -36,7 +36,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Accounts
+        Users
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -58,7 +58,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-gavel\\">
+      <i className=\\"fa fa-file\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -137,7 +137,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Accounts
+        Users
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -159,7 +159,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-gavel\\">
+      <i className=\\"fa fa-file\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -277,7 +277,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth po
     className="menu-text"
   >
      
-    Accounts
+    Users
   </span>
 </NavLink>
 `;
@@ -335,7 +335,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
   to="/contracts"
 >
   <i
-    className="fa fa-gavel"
+    className="fa fa-file"
   >
      
   </i>
