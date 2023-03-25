@@ -248,6 +248,7 @@ processNewBestBlock bh bd txShas = do
                                        , B.privateHashes         = hashMap
                                        , B.startTimestamp        = time
                                        }
+    $logInfoS "Bagger.processNewBestBlock" . T.pack $ show (length hashMap) ++ " private hashses in Bagger cache"
     putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
     migrateBlockHeader bd baggerBlockHash
     withBagger $ do
