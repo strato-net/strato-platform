@@ -31,7 +31,7 @@ instance HasVirginTokenCall (ReaderT Sock IO) where
     unless b . liftIO $ throwIO SockException
     pure $ VaultToken {
       accessToken = "",
-      expiresIn = 0,
+      expiresIn = 300,
       refreshExpiresIn = 0,
       refreshToken = "",
       tokenType = "",
@@ -62,7 +62,7 @@ main = hspec $ do
           vaultUrl = "",
           httpManager = error "httpManager",
           oauthUrl = "",
-          oauthClientId = "",
+          oauthClientId = "dev",
           oauthClientSecret = "",
           oauthReserveSeconds = 13,
           vaultProxyUrl = "",
@@ -74,12 +74,18 @@ main = hspec $ do
       }
       i <- newTQueueIO
       o <- newTQueueIO
-      r <- newIORef (0 :: Int)
+      oauthCallRef <- newIORef (0 :: Int)
+      threadsCompleteRef <- newIORef (0 :: Int)
       let sock = Sock i o
-      race_ (runGoodServer sock r)
-            (mapConcurrently_ (\_ -> void . flip runReaderT sock $ vaulty vaultConnection) [1..(10 :: Int)])
-      n <- readIORef r
-      n `shouldBe` 10
+      race_ (runGoodServer sock oauthCallRef)
+            (mapConcurrently_ (\_ -> do
+              void . flip runReaderT sock $ vaulty vaultConnection
+              atomicModifyIORef' threadsCompleteRef (\n -> (n+1,())))
+              [1..(10 :: Int)])
+      oauthCalls <- readIORef oauthCallRef
+      oauthCalls `shouldBe` 1
+      threadsComplete <- readIORef threadsCompleteRef
+      threadsComplete `shouldBe` 10
     it "Can call vaulty successfully even if a request to the oauth server fails" $ do
       vaultLock <- liftIO $ L.new
       tokenCash <- atomically $ C.newCacheSTM Nothing
@@ -99,14 +105,19 @@ main = hspec $ do
       }
       i <- newTQueueIO
       o <- newTQueueIO
-      r <- newIORef (0 :: Int)
+      oauthCallRef <- newIORef (0 :: Int)
+      threadsCompleteRef <- newIORef (0 :: Int)
       let sock = Sock i o
-      race_ (race_ (runBadServer sock r) (threadDelay 3000000))
+      race_ (race_ (runBadServer sock oauthCallRef) (threadDelay 3000000))
             (mapConcurrently_ (\_ -> do
-               e <- try . flip runReaderT sock $ vaulty vaultConnection
+               e <- try $ do
+                 void . flip runReaderT sock $ vaulty vaultConnection
+                 atomicModifyIORef' threadsCompleteRef (\n -> (n+1,()))
                case e of
                 Left (ex :: SomeException) -> putStrLn $ show ex
                 _ -> pure ()
                ) [1..(10 :: Int)])
-      n <- readIORef r
-      n `shouldBe` 1 -- really should be 9
+      oauthCalls <- readIORef oauthCallRef
+      oauthCalls `shouldBe` 1 -- really should be 2
+      threadsComplete <- readIORef threadsCompleteRef
+      threadsComplete `shouldBe` 0 -- really should be 9
