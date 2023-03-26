@@ -48,13 +48,6 @@ instance HasVirginTokenCall IO where
       --Convert the server response to the VaultToken type
       pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
--- -- Helper function to handle lock acquisition and release
--- withLock :: L.Lock -> IO a -> IO a
--- withLock lock action = liftIO $ E.bracket_
---   (L.acquire lock)
---   (L.release lock)
---   action
-
 getAwesomeToken :: (MonadIO m, MonadMask m, HasVirginTokenCall m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
 getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
     --Get the current STM time and the check if the item in memory needs to be cleared, clear it if needed
