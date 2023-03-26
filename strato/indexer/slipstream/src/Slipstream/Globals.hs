@@ -71,7 +71,6 @@ isTableCreated globalsIORef tableName = do
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
-  liftIO $ putStrLn $ show createdTables
   return $ M.lookup tableName createdTables
 
 getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
