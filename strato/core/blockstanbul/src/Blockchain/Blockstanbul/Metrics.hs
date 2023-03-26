@@ -45,7 +45,7 @@ recordAuthResult :: MonadIO m => AuthResult -> m ()
 recordAuthResult AuthSuccess = liftIO $ withLabel authResults "success" incCounter
 recordAuthResult AuthFailure{} = liftIO $ withLabel authResults "failure" incCounter
 
-{- NOINLINE proposalCount #-}
+{-# NOINLINE proposalCount #-}
 proposalCount :: Counter
 proposalCount = unsafeRegister
               .  counter
