@@ -11,6 +11,7 @@
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE BangPatterns          #-}
 
 module BlockApps.Bloc22.Database.Queries
   ( contractBySourceHash
@@ -37,9 +38,7 @@ import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
-import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
-import           Data.Foldable                   (for_)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
@@ -54,7 +53,6 @@ import           Database.PostgreSQL.Simple.FromField hiding (name, format)
 import           Opaleye                         hiding (not, null, index, FromField)
 import qualified Opaleye as O
 import           Opaleye.Internal.PGTypesExternal
-import           System.Clock
 import           Text.Format
 import           UnliftIO
 
@@ -165,24 +163,11 @@ insertContractDetailsQuery sourceList =
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , MonadLogger m
-                                , HasBlocEnv m
                                 , HasBlocSQL m
                                 )
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
-  srcCache <- fmap globalCodePtrCache getBlocEnv
-  now' <- liftIO $ getTime Monotonic
-  let later = (now' +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True codePtr srcCache now'
-    for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
-    pure r
-
-  runExceptT $ case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
+  runExceptT $ do
       mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
         ~(shouldCompile, name, ch) <- case codeHash of
           EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
@@ -206,9 +191,7 @@ getContractDetailsByCodeHash codePtr = do
             Just d -> pure d
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
-        Just details -> do
-          liftIO $ Cache.insert srcCache codePtr details
-          pure details
+        Just details -> pure details
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError = Text.concat
@@ -220,30 +203,16 @@ evmContractSolidVMError = Text.concat
 getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  , (Keccak256 `A.Alters` SourceMap) m
                                  , MonadLogger m
-                                 , HasBlocEnv m
                                  , HasBlocSQL m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-      cacheKey = (theVM, src)
-  srcCache <- fmap globalSourceCache getBlocEnv
-  now' <- liftIO $ getTime Monotonic
-  let later = (now' +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now'
-    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
-    pure r
 
-  idsAndDetails <- case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
+  idsAndDetails <- do
       details <- if hasAnyNonEmptySources src
                    then sourceToContractDetails shouldCompile src
                    else return Map.empty
-      liftIO $ Cache.insert srcCache cacheKey details
       pure details
   case mContract of
     Nothing ->
@@ -352,8 +321,9 @@ instance DefaultFromField PGBytea Address where
 
 instance FromField Address where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ Address $ bytesToWord160 $ B.unpack theByteString
+    !theByteString <- fromField f mdata
+    let !word160 = bytesToWord160 $ B.unpack theByteString
+    return $ Address word160
 
 instance Default ToFields Address (O.Field PGBytea) where
   def = lmap getBytes def
@@ -365,8 +335,9 @@ instance DefaultFromField PGBytea SecretBox.Nonce where
 
 instance FromField SecretBox.Nonce where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+    return decoded
 
 instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
@@ -381,16 +352,18 @@ instance DefaultFromField PGText StateMutability where
 
 instance FromField StateMutability where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
+    return decoded
 
 instance DefaultFromField PGBytea Keccak256 where
   defaultFromField = fromPGSFromField
 
 instance FromField Keccak256 where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ unsafeCreateKeccak256FromByteString theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = unsafeCreateKeccak256FromByteString theByteString
+    return decoded
 
 instance Default ToFields Keccak256 (O.Field PGBytea) where
   def = lmap keccak256ToByteString def
@@ -400,8 +373,9 @@ instance DefaultFromField PGBytea CodePtr where
 
 instance FromField CodePtr where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
+    return decoded
 
 instance Default ToFields CodePtr (O.Field PGBytea) where
   def = lmap rlpSerialize def
@@ -411,8 +385,9 @@ instance DefaultFromField PGBytea (Maybe ChainId) where
 
 instance FromField ChainId where
   fromField f mdata = do
-    theByteString <- fromField f mdata
-    return $ ChainId $ byteStringToWord256 theByteString
+    !theByteString <- fromField f mdata
+    let !decoded = ChainId $ byteStringToWord256 theByteString
+    return decoded
 
 instance Default ToFields (Maybe ChainId) (O.Field PGBytea) where
   def = lmap fromChainId def

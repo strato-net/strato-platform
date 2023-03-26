@@ -73,7 +73,7 @@ data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def
 -- unsafeCodeCahcheIORef = unsafePerformIO $ newIORef $ newCache timeLife
 
 maxCacheSize :: Integer
-maxCacheSize = 1000
+maxCacheSize = 10
 
 {-# NOINLINE unsafeCodeCahcheLRUIORef #-}
 unsafeCodeCahcheLRUIORef :: IORef (LRU.LRU  Keccak256 CodeCollection)
