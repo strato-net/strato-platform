@@ -118,6 +118,6 @@ main = hspec $ do
                 _ -> pure ()
                ) [1..(10 :: Int)])
       oauthCalls <- readIORef oauthCallRef
-      oauthCalls `shouldBe` 1 -- really should be 2
+      oauthCalls `shouldBe` 2 
       threadsComplete <- readIORef threadsCompleteRef
-      threadsComplete `shouldBe` 0 -- really should be 9
+      threadsComplete `shouldBe` 9
