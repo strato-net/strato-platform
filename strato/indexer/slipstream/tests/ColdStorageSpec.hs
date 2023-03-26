@@ -43,8 +43,8 @@ spec = do
       asyncWriteToStorage h acct []
       syncStorage h
       readStorage h acct `shouldReturn` Right []
-      readStorage h (Account 98 Nothing) `shouldReturn` Left "unseen by bloom filter"
-      readStorage h (Account 99 (Just 17)) `shouldReturn` Left "unseen by bloom filter"
+      readStorage h (Account 98 Nothing) `shouldReturn` Left "storage not found"
+      readStorage h (Account 99 (Just 17)) `shouldReturn` Left "storage not found"
 
     it "can update contracts" . runTest $ do
       let acct = Account 0x4 Nothing
@@ -71,4 +71,4 @@ spec = do
     it "will avoid a DB read if the bloom filter catches the keys" . runTest $ do
       let acct = Account 0x64 Nothing
       (_, h) <- initStorage 0
-      readStorage h acct `shouldReturn` Left "unseen by bloom filter"
+      readStorage h acct `shouldReturn` Left "storage not found"

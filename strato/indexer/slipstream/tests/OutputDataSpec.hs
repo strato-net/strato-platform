@@ -92,7 +92,7 @@ spec = do
                   ])]
 
       g <- newGlobals M.empty fakeHandle
-      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
@@ -257,9 +257,8 @@ spec = do
                        ])]
 
       g <- newGlobals M.empty fakeHandle
-      [vehicleCreate, vehicleInsert] <-
+      [vehicleCreate, _, _, _, vehicleInsert, _] <-
           runLoggingT . runConduit $ createInserts g input .| sinkList
-
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
     address text,
@@ -344,7 +343,7 @@ spec = do
                    ])]
 
     g <- newGlobals M.empty fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
@@ -523,7 +522,7 @@ spec = do
             ])]
 
     g <- newGlobals M.empty fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
