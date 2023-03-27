@@ -590,6 +590,41 @@ spec = do
     "strukt" = excluded."strukt";|]
 
 
+  describe "Cirrus scrape tests" $ do
+    it "uses values in non-empty cache to remember tables from before a restart" $ do
+      let testAdd = Address 0x98eaddede
+          input = [(ProcessedContract {
+            address = testAdd,
+            codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
+            organization = "",
+            application = "",
+            contractName = "SwissArmy",
+            chain = "<CHAIN>",
+            blockHash = hash "<BLOCKHASH>",
+            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            blockNumber = 124,
+            transactionHash = hash "<TRANSACTIONHASH>",
+            transactionSender = testAdd,
+            contractData = M.fromList [("str", bytes "Hello, World!")]
+            }, createDummyContract [("str", SVMType.String Nothing)])]
+          cache = M.singleton (IndexTableName "" "" "SwissArmy") ["str"]
+
+      g <- newGlobals cache fakeHandle
+
+      queries <- runLoggingT . runConduit $ createInserts g input .| sinkList
+
+      -- should not attempt to create new table
+      elem [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
+      address text,
+      "chainId" text,
+      block_hash text,
+      block_timestamp text,
+      block_number text,
+      transaction_hash text,
+      transaction_sender text,
+      "str" text,
+      PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
+
 
 
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
