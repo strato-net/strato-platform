@@ -6,9 +6,6 @@ module Slipstream.Data.Globals (
   Globals(..),
   TableColumns,
   TableName(..),
-  stringArrToHistoryTableName,
-  stringArrToIndexTableName,
-  stringArrToEventTableName,
   parseStringToTableName
   ) where
 
@@ -60,24 +57,24 @@ data TableName =
 
 type TableColumns = [T.Text]
 
-stringArrToHistoryTableName :: [T.Text]  -> TableName
-stringArrToHistoryTableName [contract]           = HistoryTableName T.empty T.empty  contract
-stringArrToHistoryTableName [org, contract]      = HistoryTableName  org  contract  contract
-stringArrToHistoryTableName [org, app, contract] = HistoryTableName  org  app  contract
-stringArrToHistoryTableName _ = error "whoops"
+textArrToHistoryTableName :: [T.Text]  -> TableName
+textArrToHistoryTableName [contract]           = HistoryTableName T.empty T.empty  contract
+textArrToHistoryTableName [org, contract]      = HistoryTableName  org  contract  contract
+textArrToHistoryTableName [org, app, contract] = HistoryTableName  org  app  contract
+textArrToHistoryTableName _ = error "whoops"
 
 
-stringArrToIndexTableName :: [T.Text]  -> TableName
-stringArrToIndexTableName [contract]           = IndexTableName T.empty T.empty  contract
-stringArrToIndexTableName [org, contract]      = IndexTableName  org  contract  contract
-stringArrToIndexTableName [org, app, contract] = IndexTableName  org  app  contract
-stringArrToIndexTableName _ = error "whoops"
+textArrToIndexTableName :: [T.Text]  -> TableName
+textArrToIndexTableName [contract]           = IndexTableName T.empty T.empty  contract
+textArrToIndexTableName [org, contract]      = IndexTableName  org  contract  contract
+textArrToIndexTableName [org, app, contract] = IndexTableName  org  app  contract
+textArrToIndexTableName _ = error "whoops"
   
-stringArrToEventTableName :: [T.Text]  -> TableName
-stringArrToEventTableName [contract, eventName]           = EventTableName T.empty T.empty contract eventName
-stringArrToEventTableName [org, contract, eventName]      = EventTableName org contract contract eventName
-stringArrToEventTableName [org, app, contract, eventName] = EventTableName org app contract eventName
-stringArrToEventTableName _ = error "whoops"
+textArrToEventTableName :: [T.Text]  -> TableName
+textArrToEventTableName [contract, eventName]           = EventTableName T.empty T.empty contract eventName
+textArrToEventTableName [org, contract, eventName]      = EventTableName org contract contract eventName
+textArrToEventTableName [org, app, contract, eventName] = EventTableName org app contract eventName
+textArrToEventTableName _ = error "whoops"
 
 period :: String
 period = "\\."
@@ -88,8 +85,8 @@ history = "history@"
 parseStringToTableName :: String -> TableName
 parseStringToTableName bs
     | bs =~ period  :: Bool = let (tableStuff, _, eventName) = bs =~ period  :: (String, String, String)
-                                 in stringArrToEventTableName $ (T.splitOn (T.pack "-") $ T.pack tableStuff ) ++ [(T.pack eventName)]
+                                 in textArrToEventTableName $ (T.splitOn (T.pack "-") $ T.pack tableStuff ) ++ [(T.pack eventName)]
     | bs =~ history :: Bool = let (_, _, tableStuff) = bs =~ history  :: (String, String, String) 
-                                 in stringArrToHistoryTableName $ T.splitOn  (T.pack "-") $ T.pack tableStuff
-    | otherwise                = stringArrToIndexTableName $ T.splitOn (T.pack "-") (T.pack bs)                                           
+                                 in textArrToHistoryTableName $ T.splitOn  (T.pack "-") $ T.pack tableStuff
+    | otherwise                = textArrToIndexTableName $ T.splitOn (T.pack "-") (T.pack bs)                                           
         
