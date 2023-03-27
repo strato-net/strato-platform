@@ -56,10 +56,10 @@ workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
 createBlocEnv :: MonadIO m => m BlocEnv
 createBlocEnv = liftIO $ do
   return BlocEnv { stateFetchLimit = 0
-                 , gasOn=error ("gasOn shouldn't be needed in slipstream, it is undefined")
+                 , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
-                 , globalNonceCounter=error ("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
-                 , txTBQueue=error ("txTBQueue shouldn't be needed in slipstream, it is undefined")
+                 , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
+                 , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
 
 
