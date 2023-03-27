@@ -96,7 +96,7 @@ Object {
 exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
 "<div>
   <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton className=\\"pt-minimal pt-small pt-intent-primary\\" onClick={[Function: onClick]} disabled={true} text=\\"Call Method\\" />
+    <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} disabled={true} text={[undefined]} />
   </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
@@ -212,7 +212,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
 exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] = `
 "<div>
   <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton className=\\"pt-minimal pt-small pt-intent-primary\\" onClick={[Function: onClick]} disabled={true} text=\\"Call Method\\" />
+    <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} disabled={true} text={[undefined]} />
   </Blueprint.Popover>
   <form>
     <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>

@@ -148,7 +148,7 @@ describe('ContractCard: index', () => {
     const wrapper = shallow(
       <ContractCard.WrappedComponent {...props} />
     );
-    wrapper.find('Button').simulate('click');
+    wrapper.find('Button').at(1).simulate('click');
     expect(wrapper.instance().state.isOpen).toBe(true);
   });
 
