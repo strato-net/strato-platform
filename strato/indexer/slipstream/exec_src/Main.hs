@@ -8,6 +8,8 @@
     , FlexibleContexts
     , TupleSections
 #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use =<<" #-}
 
 import Control.Concurrent
 import Control.Monad
@@ -28,7 +30,6 @@ import HFlags
 import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
-import System.Exit
 import Text.Printf
 import Text.RawString.QQ
 
@@ -58,8 +59,8 @@ createBlocEnv = liftIO $ do
   return BlocEnv { stateFetchLimit = 0
                  , gasOn=error ("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
-                 , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
-                 , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
+                 , globalNonceCounter=error ("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
+                 , txTBQueue=error ("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
 
 
@@ -101,9 +102,6 @@ main = do
     let getPGValues :: MonadIO m => B.ByteString -> m [PGValues]
         getPGValues = liftIO . pgQuery conn
 
-    -- let getColumnNames ::  B.ByteString -> IO [PGValues]
-    --     getColumnNames = liftIO . pgQuery conn
-
     let convertFromPGTextValueToShowable :: (B.ByteString -> a) -> PGValue -> Maybe a
         convertFromPGTextValueToShowable f c = case  c of (PGTextValue txt )  -> Just $ f txt ;  _ -> Nothing
 
@@ -120,9 +118,9 @@ main = do
     
     tableNamesWithPgValues :: IO [(TableName, [PGValues])] <- return $
                                 join $
-                                mapM 
+                                mapM
                                     (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getPGValues . sqlStatement $ tableNam )  <$> allTableNamesInByteString
-    createdTables          <- return $ (M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) ) . M.fromList <$> tableNamesWithPgValues -- :: IO (M.Map  TableName TableColumns)
+    let createdTables = M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) . M.fromList <$> tableNamesWithPgValues
     -- Scrape Finished 
 
     -- There are three permanent connections/pools to postgres:
@@ -130,9 +128,7 @@ main = do
     -- 2. `conn` connects slipstream to the cirrus database
     -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
 
-    (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) workerConn
-    unless ourBloom . liftIO . die $
-      "storage has been previously initialized! This should not happen"
+    handle <- runReaderT initStorage workerConn
 
     gref <- join $ liftIO $ flip newGlobals handle <$> createdTables
     sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password

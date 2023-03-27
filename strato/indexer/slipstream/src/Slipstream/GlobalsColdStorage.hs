@@ -33,7 +33,6 @@ import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
 import qualified Prelude as P ()
-import System.IO.Unsafe
 import UnliftIO.Concurrent
 import UnliftIO.Resource
 
@@ -42,7 +41,6 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 
-import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics
 import Slipstream.Data.GlobalsColdStorage
 
@@ -57,42 +55,12 @@ ColdStorage
   deriving Eq Show
 |]
 
--- Filter Management --
--- The importance of a shared filter between all worker threads is
--- to prevent a scenario where different cold storage handles have
--- different opinions about the contents of the database.
-type AcctFilter = DBF.DelayedBloomFilter Account
-
-{-# NOINLINE globalBloomFilter #-}
-globalBloomFilter :: TMVar AcctFilter
-globalBloomFilter = unsafePerformIO newEmptyTMVarIO
-
-readFilter :: STM AcctFilter
-readFilter = readTMVar globalBloomFilter
-
-setFilter :: AcctFilter -> STM ()
-setFilter = void . swapTMVar globalBloomFilter
-
-initFilter :: MonadIO m => Int -> m Bool
-initFilter = atomically . tryPutTMVar globalBloomFilter . DBF.newFilter
-
 -- SQL writer daemon --
 
 storageWorker :: MonadUnliftIO m => TQueue QueueElem -> ReaderT SqlBackend m ()
 storageWorker q = forever $ do
   datum <- atomically $ readTQueue q
-  recordKeys datum
   traverse (uncurry repsert) . serialize $ datum
-
-recordKeys :: MonadIO m => QueueElem -> m ()
-recordKeys SyncFlush = return ()
-recordKeys (PreStorageEntry a _) = do
-  depth <- atomically $ do
-    f <- readFilter
-    setFilter $ DBF.insert a f
-    return $! DBF.stackDepth f
-  incNumBloomWrites
-  recordStackDepth depth
 
 -- Data translation --
 
@@ -113,29 +81,20 @@ deserialize (Just (ColdStorage _ _ bvs)) =
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
 initStorage :: (MonadUnliftIO m, MonadResource m)
-            => Int -> ReaderT SqlBackend m (Bool, Handle)
-initStorage cacheSize = do
+            => ReaderT SqlBackend m Handle
+initStorage = do
   void $ runMigrationSilent migrateStore
   queue <- atomically newTQueue
-  ourBloom <- initFilter $ cacheSize `div` 2
   tid <- forkIO $ storageWorker queue
   void . register . liftIO . killThread $ tid
   sql <- ask
-  return $! (ourBloom, Handle queue sql)
+  return $! Handle queue sql
 
 -- | Check postgres for an entry about this account's values
 readStorage :: MonadUnliftIO m
             => Handle -> Account -> m (Either Text [(Text, Value)])
 readStorage FakeHandle _ = recordStorageResult $! Left "fake handle"
 readStorage (Handle _ sql) acct = recordStorageResult =<< do
-  -- seen <- DBF.elem acct <$> atomically readFilter
-  -- if not seen
-  --   then return . Left $ "unseen by bloom filter"
-  --   else flip runReaderT sql
-      --  . fmap deserialize
-      --  . get
-      --  . ColdStorageKey (acct ^. accountAddress)
-      --  $ MChainId (fmap ChainId $ acct ^. accountChainId)
   flip runReaderT sql
     . fmap deserialize
     . get
