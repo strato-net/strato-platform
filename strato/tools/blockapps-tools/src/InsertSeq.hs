@@ -19,6 +19,7 @@ import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
 import Network.Kafka.Protocol as KP
@@ -37,6 +38,15 @@ validatorBehavior valB = do
   let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
   resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
+    writeUnseqEvents [msg]
+  print resp 
+
+deleteDepBlock :: String -> IO ()
+deleteDepBlock k = do
+  printf "deleteDepBlock = %s \n" $ k
+  let msg = IEDeleteDepBlock $ keccak256FromHex k
+  print msg
+  resp <- runKafkaConfigured (KP.KString "delete-dep-block") $ do
     writeUnseqEvents [msg]
   print resp 
 

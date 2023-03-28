@@ -68,6 +68,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
+                 | IEDeleteDepBlock Keccak256
                  deriving (Eq, Show, GHCG.Generic)
 
 
@@ -82,6 +83,7 @@ data IngestEventType = IETTransaction
                      | IETBlockstanbul
                      | IETForcedConfigChange
                      | IETValidatorBehavior
+                     | IETDeleteDepBlock
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -97,6 +99,7 @@ iEventType = \case
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
   IEValidatorBehavior{}  -> IETValidatorBehavior
+  IEDeleteDepBlock{}     -> IETDeleteDepBlock
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -110,6 +113,7 @@ instance Format IngestEvent where
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
+  format (IEDeleteDepBlock o) = show o
 
 type Timestamp = Microtime
 
