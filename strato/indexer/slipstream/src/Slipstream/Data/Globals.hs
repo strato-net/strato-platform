@@ -59,20 +59,20 @@ type TableColumns = [T.Text]
 
 textArrToHistoryTableName :: [T.Text]  -> TableName
 textArrToHistoryTableName [contract]           = HistoryTableName T.empty T.empty  contract
-textArrToHistoryTableName [org, contract]      = HistoryTableName  org  contract  contract
+textArrToHistoryTableName [org, contract]      = HistoryTableName  org  T.empty  contract
 textArrToHistoryTableName [org, app, contract] = HistoryTableName  org  app  contract
 textArrToHistoryTableName _ = error "whoops"
 
 
 textArrToIndexTableName :: [T.Text]  -> TableName
 textArrToIndexTableName [contract]           = IndexTableName T.empty T.empty  contract
-textArrToIndexTableName [org, contract]      = IndexTableName  org  contract  contract
+textArrToIndexTableName [org, contract]      = IndexTableName  org  T.empty  contract
 textArrToIndexTableName [org, app, contract] = IndexTableName  org  app  contract
 textArrToIndexTableName _ = error "whoops"
   
 textArrToEventTableName :: [T.Text]  -> TableName
 textArrToEventTableName [contract, eventName]           = EventTableName T.empty T.empty contract eventName
-textArrToEventTableName [org, contract, eventName]      = EventTableName org contract contract eventName
+textArrToEventTableName [org, contract, eventName]      = EventTableName org T.empty contract eventName
 textArrToEventTableName [org, app, contract, eventName] = EventTableName org app contract eventName
 textArrToEventTableName _ = error "whoops"
 
