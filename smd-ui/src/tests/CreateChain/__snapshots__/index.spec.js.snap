@@ -55,6 +55,7 @@ Object {
   "createErrorMessage": null,
   "isOpen": true,
   "isSpinning": true,
+  "oauthUser": undefined,
   "publicKey": "undefined",
 }
 `;

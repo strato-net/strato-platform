@@ -19,7 +19,6 @@ module Slipstream.Metrics
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Network.Kafka.Protocol (Offset)
@@ -75,8 +74,6 @@ recordGlobals g = liftIO $ do
   let rec  :: T.Text -> (Globals -> Int) -> IO ()
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_tables" (M.size . createdTables)
-  rec "history_list" (M.size . historyList)
-  rec "solidVM_info" (HM.size . solidVMInfo)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()

@@ -5,21 +5,22 @@
 module Slipstream.Data.Globals (
   Globals(..),
   TableColumns,
-  TableName(..)
+  TableName(..),
+  parseStringToTableName
   ) where
 
 import           Control.DeepSeq
 import           Data.Cache.LRU
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict     as M
 import qualified Data.Set            as S
-import           Data.Text
+import qualified Data.Text           as T 
 import           GHC.Generics
+import           Text.Regex.Posix
+
 
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
 
 
@@ -31,29 +32,61 @@ instance NFData (TableName) where
 
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
-                       , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text CodePtr)
-                       , contractStates :: LRU Account [(Text, Value)]
+                       , contractStates :: LRU Account [(T.Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
 
 data TableName = 
     IndexTableName
-      { itOrganization :: Text
-      , itApplication  :: Text
-      , itContractName :: Text
+      { itOrganization :: T.Text
+      , itApplication  :: T.Text
+      , itContractName :: T.Text
       }
   | HistoryTableName -- technically the same as index, but logically different
-      { htOrganization :: Text
-      , htApplication  :: Text
-      , htContractName :: Text
+      { htOrganization :: T.Text
+      , htApplication  :: T.Text
+      , htContractName :: T.Text
       }
   | EventTableName
-      { etOrganization :: Text
-      , etApplication  :: Text
-      , etContractName :: Text
-      , etEventName    :: Text
+      { etOrganization :: T.Text
+      , etApplication  :: T.Text
+      , etContractName :: T.Text
+      , etEventName    :: T.Text
       } deriving (Show, Eq, Ord)
 
-type TableColumns = [Text]
+type TableColumns = [T.Text]
+
+textArrToHistoryTableName :: [T.Text]  -> TableName
+textArrToHistoryTableName [contract]           = HistoryTableName T.empty T.empty  contract
+textArrToHistoryTableName [org, contract]      = HistoryTableName  org  T.empty  contract
+textArrToHistoryTableName [org, app, contract] = HistoryTableName  org  app  contract
+textArrToHistoryTableName _ = error "whoops"
+
+
+textArrToIndexTableName :: [T.Text]  -> TableName
+textArrToIndexTableName [contract]           = IndexTableName T.empty T.empty  contract
+textArrToIndexTableName [org, contract]      = IndexTableName  org  T.empty  contract
+textArrToIndexTableName [org, app, contract] = IndexTableName  org  app  contract
+textArrToIndexTableName _ = error "whoops"
+  
+textArrToEventTableName :: [T.Text]  -> TableName
+textArrToEventTableName [contract, eventName]           = EventTableName T.empty T.empty contract eventName
+textArrToEventTableName [org, contract, eventName]      = EventTableName org T.empty contract eventName
+textArrToEventTableName [org, app, contract, eventName] = EventTableName org app contract eventName
+textArrToEventTableName _ = error "whoops"
+
+period :: String
+period = "\\."
+
+history :: String         
+history = "history@" 
+
+parseStringToTableName :: String -> TableName
+parseStringToTableName bs
+    | bs =~ period  :: Bool = let (tableStuff, _, eventName) = bs =~ period  :: (String, String, String)
+                                 in textArrToEventTableName $ (T.splitOn (T.pack "-") $ T.pack tableStuff ) ++ [(T.pack eventName)]
+    | bs =~ history :: Bool = let (_, _, tableStuff) = bs =~ history  :: (String, String, String) 
+                                 in textArrToHistoryTableName $ T.splitOn  (T.pack "-") $ T.pack tableStuff
+    | otherwise                = textArrToIndexTableName $ T.splitOn (T.pack "-") (T.pack bs)                                           
+        
