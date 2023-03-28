@@ -696,6 +696,7 @@ export function mapStateToProps(state) {
     abi: state.createChain.abi,
     contractName: state.createChain.contractName,
     publicKey: state.user.publicKey,
+    oauthUser: state.user.oauthUser,
   };
 }
 
