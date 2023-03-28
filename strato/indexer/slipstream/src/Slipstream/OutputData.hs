@@ -531,20 +531,16 @@ insertForeignKeys conn contracts = do
               wrapSingleQuotes (makeAccount c)
 
 insertHistoryTable :: OutputM m
-                   => IORef Globals
-                   -> [ProcessedContract]
+                   => [ProcessedContract]
                    -> ConduitM () Text m ()
-insertHistoryTable _ [] = return () --no data, do nothing
-insertHistoryTable globalsIORef contracts@(x:_) = do
+insertHistoryTable [] = return () --no data, do nothing
+insertHistoryTable contracts@(x:_) = do
   let tableName = historyTableName
           (organization x)
           (application x)
           (contractName x)
-  history <- isHistoric globalsIORef tableName
-
-  when history $ do
-    $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
-    yield $ insertHistoryTableQuery contracts
+  $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+  yield $ insertHistoryTableQuery contracts
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =

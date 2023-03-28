@@ -10,6 +10,7 @@ import           Control.Concurrent.STM
 import           Control.Concurrent.Lock  as L
 import           Control.Monad
 import           Control.Monad.Catch
+import qualified Control.Monad.Catch      as C
 import           Control.Monad.IO.Class
 import           Data.ByteString.Base64   as B64
 import           Data.Cache               as C
@@ -26,27 +27,28 @@ import           Text.URI                as URI
 
 import           Strato.VaultProxy.DataTypes
 
+class HasVirginTokenCall m where
+  getVirginToken :: T.Text -> T.Text -> RawOauth -> m VaultToken 
 
---This will get a fresh brand new, minty fresh clean token from the OAuth provider,
---User never really needs to use this function, it is mostly called by getAwesomeToken 
-getVirginToken ::  (MonadIO m, MonadThrow m) => T.Text -> T.Text -> RawOauth -> m VaultToken --OAuth2Token ---Might need to include the discovery URL later
-getVirginToken clientId clientSecret additionalOauth = do --virginToken
-    --Conver the token endpoint to a URI
-    uri <- URI.mkURI $ token_endpoint additionalOauth
-    --Encode all of the parameters, get ready to send to server
-    let (url, _) = fromJust (useHttpsURI $ uri)
-        authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
-        contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
-        urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
-    --Connect to the server
-    makeHttpCall <- runReq defaultHttpConfig $ do
-        response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
-        pure response
-    --Convert the server response to the VaultToken type
-    pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
+instance HasVirginTokenCall IO where
+  --This will get a fresh brand new, minty fresh clean token from the OAuth provider,
+  --User never really needs to use this function, it is mostly called by getAwesomeToken 
+  getVirginToken clientId clientSecret additionalOauth = do --virginToken
+      --Conver the token endpoint to a URI
+      uri <- URI.mkURI $ token_endpoint additionalOauth
+      --Encode all of the parameters, get ready to send to server
+      let (url, _) = fromJust (useHttpsURI $ uri)
+          authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+          contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
+          urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
+      --Connect to the server
+      makeHttpCall <- runReq defaultHttpConfig $ do
+          response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType )
+          pure response
+      --Convert the server response to the VaultToken type
+      pure $ HTC.responseBody $ toVanillaResponse makeHttpCall
 
---This will get the correct token and will get a cached token if it is still valid
-getAwesomeToken :: (MonadIO m, MonadThrow m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
+getAwesomeToken :: (MonadIO m, MonadMask m, HasVirginTokenCall m) => Bool -> L.Lock -> VaultCache -> T.Text -> T.Text -> Int -> RawOauth -> m VaultToken
 getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTime additionalOauth = do
     --Get the current STM time and the check if the item in memory needs to be cleared, clear it if needed
     cache <- liftIO . atomically $ do 
@@ -59,27 +61,22 @@ getAwesomeToken debuggingOn awesomeLock squirrel clientId clientSecret reserveTi
         Just c -> do
             vaultProxyDebug debuggingOn "Got my token from the cache, not from the remote server."
             pure c
-        --If the token was old destroy the old token and get a new one, block all threads except one to update the token
         Nothing -> do 
-            --Create a locking mechanism that can prevent other threads from trying to request information from the thread simultaneously
             traceM "Try and acquire a lock to change the token"
             doIHaveControl <- liftIO $ L.tryAcquire awesomeLock
-            if doIHaveControl then do
-                traceM "One thread got control and is getting the new token"
-                
-                traceM "Trying to get a new token from OAuth provider"
-                -- Get the virgin token from the provider
-                virToken <- getVirginToken clientId clientSecret additionalOauth
-                --Calculate the time that the token will expire
-                vaultProxyDebug debuggingOn  "Trying to calculate the expry time of the token"
-                exTime <- makeExpry virToken reserveTime
-                --Insert the new token into the STM cache
-                vaultProxyDebug debuggingOn "Trying to insert the new token into the cache"
-                liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
-                traceM "Successfully inserted the new token into the cache, releasing lock and notifiying other threads"
-                liftIO $ L.release awesomeLock
-                pure virToken
-              else do
+            if doIHaveControl then
+                (do traceM "One thread got control and is getting the new token"
+                      
+                    traceM "Trying to get a new token from OAuth provider"
+                    virToken <- getVirginToken clientId clientSecret additionalOauth
+                    vaultProxyDebug debuggingOn  "Trying to calculate the expry time of the token"
+                    exTime <- makeExpry virToken reserveTime
+                    vaultProxyDebug debuggingOn "Trying to insert the new token into the cache"
+                    liftIO . atomically $ insertSTM clientId virToken squirrel (Just exTime)
+                    traceM "Successfully inserted the new token into the cache, releasing lock and notifiying other threads"
+                    pure virToken
+                ) `C.finally` (liftIO $ L.release awesomeLock)
+            else do
                 traceM "Waiting until my neighbor thread updates the token"
                 liftIO $ L.wait awesomeLock
                 traceM "Lock is released, will try to get the token again."
@@ -103,7 +100,7 @@ makeExpry token reserveTime = do
     pure expry
 
 --Get the vault token more easily
-vaulty :: (MonadIO m, MonadThrow m) => VaultConnection -> m VaultToken
+vaulty :: (MonadIO m, MonadMask m, HasVirginTokenCall m) => VaultConnection -> m VaultToken
 vaulty vaultConn = getAwesomeToken db ll tc cid csec rs ao
     where
         cid = oauthClientId vaultConn
