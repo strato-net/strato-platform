@@ -35,7 +35,7 @@ import           Control.Monad.Change.Alter           hiding (lookup)
 import           Control.Monad.Change.Modify
 
 import           Data.Foldable                        (for_)
-import           Data.Maybe                           (fromMaybe)
+import           Data.Maybe                           (fromMaybe, isNothing)
 import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
 import qualified Data.NibbleString                    as N
@@ -259,7 +259,7 @@ getChainStateRoot chainId bh = do
             mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
             $logDebugS "getChainStateRoot" . T.pack $ "State root for chain " ++ format chainId ++ ": " ++ format mStateRoot
             case mStateRoot of
-              Just (_ :: Word256, bHash', stateRoot) | bHash == bHash' -> return $ Just stateRoot
+              Just (_ :: Word256, bHash', stateRoot) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
               _ -> do
                 mStateRoot' <- if parentHash == creationBlock
                   then return $ Just genStateRoot
