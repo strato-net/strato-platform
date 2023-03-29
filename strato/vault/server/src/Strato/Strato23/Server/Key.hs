@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns        #-}
 
 module Strato.Strato23.Server.Key where
 
@@ -80,7 +81,7 @@ getSharedKey userName otherPub = withSecretKey $ \key -> do
 -- Get an ECDH shared secret from the user's private key and a supplied public key
 getSharedKey' :: Text ->  Text ->  PublicKey -> VaultM SharedKey
 getSharedKey' userName oauthProvider otherPub = withSecretKey $ \key -> do
-  (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
+  (_ :: ByteString, !nonce, !encKey, (_ :: Address)) <- 
                           toUserError ("User " <> userName <> " " <> oauthProvider<> " doesn't exist")
                           . vaultQuery1 $ getUserKeyQuery' userName oauthProvider
   case decryptSecKey key nonce encKey of

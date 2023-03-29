@@ -32,6 +32,7 @@ library:
     - cache
     - clock
     - cryptonite
+    - deepseq
     - http-client
     - lens
     - monad-control

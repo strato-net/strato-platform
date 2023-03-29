@@ -33,6 +33,7 @@ import qualified Control.Monad.Change.Alter      as A
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Class       (lift)
 import           Control.Monad.Trans.Except
+
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
@@ -113,8 +114,8 @@ evmContractByCodeHash
   :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m [(Text, Keccak256)]
-evmContractByCodeHash codeHash = blocQuery $ proc () -> do
-  (_,ch,name,sh) <- selectTable evmContractNameTable -< ()
+evmContractByCodeHash !codeHash = blocQuery $ proc () -> do
+  (_,!ch,!name,!sh) <- selectTable evmContractNameTable -< ()
   restrict -< ch .== toFields codeHash
   returnA -< (name,sh)
 
@@ -122,8 +123,8 @@ evmCodeHashByName
   :: (MonadLogger m, HasBlocSQL m)
   => Text
   -> m [Keccak256]
-evmCodeHashByName cName = blocQuery $ proc () -> do
-  (_,ch,name,_) <- selectTable evmContractNameTable -< ()
+evmCodeHashByName !cName = blocQuery $ proc () -> do
+  (_,!ch,!name,_) <- selectTable evmContractNameTable -< ()
   restrict -< name .== toFields cName
   returnA -< ch
 
@@ -133,7 +134,7 @@ insertEvmContractNameQuery
   -> Text
   -> Keccak256
   -> m ()
-insertEvmContractNameQuery codeHash cName srcHash = do
+insertEvmContractNameQuery !codeHash !cName !srcHash = do
   void . blocModify $ \ conn ->
     runInsert_ conn $ Insert {
     iTable=evmContractNameTable,
@@ -316,9 +317,6 @@ createMetadataNoCompile sourceList = do
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
-instance DefaultFromField PGBytea Address where
-  defaultFromField = fromPGSFromField
-
 instance FromField Address where
   fromField f mdata = do
     !theByteString <- fromField f mdata
@@ -329,9 +327,6 @@ instance Default ToFields Address (O.Field PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
-
-instance DefaultFromField PGBytea SecretBox.Nonce where
-  defaultFromField = fromPGSFromField
 
 instance FromField SecretBox.Nonce where
   fromField f mdata = do
@@ -346,9 +341,6 @@ instance Default ToFields JwtToken (O.Field PGText) where
 
 instance Default ToFields StateMutability (O.Field PGText) where
   def = lmap tShow def
-
-instance DefaultFromField PGText StateMutability where
-  defaultFromField = fromPGSFromField
 
 instance FromField StateMutability where
   fromField f mdata = do
@@ -368,8 +360,6 @@ instance FromField Keccak256 where
 instance Default ToFields Keccak256 (O.Field PGBytea) where
   def = lmap keccak256ToByteString def
 
-instance DefaultFromField PGBytea CodePtr where
-  defaultFromField = fromPGSFromField
 
 instance FromField CodePtr where
   fromField f mdata = do
@@ -379,9 +369,6 @@ instance FromField CodePtr where
 
 instance Default ToFields CodePtr (O.Field PGBytea) where
   def = lmap rlpSerialize def
-
-instance DefaultFromField PGBytea (Maybe ChainId) where
-  defaultFromField = fromPGSFromField
 
 instance FromField ChainId where
   fromField f mdata = do

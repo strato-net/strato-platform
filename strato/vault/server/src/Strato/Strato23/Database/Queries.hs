@@ -137,7 +137,7 @@ getMessageQuery = proc () -> do
 -- Used for the mercata migration. --Can be deleted
 getMessageQueryAll :: Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getMessageQueryAll = proc () -> do
-  (_, salt, nonce, enc_msg) <- selectTable messageTable -< ()
+  (_, salt, nonce, !enc_msg) <- selectTable messageTable -< ()
   returnA -< (salt, nonce, enc_msg)
 
 postMessageQuery :: ByteString
@@ -146,7 +146,7 @@ postMessageQuery :: ByteString
                  -> Connection
                  -> IO Bool
 postMessageQuery salt nonce message conn = do
-  (mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runSelect conn getMessageQuery
+  (!mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runSelect conn getMessageQuery
   case mesg of
     (_:_) -> return False
     [] -> True <$ runInsert_ conn Insert {
