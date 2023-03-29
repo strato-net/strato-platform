@@ -708,7 +708,7 @@ instance (MonadIO m, MonadLogger m) => (Account `A.Alters` AddressState) (MonadT
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance MonadIO m => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
   lookup _ chainId = do
     mBH <- gets $ Lens.view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
