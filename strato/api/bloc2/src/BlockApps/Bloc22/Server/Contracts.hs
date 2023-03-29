@@ -7,6 +7,8 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE Strict #-}
+
 
 module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow

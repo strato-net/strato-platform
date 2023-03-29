@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE FlexibleContexts    #-}
-
+{-# LANGUAGE Strict #-}
 
 module BlockApps.Bloc22.Server.X509 (
     createCertificate

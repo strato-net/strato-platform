@@ -4,6 +4,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE Strict #-}
+
+
 module BlockApps.Bloc22.Server.Utils
   ( toMaybe
   , maybeChainBatchResult

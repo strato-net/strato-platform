@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE Strict #-}
 
 module BlockApps.Bloc22.Database.Queries
   ( contractBySourceHash
@@ -81,13 +82,12 @@ import           Control.Monad.Composable.BlocSQL
 import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
-{-# LANGUAGE Strict #-}
 
 contractBySourceHash
   :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m (Maybe SourceMap)
-contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
+contractBySourceHash !srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
   (_,sh,src) <- selectTable contractsSourceTable -< ()
   restrict -< sh .== toFields srcHash
   returnA -< (src)
@@ -97,8 +97,8 @@ insertContractSourceQuery
   => Keccak256
   -> SourceMap
   -> m ()
-insertContractSourceQuery srcHash src' = do
-  let src = serializeSourceMap src'
+insertContractSourceQuery !srcHash !src' = do
+  let !src = serializeSourceMap src'
   void . blocModify $ \ conn ->
     runInsert_ conn $ Insert {
     iTable=contractsSourceTable,

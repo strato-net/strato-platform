@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell   #-}
-
+{-# LANGUAGE Strict #-}
 
 module BlockApps.Bloc22.Server.BlocOptions where
 

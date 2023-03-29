@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE Strict #-}
 
 module BlockApps.Bloc22.Server.Users (
   postUsersFill

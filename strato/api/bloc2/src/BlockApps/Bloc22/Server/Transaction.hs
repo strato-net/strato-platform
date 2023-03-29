@@ -9,6 +9,7 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE Strict #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 

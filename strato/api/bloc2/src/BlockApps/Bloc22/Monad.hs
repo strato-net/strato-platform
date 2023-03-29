@@ -10,7 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict                     #-}
 
 
 {-# LANGUAGE TypeSynonymInstances #-}

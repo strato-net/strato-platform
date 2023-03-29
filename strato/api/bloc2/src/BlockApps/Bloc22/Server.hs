@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict            #-}
 
 module BlockApps.Bloc22.Server where
 

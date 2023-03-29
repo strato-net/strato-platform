@@ -9,7 +9,7 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
-
+{-# LANGUAGE Strict #-}
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module BlockApps.Bloc22.Server.TransactionResult (
