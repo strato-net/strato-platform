@@ -1,6 +1,6 @@
 {-# LANGUAGE  RecordWildCards    #-}
 {-# LANGUAGE LambdaCase          #-}
-
+{-# LANGUAGE Strict #-}
 
 module BlockApps.Bloc22.XabiHelper
   ( parseSolidXabi

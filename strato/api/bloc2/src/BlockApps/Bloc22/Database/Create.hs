@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-} 
+{-# LANGUAGE Strict #-}
 module BlockApps.Bloc22.Database.Create where
 
 import           Database.PostgreSQL.Simple

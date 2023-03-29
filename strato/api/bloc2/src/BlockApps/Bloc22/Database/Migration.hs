@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
-
+{-# LANGUAGE Strict #-}
 module BlockApps.Bloc22.Database.Migration
   ( runBlocMigrations
   ) where

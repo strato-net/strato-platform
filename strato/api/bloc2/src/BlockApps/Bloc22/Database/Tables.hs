@@ -1,3 +1,5 @@
+{-# LANGUAGE Strict #-}
+
 module BlockApps.Bloc22.Database.Tables where
 
 import Data.Profunctor.Product

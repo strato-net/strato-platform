@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE Strict #-}
 module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
 
 import           Control.Monad.IO.Class     (MonadIO(..))

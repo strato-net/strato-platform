@@ -81,6 +81,7 @@ import           Control.Monad.Composable.BlocSQL
 import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
+{-# LANGUAGE Strict #-}
 
 contractBySourceHash
   :: (MonadLogger m, HasBlocSQL m)
