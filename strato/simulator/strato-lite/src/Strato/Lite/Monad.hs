@@ -220,6 +220,12 @@ instance {-# OVERLAPPING #-} MonadIO m => State.MonadState P2PContext (MonadP2PT
   state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
     where swap ~(a,b) = (b,a)
 
+instance Mod.Accessible PublicKey (MonadTest m) where
+  access _ = error "pubkey"
+
+instance Mod.Accessible PublicKey (MonadP2PTest m) where
+  access _ = error "pubkey"
+
 instance MonadIO m => Stacks Block (MonadTest m) where
   takeStack _ n = take n <$> use blocks
   pushStack bs  = do

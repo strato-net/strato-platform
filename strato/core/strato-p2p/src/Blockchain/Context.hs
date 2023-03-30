@@ -65,6 +65,7 @@ module Blockchain.Context
     , shouldSendToPeer
     , withActivePeer
     , getPeerX509
+    , getMyX509
     , getPeerByParsedSet
     , getPeersByParsedSets
     , toMaybe
@@ -245,6 +246,9 @@ instance RunsServer ContextM (LoggingT IO) where
           conduits = P2pConduits pSource pSink sSource
           ip = IPAsText . T.pack . sockAddrToIP $ appSockAddr app
       handler conduits ip
+
+instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
+  access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
@@ -531,6 +535,7 @@ type MonadP2P m = ( MonadIO m
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
+                       , PublicKey
                        ] m
                   , All '[Mod.Modifiable]
                       '[ BestBlock
@@ -643,6 +648,10 @@ getPeerX509 :: A.Selectable Address X509CertInfoState m
 getPeerX509 peer = case pPeerPubkey peer of
   Nothing -> pure Nothing
   Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
+
+getMyX509 :: (A.Selectable Address X509CertInfoState m, Mod.Accessible PublicKey m)
+          => m (Maybe X509CertInfoState)
+getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
 
 getPeersByParsedSets :: (MonadP2P m) => ChainMemberParsedSet -> m [Maybe PPeer]
 getPeersByParsedSets org = do
