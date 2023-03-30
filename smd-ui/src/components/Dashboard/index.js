@@ -119,6 +119,7 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
+    const synced = this.props.appMetadata.metadata.isSynced
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
@@ -133,10 +134,10 @@ class Dashboard extends Component {
                onMouseLeave={this.handleMouseHover}
           >
             <NumberCard
-              number={health ? 'HEALTHY' : 'UNHEALTHY'}
+              number={!synced ? "SYNCING" : health ? 'HEALTHY' : 'UNHEALTHY'}
               description= {sec2Date(uptime)}
-              mode={(health && systemHealth) ? 'success':'warning' }
-              iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
+              mode={!synced ? 'warning' : (health && systemHealth) ? 'success':'danger' }
+              iconClass={!synced ? '' : (health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
             {(this.state.isHovering && !systemHealth) && <div> Warnings: {systemWarnings} </div>}
           </div>
@@ -211,7 +212,8 @@ class Dashboard extends Component {
 export function mapStateToProps(state) {
   return {
     node: state.node,
-    dashboard: state.dashboard
+    dashboard: state.dashboard,
+    appMetadata: state.appMetadata,
   };
 }
 

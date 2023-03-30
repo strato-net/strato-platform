@@ -14,6 +14,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
 import { getOrCreateOauthUserRequest, getUserCertificateRequest } from '../components/User/user.actions';
+import { fetchHealth, fetchMetadata } from './app.actions';
 import ReactGA from "react-ga4";
 
 ReactGA.initialize("G-PWGS3Z6YNQ");
@@ -26,9 +27,8 @@ class App extends Component {
     if (isOauthEnabled()) {
       this.props.getOrCreateOauthUserRequest();
     }
+    this.props.fetchMetadata()
   }
-
-  
 
   render() {
     return (
@@ -48,10 +48,13 @@ class App extends Component {
 export function mapStateToProps(state) {
   return ({
     oauthUser: state.user.oauthUser,
-    userCertificate: state.user.userCertificate
+    userCertificate: state.user.userCertificate,
+    appMetadata: state.appMetadata,
   })
 }
 
 export default withRouter(connect(mapStateToProps, {
   getOrCreateOauthUserRequest,
+  fetchHealth,
+  fetchMetadata
 })(App));
