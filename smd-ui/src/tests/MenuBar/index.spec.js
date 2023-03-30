@@ -31,6 +31,11 @@ describe('MenuBar: index', () => {
           { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
           { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         store: store,
+        subscribeRoom: jest.fn(),
+        unSubscribeRoom: jest.fn(),
+        changeHealthStatus: jest.fn(),
+        appMetadata: {},
+        dashboard: {},
       }
 
       let wrapper = shallow(
@@ -43,6 +48,11 @@ describe('MenuBar: index', () => {
     test('component without values', () => {
       const props = {
         currentUser: { username: '' },
+        subscribeRoom: jest.fn(),
+        unSubscribeRoom: jest.fn(),
+        changeHealthStatus: jest.fn(),
+        appMetadata: {},
+        dashboard: {},
         chainIds: [
           { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
           { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },

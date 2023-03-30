@@ -89,7 +89,7 @@ describe('NodeCard: index', () => {
     );
 
     expect(props.subscribeRoom).toHaveBeenCalled();
-    expect(props.subscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
+    expect(props.subscribeRoom.mock.calls).toEqual([["GET_PEERS"]]);
   });
 
   test('componentWillUnmount', () => {
@@ -106,7 +106,7 @@ describe('NodeCard: index', () => {
 
     wrapper.unmount();
     expect(props.unSubscribeRoom).toHaveBeenCalled();
-    expect(props.unSubscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
+    expect(props.unSubscribeRoom.mock.calls).toEqual([["GET_PEERS"]]);
   });
 
   test('mapStateToProps', () => {

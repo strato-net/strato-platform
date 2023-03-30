@@ -50,7 +50,6 @@ class ContractMethodCall extends Component {
             return args;
           }
           catch (e) {
-            console.log(e)
             args[arg] = values[arg];
             return args;
           }

@@ -5,7 +5,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './strato-mercata-beta-white.png';
 import { env } from '../../env';
-import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent, MenuDivider } from '@blueprintjs/core';
+import { Popover, Button, Menu, Position, MenuItem, Dialog, Intent, MenuDivider, PopoverInteractionKind } from '@blueprintjs/core';
 import {
   searchQueryRequest,
 } from '../SearchResults/searchresults.actions';
@@ -13,6 +13,16 @@ import {
   getUserCertificateRequest,
 } from "../User/user.actions"
 import HexText from '../HexText';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions';
+import { changeHealthStatus } from '../Dashboard/dashboard.action'
+import {
+  GET_NODE_UPTIME,
+  GET_HEALTH,
+  GET_SYSTEM_INFO
+} from '../../sockets/rooms'
+import io from 'socket.io-client';
+
+const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 
 class MenuBar extends Component {
   constructor(props) {
@@ -22,6 +32,25 @@ class MenuBar extends Component {
      isUserMenuOpen: false
     }
   }
+
+  componentDidMount() {
+
+    this.props.subscribeRoom(GET_HEALTH)
+    this.props.subscribeRoom(GET_NODE_UPTIME)
+    this.props.subscribeRoom(GET_SYSTEM_INFO)
+
+    socket.on('disconnect', () => {
+      this.props.changeHealthStatus(false);
+    });
+
+    socket.on('reconnect', () => {
+      this.props.changeHealthStatus(true);
+      this.props.subscribeRoom(GET_HEALTH)
+      this.props.subscribeRoom(GET_NODE_UPTIME)
+      this.props.subscribeRoom(GET_SYSTEM_INFO)
+    });
+  }
+
   componentWillReceiveProps(newProps) {
     if (newProps.oauthUser && !newProps.userCertificate) {
       this.props.getUserCertificateRequest(newProps.oauthUser.address)
@@ -137,7 +166,7 @@ class MenuBar extends Component {
           </div>
         </Dialog>
 
-        <Popover content={userDropdown} position={Position.BOTTOM_RIGHT}>
+        <Popover content={userDropdown} position={Position.BOTTOM}>
           <Button 
             className={"pt-large pt-minimal " + (this.props.userCertificate ? 'pt-intent-primary' : 'pt-intent-warning')} 
             iconName={"user"} 
@@ -170,7 +199,16 @@ class MenuBar extends Component {
       </Menu>
     );
 
+    const synced = this.props.appMetadata.metadata ? this.props.appMetadata.metadata.isSynced : false;
+    // const synced =false
+    const health = this.props.dashboard.healthStatus;
+    // const health = false
+    const systemHealth = this.props.dashboard.systemStatus;
+    const systemWarnings = this.props.dashboard.systemWarnings;
+    const metadata = this.props.appMetadata.metadata
+    // const metadata = undefined
     return (
+      
       <nav className="pt-navbar pt-dark smd-menu-bar" >
         <div 
           id="menu-burger" 
@@ -184,7 +222,7 @@ class MenuBar extends Component {
                 alt="Blockapps Logo"
                 height="45"
                 className="smd-menu-logo smd-pad-4"
-              />
+                />
             </Link>
           </div>
         </div>
@@ -211,8 +249,32 @@ class MenuBar extends Component {
           </div>
         <div className="pt-navbar-group pt-align-right">
           {this.afterLoggedIn()}
+          <Popover 
+            interactionKind={PopoverInteractionKind.HOVER}
+            position={Position.BOTTOM_RIGHT}
+            content={
+              // syncing = warning
+              // no metadata = danger
+              // system warnings = warnings
+              // none = success
+              <div className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}`}>
+                <h5 className="pt-callout-title">{
+                  !metadata ? 'API Disconnected' : !(health) ? 'Node Unhealthy' : !synced ? 'Syncing' : 'Healthy'}
+                </h5>
+            {
+              !metadata ? 'Cannot connect to the Node\'s API' 
+                : !(health) ? (systemWarnings || 'Reason currently unknown') 
+                : !synced ? 'This Node is currently syncing with the network' 
+                : 'Connected to STRATO Mercata'
+                }
+            </div>
+            } 
+            >
+            <Button className={`fa fa-solid fa-wifi pt-minimal pt-large ${!metadata ? 'pt-intent-danger' : ((!health || !synced) ? 'pt-intent-warning' : '')}`} />
+
+          </Popover>
           <Popover content={helpDropdown} position={Position.BOTTOM_RIGHT}>
-            <Button className="pt-minimal pt-large" style={{ marginLeft: 10}} iconName="help"/>
+            <Button className="pt-minimal pt-large" iconName="help"/>
           </Popover>
         </div>
       </nav>
@@ -224,13 +286,18 @@ export function mapStateToProps(state) {
   return {
     oauthUser: state.user.oauthUser,
     userCertificate: state.user.userCertificate,
-    searchQuery: state.search.searchQuery
+    searchQuery: state.search.searchQuery,
+    appMetadata: state.appMetadata,
+    dashboard: state.dashboard,
   };
 }
 
 const connected = connect(mapStateToProps, {
   searchQueryRequest, 
   getUserCertificateRequest,
+  subscribeRoom,
+  unSubscribeRoom,
+  changeHealthStatus
 })(MenuBar);
 
 export default withRouter(connected);

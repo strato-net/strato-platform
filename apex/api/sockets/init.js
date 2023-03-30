@@ -11,7 +11,8 @@ const {
   GET_COINBASE,
   GET_HEALTH,
   GET_NODE_UPTIME,
-  GET_SYSTEM_INFO
+  GET_SYSTEM_INFO,
+  GET_SHARD_COUNT
 } = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
@@ -23,6 +24,7 @@ const getBlocksAggregator = require('./aggregators/getBlocks')
 const getTransactionsAggregator = require('./aggregators/getTransactions');
 const getCoinbaseAggregator = require('./aggregators/getCoinbase');
 const getHealthAggregator = require('./aggregators/getHealthStatus');
+const getShardCountAggregator = require('./aggregators/getChains');
 
 const io = require('socket.io')()
 function init(server) {
@@ -66,6 +68,9 @@ function init(server) {
 
     // register request for node uptime duration
     registerRoomAllocation(socket, GET_SYSTEM_INFO, getHealthAggregator.initialHydrateSystemInfo)
+
+    // register request for chains count
+    registerRoomAllocation(socket, GET_SHARD_COUNT, getShardCountAggregator.initialHydrateShardCount)
   });
 }
 
