@@ -8,6 +8,7 @@
     "@blueprintjs/table": "^1.19.0",
     "bignumber.js": "4.0.2",
     "bootstrap": "3.3.7",
+    "react-bootstrap": "2.7.2",
     "enzyme-adapter-react-15": "^1.0.5",
     "js-cookie": "^2.2.0",
     "mixpanel-browser": "2.11.1",
