@@ -4,7 +4,7 @@ import { withRouter } from 'react-router-dom';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import { Field, reduxForm } from 'redux-form';
+import { Field, reduxForm, isDirty } from 'redux-form';
 import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
 import { validate } from './validate';
 
@@ -19,7 +19,7 @@ class AddMember extends Component {
       orgUnit: ``,
       commonName: ``,
       access: true,
-      errors: null
+      fieldsChange: false
     }
   }
 
@@ -82,6 +82,7 @@ class AddMember extends Component {
   }
 
   render() {
+    const { fieldsChange } = this.props;
     return (
       <div >
         <Button onClick={() => {
@@ -113,7 +114,7 @@ class AddMember extends Component {
                     <Field
                       id="orgName"
                       className="form-width pt-input"
-                      placeholder="Org Name"
+                      placeholder="Organization Name"
                       name="orgName"
                       component="input"
                       dir="auto"
@@ -138,7 +139,7 @@ class AddMember extends Component {
                       name="orgUnit"
                       component="input"
                       type="text"
-                      placeholder="Org Unit"
+                      placeholder="Organization Unit"
                       value={this.state.orgUnit}
                       className="pt-input form-width"
                       onChange={(e) => this.handleOrgUnitChange(e)}
@@ -223,7 +224,7 @@ class AddMember extends Component {
                 <Button
                   intent={Intent.PRIMARY}
                   onClick={this.submit}
-                  text="Add Member"
+                  text={fieldsChange?"Add Member":"Include All"}
                 />
               </div>
             </div>
@@ -237,6 +238,7 @@ class AddMember extends Component {
 export function mapStateToProps(state) {
   return {
     isOpen: state.createChain.isAddMemberModalOpen,
+    fieldsChange:isDirty("add-member")(state),
     initialValues: {
       orgName: "",
       orgUnit: "",
