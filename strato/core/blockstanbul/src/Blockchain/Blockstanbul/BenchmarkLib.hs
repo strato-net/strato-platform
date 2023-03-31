@@ -48,7 +48,7 @@ benchChainMember :: ChainMemberParsedSet
 benchChainMember = CommonName "BlockApps" "Engineering" "Admin" True
 
 benchContext :: BlockstanbulContext
-benchContext = newContext (Checkpoint (View 200 40) [benchChainMember]) benchChainMember
+benchContext = newContext (Checkpoint (View 200 40) [benchChainMember]) benchChainMember True
 
 
 makeBlock :: Int -> Int -> Block
