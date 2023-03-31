@@ -642,6 +642,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETValidatorBehavior  -> do
       record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
       blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
+    IETDeleteDepBlock  -> do
+      record "inevent_type_delete_dep_block" "DeleteDepBlock"
+      traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
