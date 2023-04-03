@@ -758,7 +758,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                       _ -> (functionName, []) ;)
           else (functionName, [])
   
-  (f, args) <-
+  (!f, !args) <-
         case M.lookup functionName' functionsIncludingConstructor of
           Just theFunction | isDelegateCall == False -> do
                 args' <- argsToVals contract' theFunction argExps
@@ -1142,7 +1142,7 @@ runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
 runStatement (CC.WhileStatement condition code pos) = do
   solidVMBreakpoint pos
 
-  while (getBool =<< expToVar condition) $ do
+  while (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
@@ -1151,7 +1151,7 @@ runStatement (CC.WhileStatement condition code pos) = do
 
 runStatement (CC.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
-  doWhile (getBool =<< expToVar condition) $ do
+  doWhile (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
@@ -1178,7 +1178,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
   let condition = getBool =<< expToVar conditionExp
 
-  while condition $ do
+  while condition $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
