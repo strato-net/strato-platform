@@ -203,7 +203,7 @@ processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                           => [Either OutputGenesis OutputBlock]
                           -> ConduitT a VmOutEvent m ()
 processBlocksAndNewChains blocksAndChains = do
-  let grouped = groupEithers blocksAndChains
+  let !grouped = groupEithers blocksAndChains
   for_ grouped $ \case
     Left newChains -> outputNewChains =<< insertNewChains newChains
     Right blocks -> processBlocks blocks
@@ -243,8 +243,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
             _ -> return (EVM, (sr', [], [])) -- TODO: add contracts from accountInfo list?
         case catMaybes $ erException <$> mExecResults of
           [] -> do
-            yieldMany . concat $ map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $ map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
+            yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
+            yieldMany . concat $! map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
             let (orgName, appName) = case mExecResults of
                                        [] -> ("","")
                                        x:_ -> (erOrgName x, erAppName x)
@@ -301,7 +301,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
-  yield . OutIndexEvent $ NewChainInfo cId cInfo
+  yield . OutIndexEvent $! NewChainInfo cId cInfo
   let org = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
