@@ -64,6 +64,7 @@ executables:
   strato-sequencer:
     source-dirs:      exec-src
     main:             Main.hs
+    ghc-options: -Wall -O2 -eventlog -finfo-table-map -fdistinct-constructor-tables
     dependencies:
       - aeson
       - async

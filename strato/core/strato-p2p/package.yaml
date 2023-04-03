@@ -17,6 +17,7 @@ ghc-options: -Wall -threaded
 executables:
   strato-p2p:
     source-dirs: exec_src/
+    ghc-options: -Wall -O2 -eventlog -finfo-table-map -fdistinct-constructor-tables
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init

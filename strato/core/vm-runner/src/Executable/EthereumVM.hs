@@ -120,7 +120,7 @@ ethereumVM d = void . execContextM d $ do
 
         logEventSummaries seqEvents
 
-        let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
+        let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         trs <- runConduit $ yield vmInEventBatch
                          .| handleVmEvents flags_useSyncMode
                          .| awaitForever sendOutEvent
@@ -148,7 +148,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
-  yieldMany $ uncurry OutJSONRPC <$> rpcResps
+  yieldMany $! uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
@@ -361,7 +361,7 @@ getNumPoolable txPairs = do
 
   forM_ allNewTxs $ \(ts, _) ->
       $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
-  let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
+  let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
   $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
   unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
   return $ length poolableNewTxs
@@ -734,5 +734,5 @@ getUnprocessedKafkaEvents offset = do
                                      $ blockDataExtraData obBlockData
           _ -> 1
 
-        ret' = eventLimit . countLimit $ ret
+        !ret' = eventLimit . countLimit $ ret
     return ret'
