@@ -198,7 +198,7 @@ function newnode {
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${vbFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" "${ciFlag}"  --genesisBlockName=$genesis \
-    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    +RTS "${seqRTSOPTs:-}" -N1 -l -hi -i1.0 -RTS &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -233,7 +233,7 @@ function newnode {
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
-                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 -l -hi -i1.0 -RTS &>> logs/vm-runner
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
