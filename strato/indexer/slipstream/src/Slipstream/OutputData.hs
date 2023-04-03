@@ -616,15 +616,15 @@ insertIndexTableQuery cs = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-          ON CONFLICT (record_id) DO UPDATE SET
-            record_id = excluded.record_id,
-            address = excluded.address,
-            "chainId" = excluded."chainId",
-            block_hash = excluded.block_hash,
-            block_timestamp = excluded.block_timestamp,
-            block_number = excluded.block_number,
-            transaction_hash = excluded.transaction_hash,
-            transaction_sender = excluded.transaction_sender|]
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender|]
                 , if null list then "" else ",\n    "
                 , tableUpsert $ map fst list
                 , ";"
