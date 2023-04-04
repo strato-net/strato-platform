@@ -220,6 +220,12 @@ instance {-# OVERLAPPING #-} MonadIO m => State.MonadState P2PContext (MonadP2PT
   state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
     where swap ~(a,b) = (b,a)
 
+instance MonadIO m => Mod.Accessible PublicKey (MonadTest m) where
+  access _ = fmap (derivePublicKey . _prvKey) $ asks _p2pTestContext >>= liftIO . atomically . readTVar
+
+instance (Monad m, Mod.Accessible PublicKey m) => Mod.Accessible PublicKey (MonadP2PTest m) where
+  access = lift . Mod.access
+
 instance MonadIO m => Stacks Block (MonadTest m) where
   takeStack _ n = take n <$> use blocks
   pushStack bs  = do
@@ -708,7 +714,7 @@ instance (MonadIO m, MonadLogger m) => (Account `A.Alters` AddressState) (MonadT
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance MonadIO m => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
   lookup _ chainId = do
     mBH <- gets $ Lens.view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
@@ -1128,7 +1134,7 @@ startingCheckpoint as = def{checkpointValidators = as}
 newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
 newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
-  in newContext ckpt paddr
+  in newContext ckpt paddr True
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext undefined []

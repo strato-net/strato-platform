@@ -87,6 +87,7 @@ data Options = State{root::String, db::String}
              | GetPrivacy { registry :: String, key :: String }
              | PutPrivacy { registry :: String, key :: String , value :: String }
              | ValidatorBehavior { valB :: Bool } 
+             | DeleteDepBlock { valK :: String } 
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -300,6 +301,11 @@ validatorBehaviorOptions = record ValidatorBehavior{valB = undefined}
                         [ valB := error "valB" += typ "BOOL" += argPos 0
                         ]
 
+deleteDepBlockOptions :: Annotate Ann
+deleteDepBlockOptions = record DeleteDepBlock{valK = undefined} 
+                        [ valK := error "valK" += typ "STRING" += argPos 0
+                        ]
+
 saveKafkaOptions :: Annotate Ann
 saveKafkaOptions = record SaveKafka { filename = error "unused filename", topic = error "unused topic"}
                  [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
@@ -382,6 +388,7 @@ options = modes_ [blockGoOptions
                 , addGenesisFromFileOptions
                 , addTxsFromFileOptions
                 , validatorBehaviorOptions
+                , deleteDepBlockOptions
                 , saveKafkaOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
@@ -425,6 +432,7 @@ run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
 run ValidatorBehavior{..}      = validatorBehavior valB
+run DeleteDepBlock{..}         = deleteDepBlock valK
 run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
