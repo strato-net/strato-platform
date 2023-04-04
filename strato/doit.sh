@@ -198,7 +198,7 @@ function newnode {
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${vbFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" "${ciFlag}"  --genesisBlockName=$genesis \
-    +RTS "${seqRTSOPTs:-}" -N1 -l -hi -i1.0 -RTS &>> logs/strato-sequencer
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
