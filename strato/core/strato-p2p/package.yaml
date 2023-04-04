@@ -17,7 +17,6 @@ ghc-options: -Wall -threaded
 executables:
   strato-p2p:
     source-dirs: exec_src/
-    ghc-options: -Wall -O2
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init
