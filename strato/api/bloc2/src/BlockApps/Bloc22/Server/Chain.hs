@@ -41,7 +41,7 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
+import           BlockApps.Bloc22.Server.Utils              (waitFor', getSigVals, maybeChainBatchResult)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
@@ -200,7 +200,17 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
         then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
     else do
         chainInfo' <- createChainInfo jwtToken bHash chainInput
-        CORE.postChain chainInfo'
+        chainId <- CORE.postChain chainInfo'
+        let isAsync = fromMaybe False $ chaininputAsync chainInput
+        unless isAsync $ do
+          info <- waitForChainInfo chainId
+          case info of
+            Nothing -> pure ()
+            Just info' -> do
+              let status = transactionResultStatus $ fst info'
+              when (status /= Just Success) . throwIO . UserError . Text.pack $
+                "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
+        pure chainId
 
 postChainInfos :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
@@ -215,30 +225,45 @@ postChainInfos mJwtToken chainInputs = case mJwtToken of
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     postChains chainInfos
+    -- chainIds <- postChains chainInfos
+    -- let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
+    --     asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
+    -- unless (null asyncChains) $ do
+    --   infos <- zip asyncChains <$> waitForChainInfos asyncChains
+    --   let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
+    --   unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
+    --     \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
+    -- pure chainIds
 
 
 waitForChainInfo :: (MonadLogger m,
                      HasSQL m) =>
-                    ChainId -> m (TransactionResult, Maybe ChainInfo)
-waitForChainInfo chainId = head <$> waitForChainInfos [chainId]
+                    ChainId -> m (Maybe (TransactionResult, Maybe ChainInfo))
+waitForChainInfo chainId = do
+  result <- waitForChainInfos [chainId]
+  case result of
+    Nothing -> do
+      $logInfoS "waitForChainInfo" "Timed out!"
+      return Nothing
+    Just infos -> return $ Just $ head infos
 
 waitForChainInfos :: (MonadLogger m,
                       HasSQL m) =>
-                     [ChainId] -> m [(TransactionResult, Maybe ChainInfo)]
-waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
+                     [ChainId] -> m (Maybe [(TransactionResult, Maybe ChainInfo)])
+waitForChainInfos chainIds = waitFor' go
   where go = do
           infos <- catMaybes <$> maybeChainBatchResult chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
           $logDebugLS "waitForChainInfo/resp" infos
           return (length infos == length chainIds, infos)
 
-getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) => 
+getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
                 ChainId -> m ChainIdChainOutput
 
 getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing
-  
 
-getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
+
+getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>
                 [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
 getChainInfo chainIds lim off = do
   chainIdChainInfos <- getChain chainIds lim off
