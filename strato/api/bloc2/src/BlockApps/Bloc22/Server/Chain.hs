@@ -200,14 +200,7 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
         then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
     else do
         chainInfo' <- createChainInfo jwtToken bHash chainInput
-        chainId <- CORE.postChain chainInfo'
-        let isAsync = fromMaybe False $ chaininputAsync chainInput
-        unless isAsync $ do
-          info <- waitForChainInfo chainId
-          let status = transactionResultStatus $ fst info
-          when (status /= Just Success) . throwIO . UserError . Text.pack $
-            "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
-        pure chainId
+        CORE.postChain chainInfo'
 
 postChainInfos :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
@@ -221,15 +214,7 @@ postChainInfos mJwtToken chainInputs = case mJwtToken of
   Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
-    chainIds <- postChains chainInfos
-    let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
-        asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-    unless (null asyncChains) $ do
-      infos <- zip asyncChains <$> waitForChainInfos asyncChains
-      let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
-      unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
-        \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
-    pure chainIds
+    postChains chainInfos
 
 
 waitForChainInfo :: (MonadLogger m,
