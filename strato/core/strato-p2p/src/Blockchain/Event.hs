@@ -71,6 +71,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event
@@ -275,6 +276,7 @@ handleEvents peer = awaitForever $ \case
                                  , (Word256 `Selectable` ChainMemberRSet) m
                                  , (Keccak256 `Alters` OutputBlock) m
                                  , (Address `Selectable` X509CertInfoState) m
+                                 , Accessible PublicKey m
                                  )
                               => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
@@ -284,6 +286,7 @@ handleEvents peer = awaitForever $ \case
                     ChainTxsInBlock cIdTxsMap <- selectWithDefault (Proxy @ChainTxsInBlock) h
                     mems <- selectMany (Proxy @ChainMemberRSet) $ M.keys cIdTxsMap
                     peerX509 <- getPeerX509 peer
+                    myX509 <- getMyX509
                     let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
                         trMems = merge (whenMissing This)
                                        (whenMissing That)
@@ -291,7 +294,7 @@ handleEvents peer = awaitForever $ \case
                                        cIdTxsMap
                                        mems
                         filtered = flip M.filter trMems $
-                          mergeTheseWith (const False) (checkPeerIsMember peerX509) (||) 
+                          mergeTheseWith (const False) (checkPeerIsMember myX509 peerX509) (||) 
                         pshas' = M.foldr (DL.append . DL.fromList . these id (const []) const) DL.empty filtered
                     getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` pshas')
 
@@ -362,7 +365,8 @@ handleEvents peer = awaitForever $ \case
       ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
       mems <- lift . selectMany (Proxy @ChainMemberRSet) $ map fst ptrs
       peerX509 <- lift $ getPeerX509 peer
-      let peerCheck (cId, _) = checkPeerIsMember peerX509 . fromMaybe def $ M.lookup cId mems
+      myX509 <- lift getMyX509
+      let peerCheck (cId, _) = checkPeerIsMember myX509 peerX509 . fromMaybe def $ M.lookup cId mems
       yieldR . Transactions . map (morphTx . snd) $ filter peerCheck ptrs
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -382,8 +386,9 @@ handleEvents peer = awaitForever $ \case
           Nothing -> return True
           Just cId -> do
             peerX509 <- lift $ getPeerX509 peer
+            myX509 <- lift getMyX509
             mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
-            return $ checkPeerIsMember peerX509 mems
+            return $ checkPeerIsMember myX509 peerX509 mems
 
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           if not match
@@ -397,7 +402,8 @@ handleEvents peer = awaitForever $ \case
         when (shouldSend peer og) $ do
           $logInfoS "handleEvents/P2pGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
           peerX509 <- lift $ getPeerX509 peer
-          if checkPeerIsMember peerX509 (chainMembersToChainMemberRset (members uci))
+          myX509 <- lift getMyX509
+          if checkPeerIsMember myX509 peerX509 (chainMembersToChainMemberRset (members uci))
             then do
               $logInfoS "handleEvents/P2pGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
               yieldR $ ChainDetails [(cId, cInfo)]
@@ -412,10 +418,11 @@ handleEvents peer = awaitForever $ \case
             orgFormat = CL.blue $ show org
         $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
         peerX509 <- lift $ getPeerX509 peer
+        myX509 <- lift getMyX509
         ChainMemberRSet mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
         let (hasAccess, ChainMemberRSet newMem) = chainMemberParsedSetToChainMemberRSet org
             mems' = ChainMemberRSet $ (if hasAccess then rSetUnion else rSetIntersection) mems newMem
-        when (checkPeerIsMember peerX509 mems') $ do
+        when (checkPeerIsMember myX509 peerX509 mems') $ do
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Peer cleared for chain " ++ formatted
           cInfo <- lift $ select (Proxy @ChainInfo) cId -- This should never be Nothing
           when (isJust cInfo) $ do 
@@ -501,12 +508,14 @@ handleGetChainDetails :: ( MonadIO m
                          , (Word256 `Selectable` ChainInfo) m
                          , (Address `Selectable` X509CertInfoState) m
                          , Modifiable ActionTimestamp m
+                         , Accessible PublicKey m
                          )
                       => PPeer
                       -> S.Set Word256
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
   peerX509 <- lift $ getPeerX509 peer
+  myX509 <- lift getMyX509
   cids <- S.toList <$> if S.null cids'
             then do
               TrueOrgNameChains trueChains <- case peerX509 of
@@ -520,7 +529,7 @@ handleGetChainDetails peer cids' = do
   lift stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ intercalate "\n" (formatChainId . Just <$> cids)
   mems <- lift $ selectMany (Proxy @ChainMemberRSet) cids
-  let filteredPairs = M.keys $ M.filter (checkPeerIsMember peerX509) mems
+  let filteredPairs = M.keys $ M.filter (checkPeerIsMember myX509 peerX509) mems
 
   unless (null filteredPairs) $ do
     -- chains that use X509 may not have ChainMembers with enode addresses,
@@ -571,11 +580,11 @@ shouldSendGossip peer txo = recordGossipFinal
       recordGossipRNG $! rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
     _ -> return True
 
-checkPeerIsMember :: Maybe X509CertInfoState -> ChainMemberRSet -> Bool
-checkPeerIsMember pcert mems = case pcert of
+checkPeerIsMember :: Maybe X509CertInfoState -> Maybe X509CertInfoState -> ChainMemberRSet -> Bool
+checkPeerIsMember myCert pcert mems = case pcert of
     Nothing  -> False
-    Just (X509CertInfoState _ _ _ _  n (Just u) c) -> isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack u) (T.pack c) True)) mems
-    Just (X509CertInfoState _ _ _ _  n Nothing c) -> isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack "") (T.pack c) True)) mems
+    Just (X509CertInfoState _ _ _ _  n (Just u) c) -> (fmap x509CertInfoStateToCMPS myCert == fmap x509CertInfoStateToCMPS pcert) || isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack u) (T.pack c) True)) mems
+    Just (X509CertInfoState _ _ _ _  n Nothing c) -> (fmap x509CertInfoStateToCMPS myCert == fmap x509CertInfoStateToCMPS pcert) || isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack "") (T.pack c) True)) mems
 
 -- extract the organization name from the cert
 x509CertInfoStateToCMPS :: X509CertInfoState -> ChainMemberParsedSet

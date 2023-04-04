@@ -51,7 +51,7 @@ myPriv = fromMaybe (error "could not import private key") (importPrivateKey (Lab
 
 
 testContext :: BlockstanbulContext
-testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv)
+testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv) True
 
 
 runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()

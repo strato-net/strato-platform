@@ -1,6 +1,7 @@
 {-# LANGUAGE
     ConstraintKinds
   , FlexibleContexts
+  , LambdaCase
   , OverloadedStrings
   , QuasiQuotes
   , RecordWildCards
@@ -49,6 +50,7 @@ import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, catch, SomeException)
 
+import           BlockApps.Bloc22.Server.Utils   (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
@@ -493,7 +495,7 @@ insertIndexTable :: OutputM m
                  => [ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable contracts = yield $ insertIndexTableQuery contracts
+insertIndexTable contracts = yieldMany $ insertIndexTableQuery contracts
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
@@ -540,7 +542,7 @@ insertHistoryTable contracts@(x:_) = do
           (application x)
           (contractName x)
   $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
-  yield $ insertHistoryTableQuery contracts
+  yieldMany $ insertHistoryTableQuery contracts
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
@@ -582,36 +584,38 @@ addHistoryUnique (o, a, n) =
       wrapDoubleQuotes indexName <> 
       ";"]
 
-insertIndexTableQuery :: [ProcessedContract] -> Text
+insertIndexTableQuery :: [ProcessedContract] -> [Text]
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
-insertIndexTableQuery contracts@(x:_) =
-  let tableName = indexTableName
-          (organization x)
-          (application x)
-          (contractName x)
-      list = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData x
-      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-      baseVals = [ makeAccount
-                 , tshow . address
-                 , chain
-                 , T.pack . keccak256ToHex . blockHash
-                 , tshow . blockTimestamp
-                 , tshow . blockNumber
-                 , T.pack . keccak256ToHex . transactionHash
-                 , tshow . transactionSender
-                 ]
-      vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData row
-         in wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-      inserts = csv vals
-   in T.concat
-        [ "INSERT INTO "
-        , tableNameToDoubleQuoteText tableName
-        , " "
-        , keySt
-        , "\n  VALUES "
-        , inserts
-        , [r|
+insertIndexTableQuery cs = concat $
+  let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData c)) <$> cs
+   in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+        [] -> []
+        contracts@((x,list):_) ->
+          let tableName = indexTableName
+                  (organization x)
+                  (application x)
+                  (contractName x)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+              baseVals = [ makeAccount
+                         , tshow . address
+                         , chain
+                         , T.pack . keccak256ToHex . blockHash
+                         , tshow . blockTimestamp
+                         , tshow . blockNumber
+                         , T.pack . keccak256ToHex . transactionHash
+                         , tshow . transactionSender
+                         ]
+              vals = flip map contracts $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+              inserts = csv vals
+           in (:[]) $ T.concat
+                [ "INSERT INTO "
+                , tableNameToDoubleQuoteText tableName
+                , " "
+                , keySt
+                , "\n  VALUES "
+                , inserts
+                , [r|
   ON CONFLICT (record_id) DO UPDATE SET
     record_id = excluded.record_id,
     address = excluded.address,
@@ -621,42 +625,44 @@ insertIndexTableQuery contracts@(x:_) =
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender|]
-        , if null list then "" else ",\n    "
-        , tableUpsert $ map fst list
-        , ";"
-        ]
+                , if null list then "" else ",\n    "
+                , tableUpsert $ map fst list
+                , ";"
+                ]
 
-insertHistoryTableQuery :: [ProcessedContract] -> Text
+insertHistoryTableQuery :: [ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
-insertHistoryTableQuery contracts@(x:_) =
-  let tableName = historyTableName
-          (organization x)
-          (application x)
-          (contractName x)
-      list = Map.toList . Map.mapMaybe valueToSQLText $ contractData x
-      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list 
-      baseVals = [ makeAccount
-                 , tshow . address
-                 , chain
-                 , T.pack . keccak256ToHex . blockHash
-                 , tshow . blockTimestamp
-                 , tshow . blockNumber
-                 , T.pack . keccak256ToHex . transactionHash
-                 , tshow . transactionSender
-                 ]
-      vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
-         in wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-      inserts = csv vals
-   in T.concat $
-        [ "INSERT INTO "
-        , tableNameToDoubleQuoteText tableName
-        , " "
-        , keySt
-        , "\n  VALUES "
-        , inserts
-        , "\n  ON CONFLICT DO NOTHING;"
-        ]
+insertHistoryTableQuery cs = concat $
+  let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ contractData c)) <$> cs
+   in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+        [] -> []
+        contracts@((x,list):_) ->
+          let tableName = historyTableName
+                  (organization x)
+                  (application x)
+                  (contractName x)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+              baseVals = [ makeAccount
+                         , tshow . address
+                         , chain
+                         , T.pack . keccak256ToHex . blockHash
+                         , tshow . blockTimestamp
+                         , tshow . blockNumber
+                         , T.pack . keccak256ToHex . transactionHash
+                         , tshow . transactionSender
+                         ]
+              vals = flip map contracts $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+              inserts = csv vals
+           in (:[]) . T.concat $
+                [ "INSERT INTO "
+                , tableNameToDoubleQuoteText tableName
+                , " "
+                , keySt
+                , "\n  VALUES "
+                , inserts
+                , "\n  ON CONFLICT DO NOTHING;"
+                ]
 
 
 

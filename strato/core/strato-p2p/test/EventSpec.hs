@@ -202,6 +202,12 @@ type MonadTest m = ReaderT P2PPeer m
 
 type MonadP2PTest m = ReaderT (IORef P2PContext) m
 
+instance Mod.Accessible PublicKey (MonadTest m) where
+  access _ = error "pubkey"
+
+instance Mod.Accessible PublicKey (MonadP2PTest m) where
+  access _ = error "pubkey"
+
 instance {-# OVERLAPPING #-} MonadIO m => State.MonadState TestContext (MonadTest m) where
   state f = asks _p2pTestContext >>= \ctx -> liftIO . atomically $ do
     s <- readTVar ctx
@@ -1101,7 +1107,7 @@ startingCheckpoint as = def{checkpointValidators = as}
 newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
 newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
-  in newContext ckpt paddr
+  in newContext ckpt paddr True
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext emptyChainMember []
