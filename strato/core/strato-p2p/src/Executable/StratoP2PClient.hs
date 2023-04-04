@@ -19,6 +19,7 @@ module Executable.StratoP2PClient
 
 import           Blockchain.RLPx
 import           Control.Concurrent                    hiding (yield)
+import           Control.Concurrent.Async              as Async
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
@@ -157,10 +158,10 @@ stratoP2PClient runner = runner $ \_ -> do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . liftIO . forkIO . runLoggingT . runner $ \sSource -> do
-              result <- try $ runPeerInList p sSource
-              liftIO (SSem.signal sem)
+            Just _  -> do
+              result <- try $ liftIO $ Async.withAsync (runLoggingT . runner $ \sSource -> runPeerInList p sSource) $ \res -> Async.waitCatch res
               handleRunPeerResult p result
+              liftIO (SSem.signal sem)
 
       handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case
