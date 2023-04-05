@@ -41,7 +41,7 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor', getSigVals, maybeChainBatchResult)
+import           BlockApps.Bloc22.Server.Utils              (waitForWithTimeout, getSigVals, maybeChainBatchResult)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
@@ -254,7 +254,7 @@ waitForChainInfo chainId = do
 waitForChainInfos :: (MonadLogger m,
                       HasSQL m) =>
                      [ChainId] -> m (Maybe [(TransactionResult, Maybe ChainInfo)])
-waitForChainInfos chainIds = waitFor' go
+waitForChainInfos chainIds = waitForWithTimeout go
   where go = do
           infos <- catMaybes <$> maybeChainBatchResult chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
