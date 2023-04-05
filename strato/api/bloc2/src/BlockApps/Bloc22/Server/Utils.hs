@@ -16,7 +16,7 @@ module BlockApps.Bloc22.Server.Utils
   , binRuntimeToCodeHash
   , emptyTxParams
   , waitFor
-  , waitFor'
+  , waitForWithTimeout
   , getSigVals
   ) where
 
@@ -131,9 +131,9 @@ waitFor msg action = go 20
               liftIO . threadDelay $ ms * 1000
               go $ 2 * ms
 
-waitFor' :: MonadIO m =>
+waitForWithTimeout :: MonadIO m =>
            m (Bool, a) -> m (Maybe a)
-waitFor' action = go 20
+waitForWithTimeout action = go 20
   where go ms = do
           if (ms > 30000)
             then pure Nothing
