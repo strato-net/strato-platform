@@ -224,16 +224,19 @@ postChainInfos mJwtToken chainInputs = case mJwtToken of
   Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
-    postChains chainInfos
-    -- chainIds <- postChains chainInfos
-    -- let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
-    --     asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-    -- unless (null asyncChains) $ do
-    --   infos <- zip asyncChains <$> waitForChainInfos asyncChains
-    --   let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos
-    --   unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
-    --     \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
-    -- pure chainIds
+    chainIds <- postChains chainInfos
+    let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
+        asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
+    unless (null asyncChains) $ do
+      infos <- waitForChainInfos asyncChains
+      case infos of
+        Nothing -> pure ()
+        Just infos' -> do
+          let infos'' = zip asyncChains infos'
+          let errors = filter ((/= Just Success) . transactionResultStatus . fst . snd) infos''
+          unless (null errors) . throwIO . UserError . Text.pack . unlines . flip map errors $
+            \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
+    pure chainIds
 
 
 waitForChainInfo :: (MonadLogger m,
@@ -245,7 +248,8 @@ waitForChainInfo chainId = do
     Nothing -> do
       $logInfoS "waitForChainInfo" "Timed out!"
       return Nothing
-    Just infos -> return $ Just $ head infos
+    Just (x:_) -> return $ Just x
+    Just [] -> return Nothing
 
 waitForChainInfos :: (MonadLogger m,
                       HasSQL m) =>
