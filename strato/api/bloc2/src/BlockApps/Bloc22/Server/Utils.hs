@@ -119,9 +119,9 @@ mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
                                 then x:merge xs (y:ys)
                                 else y:merge (x:xs) ys
 
-waitFor :: MonadIO m =>
+waitForWithTimeout :: MonadIO m =>
            Text.Text -> m (Bool, a) -> m a
-waitFor msg action = go 20
+waitForWithTimeout msg action = go 20
   where go ms = do
           when (ms > 30000) . throwIO $ CouldNotFind msg
           (b, a) <- action
@@ -131,9 +131,9 @@ waitFor msg action = go 20
               liftIO . threadDelay $ ms * 1000
               go $ 2 * ms
 
-waitForWithTimeout :: MonadIO m =>
+waitFor :: MonadIO m =>
            m (Bool, a) -> m (Maybe a)
-waitForWithTimeout action = go 20
+waitFor action = go 20
   where go ms = do
           if (ms > 30000)
             then pure Nothing

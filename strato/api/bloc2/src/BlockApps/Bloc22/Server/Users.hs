@@ -64,7 +64,7 @@ postUsersFill _ addr resolve = do
       else throwIO $ UserError "the '/fill' route doesn't work when the 'gasOn' flag has been set to false."
 
 waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
-waitForBalance addr = waitFor "no user account found" go
+waitForBalance addr = waitForWithTimeout "no user account found" go
   where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m (Bool, ())
         go = do
           let params = accountsFilterParams & qaAddress ?~ addr & qaMinBalance ?~ 1
