@@ -16,6 +16,7 @@ module BlockApps.Bloc22.Server.Utils
   , binRuntimeToCodeHash
   , emptyTxParams
   , waitFor
+  , waitForWithTimeout
   , getSigVals
   ) where
 
@@ -118,9 +119,9 @@ mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
                                 then x:merge xs (y:ys)
                                 else y:merge (x:xs) ys
 
-waitFor :: MonadIO m =>
+waitForWithTimeout :: MonadIO m =>
            Text.Text -> m (Bool, a) -> m a
-waitFor msg action = go 20
+waitForWithTimeout msg action = go 20
   where go ms = do
           when (ms > 30000) . throwIO $ CouldNotFind msg
           (b, a) <- action
@@ -129,6 +130,20 @@ waitFor msg action = go 20
             else do
               liftIO . threadDelay $ ms * 1000
               go $ 2 * ms
+
+waitFor :: MonadIO m =>
+           m (Bool, a) -> m (Maybe a)
+waitFor action = go 20
+  where go ms = do
+          if (ms > 30000)
+            then pure Nothing
+            else do
+              (b, a) <- action
+              if b
+                then pure (Just a)
+                else do
+                  liftIO . threadDelay $ ms * 1000
+                  go $ 2 * ms
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
