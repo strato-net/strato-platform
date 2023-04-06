@@ -16,6 +16,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Cache
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
@@ -28,6 +29,7 @@ import HFlags
 import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
+import System.Clock
 import Text.Printf
 import Text.RawString.QQ
 
@@ -52,12 +54,17 @@ workerConnStr :: ConnectionString
 workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
                         flags_pghost flags_pgport flags_pguser flags_password flags_database
 
+
 createBlocEnv :: MonadIO m => m BlocEnv
 createBlocEnv = liftIO $ do
+  codePtrCache <- newCache . Just $ TimeSpec 60  0
+  sourceCache <- newCache . Just $ TimeSpec 60 0
   return BlocEnv { stateFetchLimit = 0
                  , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
+                 , globalSourceCache=sourceCache
+                 , globalCodePtrCache=codePtrCache
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
 

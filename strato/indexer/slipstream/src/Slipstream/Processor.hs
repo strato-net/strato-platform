@@ -69,6 +69,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 
+import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.CoreAPI
@@ -207,6 +208,7 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: ( MonadLogger m
+                       , Accessible BlocEnv m
                        , HasBlocSQL m
                        , Selectable Account AddressState m
                        , (Keccak256 `Alters` SourceMap) m
@@ -388,6 +390,7 @@ getCodeCollection f cp ccString = do
 
 getEVMInserts :: (
   MonadLogger m,
+  Accessible BlocEnv m,
   HasBlocSQL m,
   Selectable Account AddressState m,
   (Keccak256 `Alters` SourceMap) m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)

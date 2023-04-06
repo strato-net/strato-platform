@@ -1039,6 +1039,7 @@ getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Obje
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
+                       , HasBlocEnv m
                        , HasBlocSQL m
                        , HasSQL m
                        )

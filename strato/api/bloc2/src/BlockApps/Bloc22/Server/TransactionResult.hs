@@ -112,6 +112,7 @@ getBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                              , MonadLogger m
                              , HasBlocSQL m
                              , HasSQL m
+                             , HasBlocEnv m
                              )
                           => [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
@@ -134,6 +135,7 @@ getBlocTransactionResult :: ( (Keccak256 `A.Alters` SourceMap) m
                             , MonadLogger m
                             , HasBlocSQL m
                             , HasSQL m
+                            , HasBlocEnv m
                             )
                          => Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
@@ -144,6 +146,7 @@ getBatchBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                                   , MonadLogger m
                                   , HasBlocSQL m
                                   , HasSQL m
+                                  , HasBlocEnv m
                                   )
                                => [Keccak256] -> Bool -> m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
@@ -156,6 +159,7 @@ postBlocTransactionResults :: ( (Keccak256 `A.Alters` SourceMap) m
                               , MonadLogger m
                               , HasBlocSQL m
                               , HasSQL m
+                              , HasBlocEnv m
                               )
                            => Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
@@ -223,6 +227,7 @@ evalAndReturn :: ( (Keccak256 `A.Alters` SourceMap) m
                  , A.Selectable Account AddressState m
                  , MonadLogger m
                  , HasBlocSQL m
+                 , HasBlocEnv m
                  )
               => [TRD] -> m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
@@ -246,6 +251,7 @@ contractResult :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m
+                  , HasBlocEnv m
                   )
                => Integer
                -> Keccak256
@@ -297,6 +303,7 @@ functionResult :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m
+                  , HasBlocEnv m
                   )
                => Integer
                -> Keccak256
