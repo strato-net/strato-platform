@@ -29,7 +29,7 @@ class SideBar extends Component {
     );
 
     return (
-      <aside>
+      <aside id="sidebar">
         <div className="menu">
           {
             navLinksData.map(data =>

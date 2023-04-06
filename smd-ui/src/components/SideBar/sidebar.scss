@@ -1,6 +1,7 @@
 @import "~@blueprintjs/core/dist/blueprint.css";
 @import "../../../node_modules/@blueprintjs/core/dist/variables.scss";
 
+$navbarWidth: 260px;
 aside {
   position: fixed;
   height: 100%;
@@ -8,9 +9,10 @@ aside {
   left: 0px;
   background: #394b59;
   padding: 20px;
-  width: 320px;
+  width: $navbarWidth;
   margin-top: 48px;
   box-shadow: inset 0 0 2px 1px rgba(16, 22, 26, 0.2), 0 1px 2px rgba(16, 22, 26, 0.4);
+  z-index: 9;
 }
 
 .menu-item{
@@ -20,6 +22,13 @@ aside {
   padding: 8px 16px;
   text-decoration: none;
   display: block;
+}
+
+#menu-burger {
+  color: $pt-dark-text-color;
+  font-size: 1.25em;
+  padding: 8px 16px;
+  cursor: pointer;
 }
 
 .menu-text {
@@ -47,7 +56,6 @@ aside {
 }
 
 .menu {
-  padding: 0px 20px;
   min-height: 35vh;
   max-height: 60vh;
   overflow-y: auto;
@@ -74,4 +82,31 @@ aside {
 
 .send-tokens-dialog .chain-field {
   width: 100%;
+}
+
+#outer-container {
+  position: relative;
+  top: 48px;
+  margin-left: $navbarWidth;
+  padding: 0px 12px;
+}
+
+$collapsePoint: 800px;
+@media only screen and (max-width: $collapsePoint) {
+  #sidebar {
+    display: none;
+  }
+  #outer-container {
+    margin-left: 0px;
+  }
+}
+
+@media only screen and (min-width: $collapsePoint) {
+  aside {
+    display: block;
+    visibility: visible;
+  }
+  #outer-container {
+    margin-left: $navbarWidth;
+  }
 }

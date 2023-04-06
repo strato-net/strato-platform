@@ -31,10 +31,11 @@ class App extends Component {
   
 
   render() {
+    const collapsePoint = 800; //in px
     return (
       <div className="App" >
         <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
-        <MenuBar />
+        <MenuBar sidebarCollapsed={(window.innerWidth < collapsePoint)}/>
         <SideBar />
         <main id="outer-container">
           {scenes}

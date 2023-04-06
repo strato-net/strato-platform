@@ -16,11 +16,12 @@ import {
 import HexText from '../HexText';
 
 class MenuBar extends Component {
-  constructor() {
+  constructor(props) {
     super()
     this.state = {
      searchQuery:"",
-     isUserMenuOpen: false
+     isUserMenuOpen: false,
+     sidebarCollapsed: props.sidebarCollapsed
     }
   }
   componentWillReceiveProps(newProps) {
@@ -75,6 +76,14 @@ class MenuBar extends Component {
     )
   }
 
+  toggleCollapse = () => {
+    const sidebar = document.querySelector('#sidebar');
+    const outerContainer = document.querySelector('#outer-container');
+    sidebar.style.display = this.state.sidebarCollapsed ? "block" : "none";
+    outerContainer.style.marginLeft = this.state.sidebarCollapsed? '260px' : '0px';
+
+    this.state.sidebarCollapsed = !this.state.sidebarCollapsed;
+  }
 
   handleKeyDown = (e) => {
 
@@ -171,6 +180,7 @@ class MenuBar extends Component {
 
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
+        <i className="fa fa-bars" id="menu-burger" onClick={this.toggleCollapse}></i>
         <div className="pt-navbar-group pt-align-left col-sm-2 ">
           <div>
             <Link to="/home">
