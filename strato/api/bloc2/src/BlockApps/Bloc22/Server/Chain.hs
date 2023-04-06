@@ -91,6 +91,7 @@ governanceAddress = Address 0x100
 createChainInfo :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
+                   , HasBlocEnv m
                    , HasBlocSQL m
                    , HasVault m
                    )
@@ -215,6 +216,7 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
 postChainInfos :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
+                  , HasBlocEnv m
                   , HasBlocSQL m
                   , HasSQL m
                   , HasVault m
