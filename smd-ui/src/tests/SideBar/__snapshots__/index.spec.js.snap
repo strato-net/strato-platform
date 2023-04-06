@@ -1,7 +1,7 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`SideBar: index render component for non oauth mode 1`] = `
-"<aside>
+"<aside id=\\"sidebar\\">
   <div className=\\"menu\\">
     <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-window-restore\\">
@@ -102,7 +102,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
 `;
 
 exports[`SideBar: index render component for public mode 1`] = `
-"<aside>
+"<aside id=\\"sidebar\\">
   <div className=\\"menu\\">
     <NavLink id=\\"app_store\\" to=\\"/appstore\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-window-restore\\">

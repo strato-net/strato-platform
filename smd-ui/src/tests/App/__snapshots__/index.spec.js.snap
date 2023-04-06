@@ -10,7 +10,7 @@ Object {
 exports[`App: index componentDidMount1 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(MenuBar)) sidebarCollapsed={false} />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>
@@ -40,7 +40,7 @@ exports[`App: index componentDidMount1 1`] = `
 exports[`App: index componentDidMount2 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(MenuBar)) sidebarCollapsed={false} />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>
@@ -70,7 +70,7 @@ exports[`App: index componentDidMount2 1`] = `
 exports[`App: index render component 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(MenuBar)) sidebarCollapsed={false} />
   <SideBar />
   <main id=\\"outer-container\\">
     <Switch>

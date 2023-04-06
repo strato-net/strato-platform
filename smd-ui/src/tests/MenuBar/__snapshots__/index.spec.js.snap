@@ -2,6 +2,7 @@
 
 exports[`MenuBar: index renders Oauth mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <i className=\\"fa fa-bars\\" id=\\"menu-burger\\" onClick={[Function]} />
   <div className=\\"pt-navbar-group pt-align-left col-sm-2 \\">
     <div>
       <Link to=\\"/home\\" replace={false}>
@@ -58,6 +59,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
 
 exports[`MenuBar: index renders Oauth mode component without values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <i className=\\"fa fa-bars\\" id=\\"menu-burger\\" onClick={[Function]} />
   <div className=\\"pt-navbar-group pt-align-left col-sm-2 \\">
     <div>
       <Link to=\\"/home\\" replace={false}>
