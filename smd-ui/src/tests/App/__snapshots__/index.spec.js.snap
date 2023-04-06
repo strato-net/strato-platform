@@ -10,8 +10,8 @@ Object {
 exports[`App: index componentDidMount 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
-  <SideBar />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
@@ -38,8 +38,8 @@ exports[`App: index componentDidMount 1`] = `
 exports[`App: index componentDidMount 2`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
-  <SideBar />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
@@ -66,8 +66,8 @@ exports[`App: index componentDidMount 2`] = `
 exports[`App: index render component 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
-  <SideBar />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
