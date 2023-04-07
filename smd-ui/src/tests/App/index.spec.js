@@ -14,7 +14,6 @@ describe('App: index', () => {
 
   test('componentDidMount', () => {
     checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
-    checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
 
     const wrapper = shallow(
       <App.WrappedComponent />
@@ -25,7 +24,6 @@ describe('App: index', () => {
 
   test('componentDidMount', () => {
     checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
-    checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
 
     const wrapper = shallow(
       <App.WrappedComponent getOrCreateOauthUserRequest={jest.fn()} />
