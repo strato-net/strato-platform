@@ -24,7 +24,7 @@ class CodeEditor extends Component {
     this.timeout = null;
     this.saveLocalState = null
     this.state = {
-      chainLimit: 25,
+      chainLimit: 2,
       chainOffset: 0,
       useSearch: true,
       chainSearchQueryField: "chainid",
@@ -264,7 +264,7 @@ class CodeEditor extends Component {
       </div>) : 
       
           <div className='row smd-margin-16 col-sm-8' style={{ display: 'flex', alignItems: 'center', margin: '16px 0'}}>
-              <h4 className="text-left" style={{margin: '0 auto'}}>Chain:</h4>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Shard:</h4>
               <div className="pt-select" style={{margin: '0 5px'}}>
                 <Field
                   className="pt-input select-chain"
@@ -353,21 +353,19 @@ class CodeEditor extends Component {
           </div>
         </div>
         <div className='row'>
-            {this.props.chainIds ?
-                  <div className='row pt-dark chain-wrapper smd-pad-8' style={{ display: 'flex', alignItems: 'center', marginLeft: '8px'}}>
-                    {chainSelector}
-                    <div className="smd-pad-8 col-sm-6" style={{display: 'flex', alignItems: 'center'}}>
-                      <Switch
-                        checked={this.state.useSearch}
-                        onChange={this.toggleChainQueryType}
-                        label="Use Shard Search"
-                        />
-                      </div>
-                    <div className='col-sm-4 text-left'>
-                      <strong>Shard ID:</strong> { this.props.selectedChain ? <HexText value={this.props.selectedChain}></HexText> : 'Main Chain'}
-                    </div>
-                  </div>
-            : ''}
+            <div className='row pt-dark chain-wrapper smd-pad-8' style={{ display: 'flex', alignItems: 'center', marginLeft: '8px'}}>
+              {chainSelector}
+              <div className="smd-pad-8 col-sm-6" style={{display: 'flex', alignItems: 'center'}}>
+                <Switch
+                  checked={this.state.useSearch}
+                  onChange={this.toggleChainQueryType}
+                  label="Search by Shard ID"
+                  />
+                </div>
+              <div className='col-sm-4 text-left'>
+                <strong>Shard:</strong> { this.props.selectedChain ? <HexText value={this.props.selectedChain}></HexText> : 'Main Chain'}
+              </div>
+            </div>
         </div>
         {this.renderFileHandlerButtons()}
         <div className="row">

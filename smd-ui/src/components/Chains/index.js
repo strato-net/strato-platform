@@ -32,7 +32,7 @@ class Chains extends Component {
     super()
     this.state = {
       selected: null,
-      limit: 25,
+      limit: 2,
       offset: 0,
       useChainIdSearch: false,
       chainId: "",

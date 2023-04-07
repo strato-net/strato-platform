@@ -171,7 +171,7 @@ class Contracts extends Component {
       </div>) : 
       
           <div className='row smd-margin-16' style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
-              <h4 className="text-left" style={{margin: '0 auto'}}>Shard Selection:</h4>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Shard:</h4>
               <div className="pt-select" style={{margin: '0 5px'}}>
                 <Field
                   className="pt-input select-chain"
@@ -242,7 +242,7 @@ class Contracts extends Component {
                         <Switch
                           checked={this.state.useSearch}
                           onChange={this.toggleChainQueryType}
-                          label="Use Shard Search"
+                          label="Search by Shard ID"
                         />
                         </div>
                       <div className='col-sm-4 text-left'>
