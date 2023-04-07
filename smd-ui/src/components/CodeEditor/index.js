@@ -24,7 +24,7 @@ class CodeEditor extends Component {
     this.timeout = null;
     this.saveLocalState = null
     this.state = {
-      chainLimit: 2,
+      chainLimit: 25,
       chainOffset: 0,
       useSearch: true,
       chainSearchQueryField: "chainid",
