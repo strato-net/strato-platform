@@ -872,8 +872,13 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
       cacheKey = Account addr (unChainId <$> chainId)
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
+  let later = (now +) <$> Cache.defaultExpiration nonceCache
   mCachedNonce <- case cacheNonce of
-    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
+    Do CacheNonce -> atomically $ do
+      Cache.purgeExpiredSTM nonceCache now
+      r <- Cache.lookupSTM True cacheKey nonceCache now
+      for_ r $ \v -> Cache.insertSTM cacheKey v nonceCache later
+      pure r  
     Don't CacheNonce -> pure Nothing
   nonceMap <- case mCachedNonce of
                 Just n -> pure $ Map.singleton chainId n
