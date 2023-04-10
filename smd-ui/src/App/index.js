@@ -28,15 +28,24 @@ class App extends Component {
     }
   }
 
-  
+  constructor(){
+    super()
+    this.state = {
+      isCollapsed: true
+    }
+  }
+
+  toggleCollapse = () => {
+    this.setState(prevState => ({isCollapsed: !prevState.isCollapsed}))
+  }
 
   render() {
     const collapsePoint = 800; //in px
     return (
       <div className="App" >
         <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
-        <MenuBar sidebarCollapsed={(window.innerWidth < collapsePoint)}/>
-        <SideBar />
+        <MenuBar isCollapsed={this.state.isCollapsed} toggleCollapse={this.toggleCollapse}/>
+        <SideBar isCollapsed={this.state.isCollapsed} toggleCollapse={this.toggleCollapse}/>
         <main id="outer-container">
           {scenes}
         </main>

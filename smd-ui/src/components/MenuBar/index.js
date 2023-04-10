@@ -20,8 +20,7 @@ class MenuBar extends Component {
     super()
     this.state = {
      searchQuery:"",
-     isUserMenuOpen: false,
-     sidebarCollapsed: props.sidebarCollapsed
+     isUserMenuOpen: false
     }
   }
   componentWillReceiveProps(newProps) {
@@ -74,15 +73,6 @@ class MenuBar extends Component {
         <pre>{certificateString}</pre>
       </div>      
     )
-  }
-
-  toggleCollapse = () => {
-    const sidebar = document.querySelector('#sidebar');
-    const outerContainer = document.querySelector('#outer-container');
-    sidebar.style.display = this.state.sidebarCollapsed ? "block" : "none";
-    outerContainer.style.marginLeft = this.state.sidebarCollapsed? '260px' : '0px';
-
-    this.state.sidebarCollapsed = !this.state.sidebarCollapsed;
   }
 
   handleKeyDown = (e) => {
@@ -180,7 +170,10 @@ class MenuBar extends Component {
 
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
-        <i className="fa fa-bars" id="menu-burger" onClick={this.toggleCollapse}></i>
+        <div 
+          id="menu-burger" 
+          onClick={this.props.toggleCollapse}
+          className={this.props.isCollapsed? '' : 'burger-x'}><span></span></div>
         <div className="pt-navbar-group pt-align-left col-sm-2 ">
           <div>
             <Link to="/home">

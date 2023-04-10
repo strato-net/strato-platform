@@ -91,7 +91,12 @@ aside {
   padding: 0px 12px;
 }
 
+#menu-burger {
+  display: none;
+}
+
 $collapsePoint: 800px;
+$burgerSize: 35px;
 @media only screen and (max-width: $collapsePoint) {
   #sidebar {
     display: none;
@@ -99,14 +104,47 @@ $collapsePoint: 800px;
   #outer-container {
     margin-left: 0px;
   }
-}
-
-@media only screen and (min-width: $collapsePoint) {
-  aside {
+  #sidebar.sidebar-expand {
     display: block;
-    visibility: visible;
+    width: 100%;
   }
-  #outer-container {
-    margin-left: $navbarWidth;
+  #menu-burger {
+    display: block;
+    height: $burgerSize;
+    width: $burgerSize;
+    padding: 15px;
+    cursor: pointer;
+    span,
+    span:before,
+    span:after {
+      cursor: pointer;
+      border-radius: 1px;
+      height: 5px;
+      width: $burgerSize;
+      background: $pt-dark-text-color;
+      position: absolute;
+      display: block;
+      content: '';
+      transition: all 300ms ease-in-out;
+    }
+    span:before {
+      top: -10px;
+    }
+    span:after {
+      bottom: -10px;
+    }
+    &.burger-x span {
+      background-color: transparent;
+      &:before,
+      &:after {
+        top: 0;
+      }
+      &:before {
+        transform: rotate(45deg);
+      }
+      &:after {
+        transform: rotate(-45deg);
+      }
+    }
   }
 }

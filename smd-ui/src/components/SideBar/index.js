@@ -29,7 +29,7 @@ class SideBar extends Component {
     );
 
     return (
-      <aside id="sidebar">
+      <aside id="sidebar" className={this.props.isCollapsed ? '' : 'sidebar-expand'}>
         <div className="menu">
           {
             navLinksData.map(data =>
@@ -39,7 +39,7 @@ class SideBar extends Component {
                 to={data.path}
                 className="menu-item"
                 activeClassName="active-menu-item"
-                onClick={() => { mixpanelWrapper.track('nav_link_' + data.id + '_click') }}
+                onClick={this.props.toggleCollapse}
               >
                 <i className={'fa ' + data.icon}> </i>
                 <span className="menu-text"> {data.label}</span>
