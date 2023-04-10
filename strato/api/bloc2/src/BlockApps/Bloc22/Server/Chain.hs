@@ -251,13 +251,16 @@ getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "i
                 ChainId -> m ChainIdChainOutput
 
 getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing
-  
+
 
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
-                [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
+                [ChainId] -> Maybe Text -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
 getChainInfo chainIds lim off = do
   chainIdChainInfos <- getChain chainIds lim off
-  return $ map convertChainInfo chainIdChainInfos
+  let chainIdChainOutputs = map convertChainInfo chainIdChainInfos
+  return $ case mChainLabel  of 
+    Nothing -> chainIdChainOutputs
+    Just label  -> filter (\x -> (label == (chainoutputLabel $ snd . unNamedTuple $  x )  )) chainIdChainOutputs
     where
       convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
