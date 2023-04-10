@@ -24,13 +24,6 @@ aside {
   display: block;
 }
 
-#menu-burger {
-  color: $pt-dark-text-color;
-  font-size: 1.25em;
-  padding-left: 16px;
-  cursor: pointer;
-}
-
 .menu-text {
   margin-left: 8px;
 }
@@ -141,7 +134,19 @@ $burgerSize: 35px;
       }
       &:before {
         transform: rotate(45deg);
-      }
+      }​
+27
+#menu-burger {
+28
+  color: $pt-dark-text-color;
+29
+  font-size: 1.25em;
+30
+  padding-left: 16px;
+31
+  cursor: pointer;
+32
+}
       &:after {
         transform: rotate(-45deg);
       }
