@@ -9,6 +9,9 @@
 .smd-menu-bar {
   position: fixed !important;
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .menubar-button {
@@ -29,4 +32,9 @@
 .select-chain {
   min-width: 230px !important;
   max-width: 350px !important;
+}
+
+.pt-icon-user {
+  height: 50px;
+  overflow: hidden; 
 }

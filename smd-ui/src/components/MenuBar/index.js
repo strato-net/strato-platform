@@ -8,6 +8,13 @@ import { env } from '../../env';
 import { isOauthEnabled } from '../../lib/checkMode';
 
 class MenuBar extends Component {
+  constructor(props) {
+    super()
+    this.state = {
+     searchQuery:"",
+     isUserMenuOpen: false
+    }
+  }
   state = {
     isModalOpen: false,
   }
@@ -92,6 +99,11 @@ class MenuBar extends Component {
     
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
+        <div 
+          id="menu-burger" 
+          onClick={this.props.toggleCollapse}
+          className={this.props.isCollapsed? '' : 'burger-x'}><span></span>
+        </div>
         <div className="pt-navbar-group pt-align-left">
           <div>
             <Link to="/home">
