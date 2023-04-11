@@ -16,7 +16,7 @@ import {
 import HexText from '../HexText';
 
 class MenuBar extends Component {
-  constructor() {
+  constructor(props) {
     super()
     this.state = {
      searchQuery:"",
@@ -74,7 +74,6 @@ class MenuBar extends Component {
       </div>      
     )
   }
-
 
   handleKeyDown = (e) => {
 
@@ -171,6 +170,10 @@ class MenuBar extends Component {
 
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
+        <div 
+          id="menu-burger" 
+          onClick={this.props.toggleCollapse}
+          className={this.props.isCollapsed? '' : 'burger-x'}><span></span></div>
         <div className="pt-navbar-group pt-align-left col-sm-2 ">
           <div>
             <Link to="/home">

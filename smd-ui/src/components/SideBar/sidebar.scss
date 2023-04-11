@@ -1,6 +1,7 @@
 @import "~@blueprintjs/core/dist/blueprint.css";
 @import "../../../node_modules/@blueprintjs/core/dist/variables.scss";
 
+$navbarWidth: 260px;
 aside {
   position: fixed;
   height: 100%;
@@ -8,9 +9,10 @@ aside {
   left: 0px;
   background: #394b59;
   padding: 20px;
-  width: 320px;
+  width: $navbarWidth;
   margin-top: 48px;
   box-shadow: inset 0 0 2px 1px rgba(16, 22, 26, 0.2), 0 1px 2px rgba(16, 22, 26, 0.4);
+  z-index: 9;
 }
 
 .menu-item{
@@ -47,7 +49,6 @@ aside {
 }
 
 .menu {
-  padding: 0px 20px;
   min-height: 35vh;
   max-height: 60vh;
   overflow-y: auto;
@@ -74,4 +75,69 @@ aside {
 
 .send-tokens-dialog .chain-field {
   width: 100%;
+}
+
+#outer-container {
+  position: relative;
+  top: 48px;
+  margin-left: $navbarWidth;
+  padding: 0px 12px;
+}
+
+#menu-burger {
+  display: none;
+}
+
+$collapsePoint: 800px;
+$burgerSize: 35px;
+@media only screen and (max-width: $collapsePoint) {
+  #sidebar {
+    display: none;
+  }
+  #outer-container {
+    margin-left: 0px;
+  }
+  #sidebar.sidebar-expand {
+    display: block;
+    width: 100%;
+  }
+  #menu-burger {
+    display: block;
+    height: $burgerSize;
+    width: $burgerSize;
+    padding: 15px;
+    cursor: pointer;
+    span,
+    span:before,
+    span:after {
+      cursor: pointer;
+      border-radius: 1px;
+      height: 5px;
+      width: $burgerSize;
+      background: $pt-dark-text-color;
+      position: absolute;
+      display: block;
+      content: '';
+      transition: all 300ms ease-in-out;
+    }
+    span:before {
+      top: -10px;
+    }
+    span:after {
+      bottom: -10px;
+    }
+    &.burger-x span {
+      background-color: transparent;
+      &:before,
+      &:after {
+        top: 0;
+      }
+      &:before {
+        transform: rotate(45deg);
+      }
+      &:after {
+        transform: rotate(-45deg);
+      }
+    }
+  }
 }
