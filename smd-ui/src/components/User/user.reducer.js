@@ -7,10 +7,9 @@ import {
   FETCH_USER_CERT_SUCCESS,
   FETCH_USER_CERT_FAILURE,
 } from './user.actions';
-import { getUserFromLocal } from '../../lib/localStorage';
 
 const initialState = {
-  oauthUser: getUserFromLocal(),
+  oauthUser: undefined,
   publicKey : "abcde",
   certificateLoading: false,
   userCertificate: undefined,

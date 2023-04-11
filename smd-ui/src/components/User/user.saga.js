@@ -16,35 +16,29 @@ import {
 } from './user.actions';
 import { handleErrors } from '../../lib/handleErrors'; 
 import { env } from '../../env';
-import { getUserFromLocal } from '../../lib/localStorage';
 
 const oauthUserUrl = env.APEX_URL + "/user";
 
 function getOrCreateOauthUserApi() {
-  let user = getUserFromLocal() 
-  if (!user) {
 
-    return fetch(
-      oauthUserUrl,
-      {
-        method: 'POST',
-        credentials: "include",
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      })
-      .then(handleErrors)
-      .then(function (res) {
-        return res.json();
-      })
-      .catch(function (error) {
-        throw error;
-      });
-  } else {
-    return user
-  }
+  return fetch(
+    oauthUserUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    })
+    .then(handleErrors)
+    .then(function (res) {
+      return res.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
     
 }
 
@@ -97,7 +91,6 @@ export function* getOrCreateOauthUser() {
 
       const user = oauthUser
 
-      localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));
     }
   } catch (e) {
