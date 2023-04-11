@@ -75,6 +75,15 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
+    <NavLink id=\\"challenge_cards\\" to=\\"/challenge_cards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-question\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Challenge Cards
+      </span>
+    </NavLink>
     <NavLink id=\\"external_storage\\" to=\\"/external_storage\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-cloud-upload\\">
          
@@ -167,6 +176,15 @@ exports[`SideBar: index render component for public mode 1`] = `
         Contract Editor
       </span>
     </NavLink>
+    <NavLink id=\\"challenge_cards\\" to=\\"/challenge_cards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-question\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Challenge Cards
+      </span>
+    </NavLink>
   </div>
   <div className=\\"smd-sidebar-logo\\">
     <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
@@ -180,19 +198,20 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth po
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="external_storage"
+  id="challenge_cards"
   onClick={[Function]}
-  to="/external_storage"
+  to="/challenge_cards"
 >
   <i
-    className="fa fa-cloud-upload"
+    className="fa fa-question"
   >
      
   </i>
   <span
     className="menu-text"
   >
-    External Storage
+     
+    Challenge Cards
   </span>
 </NavLink>
 `;

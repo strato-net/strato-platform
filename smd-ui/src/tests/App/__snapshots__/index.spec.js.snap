@@ -25,6 +25,7 @@ exports[`App: index componentDidMount1 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/challenge_cards\\" component={[Function: ChallengeCards]} />
     </Switch>
   </main>
 </div>"
@@ -53,6 +54,7 @@ exports[`App: index componentDidMount2 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/challenge_cards\\" component={[Function: ChallengeCards]} />
     </Switch>
   </main>
 </div>"
@@ -81,6 +83,7 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
       <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
       <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/challenge_cards\\" component={[Function: ChallengeCards]} />
     </Switch>
   </main>
 </div>"
