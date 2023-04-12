@@ -256,8 +256,6 @@ getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chai
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m => 
                 [ChainId] -> Maybe Text -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
 getChainInfo chainIds mChainLabel lim off = do
-  --TODO check if label is not nothing, then make this call
-
   case (chainIds, mChainLabel)  of 
     ((_:_), Just label)     -> do 
       chainIdChainInfos <- getChain  chainIds Nothing lim off
