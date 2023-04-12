@@ -257,7 +257,8 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       }
   let gasInfo' = GasInfo {
         _gasLeft = availableGas,
-        _gasInitalAllotment = availableGas,
+        _gasUsed = 0,
+        _gasInitialAllotment = availableGas,
         _gasMetadata = ""
       }
 
@@ -303,8 +304,13 @@ create' creator newAccount ch cc contractName' argExps = do
 
   -- get the gasLeft from the environment
   gasInfo <- getGasInfo
-
-  liftIO $ putStrLn $ C.green $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName' ++ "with gasInfo: " ++ show gasInfo
+  multilineLog "create'/contract" $ boringBox [
+    "Creating contract: ",
+    "Account: " ++ (format newAccount),
+    "Type: " ++ C.yellow (labelToString contractName'),
+    "Gas allotment: " ++ (C.yellow $ show (_gasInitialAllotment gasInfo)),
+    "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
+    ]
 
   addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
 
@@ -335,8 +341,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++
-      " in app " ++ (show parentName) ++ " of org " ++ show org
+  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName), "Org: " ++ (C.yellow org)]
 
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -411,7 +416,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
   let gasInfo' = GasInfo {
       _gasLeft = availableGas,
-      _gasInitalAllotment = availableGas,
+      _gasUsed = 0,
+      _gasInitialAllotment = availableGas,
       _gasMetadata = ""
     }
 
@@ -461,7 +467,7 @@ setCreator creator contract _ _ = do
     (Just cert) -> do
       onTraced $ $logDebugS "setCreator/versioning" . T.pack . C.green $ "Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
     Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
-  
+
   $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
   let putCreatorField org = do
@@ -548,8 +554,10 @@ logFunctionCall args address contract functionName f = do
             return $ labelToString n ++ ": " ++ valString
 
     let shownFunc = labelToString functionName ++ "(" ++ argStrings ++ ")"
-    liftIO $ putStrLn $ box $ concat $ map (wrap 150)
-      ["calling function: " ++ format address, (labelToString $ contract^.CC.contractName) ++ "/" ++ shownFunc]
+    multilineLog "Calling function" $ boringBox [
+        "Address: " ++ format address,
+        labelToString (contract ^. CC.contractName) ++ "/" ++ shownFunc
+      ]
 
   result <- f
 
@@ -734,7 +742,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
           Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions                  --contract^. M.empty $ CC.functions 
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
         where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False [] 
+          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False []
           dummyAnnotation :: SourceAnnotation ()
           dummyAnnotation =
             SourceAnnotation
@@ -751,18 +759,18 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                 },
               _sourceAnnotationAnnotation = ()
             }
-  
+
   let (functionName', argsParsed) = if isDelegateCall
-          then (case runParser parseDelegateCallArgs (ParserState "" "" M.empty) "" functionName of 
+          then (case runParser parseDelegateCallArgs (ParserState "" "" M.empty) "" functionName of
                       Right (funcTocall, typesArr) -> (funcTocall, typesArr)
                       _ -> (functionName, []) ;)
           else (functionName, [])
-  
+
   (!f, !args) <-
         case M.lookup functionName' functionsIncludingConstructor of
           Just theFunction | isDelegateCall == False -> do
                 args' <- argsToVals contract' theFunction argExps
-                mCallInfo <- getCurrentCallInfoIfExists                
+                mCallInfo <- getCurrentCallInfoIfExists
                 let ro = case mCallInfo of
                           Nothing -> False
                           Just ci -> if fromChain == toChain then readOnly ci else True
@@ -775,7 +783,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                           filteredFuncsWithSameArgLength = filter boolTrueIfArgsSameLength ( [theFunction] ++  (CC._funcOverload  theFunction) )
                           boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
                           finalFuncFind = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
-                      case finalFuncFind of [a] -> Just  a; _ -> Nothing; 
+                      case finalFuncFind of [a] -> Just  a; _ -> Nothing;
                 case mtheFunction' of
                       Just theFunction' | (length argsParsed) == (length argExps) -> do
                                 args' <- argsToVals contract' theFunction' argExps
@@ -786,9 +794,9 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                                     f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
                                 return (f', args')
                       _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
-                                  Just fallbackFunc -> do 
+                                  Just fallbackFunc -> do
                                                 args' <- argsToVals contract' fallbackFunc argExps
-                                                mCallInfo <- getCurrentCallInfoIfExists  
+                                                mCallInfo <- getCurrentCallInfoIfExists
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
                                                               Just ci -> if fromChain == toChain then readOnly ci else True
@@ -798,17 +806,17 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.CC.storageDefs of
               Just _ -> do
-                  liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName)
+                  $logDebugS "callWrapper/getter" . T.pack $ labelToString functionName
                   addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
                   val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                   popCallInfo
-                  return (pure val, OrderedVals []) 
+                  return (pure val, OrderedVals [])
               Nothing -> (case M.lookup "fallback" functionsIncludingConstructor of
-                                  Just fallbackFunc -> do 
+                                  Just fallbackFunc -> do
                                                 args' <- argsToVals contract' fallbackFunc argExps
-                                                mCallInfo <- getCurrentCallInfoIfExists  
+                                                mCallInfo <- getCurrentCallInfoIfExists
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
                                                               Just ci -> if fromChain == toChain then readOnly ci else True
@@ -839,7 +847,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
-  
+
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements' [] = return Nothing
@@ -1257,9 +1265,13 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdde
         -- pair up field names with values one-by-one (no type checking tho, lol)
         let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-        liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++
-              " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++
-              " of org " ++ show org
+        multilineLog "event/emit/versioning" $ boringBox [
+            "Emitting event:",
+            "Event: " ++ C.yellow eventName,
+            "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct),
+            "App: " ++ C.yellow (show parentName),
+            "Org: " ++ C.yellow (show org)
+          ]
 
         bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
         addEvent $ Event bHash org parentName (labelToString $ CC._contractName curCnct) account eventName pairs
@@ -1389,12 +1401,14 @@ expToVar x = do
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas gas = do
   gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
+  Mod.modifyStatefully_ (Mod.Proxy @GasInfo) $ gasUsed += gas
+  SyncStatus synced <- Mod.access (Mod.Proxy @SyncStatus)
   let !gasLeft' = gasInfo' ^. gasLeft
-  if (gasLeft') < (Gas 0)
+  if (gasLeft') < (Gas 0) && synced
     then do
       let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
       liftIO $ putStrLn $ C.red $ msg
-      tooMuchGas (show (_gasInitalAllotment gasInfo')) gasInfo'
+      tooMuchGas (show (_gasInitialAllotment gasInfo')) gasInfo'
     else do
       return ()
 
@@ -1573,7 +1587,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "block", "coinbase") ->
         pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
 
-      (SBuiltinVariable "block", "difficulty") -> 
+      (SBuiltinVariable "block", "difficulty") ->
         (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
 
       (SBuiltinVariable "block", "gaslimit") ->
@@ -1859,14 +1873,14 @@ expToVar' (CC.FunctionCall _ e args) = do
       var1 <- expToVar expr
       val1 <- getVar var1
       case (val1, name) of
-        (SAccount addr _, "delegatecall") -> do 
-          let  (funcName, args') = (case args of 
+        (SAccount addr _, "delegatecall") -> do
+          let  (funcName, args') = (case args of
                 (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
                 (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first arguement to be a string" args
                 (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
           fromAddress <- getCurrentAccount
-          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr 
-          res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args' 
+          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
+          res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args'
           case res of
               Just a  -> return $ Constant  a
               Nothing -> return $ Constant SNULL

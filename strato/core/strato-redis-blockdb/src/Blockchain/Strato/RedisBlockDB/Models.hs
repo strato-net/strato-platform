@@ -144,6 +144,14 @@ instance RedisDBKeyable RedisValidator where
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
+instance RedisDBValuable Integer where
+    fromValue v =
+        case S8.readInt v of
+            Just (num, _) -> toInteger num
+            Nothing       -> error "Invalid number format"
+
+    toValue = S8.pack . show
+
 instance RedisDBValuable RedisHeader where
     toValue   = rlpSerialize . rlpEncode
     fromValue = RedisHeader . rlpDecode . rlpDeserialize
