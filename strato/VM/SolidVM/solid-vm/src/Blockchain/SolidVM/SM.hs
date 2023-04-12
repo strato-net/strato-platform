@@ -317,7 +317,7 @@ runSM :: ( MonadUnliftIO m
 runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
-  let startingState =
+  let !startingState =
         SState {
         env = env,
         callStack = [],

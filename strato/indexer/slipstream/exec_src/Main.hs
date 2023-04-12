@@ -52,12 +52,15 @@ workerConnStr :: ConnectionString
 workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
                         flags_pghost flags_pgport flags_pguser flags_password flags_database
 
+
 createBlocEnv :: MonadIO m => m BlocEnv
 createBlocEnv = liftIO $ do
   return BlocEnv { stateFetchLimit = 0
                  , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
+                 , globalSourceCache=error("globalSourceCache shouldn't be needed in slipstream, it is undefined")
+                 , globalCodePtrCache=error("globalCodePtrCache shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
 

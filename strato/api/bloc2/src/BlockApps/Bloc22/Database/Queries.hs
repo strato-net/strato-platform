@@ -38,7 +38,9 @@ import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
+import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
+import           Data.Foldable                   (for_)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
@@ -53,6 +55,7 @@ import           Database.PostgreSQL.Simple.FromField hiding (name, format)
 import           Opaleye                         hiding (not, null, index, FromField)
 import qualified Opaleye as O
 import           Opaleye.Internal.PGTypesExternal
+import           System.Clock
 import           Text.Format
 import           UnliftIO
 
@@ -162,12 +165,24 @@ insertContractDetailsQuery sourceList =
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
+                                , HasBlocEnv m
                                 , MonadLogger m
                                 , HasBlocSQL m
                                 )
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
-  runExceptT $ do
+  srcCache <- fmap globalCodePtrCache getBlocEnv
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True codePtr srcCache now'
+    for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
+    pure r
+  runExceptT $ case mCachedDetails of
+    Just cachedDetails -> pure cachedDetails
+    Nothing -> do
       mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
         ~(shouldCompile, name, ch) <- case codeHash of
           EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
@@ -191,7 +206,9 @@ getContractDetailsByCodeHash codePtr = do
             Just d -> pure d
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
-        Just details -> pure details
+        Just details -> do
+          liftIO $ Cache.insert srcCache codePtr details
+          pure details
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError = Text.concat
@@ -204,12 +221,25 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  , (Keccak256 `A.Alters` SourceMap) m
                                  , MonadLogger m
                                  , HasBlocSQL m
+                                 , HasBlocEnv m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+      cacheKey = (theVM, src)
+  srcCache <- fmap globalSourceCache getBlocEnv
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True cacheKey srcCache now'
+    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
+    pure r
 
-  idsAndDetails <- do
+  idsAndDetails <- case mCachedDetails of
+    Just cachedDetails -> pure cachedDetails
+    Nothing -> do
       details <- if hasAnyNonEmptySources src
                    then sourceToContractDetails shouldCompile src
                    else return Map.empty
