@@ -28,6 +28,7 @@ class App extends Component {
       this.props.getOrCreateOauthUserRequest();
     }
     this.props.fetchMetadata()
+    this.props.fetchHealth()
   }
 
   render() {

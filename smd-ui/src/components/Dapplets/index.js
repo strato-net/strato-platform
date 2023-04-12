@@ -27,7 +27,7 @@ class Dapplets extends Component {
                 <DappletCard
                     name="Invoicing"
                     description="Send, pay, and manage your invoices"
-                    iconClass="fa-envelope-o"
+                    iconClass="fa-envelope"
                 />
             </div>
             <div className="col-md-6 smd-margin-8">
@@ -41,7 +41,7 @@ class Dapplets extends Component {
                 <DappletCard
                     name="Escrow"
                     description="Manage the secure transactions of your assets"
-                    iconClass="fa-handshake-o"
+                    iconClass="fa-handshake"
                 />
             </div>
             <div className="col-md-6 smd-margin-8">

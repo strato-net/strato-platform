@@ -9,7 +9,7 @@ class NumberCard extends Component {
     classes += this.props.mode ? this.props.mode : 'neutral';
 
     return (
-      <div className={classes}>
+        <div className={classes}>
         <div className="row">
           <div className="col-xs-4 text-center">
             <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>

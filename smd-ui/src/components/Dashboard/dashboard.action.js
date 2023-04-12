@@ -19,6 +19,8 @@ export const UPDATE_NODE_UPTIME = 'UPDATE_NODE_UPTIME'
 export const PRELOAD_SYSTEM_INFO = 'PRELOAD_SYSTEM_INFO'
 export const UPDATE_SYSTEM_INFO = 'UPDATE_SYSTEM_INFO'
 export const CHANGE_HEALTH_STATUS = 'CHANGE_HEALTH_STATUS'
+export const PRELOAD_SHARD_COUNT = 'PRELOAD_SHARD_COUNT'
+export const UPDATE_SHARD_COUNT = 'UPDATE_SHARD_COUNT'
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockNumber = function (data) {
@@ -177,3 +179,16 @@ export const changeHealthStatus = function (data) {
     data
   }
 };
+
+export const preloadShardCount = (data) => {
+  return {
+    type: PRELOAD_SHARD_COUNT,
+    data,
+  }
+}
+export const updateShardCount = (data) => {
+  return {
+    type: UPDATE_SHARD_COUNT,
+    data,
+  }
+}

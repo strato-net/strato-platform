@@ -53,7 +53,6 @@ class BarGraph extends Component {
     const yScale = new Plottable.Scales.Linear().domain([scaleMin, scaleMax]);
     let self = this;
 
-
     // TODO: fix this. Do not mutate state directly. Use redux.
     // eslint-disable-next-line
     this.state.dataset = new Plottable.Dataset(this.props.data);
@@ -67,7 +66,9 @@ class BarGraph extends Component {
         return d.y;
       }, yScale)
       //.animator(Plottable.Plots.Animator.MAIN, new Plottable.Animators.Easing().easingMode('quad'))
-      .animated(true);
+      .animated(true)
+      .attr('fill', '#00AEEF')
+      ;
 
     // eslint-disable-next-line
     this.state.interaction = new Plottable.Interactions.Pointer();
@@ -176,11 +177,11 @@ class BarGraph extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12 text-center">
-            <h1>
+            <h2>Avg: {' '}
                 {this.averageY() !== this.averageY() ? "No Blocks" : this.averageY() +
                 (this.props.units === undefined ? '' : ' ' + this.props.units)
                 }
-            </h1>
+            </h2>
           </div>
         </div>
 

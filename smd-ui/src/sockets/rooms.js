@@ -13,3 +13,4 @@ export const GET_COINBASE = 'GET_COINBASE';
 export const GET_NODE_UPTIME = 'GET_NODE_UPTIME';
 export const GET_HEALTH = 'GET_HEALTH';
 export const GET_SYSTEM_INFO = 'GET_SYSTEM_INFO';
+export const GET_SHARD_COUNT = 'GET_SHARD_COUNT';
