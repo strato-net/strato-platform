@@ -43,31 +43,17 @@ class NodeCard extends Component {
       <div>
         <div className={className} onClick={this.handleClick}>
           <div className="row">
-            <div className="col-xs-9">
-              <h5>{node.name}</h5>
-            </div>
-            <span className={arrowIcon}></span>
-          </div>
-          <div className="row pt-text-muted">
-            <div className="col-xs-3">
-              <small>Block</small>
-            </div>
-            <div className="col-xs-9">
-              <small>{blockNumber}</small>
+            <div className='col-sm-6'>
+
+              <h3>Peers ({peers.length})</h3>
+              <span className={arrowIcon}>{this.state.isOpen ? "Close" : "Expand"}</span>
             </div>
           </div>
-          <div className="row pt-text-muted">
-            <div className="col-xs-3">
-              <small>Peers</small>
-            </div>
-            <div className="col-xs-9">
-              <small>{peers.length}</small>
-            </div>
-          </div>
-        </div>
+        <hr/>
         <Collapse isOpen={this.state.isOpen}>
           <PeersCard />
         </Collapse>
+        </div>
       </div>
     );
   }

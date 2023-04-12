@@ -182,8 +182,32 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
+          <div className="col-sm-12">
+            <br />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-3">
+            <NumberCard
+                number={
+                  this.props.appMetadata && this.props.appMetadata.nodeInfo ?
+                  <div>
+                    <p>
+                      {this.props.appMetadata.nodeInfo.organization} {this.props.appMetadata.nodeInfo.organizationalUnit} 
+                    </p>
+                    <p>
+                      {this.props.appMetadata.nodeInfo.commonName}
+                    </p> 
+                  </div>
+                  : 'No Identity'}
+                description="Node ID"
+                iconClass={this.props.appMetadata && this.props.appMetadata.nodeInfo ? 'fa-id-card' : 'fa-exclamation-circle' }
+                className={`smd-pointer`}
+                mode={this.props.appMetadata && this.props.appMetadata.nodeInfo ? '' : 'pt-intent-warning'}
+                textSize='h4'
+              />
+          </div>
           <div className="col-sm-6">
-            <h3>Peers</h3>
             <NodeCard />
           </div>
           

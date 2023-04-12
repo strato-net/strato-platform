@@ -15,49 +15,53 @@ class ValidatorsCard extends Component {
         {validators.length > 0
           ? validators.map((validator, index) => {
             return (
-              <div key={index} className="row node-peers">
+              <div key={index} className="row node-peers smd-vertical-center">
                 <div className="col-xs-2">
                   <i className={'fa fa-gavel fa-2x'} aria-hidden="true"></i>
                 </div>
                 <div className='col-xs-10'>
                   <div className='row'>
-                    <div className="col-xs-5">
+                    <div className="col-xs-6">
                       <small>
                         Common Name:
                       </small>
                     </div>
-                    <div className="col-xs-7">
-                    <Text ellipsize={true}>
-                      <small>
-                        {validator.commonName}
-                      </small>
+                    <div className="col-xs-6">
+                      <Text ellipsize={true}>
+                        <small>
+                          {validator.commonName}
+                        </small>
                       </Text>
                     </div>
-                    <div className="col-xs-5">
+                  </div>
+                  <div className='row'>
+                    <div className="col-xs-6">
                       <small>
                         Organization:
                       </small>
                     </div>
-                    <div className="col-xs-7">
+                    <div className="col-xs-6">
                       <Text ellipsize={true}>
                         <small>
                           {validator.orgName}
                         </small>
                       </Text>
                     </div>
-                    <div className="col-xs-5">
+                  </div>
+                  <div className='row'>
+                    <div className="col-xs-6">
                       <small>
                         Org. Unit:
                       </small>
                     </div>
-                    <div className="col-xs-7">
+                    <div className="col-xs-6">
                       <Text ellipsize={true}>
                         <small>
                           {validator.orgUnit}
                         </small>
                       </Text>
-                    </div>
-              </div>
+                    </div>        
+                  </div>
                 </div>
               </div>
             )

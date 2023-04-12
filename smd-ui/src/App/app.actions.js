@@ -30,10 +30,11 @@ export const fetchMetadata = function () {
     }
 };
   
-export const fetchMetadataSuccess = function (metadata) {
+export const fetchMetadataSuccess = function ({metadata, nodeInfo}) {
     return {
         type: GET_METADATA_SUCCESS,
         metadata: metadata,
+        nodeInfo,
     }
 };
 

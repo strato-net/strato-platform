@@ -4,11 +4,24 @@ import { withRouter } from 'react-router-dom';
 import { Text } from '@blueprintjs/core';
 import './peersCard.css';
 import HexText from '../HexText';
+import * as R from 'ramda'
+import { getPeerIdentityRequest } from './peers.actions';
 class PeersCard extends Component {
 
-  componentWillReceiveProps(newProps) {
-
-  }
+  // componentDidMount() {
+  //   if (this.props.node && this.props.node.peers.length > 0) {
+  //     this.props.getPeerIdentityRequest(this.props.node.peers)
+      
+  //   }
+  // }
+  
+  // componentWillReceiveProps(newProps) {
+  //   console.log('HERE')
+  //   console.log(newProps.node.peers)
+  //   if (newProps.node && this.props.node.peers && R.equals(newProps.node.peers, this.props.node.peers)) {
+  //     this.props.getPeerIdentityRequest(newProps.node.peers)
+  //   }
+  // }
 
   extractPubkey(enode) {
     return enode.substring(8, 128 + 8)
@@ -20,7 +33,6 @@ class PeersCard extends Component {
     let className = 'pt-card pt-elevation-2';
     return (
       <div className={className}>
-        <h5>Peers {`(${peers.length})`}</h5>
         {peers.length > 0
           ? peers.map((peer, index) => {
             return (
@@ -70,4 +82,6 @@ export function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, null)(PeersCard));
+export default withRouter(connect(mapStateToProps, {
+  getPeerIdentityRequest
+})(PeersCard));

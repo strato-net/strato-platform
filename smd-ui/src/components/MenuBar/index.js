@@ -202,7 +202,6 @@ class MenuBar extends Component {
     // const synced =false
     const health = this.props.dashboard.healthStatus;
     // const health = false
-    // console.log(health, systemHealth)
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
     const metadata = this.props.appMetadata.metadata

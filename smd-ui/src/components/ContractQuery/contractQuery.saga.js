@@ -60,7 +60,6 @@ export function queryCirrusAddressRequest(contractName) {
       return response.json()
     })
     .catch(function (error) {
-      console.log(error)
       throw error;
     });
 }
@@ -82,7 +81,6 @@ export function queryCirrusVarsRequest(contractName, contractAddress) {
       return response.json()
     })
     .catch(function (error) {
-      console.log(error)
       throw error;
     });
 }

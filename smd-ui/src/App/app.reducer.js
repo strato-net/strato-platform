@@ -12,6 +12,7 @@ const initialState = {
     loading: false,
     health: undefined,
     metadata: undefined,
+    nodeInfo: undefined,
 }
 
 const reducer = function (state = initialState, action) {
@@ -46,7 +47,8 @@ const reducer = function (state = initialState, action) {
                 ...state,
                 error: undefined,
                 loading: false,
-                metadata: action.metadata
+                metadata: action.metadata,
+                nodeInfo: action.nodeInfo
             }
         case GET_METADATA_FAILURE:
             return {

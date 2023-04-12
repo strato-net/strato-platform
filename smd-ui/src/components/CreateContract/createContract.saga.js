@@ -132,7 +132,6 @@ export function* createContract(action) {
     if (typeof response === "string") {
       yield put(createContractFailure(response));
     } else {
-      console.log(action);
       yield put(createContractSuccess(response[0] || response));
       yield put(updateToast());
       yield put(fetchContracts(action.payload.chainId, 10, 0));

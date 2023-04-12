@@ -38,6 +38,8 @@ import createChainReducer from './components/CreateChain/createChain.reducer';
 import oauthAccountsReducer from './components/Accounts/components/OauthAccounts/oauthAccounts.reducer';
 import searchQueryReducer from './components/SearchResults/searchresults.reducer';
 import appMetadataReducer from './App/app.reducer'
+import peersReducer from './components/PeersCard/peers.reducer'
+
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -69,6 +71,7 @@ import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
 import watchSearchQuery from './components/SearchResults/searchresults.saga';
 import watchAppMetadata from './App/app.saga'
+import watchGetPeerIdentity from './components/PeersCard/peers.saga';
 
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
 
@@ -112,6 +115,7 @@ const rootReducer = combineReducers({
   oauthAccounts: oauthAccountsReducer,
   search: searchQueryReducer,
   appMetadata: appMetadataReducer, 
+  peers: peersReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -145,7 +149,8 @@ const rootSaga = function* startForeman() {
     fork(watchCreateChain),
     fork(watchOauthAccountActions),
     fork(watchSearchQuery),
-    fork(watchAppMetadata)
+    fork(watchAppMetadata),
+    fork(watchGetPeerIdentity),
   ])
 };
 
