@@ -11,7 +11,9 @@ function getPeers() {
     .findAll({
       attributes: [
         'ip',
-        'tcp_port'
+        'tcp_port',
+        'pubkey',
+        'enode',
       ],
       where: {
         active_state: 1
@@ -19,7 +21,7 @@ function getPeers() {
     })
     .then((newPeers)=> {
       currentPeers = newPeers.reduce((obj, peer, i)=> {
-        obj[peer.ip] = peer.tcp_port
+        obj[peer.ip] = peer
         return obj;
       }, {})
 
