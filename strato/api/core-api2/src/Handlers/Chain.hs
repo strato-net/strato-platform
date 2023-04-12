@@ -20,6 +20,7 @@ module Handlers.Chain
   , qaOffset
   , chainFilterParams
   , getChain
+  -- , getChainByLabel
   , getChainClient
   , postChain
   , postChainClient
@@ -61,7 +62,8 @@ import           UnliftIO
 import           Settings
 
 type API = 
-  "chain" :> QueryParams "chainid" ChainId  
+  "chain" :> QueryParams "chainid" ChainId
+          :> QueryParam "label" T.Text  
           :> QueryParam "limit" Integer
           :> QueryParam "offset" Integer
           :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
@@ -70,13 +72,14 @@ type API =
 
 data ChainFilterParams = ChainFilterParams
   { _qaChainId :: [ChainId]
+  , qaLabel :: Maybe T.Text
   , _qaLimit :: Maybe Integer
   , _qaOffset :: Maybe Integer
   } deriving (Eq, Ord, Show)
 
 makeLenses ''ChainFilterParams
 
-getChainClient :: [ChainId] -> Maybe Integer -> Maybe Integer -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
+getChainClient :: [ChainId] -> Maybe T.Text -> Maybe Integer -> Maybe Integer -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
 postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
@@ -91,19 +94,20 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 chainFilterParams :: ChainFilterParams
-chainFilterParams = ChainFilterParams [] Nothing Nothing
+chainFilterParams = ChainFilterParams [] Nothing Nothing Nothing
 
 instance HasSQL m => Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m where
-  select _ (ChainFilterParams cIds lim ofs) = Just <$> getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
-  selectWithDefault _ (ChainFilterParams cIds lim ofs) = getChainInfos cIds (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
+  select _ (ChainFilterParams cIds mLabel lim ofs) = Just <$> getChainInfos cIds mLabel (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
+  selectWithDefault _ (ChainFilterParams cIds mLabel lim ofs) = getChainInfos cIds mLabel (fromMaybe (fromIntegral appFetchLimit) lim) (fromMaybe 0 ofs)
 
 --- get an array of chains
 getChain :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m
          => [ChainId]
+         -> Maybe T.Text
          -> Maybe Integer
          -> Maybe Integer
          -> m (NamedMap "id" "info" ChainId ChainInfo)
-getChain cIds mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLim mOff
+getChain cIds mLabel mLim mOff = selectWithDefault (Proxy @(NamedMap "id" "info" ChainId ChainInfo)) $ ChainFilterParams cIds mLabel mLim mOff
 
 
 postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId

@@ -69,7 +69,7 @@ maybeTxBatchResult hashes = do
 maybeChainBatchResult :: HasSQL m =>
                          [ChainId] -> m [Maybe (TransactionResult, Maybe ChainInfo)]
 maybeChainBatchResult chainIds = do
-  cIdsAndInfos <- M.fromList . map unNamedTuple <$> getChain chainIds Nothing Nothing
+  cIdsAndInfos <- M.fromList . map unNamedTuple <$> getChain chainIds Nothing Nothing Nothing
   mtxrs <- postBatchTransactionResult $ unsafeCreateKeccak256FromWord256 . unChainId <$> chainIds
   pure $ maybeHeads mtxrs cIdsAndInfos <$> chainIds
   where maybeHeads :: M.Map Keccak256 [TransactionResult] -> M.Map ChainId ChainInfo -> ChainId -> Maybe (TransactionResult, Maybe ChainInfo)
