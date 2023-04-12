@@ -74,6 +74,9 @@ import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , MemDBs(..)
                                                     , ContextState(..)
+                                                    , SyncStatus(..)
+                                                    , VmGasCap(..)
+                                                    , vmGasCap
                                                     , currentBlock
                                                     , txRunResultsCache
                                                     , debugSettings
@@ -337,6 +340,13 @@ instance (Keccak256 `A.Alters` BlockSummary) MemContextM where
 
 instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
   access _ = dbsGets $ view worldBestBlock
+
+instance Mod.Modifiable VmGasCap MemContextM where
+  get _ = VmGasCap . _vmGasCap <$> get
+  put _ g = contextModify $ vmGasCap .~ unVmGasCap g
+
+instance Mod.Accessible SyncStatus MemContextM where
+  access _ = SyncStatus . _isSynced <$> get
 
 instance MonadMonitor (LoggingT IO) where
     doIO = liftIO

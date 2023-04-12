@@ -48,6 +48,7 @@ library:
   - solid-vm-static-analysis
   - source-tools
   - strato-model
+  - strato-redis-blockdb
   - text
   - time
   - transformers
