@@ -758,7 +758,7 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                       _ -> (functionName, []) ;)
           else (functionName, [])
   
-  (f, args) <-
+  (!f, !args) <-
         case M.lookup functionName' functionsIncludingConstructor of
           Just theFunction | isDelegateCall == False -> do
                 args' <- argsToVals contract' theFunction argExps
@@ -862,7 +862,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
-  decrementGas 100
+  decrementGas 50000
   ret <- runStatement s
 
   case ret of
@@ -1142,7 +1142,7 @@ runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
 runStatement (CC.WhileStatement condition code pos) = do
   solidVMBreakpoint pos
 
-  while (getBool =<< expToVar condition) $ do
+  while (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
@@ -1151,7 +1151,7 @@ runStatement (CC.WhileStatement condition code pos) = do
 
 runStatement (CC.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
-  doWhile (getBool =<< expToVar condition) $ do
+  doWhile (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
@@ -1178,7 +1178,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
   let condition = getBool =<< expToVar conditionExp
 
-  while condition $ do
+  while condition $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
@@ -1279,7 +1279,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-  decrementGas 1000
+  decrementGas 50000
   if c
     then do
       result <- code
@@ -1293,7 +1293,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
-  decrementGas 1000
+  decrementGas 50000
   case result of
     Nothing -> do
       c <- condition
@@ -1383,7 +1383,7 @@ expToPath x = todo "expToPath/unhandled" x
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
-  decrementGas 100
+  decrementGas 50000
   return v
 
 decrementGas :: MonadSM m => Gas -> m ()
@@ -2077,7 +2077,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing
             --get only the contract containing the sweet succulent ContractF definition
-            (contract, _, _) <- getCodeAndCollection toAccount
+            (!contract, _, _) <- getCodeAndCollection toAccount
             let codeSnippets :: [String]
                 codeSnippets =
                   case (fromMaybe "" searchTerms) of
@@ -2192,12 +2192,12 @@ SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionC
 -}
 
 expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) = do
-  srcVar <- expToVar src
-  srcVal <- getVar srcVar
+  !srcVar <- expToVar src
+  !srcVal <- getVar srcVar
 
 
-  pVar <- expToVar parent
-  pVal <- weakGetVar pVar
+  !pVar <- expToVar parent
+  !pVal <- weakGetVar pVar
 
   -- If it's an array, calling (expToVar dst) gives us
   -- the value at the index, NOT a reference that we can
@@ -2826,8 +2826,8 @@ runTheCall :: MonadSM m
            -> Bool
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
-  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
-      theModifierNames = map fst $ (CC._funcModifiers theFunction)
+  let !returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
+      !theModifierNames = map fst $ (CC._funcModifiers theFunction)
 
   theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract'^.CC.modifiers) of
@@ -2836,7 +2836,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  let args = case argVals of
+  let !args = case argVals of
         OrderedVals vs -> let argMeta =
                                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                 $ CC._funcArgs theFunction
@@ -2863,7 +2863,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
   matchedArgvals <- forM theModifiers $ \modi -> do
-    let margList = CC.OrderedArgs
+    let !margList = CC.OrderedArgs
             . fromMaybe []
             $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
     margVals <- argsToValsModifiers contract' modi margList
@@ -2880,7 +2880,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
                                 $ M.mapKeys T.pack $ M.fromList ns
             -- These probably don't need to be sorted by argument index, as they are turned into a map
             -- when added to the call info.
-            sortedArgs = map snd . sortWith fst
+            !sortedArgs = map snd . sortWith fst
                       . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                       $ M.toList typeAndVal
         return sortedArgs

@@ -120,10 +120,12 @@ ethereumVM d = void . execContextM d $ do
 
         logEventSummaries seqEvents
 
-        let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        runConduit $ yield vmInEventBatch
-                  .| handleVmEvents flags_useSyncMode
-                  .| mapM_C sendOutEvent
+        let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
+        trs <- runConduit $ yield vmInEventBatch
+                         .| handleVmEvents flags_useSyncMode
+                         .| awaitForever sendOutEvent
+                         .| sinkList
+        void . produceVMEvents $ NewTransactionResult <$> trs
         
         loopTimeit "compactContextM" $ compactContextM
 
@@ -146,7 +148,7 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
-  yieldMany $ uncurry OutJSONRPC <$> rpcResps
+  yieldMany $! uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
@@ -201,7 +203,7 @@ processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                           => [Either OutputGenesis OutputBlock]
                           -> ConduitT a VmOutEvent m ()
 processBlocksAndNewChains blocksAndChains = do
-  let grouped = groupEithers blocksAndChains
+  let !grouped = groupEithers blocksAndChains
   for_ grouped $ \case
     Left newChains -> outputNewChains =<< insertNewChains newChains
     Right blocks -> processBlocks blocks
@@ -241,8 +243,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
             _ -> return (EVM, (sr', [], [])) -- TODO: add contracts from accountInfo list?
         case catMaybes $ erException <$> mExecResults of
           [] -> do
-            yieldMany . concat $ map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $ map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
+            yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
+            yieldMany . concat $! map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
             let (orgName, appName) = case mExecResults of
                                        [] -> ("","")
                                        x:_ -> (erOrgName x, erAppName x)
@@ -299,7 +301,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
-  yield . OutIndexEvent $ NewChainInfo cId cInfo
+  yield . OutIndexEvent $! NewChainInfo cId cInfo
   let org = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
@@ -359,7 +361,7 @@ getNumPoolable txPairs = do
 
   forM_ allNewTxs $ \(ts, _) ->
       $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
-  let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
+  let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
   $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
   unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
   return $ length poolableNewTxs
@@ -536,7 +538,7 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: VmOutEvent -> ContextM ()
+sendOutEvent :: VmOutEvent ->  ConduitT VmOutEvent TransactionResult ContextM ()
 sendOutEvent (OutAction act) =
   let filterOutEvents :: Action -> Action
       filterOutEvents x = x{Action._events=Seq.empty}
@@ -568,14 +570,14 @@ sendOutEvent (OutAction act) =
 sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
   void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
+sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
-sendOutEvent (OutTXR tr) = void $ produceVMEvents [NewTransactionResult tr]
+sendOutEvent (OutTXR tr) = yield tr
 sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
   timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-    updateSQLBalanceAndNonce $
+    lift . updateSQLBalanceAndNonce $
       [ (theAccount,
          (addressStateBalance asMod, addressStateNonce asMod))
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
@@ -732,5 +734,5 @@ getUnprocessedKafkaEvents offset = do
                                      $ blockDataExtraData obBlockData
           _ -> 1
 
-        ret' = eventLimit . countLimit $ ret
+        !ret' = eventLimit . countLimit $ ret
     return ret'

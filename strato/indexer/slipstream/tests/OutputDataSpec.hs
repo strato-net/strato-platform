@@ -49,17 +49,15 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [Text]
               -> [(ProcessedContract, Contract)]
               -> ConduitM () Text m ()
-createInserts globalsIORef historyList' contracts = do
+createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-        hasHistory = contractName (fst contract) `elem` historyList'
     _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
-    when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
-    insertHistoryTable globalsIORef $ map fst contracts
+    insertHistoryTable $ map fst contracts
 
 
 
@@ -93,8 +91,8 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals fakeHandle
-      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      g <- newGlobals M.empty fakeHandle
+      [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
@@ -157,12 +155,10 @@ spec = do
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals fakeHandle
-      runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
-      let hl = ["Vehicle2"]
+      g <- newGlobals M.empty fakeHandle
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
+        <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
@@ -260,10 +256,9 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals fakeHandle
-      [vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
+      g <- newGlobals M.empty fakeHandle
+      [vehicleCreate, _, _, _, vehicleInsert, _] <-
+          runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
     address text,
@@ -347,9 +342,9 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+    g <- newGlobals M.empty fakeHandle
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
     address text,
@@ -434,7 +429,7 @@ spec = do
           }, createDummyContract [
                      ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                      ])]
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
@@ -475,7 +470,7 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
@@ -526,9 +521,9 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+    g <- newGlobals M.empty fakeHandle
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
     address text,
@@ -594,6 +589,41 @@ spec = do
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
 
+
+  describe "Cirrus scrape tests" $ do
+    it "uses values in non-empty cache to remember tables from before a restart" $ do
+      let testAdd = Address 0x98eaddede
+          input = [(ProcessedContract {
+            address = testAdd,
+            codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
+            organization = "",
+            application = "",
+            contractName = "SwissArmy",
+            chain = "<CHAIN>",
+            blockHash = hash "<BLOCKHASH>",
+            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            blockNumber = 124,
+            transactionHash = hash "<TRANSACTIONHASH>",
+            transactionSender = testAdd,
+            contractData = M.fromList [("str", bytes "Hello, World!")]
+            }, createDummyContract [("str", SVMType.String Nothing)])]
+          cache = M.singleton (IndexTableName "" "" "SwissArmy") ["str"]
+
+      g <- newGlobals cache fakeHandle
+
+      queries <- runLoggingT . runConduit $ createInserts g input .| sinkList
+
+      -- should not attempt to create new table
+      elem [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
+      address text,
+      "chainId" text,
+      block_hash text,
+      block_timestamp text,
+      block_number text,
+      transaction_hash text,
+      transaction_sender text,
+      "str" text,
+      PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
 
 
 

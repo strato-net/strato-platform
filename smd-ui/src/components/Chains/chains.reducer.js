@@ -93,16 +93,25 @@ const reducer = function (state = initialState, action) {
         error: state.error
       }
     case FETCH_SELECT_CHAIN_DETAIL_SUCCESS:
+      const chainLabelIds_2 = {};
+      action.detail.forEach((chain) => {
+        console.log(chain)
+        const id = chain.id;
+        const label = chain.info.label;
+        if (!chainLabelIds_2[label]) {
+          chainLabelIds_2[label] = {};
+          chainLabelIds_2[label][id] = {};
+        } else {
+          chainLabelIds_2[label][id] = {};
+        }
+      });
       return {
         ...state,
-        chains: {
-          [action.detail[0].label]: {
-            [action.detail[0].id]: {
-              ...action.detail[0]
-            }
-          }
-        },
-        selectedChain: action.detail[0].id
+        chains: chainLabelIds_2,
+        labelIds: chainLabelIds_2,
+        chainIds: [action.detail[0], ...state.chainIds],
+        selectedChain: action.detail[0].id,
+        isLoading: false,
       }
     case RESET_CHAIN_ID:
       return {

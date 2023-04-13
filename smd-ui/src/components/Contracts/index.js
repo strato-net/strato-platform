@@ -171,7 +171,7 @@ class Contracts extends Component {
       </div>) : 
       
           <div className='row smd-margin-16' style={{ display: 'flex', alignItems: 'center', marginRight: '8'}}>
-              <h4 className="text-left" style={{margin: '0 auto'}}>Shard Selection:</h4>
+              <h4 className="text-left" style={{margin: '0 auto'}}>Shard:</h4>
               <div className="pt-select" style={{margin: '0 5px'}}>
                 <Field
                   className="pt-input select-chain"
@@ -218,7 +218,7 @@ class Contracts extends Component {
         <Tour steps={tourSteps} name="contracts" finalStepSelector='#transactions' nextPage='transactions' />
         <div className="row pt-dark" >
           <div className="col-sm-2 text-left">
-            <h2>Contracts</h2>
+            <h3>Contracts</h3>
           </div>
         <div className="col-sm-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
@@ -231,9 +231,6 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-          <div className="col-sm-4 text-right smd-pad-8">
-            <CreateContract />
-          </div>
     
         </div>
         <div className='row pt-dark' style={{ display: 'flex', alignItems: 'center'}}>
@@ -245,7 +242,7 @@ class Contracts extends Component {
                         <Switch
                           checked={this.state.useSearch}
                           onChange={this.toggleChainQueryType}
-                          label="Use Shard Search"
+                          label="Search by Shard ID"
                         />
                         </div>
                       <div className='col-sm-4 text-left'>

@@ -98,8 +98,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: Checkpoint -> ChainMemberParsedSet -> BlockstanbulContext
-newContext (Checkpoint v as) chainm =
+newContext :: Checkpoint -> ChainMemberParsedSet -> Bool -> BlockstanbulContext
+newContext (Checkpoint v as) chainm valB =
   let valSet = S.fromList as
       prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
   in BlockstanbulContext
@@ -119,7 +119,7 @@ newContext (Checkpoint v as) chainm =
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _lastParent = Nothing
-     , _validatorBehavior = True
+     , _validatorBehavior = valB
      }
 
 generateNonceMap :: [ChainMemberParsedSet] -> M.Map ChainMemberParsedSet Int

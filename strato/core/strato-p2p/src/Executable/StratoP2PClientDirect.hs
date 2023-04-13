@@ -91,8 +91,9 @@ handleEvents ev sSource runner = do
                   Just pub -> return pub
 
                 peerX509 <- getPeerX509 peer
+                myX509 <- getMyX509
                 orgChains <- selectWithDefault (Proxy @ChainMemberRSet) cId
-                let peerCheck = checkPeerIsMember peerX509 orgChains
+                let peerCheck = checkPeerIsMember myX509 peerX509 orgChains
 
                 $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack . C.red $ show peerCheck
                 

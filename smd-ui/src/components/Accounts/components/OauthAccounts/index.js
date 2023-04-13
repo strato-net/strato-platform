@@ -70,7 +70,7 @@ class OauthAccounts extends Component {
       <div>
         <div className="row">
           <div className="col-sm-4 text-left">
-            <h3>Accounts</h3>
+            <h3>Users</h3>
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
@@ -85,7 +85,7 @@ class OauthAccounts extends Component {
               <input
                 className="pt-input"
                 type="search"
-                placeholder="Search accounts"
+                placeholder="Search users"
                 onChange={e => this.updateFilter(e.target.value.toLowerCase())}
                 dir="auto" />
             </div>
@@ -100,7 +100,7 @@ class OauthAccounts extends Component {
                   <table>
                     <tbody>
                       <tr>
-                        <td colSpan={3}>No Accounts</td>
+                        <td colSpan={3}>No Users</td>
                       </tr>
                     </tbody>
                   </table>

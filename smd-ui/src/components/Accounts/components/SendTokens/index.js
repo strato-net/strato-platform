@@ -269,7 +269,7 @@ class SendTokens extends Component {
           <div className="row">
             <div className="col-sm-4 text-right">
               <label className="pt-label smd-pad-4">
-                Chain
+                Shard
               </label>
             </div>
             <div className="col-sm-8 smd-pad-4">
@@ -298,7 +298,7 @@ class SendTokens extends Component {
           <div className="row">
             <div className="col-sm-4 text-right">
               <label className="pt-label smd-pad-4">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className="col-sm-8 smd-pad-4">
