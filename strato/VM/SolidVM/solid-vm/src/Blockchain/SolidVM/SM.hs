@@ -320,16 +320,14 @@ runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
-
-  let gi' = gi{_gasLeft=min (_gasLeft gi) gasCap }  -- capping the transaction gas limit 
-      !startingState =
+  let !startingState =
         SState {
         env = env,
         callStack = [],
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi'
+        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
         }
 
   eValState <- try $ runStateT f startingState
