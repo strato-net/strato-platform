@@ -319,7 +319,7 @@ runSM :: ( MonadUnliftIO m
 runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
-  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.yellow (show gasCap)
+  $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
 
   let gi' = gi{_gasLeft=min (_gasLeft gi) gasCap }  -- capping the transaction gas limit 
       !startingState =
