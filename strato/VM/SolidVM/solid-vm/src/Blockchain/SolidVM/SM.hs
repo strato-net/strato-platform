@@ -97,7 +97,6 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Gas
 import           Blockchain.Stream.Action           (Action)
 import qualified Blockchain.Stream.Action           as Action
 import qualified Blockchain.SolidVM.Environment     as Env
@@ -160,7 +159,6 @@ data SState = SState
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   , _gasInfo        :: GasInfo
-  , _syncStatus     :: SyncStatus
   }
 makeLenses ''SState
 
@@ -184,7 +182,6 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
-                 , Mod.Accessible SyncStatus m
                  , MonadIO m --todo: remove
                  , MonadCatch m
                  , MonadLogger m
@@ -299,9 +296,6 @@ instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
   put _ = assign action
 
-instance Monad m => Mod.Accessible SyncStatus (SM m) where
-  access _ = use syncStatus 
-
 instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
   -- adding events to the action so that slipstream gets them,
   --   and also to the events field of the sstate, so that they get sent to
@@ -314,8 +308,7 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
 runSM :: ( MonadUnliftIO m
          , MonadLogger m
          , Mod.Modifiable ContextState m
-         , Mod.Modifiable VmGasCap m
-         , Mod.Accessible SyncStatus m
+         , Mod.Modifiable GasCap m
          )
       => (Maybe ByteString)
       -> Env.Environment
@@ -325,9 +318,8 @@ runSM :: ( MonadUnliftIO m
       -> m (Either SolidException a)
 runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
-  SyncStatus synced <- Mod.access (Mod.Proxy @SyncStatus)
-  VmGasCap gasCap <- Mod.get (Mod.Proxy @VmGasCap)
-  $logDebugS "runSM/VmGasCap/status" . T.pack $ "Current gas cap: " ++ CL.yellow (show gasCap)
+  GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
+  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.yellow (show gasCap)
 
   let gi' = gi{_gasLeft=min (_gasLeft gi) gasCap }  -- capping the transaction gas limit 
       !startingState =
@@ -337,8 +329,7 @@ runSM maybeCode env gi chainId' f = do
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi',
-        _syncStatus = SyncStatus synced
+        _gasInfo = gi'
         }
 
   eValState <- try $ runStateT f startingState
@@ -357,26 +348,7 @@ runSM maybeCode env gi chainId' f = do
         else return $ Left se
     Right (value, sstateAfter) -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
-      let !used = _gasUsed (_gasInfo sstateAfter)
-      case gasCap of
-        -- the cap should not change once the node is synced
-        cap | used > cap && not synced -> do
-          setVmGasCap used
-          $logInfoS "runSM/VmGasCap/update" . T.pack $ "Setting new gas cap to:  " ++ CL.magenta (show used)
-        _ -> pure ()
       return $ Right value
-
-{-
-  While the node is syncing, it will execute the transactions and
-  calculate the amount of gas used. The gas cap will be the most amount
-  of gas used in a transaction so far so that future transactions (specifically
-  ones with a lot of loops) don't overwork the node. This is temporary until
-  gas is properly implemented in the VM.
--}
-setVmGasCap :: (MonadLogger m, Mod.Modifiable VmGasCap m, Mod.Modifiable ContextState m) => Gas -> m ()
-setVmGasCap g = void $ do
-  Mod.put (Mod.Proxy @VmGasCap) (VmGasCap g)
-  Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ vmGasCap .= g
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.

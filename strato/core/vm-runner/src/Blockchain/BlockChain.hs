@@ -176,7 +176,7 @@ addBlocks unfiltered = do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb <- readIORef replacedBest
         yield . OutIndexEvent $ NewBestBlock nbb
-        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
+        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs" timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 

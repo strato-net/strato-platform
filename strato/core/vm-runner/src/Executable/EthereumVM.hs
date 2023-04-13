@@ -164,9 +164,6 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    synced <- fromMaybe False <$> RBDB.withRedisBlockDB RBDB.getSyncStatusNow
-    $logInfoS "evm/loop/newBlock/syncStatus" . T.pack . CL.yellow . show $ synced
-    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (isSynced &&~ synced)
     let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
@@ -177,8 +174,10 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
             else not makeLazyBlocks || hasTxs)
     $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
+    synced <- fromMaybe False <$> RBDB.withRedisBlockDB RBDB.getSyncStatusNow
     multilineLog "evm/loop/newBlock" $ boringBox [
         CL.yellow "Decision making for block creation:",
+        "Sync status: " ++ formatBool synced,
         "isCaughtUp: " ++ formatBool isCaughtUp,
         "pbft: " ++ formatBool pbft,
         "reqd: " ++ formatBool reqd,

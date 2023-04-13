@@ -85,7 +85,7 @@ import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.Generation
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
-import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), SyncStatus(..), VmGasCap(..), baggerState, putContextBestBlockInfo, vmGasCap)
+import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), GasCap(..), baggerState, putContextBestBlockInfo, vmGasCap)
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
@@ -669,15 +669,13 @@ instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
 instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
   access _ = get
 
-instance MonadIO m => Mod.Modifiable VmGasCap (MonadTest m) where
-  get _ = VmGasCap <$> gets (Lens.view vmGasCap)
-  put _ g = modify $ vmGasCap .~ unVmGasCap g
-
-instance MonadIO m => Mod.Accessible SyncStatus (MonadTest m) where
-  access _ = return . SyncStatus $ False
+instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
+  get _ = GasCap <$> gets (Lens.view vmGasCap)
+  put _ g = modify $ vmGasCap .~ unGasCap g
 
 instance MonadIO m => Mod.Accessible RedisConnection (MonadTest m) where
-  access _ = liftIO $ error "should not be called"
+  access _ = liftIO $ error "not work"
+
 instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
   access _ = gets $ Lens.view memDBs
 

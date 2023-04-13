@@ -1402,9 +1402,8 @@ decrementGas :: MonadSM m => Gas -> m ()
 decrementGas gas = do
   gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
   Mod.modifyStatefully_ (Mod.Proxy @GasInfo) $ gasUsed += gas
-  SyncStatus synced <- Mod.access (Mod.Proxy @SyncStatus)
   let !gasLeft' = gasInfo' ^. gasLeft
-  if (gasLeft') < (Gas 0) && synced
+  if (gasLeft') < (Gas 0) 
     then do
       let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
       liftIO $ putStrLn $ C.red $ msg
