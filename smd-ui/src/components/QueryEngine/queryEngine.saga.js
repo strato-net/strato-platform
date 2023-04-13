@@ -34,7 +34,6 @@ export function query(query, resourceType, chainId) {
     const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
     constructedURL += symbol + `chainId=${chainId}`;
   }
-  console.log(constructedURL);
   return fetch(
     constructedURL,
     {
