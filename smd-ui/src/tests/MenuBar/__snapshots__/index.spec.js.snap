@@ -48,12 +48,15 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
           </div>
         </div>
       </Blueprint.Dialog>
-      <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+      <Blueprint.Popover content={{...}} position={7} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
         <Blueprint.Button className=\\"pt-large pt-minimal pt-intent-warning\\" iconName=\\"user\\" text=\\"Verification Pending\\" />
       </Blueprint.Popover>
     </div>
+    <Blueprint.Popover interactionKind={2} position={6} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+      <Blueprint.Button className=\\"fa fa-solid fa-wifi pt-minimal pt-large pt-intent-danger\\" />
+    </Blueprint.Popover>
     <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-      <Blueprint.Button className=\\"pt-minimal pt-large\\" style={{...}} iconName=\\"help\\" />
+      <Blueprint.Button className=\\"pt-minimal pt-large\\" iconName=\\"help\\" />
     </Blueprint.Popover>
   </div>
 </nav>"
@@ -107,12 +110,15 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
           </div>
         </div>
       </Blueprint.Dialog>
-      <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+      <Blueprint.Popover content={{...}} position={7} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
         <Blueprint.Button className=\\"pt-large pt-minimal pt-intent-warning\\" iconName=\\"user\\" text=\\"Verification Pending\\" />
       </Blueprint.Popover>
     </div>
+    <Blueprint.Popover interactionKind={2} position={6} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
+      <Blueprint.Button className=\\"fa fa-solid fa-wifi pt-minimal pt-large pt-intent-danger\\" />
+    </Blueprint.Popover>
     <Blueprint.Popover content={{...}} position={6} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} interactionKind={0} isDisabled={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-      <Blueprint.Button className=\\"pt-minimal pt-large\\" style={{...}} iconName=\\"help\\" />
+      <Blueprint.Button className=\\"pt-minimal pt-large\\" iconName=\\"help\\" />
     </Blueprint.Popover>
   </div>
 </nav>"
@@ -120,6 +126,8 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
 
 exports[`MenuBar: index renders Oauth mode mapStateToProps 1`] = `
 Object {
+  "appMetadata": undefined,
+  "dashboard": undefined,
   "oauthUser": undefined,
   "searchQuery": undefined,
   "userCertificate": Object {

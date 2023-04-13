@@ -22,7 +22,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"network_stats\\" to=\\"/stats\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-rocket\\">
+      <i className=\\"fa fa-chart-simple\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -36,7 +36,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Users
+        Accounts
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
@@ -49,16 +49,16 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-user-secret\\">
+      <i className=\\"fa fa-diagram-project\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Shards
+        Private Shards
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-file\\">
+      <i className=\\"fa fa-file-contract\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -67,7 +67,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-link\\">
+      <i className=\\"fa fa-cube\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -123,7 +123,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"network_stats\\" to=\\"/stats\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-rocket\\">
+      <i className=\\"fa fa-chart-simple\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -137,7 +137,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Users
+        Accounts
       </span>
     </NavLink>
     <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
@@ -150,16 +150,16 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-user-secret\\">
+      <i className=\\"fa fa-diagram-project\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Shards
+        Private Shards
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-file\\">
+      <i className=\\"fa fa-file-contract\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -168,7 +168,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-link\\">
+      <i className=\\"fa fa-cube\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -203,7 +203,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth po
   to="/blocks"
 >
   <i
-    className="fa fa-link"
+    className="fa fa-cube"
   >
      
   </i>
@@ -277,7 +277,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth po
     className="menu-text"
   >
      
-    Users
+    Accounts
   </span>
 </NavLink>
 `;
@@ -335,7 +335,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
   to="/contracts"
 >
   <i
-    className="fa fa-file"
+    className="fa fa-file-contract"
   >
      
   </i>
@@ -357,7 +357,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth pos
   to="/shards"
 >
   <i
-    className="fa fa-user-secret"
+    className="fa fa-diagram-project"
   >
      
   </i>
@@ -365,7 +365,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth pos
     className="menu-text"
   >
      
-    Shards
+    Private Shards
   </span>
 </NavLink>
 `;
@@ -400,7 +400,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode third pos
   to="/stats"
 >
   <i
-    className="fa fa-rocket"
+    className="fa fa-chart-simple"
   >
      
   </i>

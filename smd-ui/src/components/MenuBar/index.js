@@ -296,7 +296,6 @@ const connected = connect(mapStateToProps, {
   subscribeRoom,
   unSubscribeRoom,
   changeHealthStatus
-
 })(MenuBar);
 
 export default withRouter(connected);
