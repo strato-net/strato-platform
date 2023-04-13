@@ -112,7 +112,6 @@ import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Wei
-import           Blockchain.Strato.RedisBlockDB       (RedisConnection)
 import           Blockchain.VMContext                 (lookupX509AddrFromCBHash)
 import qualified Blockchain.TxRunResultCache           as TRC
 import           Text.Read                            (readMaybe)
@@ -671,10 +670,7 @@ instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
 
 instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
   get _ = GasCap <$> gets (Lens.view vmGasCap)
-  put _ g = modify $ vmGasCap .~ unGasCap g
-
-instance MonadIO m => Mod.Accessible RedisConnection (MonadTest m) where
-  access _ = liftIO $ error "not work"
+  put _ (GasCap g) = modify $ vmGasCap .~ g
 
 instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
   access _ = gets $ Lens.view memDBs

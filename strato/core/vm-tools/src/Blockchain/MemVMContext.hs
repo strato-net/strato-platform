@@ -342,7 +342,7 @@ instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
 
 instance Mod.Modifiable GasCap MemContextM where
   get _ = GasCap . _vmGasCap <$> get
-  put _ g = contextModify $ vmGasCap .~ unGasCap g
+  put _ (GasCap g) = contextModify $ vmGasCap .~ g
 
 instance MonadMonitor (LoggingT IO) where
     doIO = liftIO

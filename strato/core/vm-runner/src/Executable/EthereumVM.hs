@@ -61,7 +61,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
@@ -142,7 +141,7 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m)
+handleVmEvents :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
                => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   rpcResps <- lift $ do
@@ -174,10 +173,8 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
             else not makeLazyBlocks || hasTxs)
     $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
-    synced <- fromMaybe False <$> RBDB.withRedisBlockDB RBDB.getSyncStatusNow
     multilineLog "evm/loop/newBlock" $ boringBox [
         CL.yellow "Decision making for block creation:",
-        "Sync status: " ++ formatBool synced,
         "isCaughtUp: " ++ formatBool isCaughtUp,
         "pbft: " ++ formatBool pbft,
         "reqd: " ++ formatBool reqd,

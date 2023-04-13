@@ -653,7 +653,7 @@ instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
 
 instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
   get _ = GasCap <$> gets (Lens.view vmGasCap)
-  put _ g = modify $ vmGasCap .~ unGasCap g
+  put _ (GasCap g) = modify $ vmGasCap .~ g
 
 instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
   access _ = get

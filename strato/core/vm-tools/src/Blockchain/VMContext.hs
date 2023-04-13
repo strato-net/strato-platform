@@ -146,7 +146,7 @@ newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
 newtype IsBlockstanbul = IsBlockstanbul { unIsBlockstanbul :: Bool }
   deriving (Generic, NFData, Show, Eq)
 
-newtype GasCap = GasCap { unGasCap :: Gas }
+newtype GasCap = GasCap { unVmGasCap :: Gas }
   deriving (Generic, NFData, Show, Eq)
 
 instance NFData RBDB.RedisConnection where
