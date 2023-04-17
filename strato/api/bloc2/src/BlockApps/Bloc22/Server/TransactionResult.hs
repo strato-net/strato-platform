@@ -45,7 +45,7 @@ import           Data.Set                          (isSubsetOf)
 import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
-import qualified Data.Text.Encoding                as Text
+-- import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Text.Format
 import           Text.Read                         (readMaybe)
@@ -249,10 +249,8 @@ nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
       | otherwise       = Text.pack (show $ n + 1) <> "th"
 
 contractResult :: ( A.Selectable Account AddressState m
-                  , (Keccak256 `A.Alters` SourceMap) m
-                  , MonadLogger m
                   , HasBlocSQL m
-                  , HasBlocEnv m
+                  , MonadLogger m
                   )
                => Integer
                -> Keccak256
@@ -260,20 +258,12 @@ contractResult :: ( A.Selectable Account AddressState m
                -> TransactionResult
                -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult i txHash code txResult mmd = do
-  ~(name, src, vm) <- case mmd of
+contractResult i txHash _ txResult mmd = do
+  name <- case mmd of
     Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
     Just md -> case Map.lookup "name" md of
       Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
-        "EVM" -> case Map.lookup "src" md of
-          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-          Just src -> pure (name, src, "EVM")
-        vm -> case code of
-          Code bs -> pure (name, Text.decodeUtf8 bs, vm)
-          PtrToCode codePtr -> lift $ getContractDetailsByCodeHash codePtr >>= \case
-            Left e -> throwIO $ UserError e
-            Right ContractDetails{..} -> pure (name, serializeSourceMap contractdetailsSrc, vm)
+      Just n -> pure n
   let
     accountMaybe = do
       str <- listToMaybe $
@@ -289,15 +279,7 @@ contractResult i txHash code txResult mmd = do
           Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
-      let cn = ContractName name
-      mdetails <- use $ contractDetailsMap . at cn
-      details <- case mdetails of
-        Just details' -> return details'{contractdetailsAccount = Just acct}
-        Nothing -> do
-          cds <- lift $ getContractDetailsForContract vm (deserializeSourceMap src) (Just name)
-          case cds of
-            Nothing -> lift . throwIO . UserError $ "Could not get details for contract" <> name
-            Just (_, ds) -> contractDetailsMap . at cn <?= ds{contractdetailsAccount = Just acct}
+      let details = UploadContractDetails{contractName = name, contractAccount = Just $ acct}
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
 functionResult :: ( A.Selectable Account AddressState m
