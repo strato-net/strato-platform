@@ -6,7 +6,8 @@ import {
   selectContractInstance,
   fetchState,
   fetchCirrusInstances,
-  fetchAccount
+  fetchAccount,
+  fetchContractInfoRequest
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -14,6 +15,7 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
 import HexText from '../../../HexText';
 import { Tooltip, Position } from '@blueprintjs/core';
+import ContractSource from './ContractSource';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -24,8 +26,6 @@ class ContractCard extends Component {
   render() {
     let cardData = [];
     const name = this.props.contract.name;
-    console.log(this.props.contract)
-    console.log(name)
     const contract = this.props.contract.contract;
     const instances = contract && contract.instances ? contract.instances : [];
     const self = this;
@@ -44,6 +44,7 @@ class ContractCard extends Component {
               mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
+              self.props.fetchContractInfoRequest(`card-data-${instance.address}-${self.props.selectedChain}`, name, instance.address, self.props.selectedChain)
               self.props.selectContractInstance(name, instance.address);
             }}
             key={`card-data-${instance.address}-${index}`}
@@ -67,6 +68,8 @@ class ContractCard extends Component {
 
     if (selectedInstance.length > 0 && selectedInstance[0].state) {
       const instance = selectedInstance[0];
+      const contractKey = `card-data-${instance.address}-${self.props.selectedChain}`
+      const contractInfo = this.props.contractInfos && this.props.contractInfos[contractKey] ? this.props.contractInfos[contractKey] : {}
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
       if ((typeof instance.state !== 'string') && symbols.length > 0) {
@@ -82,7 +85,8 @@ class ContractCard extends Component {
                 <td style={{ verticalAlign: 'middle' }}>
                   <ContractMethodCall
                     key={'methodCall' + symbol + instance.address}
-                    lookup={'methodCall' + symbol + instance.address}
+                    contractKey={contractKey}
+                    methodKey={'methodCall' + symbol + instance.address}
                     contractName={name}
                     contractAddress={instance.address}
                     symbolName={symbol}
@@ -123,8 +127,16 @@ class ContractCard extends Component {
       }
       state = (
         <div className="pt-card pt-elevation-2">
-          <div className="row">
-            <div className="col-sm-12 text-right">
+
+            <div className="row">
+            <div className='col-sm-6'>
+              { contractInfo &&
+                <ContractSource
+                  contract={contractInfo}
+                  />
+              }
+            </div>
+            <div className="col-sm-6 text-right">
               <span className="pt-monospace-text"> {instance && instance.balance ? <div> Contract Balance: {instance.balance} wei </div> : ''} </span>
             </div>
           </div>
@@ -155,8 +167,7 @@ class ContractCard extends Component {
         </div>
       );
     }
-
-
+    
     return (
       <div className="row">
         <div className="col-sm-6">
@@ -218,8 +229,9 @@ class ContractCard extends Component {
   }
 }
 
-export function mapStateToProps(state) {
+export function mapStateToProps(state, ownProps) {
   return {
+    contractInfos: state.contractCard.contractInfos,
     selectedChain: state.chains.selectedChain
   };
 }
@@ -227,6 +239,7 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps, {
     selectContractInstance,
+    fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
     fetchAccount

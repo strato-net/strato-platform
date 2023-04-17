@@ -166,6 +166,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
+
     default:
       return state;
   }

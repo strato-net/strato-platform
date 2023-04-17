@@ -183,18 +183,6 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
             </table>
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-12\\">
-            <hr />
-            <h5>
-              Results
-            </h5>
-            <pre className=\\"smd-scrollable\\">
-               
-              <br />
-            </pre>
-          </div>
-        </div>
       </div>
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
@@ -343,18 +331,6 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-12\\">
-            <hr />
-            <h5>
-              Results
-            </h5>
-            <pre className=\\"smd-scrollable\\">
-               
-              <br />
-            </pre>
           </div>
         </div>
       </div>

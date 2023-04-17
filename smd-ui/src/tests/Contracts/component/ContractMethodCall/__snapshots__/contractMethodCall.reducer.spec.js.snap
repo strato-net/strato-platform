@@ -5,6 +5,7 @@ Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "isOpen": true,
+      "loading": false,
       "result": "ERROR",
     },
   },
@@ -16,7 +17,8 @@ Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "isOpen": true,
-      "result": "Sending transaction...",
+      "loading": true,
+      "result": undefined,
     },
   },
 }
@@ -27,6 +29,7 @@ Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "isOpen": true,
+      "loading": false,
       "result": Object {},
     },
   },
@@ -45,7 +48,8 @@ Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "error": "ERROR",
       "isOpen": true,
-      "result": "Waiting for method to be called...",
+      "loading": false,
+      "result": undefined,
     },
   },
 }
@@ -64,7 +68,8 @@ Object {
       },
       "isOpen": true,
       "isPayable": true,
-      "result": "Waiting for method to be called...",
+      "loading": false,
+      "result": undefined,
     },
   },
 }
@@ -75,7 +80,8 @@ Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "isOpen": false,
-      "result": "Waiting for method to be called...",
+      "loading": false,
+      "result": undefined,
     },
   },
 }
@@ -86,7 +92,7 @@ Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
       "isOpen": true,
-      "result": "Waiting for method to be called...",
+      "result": undefined,
     },
   },
 }
