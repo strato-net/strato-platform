@@ -50,30 +50,30 @@ bloc :: ( MonadLogger m
         )
      => ServerT BlocAPI m
 bloc = return gitInfo
-  :<|> postUsersFill
+  :<|> postUsersFill -- TODO:JIN
   :<|> createCertificate
   :<|> getContracts
   :<|> postContractsBatchStates
   :<|> getContractsData
-  :<|> getContractsContract
-  :<|> getContractsState
-  :<|> getContractsDetails
-  :<|> getContractsFunctions
-  :<|> getContractsSymbols
-  :<|> getContractsStateMapping
+  :<|> getContractsContract -- TODO:JIN
+  :<|> getContractsState -- TODO:JIN
+  :<|> getContractsDetails -- TODO:JIN
+  :<|> getContractsFunctions -- TODO:JIN
+  :<|> getContractsSymbols -- TODO:JIN
+  :<|> getContractsStateMapping -- TODO:JIN
   :<|> getContractsStates
-  :<|> getContractsEnum
+  :<|> getContractsEnum -- TODO:JIN
   :<|> postContractsCompile
   :<|> postContractsXabi
-  :<|> getBlocTransactionResult
-  :<|> postBlocTransactionResults
-  :<|> postChainInfo
+  :<|> getBlocTransactionResult -- TODO:JIN
+  :<|> postBlocTransactionResults -- TODO:JIN
+  :<|> postChainInfo -- TODO:JIN
   :<|> getSingleChainInfo
-  :<|> postChainInfos
+  :<|> postChainInfos -- TODO:JIN
   :<|> getChainInfo
-  :<|> postBlocTransactionParallel
+  :<|> postBlocTransactionParallel -- TODO:JIN
   :<|> postBlocTransactionRaw
-  :<|> postBlocTransaction
+  :<|> postBlocTransaction -- TODO:JIN
 
 --serveBloc :: BlocEnv -> Server BlocAPI
 --serveBloc env = hoistServer blocApi (enterBloc env) bloc
