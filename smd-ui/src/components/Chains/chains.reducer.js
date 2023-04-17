@@ -95,7 +95,6 @@ const reducer = function (state = initialState, action) {
     case FETCH_SELECT_CHAIN_DETAIL_SUCCESS:
       const chainLabelIds_2 = {};
       action.detail.forEach((chain) => {
-        console.log(chain)
         const id = chain.id;
         const label = chain.info.label;
         if (!chainLabelIds_2[label]) {

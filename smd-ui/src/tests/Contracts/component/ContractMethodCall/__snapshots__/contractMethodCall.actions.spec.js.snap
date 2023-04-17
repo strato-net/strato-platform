@@ -68,10 +68,38 @@ Object {
 exports[`ContractMethodCall: action method call success 1`] = `
 Object {
   "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "result": Object {
-    "hash": "8f6fcd037e028f84ec2e9462c4e29444cd3456c8bc8705723f0c36d075c14c5d",
-    "status": "Success",
-  },
+  "result": Array [
+    Object {
+      "data": Object {
+        "contents": Array [
+          "200",
+        ],
+        "tag": "Call",
+      },
+      "hash": "31bcbc86cb6fdd273443406ae27906485fccc8475b269de04878d9b797c0f47e",
+      "status": "Success",
+      "txResult": Object {
+        "appName": "",
+        "blockHash": "36d2629fb5ef27457eb70a87cd886284d0ac7c197f7b3eaf1102edbb8e3518b1",
+        "chainId": null,
+        "contractsCreated": "",
+        "contractsDeleted": "",
+        "deletedStorage": "",
+        "etherUsed": "0000000000000000000000000000000000000000000000000000000005f5e100",
+        "gasUsed": "0000000000000000000000000000000000000000000000000000000005f5e100",
+        "kind": "SolidVM",
+        "message": "Success!",
+        "newStorage": "",
+        "orgName": "Blockapps",
+        "response": "(200)",
+        "stateDiff": "",
+        "status": "success",
+        "time": 0.001361853,
+        "trace": "",
+        "transactionHash": "31bcbc86cb6fdd273443406ae27906485fccc8475b269de04878d9b797c0f47e",
+      },
+    },
+  ],
   "type": "METHOD_CALL_SUCCESS",
 }
 `;

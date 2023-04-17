@@ -40,6 +40,7 @@ import searchQueryReducer from './components/SearchResults/searchresults.reducer
 import appMetadataReducer from './App/app.reducer'
 import peersReducer from './components/PeersCard/peers.reducer'
 
+import contractCardReducer from './components/Contracts/components/ContractCard/contractCard.reducer'
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -54,11 +55,12 @@ import {watchFetchUser, watchFetchPubKey, watchuserCert} from './components/User
 import {
   watchFetchState,
   watchFetchCirrusContracts,
-  watchAccount
+  watchAccount,
+  watchFetchInfo,
 } from './components/Contracts/components/ContractCard/contractCard.saga';
+
 import {
   watchMethodCall,
-  watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 import {watchExecuteQuery, watchTransactionResult} from './components/QueryEngine/queryEngine.saga';
 import { watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
@@ -93,6 +95,7 @@ const rootReducer = combineReducers({
   chains: chainsReducer,
   contracts: contractsReducer,
   contractQuery: contractQueryReducer,
+  contractCard: contractCardReducer,
   createContract: createContractReducer,
   deployDapp: deployDappReducer,
   methodCall: methodCallReducer,
@@ -129,7 +132,7 @@ const rootSaga = function* startForeman() {
     fork(watchFetchContracts),
     fork(watchCompileContract),
     fork(watchFetchState),
-    fork(watchFetchArgs),
+    fork(watchFetchInfo),
     fork(watchMethodCall),
     fork(watchFetchCirrusContracts),
     fork(watchExecuteQuery),

@@ -17,9 +17,32 @@ class TransactionView extends Component {
     const history = this.props.history;
     const hash = this.props.match.params.hash;
     const tx = this.props.tx ? this.props.tx : {};
+    console.log(tx)
     if (!Object.keys(tx).length) history.push(`/transactions`);
+
+    let cardIntent = ''
+    switch (this.props.txResult) {
+      case 'Success':
+          cardIntent = 'pt-intent-success'
+          break;
+      case 'Pending':
+          cardIntent = 'pt-intent-warning'
+          break;
+      case 'ExecutionFailure':
+          cardIntent = 'pt-intent-danger'
+          break
+      default:
+          break
+    }
+    const parseArgs = (args) => {
+      const cleaned = args.substring(1, args.length - 1)
+      return cleaned.split(',')
+    }
+    const parsedArgs = tx.metadata && tx.metadata.args ? parseArgs(tx.metadata.args) : [] 
+    console.log(parsedArgs)
     return (
-      <div className="container-fluid pt-dark">
+      <div className="container-fluid pt-dark ">
+        
         <div className="row">
           <div className="col-sm-9">
             <div className="h3">
@@ -36,7 +59,8 @@ class TransactionView extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            <div className="pt-card">
+            <div className={`pt-card pt-callout ${cardIntent}`}>
+
               <table className="pt-table pt-str">
                 <thead>
                   <tr>
@@ -46,6 +70,25 @@ class TransactionView extends Component {
                 </thead>
                 <tbody>
                   <tr>
+                    <td><strong>Result</strong></td>
+                    <td>{this.props.txResult ? this.props.txResult : ""}</td>
+                  </tr>
+                  {
+                      this.props.txResult === 'ExecutionFailure' &&
+                    <tr>
+                      <td><strong>Error Message</strong></td>
+                      <td>
+                        <pre>
+                        {this.props.txResultMessage || "Unknown Error"}
+                        </pre>
+                        </td>
+                    </tr>
+                  }
+                  <tr>
+                    <td><strong>Type</strong></td>
+                    <td>{tx.transactionType ? tx.transactionType : "Unknown TX Type"}</td>
+                  </tr>
+                  <tr>
                     <td><strong>From</strong></td>
                     <td>{tx.from === undefined ? '' : <HexText value={tx.from} classes="smd-pad-2" />}</td>
                   </tr>
@@ -53,13 +96,47 @@ class TransactionView extends Component {
                     <td><strong>To</strong></td>
                     <td><HexText value={tx.to} classes="smd-pad-2" /></td>
                   </tr>}
+                  {
+                    tx.metadata && tx.metadata.funcName &&
+                    <tr>
+                      <td><strong>Function Name</strong></td>
+                      <td>
+                        {tx.metadata.funcName}
+                      </td>
+                    </tr>
+                  }
+                  {
+                    tx.metadata && tx.metadata.name &&
+                    <tr>
+                      <td><strong>Contract Name</strong></td>
+                      <td>
+                        {tx.metadata.name}
+                      </td>
+                    </tr>
+                  }
+                  {
+                    tx.metadata && tx.metadata.args &&
+                    <tr>
+                      <td><strong>Arguments</strong></td>
+                      <td>
+                        <pre>
+                          {parsedArgs.length > 0 ? parsedArgs.join(',') : 'N/A'}
+                        </pre>
+                      </td>
+                    </tr>
+                  }
+                  {
+                    tx.metadata && tx.metadata.VM &&
+                    <tr>
+                      <td><strong>VM</strong></td>
+                      <td>
+                        {tx.metadata.VM}
+                      </td>
+                    </tr>
+                  }
                   <tr>
                     <td><strong>Value</strong></td>
                     <td>{tx.value === undefined ? '' : tx.value}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Result</strong></td>
-                    <td>{this.props.txResult ? this.props.txResult : ""}</td>
                   </tr>
                   <tr>
                     <td><strong>Block Number</strong></td>
@@ -101,7 +178,8 @@ export function mapStateToProps(state, ownProps) {
     query: state.queryEngine.query,
     selectedChain: state.chains.selectedChain,
     tx: state.transactions.tx.filter((val) => { return val.hash === hash })[0] || state.queryEngine.queryResult.filter((val) => { return val.hash === hash })[0],
-    txResult : state.queryEngine.txResult
+    txResult : state.queryEngine.txResult,
+    txResultMessage: state.queryEngine.txResultMessage
   };
 }
 

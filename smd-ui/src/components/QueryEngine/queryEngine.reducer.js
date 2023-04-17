@@ -72,11 +72,13 @@ const reducer = function (state = initialState, action) {
         error: action.error
       };
     case TRANSACTION_RESULT_SUCCESS:
-      const r = action.txResult ? `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}` : "";
+      console.log(action.txResult)
+      const r = action.txResult && ((typeof action.txResult) == 'string') ? `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}` : action.txResult.type.tag;
       return {
         ...state,
         error : null,
-        txResult : r
+        txResult : r,
+        txResultMessage: action.txResult.details
       };
     case TRANSACTION_RESULT_FAILURE:
       return {

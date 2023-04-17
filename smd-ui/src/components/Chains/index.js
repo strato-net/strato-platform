@@ -178,7 +178,6 @@ class Chains extends Component {
               onChange={() => {
                 this.setState({useChainIdSearch: !this.state.useChainIdSearch}, () => {
                   if (!this.state.useChainIdSearch) {
-                    console.log('set to label')
                     this.props.fetchChains(this.state.limit, this.state.offset)
                     this.setState({chainId : ""})
                   }
