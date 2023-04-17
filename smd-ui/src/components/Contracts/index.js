@@ -251,7 +251,9 @@ class Contracts extends Component {
                     </div>
               : ''}
             </div>
-
+            <div className="col-sm-2 text-right smd-pad-8">
+              <CreateContract />
+            </div>
         </div>
         {!cards.length && !this.props.isLoading &&
           <div className="row pt-dark" key={'contract-card-'}>

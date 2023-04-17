@@ -3,13 +3,13 @@
 exports[`SideBar: index render component for non oauth mode 1`] = `
 "<aside id=\\"sidebar\\" className=\\"sidebar-expand\\">
   <div className=\\"menu\\">
-    <NavLink id=\\"dashboard\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
+    <NavLink id=\\"network_stats\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
       <i className=\\"fa fa-rocket\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Dashboard
+        Network Stats
       </span>
     </NavLink>
     <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
@@ -40,7 +40,7 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-file\\">
+      <i className=\\"fa fa-gavel\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -86,13 +86,13 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
 exports[`SideBar: index render component for public mode 1`] = `
 "<aside id=\\"sidebar\\" className=\\"sidebar-expand\\">
   <div className=\\"menu\\">
-    <NavLink id=\\"dashboard\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
+    <NavLink id=\\"network_stats\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
       <i className=\\"fa fa-rocket\\">
          
       </i>
       <span className=\\"menu-text\\">
          
-        Dashboard
+        Network Stats
       </span>
     </NavLink>
     <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
@@ -123,7 +123,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </span>
     </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-file\\">
+      <i className=\\"fa fa-gavel\\">
          
       </i>
       <span className=\\"menu-text\\">
@@ -188,7 +188,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
   to="/contracts"
 >
   <i
-    className="fa fa-file"
+    className="fa fa-gavel"
   >
      
   </i>
@@ -205,7 +205,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode first pos
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="dashboard"
+  id="network_stats"
   onClick={undefined}
   to="/home"
 >
@@ -218,7 +218,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode first pos
     className="menu-text"
   >
      
-    Dashboard
+    Network Stats
   </span>
 </NavLink>
 `;
