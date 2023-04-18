@@ -33,7 +33,7 @@ dependencies:
   - x509-certs
 
 
-ghc-options: -Wall -Werror -dynamic
+ghc-options: -Wall -Werror
 
 executables:
   x509-generator:
