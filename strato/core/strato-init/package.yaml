@@ -114,7 +114,6 @@ executables:
   genesis-builder:
     source-dirs: exec_src/
     main: GenesisBuilder.hs
-    ghc-options: -dynamic
     dependencies:
       - aeson
       - bytestring
@@ -127,6 +126,7 @@ tests:
   strato-init-test:
     source-dirs: test/
     main: Main.hs
+    ghc-options: -dynamic
     dependencies:
       - aeson
       - base16-bytestring
