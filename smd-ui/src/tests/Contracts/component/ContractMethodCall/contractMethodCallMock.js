@@ -57,7 +57,6 @@ export const modals = {
 export const initialState = {
   modals: {
     methodCallgreet8070db2390462e2b5748085bde1350590e08bb17: {
-      isOpen: true,
       result: undefined,
       loading: false,
     }
@@ -72,6 +71,7 @@ export const methodCallArgs = {
           _dna: {
             dynamic: true,
             type: "String",
+            tag: "String",
             index: 0
           }
         }

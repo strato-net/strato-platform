@@ -4,7 +4,6 @@ exports[`ContractMethodCall: reducer method call on failure 1`] = `
 Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "isOpen": true,
       "loading": false,
       "result": "ERROR",
     },
@@ -16,7 +15,6 @@ exports[`ContractMethodCall: reducer method call on request 1`] = `
 Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "isOpen": true,
       "loading": true,
       "result": undefined,
     },
@@ -28,7 +26,6 @@ exports[`ContractMethodCall: reducer method call on success 1`] = `
 Object {
   "modals": Object {
     "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "isOpen": true,
       "loading": false,
       "result": Object {},
     },
@@ -39,61 +36,5 @@ Object {
 exports[`ContractMethodCall: reducer set initial state 1`] = `
 Object {
   "modals": Object {},
-}
-`;
-
-exports[`ContractMethodCall: reducer update args on failure 1`] = `
-Object {
-  "modals": Object {
-    "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "error": "ERROR",
-      "isOpen": true,
-      "loading": false,
-      "result": undefined,
-    },
-  },
-}
-`;
-
-exports[`ContractMethodCall: reducer update args on success 1`] = `
-Object {
-  "modals": Object {
-    "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "args": Object {
-        "_greeting": Object {
-          "dynamic": true,
-          "index": 0,
-          "type": "String",
-        },
-      },
-      "isOpen": true,
-      "isPayable": true,
-      "loading": false,
-      "result": undefined,
-    },
-  },
-}
-`;
-
-exports[`ContractMethodCall: reducer update close modal 1`] = `
-Object {
-  "modals": Object {
-    "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "isOpen": false,
-      "loading": false,
-      "result": undefined,
-    },
-  },
-}
-`;
-
-exports[`ContractMethodCall: reducer update open modal 1`] = `
-Object {
-  "modals": Object {
-    "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17": Object {
-      "isOpen": true,
-      "result": undefined,
-    },
-  },
 }
 `;

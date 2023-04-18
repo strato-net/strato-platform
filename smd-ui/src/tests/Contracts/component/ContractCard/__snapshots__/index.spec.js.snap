@@ -2,6 +2,7 @@
 
 exports[`ContractCard: index mapStateToProps with default values 1`] = `
 Object {
+  "contractInfos": Object {},
   "selectedChain": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
 }
 `;
@@ -28,6 +29,7 @@ ShallowWrapper {
     }
     fetchAccount={[Function]}
     fetchCirrusInstances={[Function]}
+    fetchContractInfoRequest={[Function]}
     fetchState={[Function]}
     selectContractInstance={[Function]}
   />,
@@ -1612,6 +1614,7 @@ ShallowWrapper {
     }
     fetchAccount={[Function]}
     fetchCirrusInstances={[Function]}
+    fetchContractInfoRequest={[Function]}
     fetchState={[Function]}
     selectContractInstance={[Function]}
     selectedChain="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
@@ -1727,7 +1730,14 @@ ShallowWrapper {
               className="row"
             >
               <div
-                className="col-sm-12 text-right"
+                className="col-sm-6"
+              >
+                <ContractSource
+                  contract={Object {}}
+                />
+              </div>
+              <div
+                className="col-sm-6 text-right"
               >
                 <span
                   className="pt-monospace-text"
@@ -1779,10 +1789,11 @@ ShallowWrapper {
                         <withRouter(Connect(ReduxForm))
                           chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                          contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractName="Greeter"
                           fromBloc={false}
                           fromCirrus={false}
-                          lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                          methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                           symbolName="greet"
                         />
                       </td>
@@ -2509,7 +2520,14 @@ ShallowWrapper {
               className="row"
             >
               <div
-                className="col-sm-12 text-right"
+                className="col-sm-6"
+              >
+                <ContractSource
+                  contract={Object {}}
+                />
+              </div>
+              <div
+                className="col-sm-6 text-right"
               >
                 <span
                   className="pt-monospace-text"
@@ -2561,10 +2579,11 @@ ShallowWrapper {
                         <withRouter(Connect(ReduxForm))
                           chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                          contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractName="Greeter"
                           fromBloc={false}
                           fromCirrus={false}
-                          lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                          methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                           symbolName="greet"
                         />
                       </td>
@@ -2636,7 +2655,14 @@ ShallowWrapper {
                 className="row"
               >
                 <div
-                  className="col-sm-12 text-right"
+                  className="col-sm-6"
+                >
+                  <ContractSource
+                    contract={Object {}}
+                  />
+                </div>
+                <div
+                  className="col-sm-6 text-right"
                 >
                   <span
                     className="pt-monospace-text"
@@ -2688,10 +2714,11 @@ ShallowWrapper {
                           <withRouter(Connect(ReduxForm))
                             chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractName="Greeter"
                             fromBloc={false}
                             fromCirrus={false}
-                            lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                             symbolName="greet"
                           />
                         </td>
@@ -2759,57 +2786,92 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <div
-                  className="col-sm-12 text-right"
-                >
-                  <span
-                    className="pt-monospace-text"
+                "children": Array [
+                  <div
+                    className="col-sm-6"
                   >
-                     
-                    
-                     
-                  </span>
-                </div>,
+                    <ContractSource
+                      contract={Object {}}
+                    />
+                  </div>,
+                  <div
+                    className="col-sm-6 text-right"
+                  >
+                    <span
+                      className="pt-monospace-text"
+                    >
+                       
+                      
+                       
+                    </span>
+                  </div>,
+                ],
                 "className": "row",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <span
-                    className="pt-monospace-text"
-                  >
-                     
-                    
-                     
-                  </span>,
-                  "className": "col-sm-12 text-right",
-                },
-                "ref": null,
-                "rendered": Object {
+              "rendered": Array [
+                Object {
                   "instance": null,
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": Array [
+                    "children": <ContractSource
+                      contract={Object {}}
+                    />,
+                    "className": "col-sm-6",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "contract": Object {},
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": "div",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": <span
+                      className="pt-monospace-text"
+                    >
+                       
+                      
+                       
+                    </span>,
+                    "className": "col-sm-6 text-right",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": Array [
+                        " ",
+                        "",
+                        " ",
+                      ],
+                      "className": "pt-monospace-text",
+                    },
+                    "ref": null,
+                    "rendered": Array [
                       " ",
                       "",
                       " ",
                     ],
-                    "className": "pt-monospace-text",
+                    "type": "span",
                   },
-                  "ref": null,
-                  "rendered": Array [
-                    " ",
-                    "",
-                    " ",
-                  ],
-                  "type": "span",
+                  "type": "div",
                 },
-                "type": "div",
-              },
+              ],
               "type": "div",
             },
             Object {
@@ -2855,10 +2917,11 @@ ShallowWrapper {
                           <withRouter(Connect(ReduxForm))
                             chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractName="Greeter"
                             fromBloc={false}
                             fromCirrus={false}
-                            lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                             symbolName="greet"
                           />
                         </td>
@@ -2958,10 +3021,11 @@ ShallowWrapper {
                           <withRouter(Connect(ReduxForm))
                             chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractName="Greeter"
                             fromBloc={false}
                             fromCirrus={false}
-                            lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                             symbolName="greet"
                           />
                         </td>
@@ -3058,10 +3122,11 @@ ShallowWrapper {
                             <withRouter(Connect(ReduxForm))
                               chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractName="Greeter"
                               fromBloc={false}
                               fromCirrus={false}
-                              lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                               symbolName="greet"
                             />
                           </td>
@@ -3231,10 +3296,11 @@ ShallowWrapper {
                               <withRouter(Connect(ReduxForm))
                                 chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractName="Greeter"
                                 fromBloc={false}
                                 fromCirrus={false}
-                                lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 symbolName="greet"
                               />
                             </td>
@@ -3308,10 +3374,11 @@ ShallowWrapper {
                                 <withRouter(Connect(ReduxForm))
                                   chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractName="Greeter"
                                   fromBloc={false}
                                   fromCirrus={false}
-                                  lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   symbolName="greet"
                                 />
                               </td>,
@@ -3338,10 +3405,11 @@ ShallowWrapper {
                                 "children": <withRouter(Connect(ReduxForm))
                                   chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractName="Greeter"
                                   fromBloc={false}
                                   fromCirrus={false}
-                                  lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   symbolName="greet"
                                 />,
                                 "style": Object {
@@ -3356,10 +3424,11 @@ ShallowWrapper {
                                 "props": Object {
                                   "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                   "contractAddress": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  "contractKey": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                   "contractName": "Greeter",
                                   "fromBloc": false,
                                   "fromCirrus": false,
-                                  "lookup": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  "methodKey": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
                                   "symbolName": "greet",
                                 },
                                 "ref": null,
@@ -3645,7 +3714,14 @@ ShallowWrapper {
                 className="row"
               >
                 <div
-                  className="col-sm-12 text-right"
+                  className="col-sm-6"
+                >
+                  <ContractSource
+                    contract={Object {}}
+                  />
+                </div>
+                <div
+                  className="col-sm-6 text-right"
                 >
                   <span
                     className="pt-monospace-text"
@@ -3697,10 +3773,11 @@ ShallowWrapper {
                           <withRouter(Connect(ReduxForm))
                             chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractName="Greeter"
                             fromBloc={false}
                             fromCirrus={false}
-                            lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                             symbolName="greet"
                           />
                         </td>
@@ -4427,7 +4504,14 @@ ShallowWrapper {
                 className="row"
               >
                 <div
-                  className="col-sm-12 text-right"
+                  className="col-sm-6"
+                >
+                  <ContractSource
+                    contract={Object {}}
+                  />
+                </div>
+                <div
+                  className="col-sm-6 text-right"
                 >
                   <span
                     className="pt-monospace-text"
@@ -4479,10 +4563,11 @@ ShallowWrapper {
                           <withRouter(Connect(ReduxForm))
                             chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractName="Greeter"
                             fromBloc={false}
                             fromCirrus={false}
-                            lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                            methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                             symbolName="greet"
                           />
                         </td>
@@ -4554,7 +4639,14 @@ ShallowWrapper {
                   className="row"
                 >
                   <div
-                    className="col-sm-12 text-right"
+                    className="col-sm-6"
+                  >
+                    <ContractSource
+                      contract={Object {}}
+                    />
+                  </div>
+                  <div
+                    className="col-sm-6 text-right"
                   >
                     <span
                       className="pt-monospace-text"
@@ -4606,10 +4698,11 @@ ShallowWrapper {
                             <withRouter(Connect(ReduxForm))
                               chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractName="Greeter"
                               fromBloc={false}
                               fromCirrus={false}
-                              lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                               symbolName="greet"
                             />
                           </td>
@@ -4677,57 +4770,92 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <div
-                    className="col-sm-12 text-right"
-                  >
-                    <span
-                      className="pt-monospace-text"
+                  "children": Array [
+                    <div
+                      className="col-sm-6"
                     >
-                       
-                      
-                       
-                    </span>
-                  </div>,
+                      <ContractSource
+                        contract={Object {}}
+                      />
+                    </div>,
+                    <div
+                      className="col-sm-6 text-right"
+                    >
+                      <span
+                        className="pt-monospace-text"
+                      >
+                         
+                        
+                         
+                      </span>
+                    </div>,
+                  ],
                   "className": "row",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <span
-                      className="pt-monospace-text"
-                    >
-                       
-                      
-                       
-                    </span>,
-                    "className": "col-sm-12 text-right",
-                  },
-                  "ref": null,
-                  "rendered": Object {
+                "rendered": Array [
+                  Object {
                     "instance": null,
                     "key": undefined,
                     "nodeType": "host",
                     "props": Object {
-                      "children": Array [
+                      "children": <ContractSource
+                        contract={Object {}}
+                      />,
+                      "className": "col-sm-6",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "contract": Object {},
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": "div",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <span
+                        className="pt-monospace-text"
+                      >
+                         
+                        
+                         
+                      </span>,
+                      "className": "col-sm-6 text-right",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          " ",
+                          "",
+                          " ",
+                        ],
+                        "className": "pt-monospace-text",
+                      },
+                      "ref": null,
+                      "rendered": Array [
                         " ",
                         "",
                         " ",
                       ],
-                      "className": "pt-monospace-text",
+                      "type": "span",
                     },
-                    "ref": null,
-                    "rendered": Array [
-                      " ",
-                      "",
-                      " ",
-                    ],
-                    "type": "span",
+                    "type": "div",
                   },
-                  "type": "div",
-                },
+                ],
                 "type": "div",
               },
               Object {
@@ -4773,10 +4901,11 @@ ShallowWrapper {
                             <withRouter(Connect(ReduxForm))
                               chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractName="Greeter"
                               fromBloc={false}
                               fromCirrus={false}
-                              lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                               symbolName="greet"
                             />
                           </td>
@@ -4876,10 +5005,11 @@ ShallowWrapper {
                             <withRouter(Connect(ReduxForm))
                               chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractName="Greeter"
                               fromBloc={false}
                               fromCirrus={false}
-                              lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                               symbolName="greet"
                             />
                           </td>
@@ -4976,10 +5106,11 @@ ShallowWrapper {
                               <withRouter(Connect(ReduxForm))
                                 chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractName="Greeter"
                                 fromBloc={false}
                                 fromCirrus={false}
-                                lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 symbolName="greet"
                               />
                             </td>
@@ -5149,10 +5280,11 @@ ShallowWrapper {
                                 <withRouter(Connect(ReduxForm))
                                   chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractName="Greeter"
                                   fromBloc={false}
                                   fromCirrus={false}
-                                  lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   symbolName="greet"
                                 />
                               </td>
@@ -5226,10 +5358,11 @@ ShallowWrapper {
                                   <withRouter(Connect(ReduxForm))
                                     chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractName="Greeter"
                                     fromBloc={false}
                                     fromCirrus={false}
-                                    lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                     symbolName="greet"
                                   />
                                 </td>,
@@ -5256,10 +5389,11 @@ ShallowWrapper {
                                   "children": <withRouter(Connect(ReduxForm))
                                     chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    contractKey="card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractName="Greeter"
                                     fromBloc={false}
                                     fromCirrus={false}
-                                    lookup="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    methodKey="methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b"
                                     symbolName="greet"
                                   />,
                                   "style": Object {
@@ -5274,10 +5408,11 @@ ShallowWrapper {
                                   "props": Object {
                                     "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                     "contractAddress": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    "contractKey": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                     "contractName": "Greeter",
                                     "fromBloc": false,
                                     "fromCirrus": false,
-                                    "lookup": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    "methodKey": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
                                     "symbolName": "greet",
                                   },
                                   "ref": null,
@@ -6845,6 +6980,7 @@ ShallowWrapper {
     }
     fetchAccount={[Function]}
     fetchCirrusInstances={[Function]}
+    fetchContractInfoRequest={[Function]}
     fetchState={[Function]}
     selectContractInstance={[Function]}
   />,

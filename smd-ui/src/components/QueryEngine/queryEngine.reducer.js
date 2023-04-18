@@ -72,7 +72,6 @@ const reducer = function (state = initialState, action) {
         error: action.error
       };
     case TRANSACTION_RESULT_SUCCESS:
-      console.log(action.txResult)
       const r = action.txResult && ((typeof action.txResult) == 'string') ? `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}` : action.txResult.type.tag;
       return {
         ...state,

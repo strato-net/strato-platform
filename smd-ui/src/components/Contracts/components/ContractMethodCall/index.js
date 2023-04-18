@@ -92,20 +92,20 @@ class ContractMethodCall extends Component {
     </div>)
   }
 
-  renderAddress = (isModeOauth) => {
+  renderAddress = () => {
     const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : [];
-    return (<div className={isModeOauth ? "" : "pt-select"}>
+    return (<div className={"pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="modalAddress"
-        disabled={isModeOauth}
+        disabled={true}
         required
       >
-        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
-          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
+        <option value={this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
+          {this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -221,6 +221,7 @@ class ContractMethodCall extends Component {
         </tr>
       );
     }
+    console.log('HERE')
     return (
       <div>
         <Popover 
@@ -308,13 +309,13 @@ class ContractMethodCall extends Component {
                   >
                     <pre >
                       {/* Render the function signature */}
-                      function {this.props.symbolName}{`(${Object.getOwnPropertyNames(funcInfo.args).length > 0 && Object.entries(funcInfo.args).map(([key, val]) => {
+                      function {this.props.symbolName}{`(${funcInfo && funcInfo.args && Object.getOwnPropertyNames(funcInfo.args).length > 0 && Object.entries(funcInfo.args).map(([key, val]) => {
                         return `${val.tag.toLowerCase()} ${key}`
-                      }).join(',')})`} {Object.getOwnPropertyNames(funcInfo.vals).length > 0 && `returns (${Object.entries(funcInfo.vals).map(([key, val]) => {
+                      }).join(',')})`} {funcInfo && funcInfo.vals && Object.getOwnPropertyNames(funcInfo.vals).length > 0 && `returns (${Object.entries(funcInfo.vals).map(([key, val]) => {
                         return val.tag.toLowerCase()
                       }).join(',')})`} &#123;
                       {/* Render the function body */}
-                        {`\n\t`}{funcInfo.contents}
+                        {`\n\t`}{funcInfo.contents || 'Error loading function body'}
                       {`\n`}&#125;
                     </pre>
                   </Collapse>
