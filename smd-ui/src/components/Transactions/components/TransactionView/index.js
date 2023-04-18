@@ -17,7 +17,6 @@ class TransactionView extends Component {
     const history = this.props.history;
     const hash = this.props.match.params.hash;
     const tx = this.props.tx ? this.props.tx : {};
-    console.log(tx)
     if (!Object.keys(tx).length) history.push(`/transactions`);
 
     let cardIntent = ''
@@ -39,7 +38,6 @@ class TransactionView extends Component {
       return cleaned.split(',')
     }
     const parsedArgs = tx.metadata && tx.metadata.args ? parseArgs(tx.metadata.args) : [] 
-    console.log(parsedArgs)
     return (
       <div className="container-fluid pt-dark ">
         

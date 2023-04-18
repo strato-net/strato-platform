@@ -22,7 +22,7 @@ export default class ContractSource extends Component {
         const contractSource = this.props.contract.bin || ''
         const contractName = this.props.contract.name || ''
         const address = this.props.contract.address || ''
-        const codeHash = this.props.contract.codeHash.digest || ''
+        const codeHash = this.props.contract.codeHash ? this.props.contract.codeHash.digest : ''
         const vm = this.props.contract.codeHash.kind || ''
         return (
             <Button 

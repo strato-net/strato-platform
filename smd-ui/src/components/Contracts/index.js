@@ -116,6 +116,9 @@ class Contracts extends Component {
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
 
+    const returnedInstances = contracts && contractNames.length > 0 ? Object.values(contracts).reduce((prev, cur) => {
+      return prev + cur.instances.length
+    }, 0) : 0
 
     const cards = contractNames.length === 0 ? [] : contractNames
       .filter(function (contract) {
@@ -290,14 +293,14 @@ class Contracts extends Component {
               />
             </div>
             <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
-              {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)}`}
+              {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)} (${returnedInstances} Contract Instances)`}
             </div>
             <div className="col-sm-2 smd-pad-16 text-right">
               <Button
                 onClick={this.onNextClick}
                 className="pt-icon-arrow-right"
                 text="Next"
-                disabled={cards.length < this.state.limit}
+                disabled={returnedInstances < this.state.limit}
               />
             </div>
           </div>

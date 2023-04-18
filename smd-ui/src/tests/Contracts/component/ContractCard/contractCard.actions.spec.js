@@ -8,9 +8,12 @@ import {
   fetchCirrusInstancesFailure,
   fetchAccount,
   fetchAccountSuccess,
-  fetchAccountFailure
+  fetchAccountFailure,
+  fetchContractInfoRequest,
+  fetchContractInfoSuccess,
+  fetchContractInfoFailure,
 } from '../../../../components/Contracts/components/ContractCard/contractCard.actions';
-import { contract } from './contractCardMock';
+import { contract, modals } from './contractCardMock';
 
 describe('ContractCard: action', () => {
 
@@ -65,5 +68,19 @@ describe('ContractCard: action', () => {
     });
 
   })
+  describe('fetch contract info snapshots', () => {
 
+    test('request', () => {
+      expect(fetchContractInfoRequest(modals.key, modals.name, modals.address, modals.chainId)).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      expect(fetchContractInfoSuccess(modals.key, {address: modals.address, chainId: modals.chainId, xabi: {}})).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchContractInfoFailure(modals.key, modals.error)).toMatchSnapshot();
+    });
+
+  })
 });

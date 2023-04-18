@@ -1,46 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`ContractMethodCall: action close model with contract key 1`] = `
-Object {
-  "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "type": "METHOD_CALL_CLOSE_MODAL",
-}
-`;
-
-exports[`ContractMethodCall: action fetch arguments failure 1`] = `
-Object {
-  "error": "ERROR",
-  "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "type": "METHOD_CALL_FETCH_ARGS_FAILURE",
-}
-`;
-
-exports[`ContractMethodCall: action fetch arguments request 1`] = `
-Object {
-  "address": "8070db2390462e2b5748085bde1350590e08bb17",
-  "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
-  "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "name": "Greeter",
-  "symbol": "greet",
-  "type": "METHOD_CALL_FETCH_ARGS_REQUEST",
-}
-`;
-
-exports[`ContractMethodCall: action fetch arguments success 1`] = `
-Object {
-  "args": Object {
-    "_greeting": Object {
-      "dynamic": true,
-      "index": 0,
-      "type": "String",
-    },
-  },
-  "isPayable": true,
-  "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "type": "METHOD_CALL_FETCH_ARGS_SUCCESS",
-}
-`;
-
 exports[`ContractMethodCall: action method call failure 1`] = `
 Object {
   "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
@@ -101,12 +60,5 @@ Object {
     },
   ],
   "type": "METHOD_CALL_SUCCESS",
-}
-`;
-
-exports[`ContractMethodCall: action open model with contract key 1`] = `
-Object {
-  "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
-  "type": "METHOD_CALL_OPEN_MODAL",
 }
 `;

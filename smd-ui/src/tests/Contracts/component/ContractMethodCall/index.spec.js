@@ -15,43 +15,27 @@ describe('ContractMethodCall: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('renders contracts card (non Oauth mode)', () => {
-    const props = {
-      modal: {
-        isPayable: true
-      },
-      accounts: indexAccountsMock,
-      modalUsername: 'Buyer1',
-      oAuthUser: {
-        "id": '',
-        "username": '',
-        "address": ''
-      },
-      chainLabel: chain,
-      chainLabelIds: chain["airline cartel 9"],
-      fetchChainIds: jest.fn(),
-      getLabelIds: jest.fn(),
-      methodCallFetchArgs: jest.fn(),
-      methodCallOpenModal: jest.fn(),
-      methodCallCloseModal: jest.fn(),
-      fetchAccounts: jest.fn(),
-      methodCall: jest.fn(),
-      store: store
-    }
-
-    checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
-
-    const wrapper = shallow(
-      <ContractMethodCall.WrappedComponent {...props} />
-    ).dive().dive().dive();
-
-    expect(wrapper.debug()).toMatchSnapshot();
-  });
 
   test('renders contracts card (Oauth mode)', () => {
     const props = {
-      modal: {
+      methodCallModal: {
         isPayable: false
+      },
+      contractInfo: {
+        bin: 'contract Foo {}',
+        xabi: {
+          funcs: {
+            'setX': {
+              args: {
+                a: {
+                  type:'int',
+                  tag: 'Int'
+                }
+              }
+            },
+          }
+        },
+        address: "f114257cb370ad0e0025eedf0a96261b51af23e3",
       },
       accounts: {},
       modalUsername: 'Buyer1',
@@ -62,11 +46,11 @@ describe('ContractMethodCall: index', () => {
         "username": 'Supplier1',
         "address": '370adf114257cb0e0025eedf0a96261b51af23e3'
       },
+      symbolName: 'setX',
+      contractKey: 'card-data-f114257cb370ad0e0025eedf0a96261b51af23e3-',
+      methodKey: 'methodCall-f114257cb370ad0e0025eedf0a96261b51af23e3-',
       fetchChainIds: jest.fn(),
       getLabelIds: jest.fn(),
-      methodCallFetchArgs: jest.fn(),
-      methodCallOpenModal: jest.fn(),
-      methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
       store: store
@@ -84,8 +68,31 @@ describe('ContractMethodCall: index', () => {
   test('mapStateToProps with default values', () => {
     const state = {
       methodCall: {
-        modals: undefined
+        methodCallModal: {
+          isPayable: false
+        },
       },
+      symbolName: 'setX',
+      contractInfo: {
+        bin: 'contract Foo {}',
+        xabi: {
+          funcs: {
+            'setX': {
+              args: {
+                a: {
+                  type:'int',
+                  tag: 'Int'
+                }
+              }
+            },
+          }
+        },
+        address: "f114257cb370ad0e0025eedf0a96261b51af23e3",
+      },
+      contractCard: {
+        contractInfos: {}
+      },
+      contractKey: 'card-data-f114257cb370ad0e0025eedf0a96261b51af23e3-',
       chains: {
         listChain: chain,
         listLabelIds: chain["airline cartel 9"]
@@ -106,70 +113,30 @@ describe('ContractMethodCall: index', () => {
     expect(mapStateToProps(state, 'methodCallgreetf62c8965f2129d178aa28c043f9b3d0cd52f9e2e')).toMatchSnapshot();
   });
 
-  test('open modal', () => {
-    const props = {
-      modal: modals,
-      accounts: indexAccountsMock,
-      modalUsername: 'Buyer1',
-      oAuthUser: {
-        "id": 6,
-        "username": "tanuj41",
-        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
-      },
-      chainLabel: chain,
-      chainLabelIds: chain["airline cartel 9"],
-      fetchChainIds: jest.fn(),
-      getLabelIds: jest.fn(),
-      methodCallFetchArgs: jest.fn(),
-      methodCallOpenModal: jest.fn(),
-      methodCallCloseModal: jest.fn(),
-      fetchAccounts: jest.fn(),
-      methodCall: jest.fn(),
-      userCertificate: { userAddress: "345678"},
-    }
-    const wrapper = mount(
-      <Provider store={store}>
-        <ContractMethodCall.WrappedComponent {...props} />
-      </Provider>
-    );
-    wrapper.find('AnchorButton').simulate('click');
-    expect(props.methodCallOpenModal).toHaveBeenCalled();
-  });
-
-  test('modal close', () => {
-    const props = {
-      modal: modals,
-      accounts: indexAccountsMock,
-      modalUsername: 'Buyer1',
-      oAuthUser: {
-        "id": 6,
-        "username": "tanuj41",
-        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
-      },
-      chainLabel: chain,
-      chainLabelIds: chain["airline cartel 9"],
-      fetchChainIds: jest.fn(),
-      getLabelIds: jest.fn(),
-      methodCallFetchArgs: jest.fn(),
-      methodCallOpenModal: jest.fn(),
-      methodCallCloseModal: jest.fn(),
-      fetchAccounts: jest.fn(),
-      methodCall: jest.fn(),
-      store: store,
-      userCertificate: { userAddress: "567890"}
-    }
-    const wrapper = shallow(
-      <Provider store={store}>
-        <ContractMethodCall.WrappedComponent {...props} />
-      </Provider>
-    ).dive().dive().dive().dive();
-    wrapper.find('Button').at(0).simulate('click', { preventDefault() { }, stopPropagation() { } })
-    expect(props.methodCallCloseModal).toHaveBeenCalled();
-  });
-
   test('simulate submit form', () => {
     const props = {
-      modal: modals,
+      methodCallModal: modals,
+      contractInfo: {
+
+      },
+      contractInfo: {
+        bin: 'contract Foo {}',
+        xabi: {
+          funcs: {
+            'setX': {
+              args: {
+                a: {
+                  type:'int',
+                  tag: 'Int'
+                }
+              }
+            },
+          }
+        },
+        address: "f114257cb370ad0e0025eedf0a96261b51af23e3",
+      },
+      symbolName: 'setX',
+      contractKey: 'card-data-f114257cb370ad0e0025eedf0a96261b51af23e3-',
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
       oAuthUser: {
@@ -181,9 +148,6 @@ describe('ContractMethodCall: index', () => {
       chainLabelIds: chain["airline cartel 9"],
       fetchChainIds: jest.fn(),
       getLabelIds: jest.fn(),
-      methodCallFetchArgs: jest.fn(),
-      methodCallOpenModal: jest.fn(),
-      methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
       store: store

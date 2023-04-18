@@ -37,3 +37,36 @@ export const state = {
   "geneticallyModify": "function (String) returns ()",
   "name": ""
 }
+
+export const modals = {
+  name: 'Foo',
+  key: 'data-card-1234567-',
+  address: '1234567',
+  chainId: '123456756789876789876543345678',
+  error: {
+    message: 'some error'
+  }
+}
+
+export const contractInfoResponse = {
+  address: '1234567',
+  chainId: '123456756789876789876543345678',
+  xabi: {
+    funcs: {
+      geneticallyModify: {
+        args: {
+          _dna: {
+            dynamic: true,
+            type: "String",
+            tag: "String",
+            index: 0
+          }
+        }
+      }
+    }
+  }
+}
+
+export const initialState = {
+  contractInfos: {}
+}
