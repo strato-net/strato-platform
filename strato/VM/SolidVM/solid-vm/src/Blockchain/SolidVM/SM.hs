@@ -29,6 +29,8 @@ module Blockchain.SolidVM.SM (
   popCallInfo,
   withTempCallInfo,
   withUncheckedCallInfo,
+  pushLocalVars,
+  popLocalVars,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -125,6 +127,7 @@ data CallInfo = CallInfo
   , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
   , localVariables      :: Map SolidString (SVMType.Type, Variable)
+  , variableStack       :: [Map SolidString (SVMType.Type, Variable)]
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
@@ -539,6 +542,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
           codeCollection=cc,
           collectionHash=hsh,
           localVariables=initialLocalVariables,
+          variableStack=[initialLocalVariables],
           readOnly=ro,
           isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
           currentSourcePos=Nothing,
@@ -561,6 +565,31 @@ popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
+
+pushLocalVars :: MonadSM m => m ()
+pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  []      -> internalError "pushLocalVars was called with an empty stack" ()
+  (curFrame:rest) -> do
+    let localVariables' = localVariables curFrame
+        variableStack'  = variableStack curFrame
+    {-- We save the local variables available in this scope to the 'stack', 
+    which is simply a list of mappings from name to type/values
+    --}
+    pure $ curFrame{variableStack = (localVariables':variableStack')} : rest
+
+-- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
+popLocalVars :: MonadSM m => m ()
+popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  []      -> internalError "popLocalVars was called with an empty stack" ()
+  (curFrame:rest) -> do
+    let (varFrame, st) = case variableStack curFrame of
+          (varFrame': st') -> (varFrame', st')
+          [] -> (M.empty, [])
+    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars), 
+    we simply reassign the local variables to the top frame of the stack
+    and the new stack's value is the rest of the frames
+    --}
+    pure $ (curFrame {localVariables = varFrame, variableStack = st} : rest)
 
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
