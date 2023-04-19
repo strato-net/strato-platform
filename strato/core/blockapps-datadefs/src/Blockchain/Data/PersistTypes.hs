@@ -8,7 +8,6 @@ module Blockchain.Data.PersistTypes where
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
-import           Data.Source.Map
 import qualified Data.Text                          as T
 import           Data.Text.Encoding
 import           Database.Persist
@@ -25,7 +24,6 @@ import qualified LabeledError
 derivePersistField "Integer"
 derivePersistField "Point"
 derivePersistField "Xabi"
-derivePersistField "SourceMap"
 
 integerCap :: Integer
 integerCap = 1000

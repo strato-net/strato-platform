@@ -506,7 +506,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} jwtToken = blocTransacti
       Right val -> return val
       _ -> throwIO $ AnError "Couldn't decode binary"
 
-  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap src),("name", cName)]
   
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
@@ -551,7 +551,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
+      (Code $ Text.encodeUtf8 $ serializeSourceMap src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   
@@ -577,7 +577,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
         cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
           Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
           Just x -> pure x
-        at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
+        at name <?= (srcs, contractdetailsXabi cd)
                   
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs

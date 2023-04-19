@@ -37,7 +37,6 @@ import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Data
-import           Data.Source.Map
 import           Data.Swagger                            hiding (Format, format)
 import           Data.Text                               (Text)
 import           Data.Time

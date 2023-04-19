@@ -98,7 +98,6 @@ ContractDetailsRef
     account Account Maybe
     codeHash CodePtr
     name Text
-    src SourceMap
     xabi Xabi
     deriving Eq Read Show
 

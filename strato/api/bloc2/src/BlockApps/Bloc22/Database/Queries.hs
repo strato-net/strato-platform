@@ -186,7 +186,7 @@ getContractDetailsFromDB codePtr ctrName = do
       , contractdetailsBinRuntime = ""
       , contractdetailsCodeHash =  contractDetailsRefCodeHash a
       , contractdetailsName = contractDetailsRefName a
-      , contractdetailsSrc = contractDetailsRefSrc a
+      , contractdetailsSrc = SourceMap []
       , contractdetailsXabi = contractDetailsRefXabi a
       }
 
@@ -195,8 +195,8 @@ insertContractDetails
   => ContractDetails
   -> Bool
   -> m ()
-insertContractDetails (ContractDetails _ a _ ch n s x) shouldInsert = case shouldInsert of
-  True -> sqlQuery $ E.insert_ $ ContractDetailsRef a ch n s x
+insertContractDetails (ContractDetails _ a _ ch n _ x) shouldInsert = case shouldInsert of
+  True -> sqlQuery $ E.insert_ $ ContractDetailsRef a ch n x
   False -> pure $ ()
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
@@ -221,7 +221,7 @@ getContractDetailsByCodeHash codePtr = do
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
       mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
-        ~(shouldCompile, name, ch) <- case codeHash of
+        (shouldCompile, name, ch) <- case codeHash of
           EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
             [] -> throwE $ "Could not find EVM contract for code hash " <> Text.pack (format ch)
             ((name, sh):xs) -> do
