@@ -186,7 +186,8 @@ getContractsState _ address chainId mName mCount mOffset mLength = do
       in join <$> mapM (getStorageRange address) ranges
 
   let storage = translateStorageMap storage'
-
+  
+  $logInfoS "DEBUG" $ Text.pack $ show $ decodeSolidVMValues $ map (key &&& value) storage'
   ret <- case (storage', mName) of
     (StorageAddress{kind=SolidVM}:_, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $ Text.unlines
@@ -384,6 +385,7 @@ getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 postContractsCompile :: ( (Keccak256 `A.Alters` SourceMap) m
                         , MonadLogger m
                         , HasBlocSQL m
+                        , HasSQL m
                         )
                      => [PostCompileRequest] -> m [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
@@ -392,7 +394,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       let shouldCompile = case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
             _ -> Do Compile
-      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource False
       for (toList idsAndDetails) $ \ details -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of

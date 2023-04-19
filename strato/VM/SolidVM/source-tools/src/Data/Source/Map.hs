@@ -31,7 +31,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
 newtype SourceMap = SourceMap { unSourceMap :: [(Text, Text)] }
-                  deriving (Eq, Show, Generic, Data, Hashable, Semigroup, Monoid)
+                  deriving (Eq, Show, Generic, Data, Hashable, Semigroup, Monoid, Read)
 
 instance ToJSON SourceMap where
   toJSON (SourceMap [("", src)]) = toJSON src

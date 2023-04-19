@@ -94,6 +94,14 @@ Storage json
     value HexStorage
     deriving Eq Read Show
 
+ContractDetailsRef
+    account Account Maybe
+    codeHash CodePtr
+    name Text
+    src SourceMap
+    xabi Xabi
+    deriving Eq Read Show
+
 TransactionResult json
     blockHash Keccak256
     transactionHash Keccak256

@@ -229,6 +229,7 @@ evalAndReturn :: ( (Keccak256 `A.Alters` SourceMap) m
                  , MonadLogger m
                  , HasBlocSQL m
                  , HasBlocEnv m
+                 , HasSQL m
                  )
               => [TRD] -> m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
@@ -238,7 +239,7 @@ evalAndReturn list = forStateT emptyBatchState list $
         Success -> case mtxr of
           Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
           Just (r@RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
-            (Nothing, code) -> contractResult i txHash code txr (Map.fromList <$> rawTransactionMetadata)
+            (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
             (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
             (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
@@ -250,15 +251,13 @@ nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
 
 contractResult :: ( A.Selectable Account AddressState m
                   , HasBlocSQL m
-                  -- , MonadLogger m
                   )
                => Integer
                -> Keccak256
-               -> Code
                -> TransactionResult
                -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult i txHash _ txResult mmd = do
+contractResult i txHash txResult mmd = do
   name <- case mmd of
     Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
     Just md -> case Map.lookup "name" md of
@@ -287,6 +286,7 @@ functionResult :: ( A.Selectable Account AddressState m
                   , MonadLogger m
                   , HasBlocSQL m
                   , HasBlocEnv m
+                  , HasSQL m
                   )
                => Integer
                -> Keccak256

@@ -94,6 +94,7 @@ createChainInfo :: ( A.Selectable Account AddressState m
                    , HasBlocEnv m
                    , HasBlocSQL m
                    , HasVault m
+                   , HasSQL m
                    )
                 => Text -> Keccak256 -> ChainInput -> m ChainInfo
 createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChains mmd _) = do

@@ -37,7 +37,7 @@ import           Data.Source.Map
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic, NFData)
+              | LibraryKind deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
@@ -59,7 +59,7 @@ data Xabi = Xabi
   , xabiEvents    :: Map Text Event
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text Using
-  } deriving (Eq,Show,Generic,NFData)
+  } deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -122,7 +122,7 @@ funcMapToConstructor = fmap snd . listToMaybe . Map.toList
 
 --------------------------------------------------------------------------------
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData, Read)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -166,7 +166,7 @@ data Func = Func
   , funcContents :: Maybe Text
   , funcVisibility :: Maybe Visibility
   , funcModifiers :: Maybe [String]
-  } deriving (Eq,Show,Generic,NFData)
+  } deriving (Eq,Show,Generic,NFData, Read)
 
 funcPayable :: Func -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True
@@ -227,7 +227,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic,NFData)
+  deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON Visibility
 instance FromJSON Visibility
@@ -246,7 +246,7 @@ data Modifier = Modifier
   , modifierSelector :: Text
   , modifierVals     :: Map Text Xabi.IndexedType
   , modifierContents :: Maybe Text
-  } deriving (Eq,Show,Generic,NFData)
+  } deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON Modifier where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -273,7 +273,7 @@ instance ToSchema Modifier where
 data Event = Event { eventAnonymous :: Bool
                    , eventLogs :: [(Text, Xabi.IndexedType)]
                    }
-              deriving (Eq,Show,Generic,NFData)
+              deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON Event where
   toJSON e = object [
@@ -304,7 +304,7 @@ instance ToSchema Event where
           ]
         }
 
-newtype Using = Using String deriving (Eq,Show,Generic,NFData)
+newtype Using = Using String deriving (Eq, Show, Generic, NFData, Read)
 
 instance ToJSON Using where
   toJSON (Using dec) = String . Text.pack $ dec

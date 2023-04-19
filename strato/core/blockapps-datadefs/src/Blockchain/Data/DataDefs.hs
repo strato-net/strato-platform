@@ -37,6 +37,7 @@ import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Data
+import           Data.Source.Map
 import           Data.Swagger                            hiding (Format, format)
 import           Data.Text                               (Text)
 import           Data.Time
@@ -47,7 +48,7 @@ import           Numeric
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
-
+import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
 import           Blockchain.Strato.Model.Class

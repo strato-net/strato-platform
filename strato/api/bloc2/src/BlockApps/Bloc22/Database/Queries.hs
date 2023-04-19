@@ -51,6 +51,7 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable                (for)
+import qualified Database.Esqueleto.Legacy       as E
 import           Database.PostgreSQL.Simple.FromField hiding (name, format)
 import           Opaleye                         hiding (not, null, index, FromField)
 import qualified Opaleye as O
@@ -71,6 +72,8 @@ import           BlockApps.Bloc22.XabiHelper
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -80,6 +83,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Data.Source.Map
 
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.SQL
 import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -163,11 +167,44 @@ insertContractDetailsQuery sourceList =
           A.insert (A.Proxy @SourceMap) srcHash sourceList
 
 
+getContractDetailsFromDB
+  :: (HasSQL m)
+  => CodePtr
+  -> Text
+  -> m (Maybe ContractDetails)
+getContractDetailsFromDB codePtr ctrName = do
+  res <- fmap (map E.entityVal) . sqlQuery $ E.select $
+    E.from $ \(contractDetailsRef) -> do
+      E.where_ (contractDetailsRef E.^. ContractDetailsRefCodeHash E.==. E.val codePtr)
+      E.where_ (contractDetailsRef E.^. ContractDetailsRefName E.==. E.val ctrName)
+      return contractDetailsRef
+  case listToMaybe res of
+    Nothing -> pure $ Nothing
+    Just a -> pure $ Just $ ContractDetails
+      { contractdetailsBin = ""
+      , contractdetailsAccount = contractDetailsRefAccount a
+      , contractdetailsBinRuntime = ""
+      , contractdetailsCodeHash =  contractDetailsRefCodeHash a
+      , contractdetailsName = contractDetailsRefName a
+      , contractdetailsSrc = contractDetailsRefSrc a
+      , contractdetailsXabi = contractDetailsRefXabi a
+      }
+
+insertContractDetails
+  :: (HasSQL m)
+  => ContractDetails
+  -> Bool
+  -> m ()
+insertContractDetails (ContractDetails _ a _ ch n s x) shouldInsert = case shouldInsert of
+  True -> sqlQuery $ E.insert_ $ ContractDetailsRef a ch n s x
+  False -> pure $ ()
+
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , HasBlocEnv m
                                 , MonadLogger m
                                 , HasBlocSQL m
+                                , HasSQL m
                                 )
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
@@ -197,13 +234,17 @@ getContractDetailsByCodeHash codePtr = do
               pure (Do Compile, name, sh)
           SolidVMCode name ch -> pure (Don't Compile, Text.pack name, ch)
           CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
-        srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
-          Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
-          Just s -> pure s
-        detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
-        case Map.lookup name detailsMap of
-            Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-            Just d -> pure d
+        cd <- lift $ getContractDetailsFromDB codeHash name
+        case cd of
+          Nothing -> do 
+            srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
+              Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
+              Just s -> pure s
+            detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap True
+            case Map.lookup name detailsMap of
+                Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
+                Just d -> pure d
+          Just d -> pure d 
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
@@ -222,6 +263,7 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  , MonadLogger m
                                  , HasBlocSQL m
                                  , HasBlocEnv m
+                                 , HasSQL m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
@@ -241,7 +283,7 @@ getContractDetailsForContract theVM src mContract = do
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
       details <- if hasAnyNonEmptySources src
-                   then sourceToContractDetails shouldCompile src
+                   then sourceToContractDetails shouldCompile src True
                    else return Map.empty
       pure details
   case mContract of
@@ -266,13 +308,14 @@ getContractDetailsForContract theVM src mContract = do
 sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
                            , MonadLogger m
                            , HasBlocSQL m
+                           , HasSQL m
                            )
-                        => Should Compile -> SourceMap -> m (Map Text ContractDetails)
-sourceToContractDetails shouldCompile sourceList =
+                        => Should Compile -> SourceMap -> Bool -> m (Map Text ContractDetails)
+sourceToContractDetails shouldCompile sourceList shouldInsert =
   let createContractDetails =
         case shouldCompile of
           Do Compile    -> compileContract
-          Don't Compile -> createMetadataNoCompile
+          Don't Compile -> createMetadataNoCompile shouldInsert
    in createContractDetails sourceList
 
 compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
@@ -317,12 +360,12 @@ compileContract sourceList = do
   pure $ Map.fromList details
 
 -- SolidVM only
-createMetadataNoCompile :: ( MonadIO m
-                           , MonadLogger m
+createMetadataNoCompile :: ( MonadLogger m
+                           , HasSQL m
                            , (Keccak256 `A.Alters` SourceMap) m
                            )
-                        => SourceMap -> m (Map Text ContractDetails)
-createMetadataNoCompile sourceList = do
+                        => Bool -> SourceMap -> m (Map Text ContractDetails)
+createMetadataNoCompile shouldInsert sourceList = do
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
       oldXabi  =  parseXabi "-" $ Text.unpack source
@@ -332,16 +375,18 @@ createMetadataNoCompile sourceList = do
     Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs
   let contracts = xabis
-      details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
-        ContractDetails
-        { contractdetailsBin = source
-        , contractdetailsAccount = Nothing
-        , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
-        , contractdetailsName = contrName
-        , contractdetailsSrc = sourceList
-        , contractdetailsXabi = xabi
-        }
+  details <- flip Map.traverseWithKey contracts $ \ contrName (xabi) -> do
+        let cd = ContractDetails
+              { contractdetailsBin = source
+              , contractdetailsAccount = Nothing
+              , contractdetailsBinRuntime = contrName `Text.append` source
+              , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
+              , contractdetailsName = contrName
+              , contractdetailsSrc = sourceList
+              , contractdetailsXabi = xabi
+              }
+        insertContractDetails cd shouldInsert
+        pure $ cd
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
