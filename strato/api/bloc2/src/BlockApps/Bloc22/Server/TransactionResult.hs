@@ -250,7 +250,7 @@ nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
 
 contractResult :: ( A.Selectable Account AddressState m
                   , HasBlocSQL m
-                  , MonadLogger m
+                  -- , MonadLogger m
                   )
                => Integer
                -> Keccak256
@@ -295,42 +295,48 @@ functionResult :: ( A.Selectable Account AddressState m
                -> Account
                -> StateT BatchState m BlocTransactionResult
 functionResult i txHash txResult mmd toAccount = do
-  funcName <- case mmd of
-    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-    Just md -> case Map.lookup "funcName" md of
-      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just funcName -> pure funcName
-  mxabi <- use $ functionXabiMap . at (toAccount, funcName)
-  xabi <- case mxabi of
-    Just xabi' -> return xabi'
-    Nothing -> do
-      mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
-      xabi' <- case mch of
-        Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
-        Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
-          Left e -> throwIO $ UserError e
-          Right d -> pure $ contractdetailsXabi d
-      functionXabiMap . at (toAccount, funcName) <?= xabi'
-  let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
-      orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-  orderedResultTypes <- lift $
-    for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-      either (throwIO . UserError . Text.pack) return $
-        xabiTypeToType xabi indexedTypeType
-  
-  let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-      txResp = transactionResultResponse txResult
-    -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-    -- workaround for enums
-  mFormattedResponse <- case transactionResultKind txResult of
-    Just SolidVM -> convertSvmResultResToVals txResp 
-    _ -> pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
-
-  case transactionResultMessage txResult of
-    "Success!" -> do
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
-      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
-    stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
+  case transactionResultKind txResult of
+    -- Check if it is a solidVm first
+    -- If it is, we can reduce calls to get ContractDetails
+    Just SolidVM -> case transactionResultMessage txResult of
+        "Success!" -> do
+              let txResp = transactionResultResponse txResult
+              mFormattedResponse <- convertSvmResultResToVals txResp
+              formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
+              return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
+        stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
+    -- Note the below can be removed if one day
+    -- EVM is decided to be taken out
+    _ -> do
+          funcName <- case mmd of
+            Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+            Just md -> case Map.lookup "funcName" md of
+              Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+              Just funcName -> pure funcName
+          mxabi <- use $ functionXabiMap . at (toAccount, funcName)
+          xabi <- case mxabi of
+            Just xabi' -> return xabi'
+            Nothing -> do
+              mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
+              xabi' <- case mch of
+                Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
+                Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
+                  Left e -> throwIO $ UserError e
+                  Right d -> pure $ contractdetailsXabi d
+              functionXabiMap . at (toAccount, funcName) <?= xabi'
+          let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
+              orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+          orderedResultTypes <- lift $
+            for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+              either (throwIO . UserError . Text.pack) return $
+                xabiTypeToType xabi indexedTypeType
+          let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
+              txResp = transactionResultResponse txResult
+            -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+            -- workaround for enums
+          mFormattedResponse <- pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
+          formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
+          return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
