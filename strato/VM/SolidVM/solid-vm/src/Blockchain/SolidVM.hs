@@ -2413,7 +2413,7 @@ callBuiltin "string" [SInteger i] _ = return . SString $ show i
 callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
-callBuiltin "address" [a@SAccount{}] _ = return a
+callBuiltin "address" [SAccount na b] _ = return $ SAccount (unspecifiedChain (_namedAccountAddress na)) b
 callBuiltin "address" [SContract _ a] _ = return $ SAccount a False
 callBuiltin "address" [ss@(SString s)] _ = maybe (typeError "address cast" ss)
                                                  (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain))
