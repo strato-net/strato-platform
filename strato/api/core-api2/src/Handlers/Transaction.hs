@@ -17,11 +17,8 @@ module Handlers.Transaction
   ( TxsFilterParams (..)
   , txsFilterParams
   , API
-  , getTxsFilter
   , getTransaction
   , getTransaction'
-  , postTx
-  , postTxList
   , postTransaction
   , postTransactionList
   , server
@@ -40,7 +37,7 @@ import qualified Database.Esqueleto.Legacy          as E
 import           MaybeNamed
 import           Numeric.Natural
 import           Servant
-import           Servant.Client
+-- import           Servant.Client
 import           System.Clock
 import           Text.Format
 
@@ -110,25 +107,7 @@ data TxsFilterParams = TxsFilterParams
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing []
-  Nothing
-
-getTxsFilter :: TxsFilterParams -> ClientM [RawTransaction']
-postTx :: RawTransaction' -> ClientM Keccak256
-postTxList :: [RawTransaction'] -> ClientM [Keccak256]
-getTxsFilter :<|> postTx :<|> postTxList =
-  uncurryTxsFilterParams getTxsFilter'
-    :<|> postTx'
-    :<|> postTxList'
-  where
-    getTxsFilter'
-      :<|> postTx'
-      :<|> postTxList' = client (Proxy @API)
-    uncurryTxsFilterParams f TxsFilterParams{..} = f
-      qtAddress qtFrom qtTo qtHash qtGasPrice qtMinGasPrice
-      qtMaxGasPrice qtGasLimit qtMinGasLimit qtMaxGasLimit
-      qtValue qtMinValue qtMaxValue qtBlockNumber qtChainId
-      qtChainIds qtSortby
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing
 
 server :: (MonadLogger m, HasSQL m) => ServerT API m
 server = getTransaction :<|> postTransaction :<|> postTransactionList
@@ -142,17 +121,12 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | AllChains
 
 instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
-  select _ t@TxsFilterParams{..} | t == txsFilterParams { qtChainId = qtChainId
-                                                        , qtChainIds = qtChainIds
-                                                        , qtSortby = qtSortby
-                                                        } =
-    throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
+  select _ t@TxsFilterParams{..} | t == txsFilterParams = throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
                                  | otherwise = do
     chainids <-
       case (qtChainId, qtChainIds) of
-        (Nothing, v) -> case v of
-          [] -> pure MainChain
-          cids -> pure $ UnnamedChainIds cids
+        (Nothing, []) -> pure MainChain
+        (Nothing, cids) -> pure $ UnnamedChainIds cids
         (Just c, []) -> case c of
           Unnamed cid -> pure $ UnnamedChainIds [cid]
           Named "main" -> pure MainChain
@@ -177,7 +151,7 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
                 fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
 
                 fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> qtValue),
-                fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> qtMinValue),
+                fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (maybe (Just 0) (Just . fromIntegral) qtMinValue),
                 fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> qtMaxValue),
 
                 fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
@@ -288,8 +262,9 @@ transactionQueryParams = [ "address",
                            "minvalue",
                            "maxvalue",
                            "blocknumber",
-                           "index",
-                           "rejected",
+                           -- "index",
+                           --"rejected",
+                           "[chainids]",
                            "chainid"]
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
