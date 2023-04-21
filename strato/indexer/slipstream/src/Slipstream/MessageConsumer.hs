@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import qualified Network.Kafka.Protocol as K hiding (Message)
 
-import BlockApps.Bloc22.Monad (BlocEnv)
+import Bloc.Monad (BlocEnv)
 import BlockApps.Logging
 import Blockchain.MilenaTools
 import Blockchain.Stream.VMEvent

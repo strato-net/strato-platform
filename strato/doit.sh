@@ -239,12 +239,6 @@ function newnode {
   # Leave the +RTS -N1, it is important
   runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
 
-  if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
-      echo "Starting strato-api2"
-      # Leave the +RTS -N1, it is important
-      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
-  fi
-
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
       indexFlag=true
@@ -365,12 +359,6 @@ function doInit {
       tail -f /dev/null
     fi
   fi
-
-  if [ "${USE_OLD_STRATO_API}" != "true" ]; then
-      echo "initializing bloc database"
-      strato-api-init
-  fi
-
 
   #we need to create the private key for the faucet
   mkdir config
