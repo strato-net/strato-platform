@@ -130,7 +130,7 @@ instance RLPSerializable GenesisData where
   rlpDecode (RLPArray [cBlock, genSR, pChain]) = GenesisData (rlpDecode cBlock, rlpDecode genSR, rlpDecode pChain)
   rlpDecode o = error ("Error in rlpDecode for GenesisData: bad RLPObject: " ++ show o)
 
-newtype ChainStateInfo = ChainStateInfo (Word256, Maybe Keccak256, MP.StateRoot)
+newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
 
 instance RLPSerializable ChainStateInfo where
   rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
@@ -268,8 +268,8 @@ getChainStateRoot chainId bh = do
             mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
             $logDebugS "getChainStateRoot" . T.pack $ "State root for chain " ++ format chainId ++ ": " ++ format mStateRoot
             case mStateRoot of
-              Just (ChainStateInfo (_ :: Word256, Just bHash', stateRoot)) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
-              Just (ChainStateInfo (_ :: Word256, Nothing, stateRoot)) -> return $ Just stateRoot
+              Just (ChainStateInfo (_, Just bHash', stateRoot)) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
+              Just (ChainStateInfo (_, Nothing, stateRoot)) -> return $ Just stateRoot
               _ -> do
                 mStateRoot' <- if parentHash == creationBlock
                   then return $ Just genStateRoot
