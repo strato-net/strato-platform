@@ -132,6 +132,9 @@ instance RLPSerializable GenesisData where
 
 newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
 
+instance Format ChainStateInfo where
+  format (ChainStateInfo x) = format x
+
 instance RLPSerializable ChainStateInfo where
   rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
   rlpEncode (ChainStateInfo (cId, Nothing, sRoot)) = RLPArray [rlpEncode cId, rlpEncode sRoot]
