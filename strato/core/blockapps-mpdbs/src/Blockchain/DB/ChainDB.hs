@@ -130,6 +130,15 @@ instance RLPSerializable GenesisData where
   rlpDecode (RLPArray [cBlock, genSR, pChain]) = GenesisData (rlpDecode cBlock, rlpDecode genSR, rlpDecode pChain)
   rlpDecode o = error ("Error in rlpDecode for GenesisData: bad RLPObject: " ++ show o)
 
+newtype ChainStateInfo = ChainStateInfo (Word256, Maybe Keccak256, MP.StateRoot)
+
+instance RLPSerializable ChainStateInfo where
+  rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
+  rlpEncode (ChainStateInfo (cId, Nothing, sRoot)) = RLPArray [rlpEncode cId, rlpEncode sRoot]
+  rlpDecode (RLPArray [cId, bHash, sRoot]) = ChainStateInfo (rlpDecode cId, Just (rlpDecode bHash), rlpDecode sRoot)
+  rlpDecode (RLPArray [cId, sRoot]) = ChainStateInfo (rlpDecode cId, Nothing, rlpDecode sRoot)
+  rlpDecode o = error ("Error in rlpDecode for ChainStateInfo: bad RLPObject: " ++ show o)
+
 word256ToMPKey :: Maybe Word256 -> N.NibbleString
 word256ToMPKey Nothing    = N.EvenNibbleString ""
 word256ToMPKey (Just cid) = N.EvenNibbleString $ word256ToBytes cid
@@ -259,7 +268,8 @@ getChainStateRoot chainId bh = do
             mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
             $logDebugS "getChainStateRoot" . T.pack $ "State root for chain " ++ format chainId ++ ": " ++ format mStateRoot
             case mStateRoot of
-              Just (_ :: Word256, bHash', stateRoot) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
+              Just (ChainStateInfo (_ :: Word256, Just bHash', stateRoot)) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
+              Just (ChainStateInfo (_ :: Word256, Nothing, stateRoot)) -> return $ Just stateRoot
               _ -> do
                 mStateRoot' <- if parentHash == creationBlock
                   then return $ Just genStateRoot
@@ -277,7 +287,7 @@ putChainStateRoot chainId bHash stateRoot = do
   case mChainRoot of
     Nothing -> pure ()
     Just (parentHash, chainRoot) -> do
-      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) (chainId, bHash, stateRoot)
+      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) $ ChainStateInfo (chainId, Just bHash, stateRoot)
       putChainBlockHashInfo bHash parentHash newChainRoot
 
 deleteChainStateRoot :: ( Modifiable BlockHashRoot m
