@@ -17,10 +17,13 @@ import {
   UPDATE_HEALTH,
   PRELOAD_NODE_UPTIME,
   UPDATE_NODE_UPTIME, PRELOAD_SYSTEM_INFO, UPDATE_SYSTEM_INFO,
-  CHANGE_HEALTH_STATUS
+  CHANGE_HEALTH_STATUS,
+  UPDATE_SHARD_COUNT,
+  PRELOAD_SHARD_COUNT,
 } from './dashboard.action'
 
 const initialState = {
+  shardCount: 0,
   lastBlockNumber: 0,
   usersCount: 0,
   contractsCount: 0,
@@ -71,6 +74,17 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         usersCount: action.data
+      };
+    case PRELOAD_SHARD_COUNT:
+      return {
+        ...state,
+        shardCount: action.data
+      };
+
+    case UPDATE_SHARD_COUNT:
+      return {
+        ...state,
+        shardCount: action.data
       };
 
     case PRELOAD_TRANSACTION_COUNT:

@@ -155,8 +155,14 @@ export const node = {
 export const nodeWithPeers = {
   "name": "LOCALHOST",
   "peers": {
-    '192.168.10.36': '3004',
-    '192.168.10.33': '3005'
+    '192.168.10.36': {
+      tcp_port: "30303",
+      enode: "enode://687294782948972018571047ra9asd8f97381asdfasd",
+    },
+    '192.168.10.33':{
+      tcp_port: "30303",
+      enode: "enode://687294782948972018571047ra9asd8f97381asdfasd",
+    }
   },
   "coinbase": {
     "coinbase": "82069cc441c42b2706fa5d3129deeb677812e5a5"
@@ -164,6 +170,7 @@ export const nodeWithPeers = {
 };
 
 export const initialState = {
+  shardCount: 0,
   lastBlockNumber: 0,
   usersCount: 0,
   contractsCount: 0,
@@ -186,7 +193,8 @@ export const unSubscribeRoomMock = [
   ['TRANSACTIONS_TYPE'],
   ['GET_HEALTH'],
   ['GET_NODE_UPTIME'],
-  ['GET_SYSTEM_INFO']
+  ['GET_SYSTEM_INFO'],
+  ['GET_SHARD_COUNT'],
 ]
 
 export const subscribeRoomMock = [
@@ -198,7 +206,5 @@ export const subscribeRoomMock = [
   ['BLOCKS_DIFFICULTY'],
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
-  ['GET_HEALTH'],
-  ['GET_NODE_UPTIME'],
-  ['GET_SYSTEM_INFO']
+  ['GET_SHARD_COUNT'],
 ]

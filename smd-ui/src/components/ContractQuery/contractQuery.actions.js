@@ -41,12 +41,12 @@ export const clearQueryString = function () {
   }
 }
 
-export const queryCirrus = function (name, queryString, chainId) {
+export const queryCirrus = function (tableName, contractName, queryString) {
   return {
     type: QUERY_CIRRUS_REQUEST,
-    contractName: name,
+    tableName,
+    contractName,
     queryString: queryString,
-    chainId: chainId
   };
 }
 

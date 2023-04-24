@@ -1,35 +1,31 @@
 import React, { Component } from 'react';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover, Collapse } from '@blueprintjs/core';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
-import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
 import {
   methodCall,
-  methodCallFetchArgs,
-  methodCallOpenModal,
-  methodCallCloseModal
 } from './contractMethodCall.actions';
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 import { isOauthEnabled } from '../../../../lib/checkMode';
+import HexText from '../../../HexText';
 
 class ContractMethodCall extends Component {
 
+  constructor() {
+    super()
+    this.state = {
+      isFunctionSourceOpen: false,
+      isOpen: false,
+    }
+  }
+
   handleOpenModal = () => {
     mixpanelWrapper.track("method_call_button_click");
-    this.props.methodCallOpenModal(this.props.lookup);
-    const address = this.props.fromCirrus && this.props.fromBloc === undefined ? this.props.contractName : this.props.contractAddress
-    this.props.methodCallFetchArgs(
-      this.props.contractName,
-      address,
-      this.props.symbolName,
-      this.props.lookup,
-      this.props.chainId
-    );
-    !isOauthEnabled() && this.props.fetchAccounts(false, false);
+    this.setState({isOpen : true})
   }
 
   handleCloseModal = (e) => {
@@ -37,19 +33,18 @@ class ContractMethodCall extends Component {
     e.preventDefault();
     this.props.reset();
     mixpanelWrapper.track("method_call_cancel");
-    this.props.methodCallCloseModal(this.props.lookup);
+    this.setState({isOpen : false})
   }
 
   submit = (values) => {
     try {
-      const parsedArgs = this.props.modal.args ? Object.entries(this.props.modal.args)
+      const parsedArgs = this.props.contractInfo.xabi.funcs[this.props.symbolName] ? Object.entries(this.props.contractInfo.xabi.funcs[this.props.symbolName].args)
         .reduce((args, [arg, info]) => {
           try {
             args[arg] = JSON.parse(values[arg]);
             return args;
           }
           catch (e) {
-            console.log(e)
             args[arg] = values[arg];
             return args;
           }
@@ -63,17 +58,13 @@ class ContractMethodCall extends Component {
           password: isOauthEnabled() ? '' : values.modalPassword,
           value: values.modalValue,
           args: parsedArgs,
-          chainId: this.props.chainId
+          chainId: this.props.selectedChain ? this.props.selectedChain : undefined
         }
         mixpanelWrapper.track("method_call_submit");
-        this.props.methodCall(this.props.lookup, payload);
+        this.props.methodCall(this.props.methodKey, payload);
       } catch (e) {
         return
       }
-  }
-
-  handleUsernameChange = (e) => {
-    this.props.fetchUserAddresses(e.target.value, false)
   }
 
   renderUsername = (isModeOauth) => {
@@ -83,12 +74,11 @@ class ContractMethodCall extends Component {
         className="pt-input"
         name="modalUsername"
         component="select"
-        onChange={this.handleUsernameChange}
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.commonName : "Certification Pending"}
+        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}>
+          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}
         </option>
         {
           users.map((user, i) => {
@@ -101,20 +91,20 @@ class ContractMethodCall extends Component {
     </div>)
   }
 
-  renderAddress = (isModeOauth) => {
+  renderAddress = () => {
     const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : [];
-    return (<div className={isModeOauth ? "" : "pt-select"}>
+    return (<div className={"pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="modalAddress"
-        disabled={isModeOauth}
+        disabled={true}
         required
       >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : "Certification Pending"}
+        <option value={this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
+          {this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -136,7 +126,7 @@ class ContractMethodCall extends Component {
           <div className="row">
             <div className="col-sm-3 text-right">
               <label className="pt-label label-margin">
-                Chain
+                Shard
               </label>
             </div>
             <div className="col-sm-9">
@@ -165,7 +155,7 @@ class ContractMethodCall extends Component {
           <div className="row">
             <div className="col-sm-3 text-right">
               <label className="pt-label label-margin">
-                Chain Ids
+                Shard Ids
               </label>
             </div>
             <div className="col-sm-9">
@@ -193,13 +183,17 @@ class ContractMethodCall extends Component {
     }
   }
 
+  handleToggleFunctionSource() {
+    this.setState({isFunctionSourceOpen: !this.state.isFunctionSourceOpen})
+  }
+
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
     const isModeOauth = isOauthEnabled();
-
-    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
-      const args = Object.getOwnPropertyNames(this.props.modal.args);
+    const funcInfo = this.props.contractInfo.xabi && Object.getOwnPropertyNames(this.props.contractInfo.xabi).length > 0 ? this.props.contractInfo.xabi.funcs[this.props.symbolName] : {}
+    if (funcInfo.args && Object.getOwnPropertyNames(funcInfo.args).length > 0) {
+      const args = Object.getOwnPropertyNames(funcInfo.args);
       const self = this;
       args.forEach(function (arg, i) {
         params.push(
@@ -210,7 +204,7 @@ class ContractMethodCall extends Component {
                 name={arg}
                 component="input"
                 type="text"
-                placeholder={self.props.modal.args[arg].type}
+                placeholder={funcInfo.args[arg].type || funcInfo.args[arg].tag}
                 className="pt-input"
                 required
               />
@@ -226,35 +220,60 @@ class ContractMethodCall extends Component {
         </tr>
       );
     }
-
+    console.log('HERE')
     return (
       <div>
-        <Button
-          className="pt-minimal pt-small pt-intent-primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            this.handleOpenModal();
-            this.props.fetchChainIds();
-          }}
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
         >
-          Call Method
-        </Button>
+          <AnchorButton
+            className="pt-intent-primary pt-icon-send-to-graph"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              this.handleOpenModal();
+            }}
+            disabled={!this.props.userCertificate}
+            text={this.props.symbolName}
+          />
+        </Popover>
         <form>
           <Dialog
             iconName="exchange"
-            isOpen={this.props.modal.isOpen}
+            isOpen={this.state.isOpen}
             onClose={this.handleCloseModal}
             title={"Call '" + this.props.symbolName + "' on " + this.props.contractName}
             className="pt-dark"
           >
             <div className="pt-dialog-body">
               <div className="row">
-                <div className="col-sm-12">
-                  <h5>Address: {this.props.contractAddress}</h5>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Contract Address
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.contractAddress}
                 </div>
               </div>
-              {this.renderChainFields()}
+              <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Shard
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
+                </div>
+              </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
@@ -268,31 +287,40 @@ class ContractMethodCall extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
-                    Address
+                    Caller Address
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.renderAddress(isModeOauth)}
                 </div>
               </div>
-              {!isModeOauth && <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label label-margin">
-                    Password
-                  </label>
+              <div className="row">
+                <div className="col-sm-9">
+                  <Button onClick={() => this.handleToggleFunctionSource()}>
+                    Show Function Source Code
+                  </Button>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <Field
-                    name="modalPassword"
-                    className="pt-input"
-                    placeholder="Password"
-                    component="input"
-                    type="password"
-                    required
-                  />
+              </div>
+              <div className="row smd-margin-4">
+                <div className="col-sm-12">
+                  <Collapse
+                    isOpen={this.state.isFunctionSourceOpen}
+                  >
+                    <pre >
+                      {/* Render the function signature */}
+                      function {this.props.symbolName}{`(${funcInfo && funcInfo.args && Object.getOwnPropertyNames(funcInfo.args).length > 0 && Object.entries(funcInfo.args).map(([key, val]) => {
+                        return `${val.tag.toLowerCase()} ${key}`
+                      }).join(',')})`} {funcInfo && funcInfo.vals && Object.getOwnPropertyNames(funcInfo.vals).length > 0 && `returns (${Object.entries(funcInfo.vals).map(([key, val]) => {
+                        return val.tag.toLowerCase()
+                      }).join(',')})`} &#123;
+                      {/* Render the function body */}
+                        {`\n\t`}{funcInfo.contents || 'Error loading function body'}
+                      {`\n`}&#125;
+                    </pre>
+                  </Collapse>
                 </div>
-              </div>}
-              {this.props.modal.isPayable && <div className="row">
+              </div>
+              {funcInfo.isPayable && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
                     Value
@@ -325,15 +353,92 @@ class ContractMethodCall extends Component {
                   </table>
                 </div>
               </div>
-              <div className="row">
-                <div className="col-sm-12">
-                  <hr />
-                  <h5>Results</h5>
-                  <pre className="smd-scrollable">
-                    {this.props.modal.result} <br />
-                  </pre>
-                </div>
+              {
+                this.props.methodCallModal.result && !this.props.methodCallModal.loading &&
+                <div className="row">
+                  <div className="col-sm-12">
+                    <hr />
+                    <div className={`pt-callout pt-intent-${this.props.methodCallModal.result[0].status == "Success" ? 'success' : this.props.methodCallModal.result[0].status == "Pending" ? 'warning' : 'danger'}`}>
+                    <h5>Transaction Results</h5>
+                        { this.props.methodCallModal.result[0].hash &&
+                    <div className="row">
+                      <div className="col-sm-3 text-right">
+                        <label className="pt-label label-margin">
+                          TX Hash
+                        </label>
+                      </div>
+                      <div className="col-sm-9 smd-pad-4">
+
+                        <HexText value={this.props.methodCallModal.result[0].hash}/>
+                      </div>
+                    </div>                   
+                        }
+                    <div className="row">
+                      <div className="col-sm-3 text-right">
+                        <label className="pt-label label-margin">
+                          Status
+                        </label>
+                      </div>
+                      <div className="col-sm-9 smd-pad-4">
+                        {this.props.methodCallModal.result[0].status == "Success" || this.props.methodCallModal.result[0].status == "Pending" ? this.props.methodCallModal.result[0].status : 'Failed'}
+                      </div>                  
+                    </div>
+                    { typeof(this.props.methodCallModal.result) == "string" &&
+                      <div className="row">
+                        <div className="col-sm-3 text-right">
+                          <label className="pt-label label-margin">
+                            Error:
+                          </label>
+                        </div>
+                        <div className="col-sm-9 smd-pad-4">
+                          {this.props.methodCallModal.result}
+                        </div>                  
+                      </div>
+                    }
+                    {this.props.methodCallModal.result[0].status == "Success" &&
+                      <div>
+                        <div className="row">
+                          <div className="col-sm-3 text-right">
+                            <label className="pt-label label-margin">
+                              Time
+                            </label>
+                          </div>
+                          <div className="col-sm-9 smd-pad-4">
+                            {this.props.methodCallModal.result[0].txResult.time}s
+                          </div>                  
+                        </div>
+                        <div className="row">
+                          <div className="col-sm-3 text-right">
+                            <label className="pt-label label-margin">
+                              Returned Value(s)
+                            </label>
+                          </div>
+                          <div className="col-sm-9 smd-pad-4">
+                            { this.props.methodCallModal.result[0].data.contents.length > 0 ?
+
+                              <pre className='smd-scrollable'>
+                                {JSON.stringify(this.props.methodCallModal.result[0].data.contents, null, 2)}
+                              </pre>
+                              : "No Returned Values"
+                            }
+                          </div>                  
+                        </div>
+                        <div className="row">
+                          <div className="col-sm-3 text-right">
+                            <label className="pt-label label-margin">
+                              Block Hash
+                            </label>
+                          </div>
+                          <div className="col-sm-9 smd-pad-4">
+                            <HexText value={this.props.methodCallModal.result[0].txResult.blockHash} />
+                          </div>                  
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  </div>
               </div>
+              }
             </div>
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
@@ -369,14 +474,19 @@ const selector = formValueSelector('contract-method-call');
 
 export function mapStateToProps(state, ownProps) {
   return {
-    modal: state.methodCall.modals
-      && state.methodCall.modals[ownProps.lookup] ?
-      state.methodCall.modals[ownProps.lookup] : {},
+    contractInfo: state.contractCard.contractInfos
+      && state.contractCard.contractInfos[ownProps.contractKey] ?
+      state.contractCard.contractInfos[ownProps.contractKey] : {},
+    methodCallModal: state.methodCall.modals
+      && state.methodCall.modals[ownProps.methodKey] ?
+      state.methodCall.modals[ownProps.methodKey] : {},
     accounts: state.accounts.accounts,
     modalUsername: selector(state, 'modalUsername'),
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
-    oAuthUser: state.user.oauthUser
+    oAuthUser: state.user.oauthUser,
+    userCertificate: state.user.userCertificate,
+    selectedChain: state.chains.selectedChain,
   };
 }
 
@@ -385,11 +495,6 @@ const formed = reduxForm({ form: 'contract-method-call', validate })(ContractMet
 const connected = connect(
   mapStateToProps,
   {
-    methodCallFetchArgs,
-    methodCallOpenModal,
-    methodCallCloseModal,
-    fetchAccounts,
-    fetchUserAddresses,
     methodCall,
     fetchChainIds,
     getLabelIds

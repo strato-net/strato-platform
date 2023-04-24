@@ -7,7 +7,10 @@ import {
   fetchState,
   getState,
   fetchAccount,
-  getAccount
+  getAccount,
+  watchFetchInfo,
+  fetchContractInfo,
+  getContract
 } from '../../../../components/Contracts/components/ContractCard/contractCard.saga';
 import {
   takeEvery,
@@ -18,14 +21,16 @@ import {
   FETCH_ACCOUNT_REQUEST,
   FETCH_CIRRUS_INSTANCES_REQUEST,
   fetchAccountSuccess,
-  fetchAccountFailure,
   fetchCirrusInstancesSuccess,
   FETCH_STATE_REQUEST,
   fetchStateSuccess,
-  fetchStateFailure
+  FETCH_CONTRACT_INFO_REQUEST,
+  fetchContractInfoRequest,
+  fetchContractInfoSuccess,
+  fetchContractInfoFailure
 } from '../../../../components/Contracts/components/ContractCard/contractCard.actions';
 import { expectSaga } from 'redux-saga-test-plan';
-import { accounts, cirrus, state } from './contractCardMock'
+import { accounts, cirrus, state, contractInfoResponse } from './contractCardMock'
 
 describe('ContractCard: saga', () => {
 
@@ -39,6 +44,51 @@ describe('ContractCard: saga', () => {
     const gen = fetchAccount({ type: "FETCH_ACCOUNT_REQUEST", address: '3771b31420eda628bf03cd5b119249da0fb4aa6d', name: 'Greeter' });
     expect(gen.next().value).toEqual(call(getAccount, '3771b31420eda628bf03cd5b119249da0fb4aa6d'));
     expect(gen.next().value).toEqual(put(fetchAccountSuccess('Greeter', '3771b31420eda628bf03cd5b119249da0fb4aa6d')))
+  })
+
+  test('watch contract args', () => {
+    const gen = watchFetchInfo();
+    expect(gen.next().value).toEqual(takeEvery(FETCH_CONTRACT_INFO_REQUEST, fetchContractInfo))
+  })
+
+  
+  describe('fetch contract info - sagas', () => {
+
+    test('success', () => {
+      fetch.mockResponse(JSON.stringify(contractInfoResponse))
+      expectSaga(fetchContractInfo, {
+        key: 'key',
+        name: 'abc',
+        address: 'xyz',
+        chainId: '4261aa13'
+      })
+        .call.fn(getContract, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'FETCH_CONTRACT_INFO_SUCCESS' } })
+        .run()
+    });
+
+    test('failure', () => {
+      fetch.mockReject(JSON.stringify(contractInfoResponse))
+      expectSaga(fetchContractInfo, {
+        name: 'abc',
+        address: 'xyz',
+        symbol: 'geneticallyModify',
+        key: 'key'
+      })
+        .call.fn(getContract, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'FETCH_CONTRACT_INFO_FAILURE' } })
+        .run()
+    });
+
+    test('exception', () => {
+      expectSaga(fetchContractInfo, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'cloneSheep')
+        .provide({
+          call() {
+            throw new Error('Not Found');
+          },
+        })
+        .put.like({ action: { type: 'FETCH_CONTRACT_INFO_FAILURE' } })
+        .run();
+    });
+
   })
 
   describe('fetch accounts', () => {

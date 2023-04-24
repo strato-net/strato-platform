@@ -205,14 +205,15 @@ describe('CreateChain: index', () => {
       resetError: jest.fn(),
       touch: jest.fn(),
       reset: jest.fn(),
-      store: store
+      store: store,
+      userCertificate: { userAddress: "4567890" }
     };
 
     const wrapper = shallow(
       <CreateChain.WrappedComponent {...props} />
     ).dive().dive().dive();
 
-    wrapper.find('Button').first().simulate('click');
+    wrapper.find('AnchorButton').first().simulate('click');
     expect(props.openCreateChainOverlay).toHaveBeenCalled();
     expect(props.openCreateChainOverlay).toHaveBeenCalledTimes(1);
   });
