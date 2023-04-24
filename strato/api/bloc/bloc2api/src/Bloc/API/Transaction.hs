@@ -404,4 +404,4 @@ instance ToSchema BlocChainOrTransactionResult where
 
 instance ToParam (QueryFlag "hash") where
   toParam _ =
-    DocQueryParam "hash" ["0","1",""] "flag for generating a tx hash without posting it to the network" Flag
+    DocQueryParam "hash" ["true", "false", ""] "flag for generating a tx hash without posting it to the network" Flag
