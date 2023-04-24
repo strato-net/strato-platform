@@ -94,7 +94,7 @@ entryPoint (Options privPath certPaths nonce) = do
             let clientEnv = mkClientEnv mgr stratoURL
 
             -- post it
-            result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
+            result <- runClientM (postRawTransaction Nothing Nothing False True request) clientEnv
             putStrLn $ "\n\nTransaction result: " <> show result
 
             let oops = error "We did not successfully post the CertificateRegistry!"
@@ -108,11 +108,11 @@ entryPoint (Options privPath certPaths nonce) = do
             BL.putStr $ Ae.encode request'
 
             -- post initializeCertificateRegistry
-            result' <- runClientM (postRawTransaction Nothing Nothing True request') clientEnv
+            result' <- runClientM (postRawTransaction Nothing Nothing False True request') clientEnv
             putStrLn $ "\n\nTransaction result: " <> show result'
 
 -- servant client for the endpoint
-postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
+postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> Bool -> PostBlocTransactionRawRequest
                    -> ClientM BlocChainOrTransactionResult
 postRawTransaction = client (Proxy @PostBlocTransactionRaw)
 

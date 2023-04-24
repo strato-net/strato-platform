@@ -229,7 +229,7 @@ parseArgs = do
 
 
 -- servant client for the endpoint
-postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
+postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> Bool -> PostBlocTransactionRawRequest
                    -> ClientM BlocChainOrTransactionResult
 postRawTransaction = client (Proxy @PostBlocTransactionRaw)
 
@@ -327,7 +327,7 @@ main = do
     let clientEnv = mkClientEnv mgr stratoURL
 
     -- post it
-    result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
+    result <- runClientM (postRawTransaction Nothing Nothing False True request) clientEnv
     putStrLn $ "\n\nTransaction result: " ++ show result
 
 

@@ -81,6 +81,7 @@ type PostBlocTransactionRaw = "transaction"
   :> "raw"
   :> S.Header "X-USER-ACCESS-TOKEN" Text
   :> QueryParam "chainid" ChainId
+  :> QueryFlag "hash"
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRawRequest
   :> Post '[JSON] BlocChainOrTransactionResult
@@ -400,3 +401,7 @@ instance ToSchema BlocChainOrTransactionResult where
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
+
+instance ToParam (QueryFlag "hash") where
+  toParam _ =
+    DocQueryParam "hash" ["0","1",""] "flag for generating a tx hash without posting it to the network" Flag
