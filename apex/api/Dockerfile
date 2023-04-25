@@ -1,4 +1,4 @@
-FROM node:16-bullseye-slim
+FROM node:8.16-buster-slim
 RUN apt-get update && \
     apt-get install -y git postgresql-client python3 build-essential curl && \
     apt-get clean && \
