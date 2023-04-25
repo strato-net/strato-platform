@@ -17,6 +17,7 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
+import           Data.Time.Clock.POSIX           (utcTimeToPOSIXSeconds)
 import           Data.Traversable
 import           Numeric
 import           UnliftIO
@@ -24,6 +25,7 @@ import           Blockchain.SolidVM.Model
 
 import           Bloc.API.Contracts
 import           Bloc.API.Utils
+import           Bloc.Server.Utils (getBlockTimestamp)
 import           Bloc.Database.Queries
 import           Bloc.Monad
 import           Bloc.XabiHelper
@@ -64,19 +66,19 @@ getContracts :: ( MonadLogger m
              => Maybe Integer -> Maybe Integer -> Maybe ChainId -> m GetContractsResponse
 getContracts mOffset mLimit chainId = blocTransaction $ do
   let
-    addressToVal addr cid = AddressCreatedAt 0 addr cid
+    addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
     addressesToMap = foldrM
-      (\(AddressStateRef' (AddressStateRef{..}) _) m ->
-        case addressStateRefContractName of
-          Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal addressStateRefAddress chainId] m
-          Nothing -> case addressStateRefCodeHash of
-            Nothing -> pure m
-            Just ch -> do
-              mName <- listToMaybe . map fst <$> evmContractByCodeHash ch
-              pure $ case mName of
-                Nothing -> m
-                Just n -> Map.insertWith (++) n [addressToVal addressStateRefAddress chainId] m
-      )
+      (\(AddressStateRef' AddressStateRef{..} _) m -> do
+          ts <- getBlockTimestamp addressStateRefLatestBlockDataRefNumber
+          case addressStateRefContractName of
+            Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
+            Nothing -> case addressStateRefCodeHash of
+              Nothing -> pure m
+              Just ch -> do
+                mName <- listToMaybe . map fst <$> evmContractByCodeHash ch
+                pure $ case mName of
+                  Nothing -> m
+                  Just n -> Map.insertWith (++) n [addressToVal ts addressStateRefAddress chainId] m )
       Map.empty
   addrStateRefs <- getAccount' accountsFilterParams
     { _qaChainId = maybeToList chainId
