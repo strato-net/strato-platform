@@ -1,6 +1,6 @@
 FROM node:16-bullseye-slim
 RUN apt-get update && \
-    apt-get install -y git postgresql-client python3 build-essential && \
+    apt-get install -y git postgresql-client python3 build-essential curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app
