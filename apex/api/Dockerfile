@@ -1,26 +1,16 @@
-FROM node:8.15-stretch-slim
+FROM node:8.16.2-buster-slim
 RUN apt-get update && \
-    mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
-    apt-get install -y git postgresql-client zip python build-essential && \
+    apt-get install -y git postgresql-client python build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app
-
-# /usr/share/man/ required for postgres-client on debian slim
-# postgres-client is required for pgtools module; also used for container health check
-
+    # Layer is shared with SMD. TODO: use shared base
+    # postgres-client is required for pgtools module; also used for container health check
 WORKDIR /usr/src/app
-
 EXPOSE 3009
-
 COPY package*.json  /usr/src/app/
-
 RUN npm install
-
 COPY . /usr/src/app
-
 ARG STRATO_VERSION
-
 ENV STRATO_VERSION=${STRATO_VERSION}
-
 CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]
