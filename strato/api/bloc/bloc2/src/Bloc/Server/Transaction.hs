@@ -87,6 +87,7 @@ import           Blockchain.Data.AlternateTransaction
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Data.Transaction      (rawTX2TX, transactionHash)
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.ChainId
@@ -147,10 +148,11 @@ txWorker = forever $ do
 postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
                           Maybe Text     -- username (unused)
                        -> Maybe ChainId
+                       -> Bool           -- hash
                        -> Bool           -- resolve
                        -> PostBlocTransactionRawRequest
                        -> m BlocChainOrTransactionResult
-postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
+postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
   checkIsSynced
   -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
   -- so, if 'v' is not provided, we have to figure out what 'v' is here
@@ -200,22 +202,27 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
                postbloctransactionrawrequestR
                postbloctransactionrawrequestS
                postbloctransactionrawrequestMetadata
-      rawTx = preparePostTx time postbloctransactionrawrequestAddress tx
+      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress tx
 
-  txHash <- postTransaction rawTx
-
-
-
-  trds <- recurseTRDs resolve [txHash]
-  case trds of
-    [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
-    [x] -> return $ BlocTxResult $ BlocTransactionResult
-              { blocTransactionStatus   = trdStatus x
-              , blocTransactionHash     = txHash
-              , blocTransactionTxResult = snd <$> trdResult x
-              , blocTransactionData     = Nothing   -- can we get this without the txHash table query?
-              }
-    _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
+  if h
+    then return . BlocTxResult $ BlocTransactionResult
+      { blocTransactionStatus = Success
+      , blocTransactionHash = transactionHash . rawTX2TX $ raw
+      , blocTransactionTxResult = Nothing
+      , blocTransactionData = Nothing
+      }
+    else do
+      txHash <- postTransaction rawTx
+      trds <- recurseTRDs resolve [txHash]
+      case trds of
+        [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
+        [x] -> return $ BlocTxResult $ BlocTransactionResult
+                  { blocTransactionStatus   = trdStatus x
+                  , blocTransactionHash     = txHash
+                  , blocTransactionTxResult = snd <$> trdResult x
+                  , blocTransactionData     = Nothing   -- can we get this without the txHash table query?
+                  }
+        _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
 
 
 
