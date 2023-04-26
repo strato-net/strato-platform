@@ -333,85 +333,29 @@ ShallowWrapper {
     "key": undefined,
     "nodeType": "host",
     "props": Object {
-      "children": Array [
+      "children": <div
+        className="pt-card pt-elevation-2 node-success pt-interactive"
+        onClick={[Function]}
+      >
         <div
-          className="pt-card pt-elevation-2 node-success pt-interactive"
-          onClick={[Function]}
+          className="row"
         >
           <div
-            className="row"
+            className="col-sm-6"
           >
-            <div
-              className="col-xs-9"
-            >
-              <h5>
-                LOCALHOST
-              </h5>
-            </div>
+            <h3>
+              Peers (
+              0
+              )
+            </h3>
             <span
               className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-            />
+            >
+              Expand
+            </span>
           </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Coinbase
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                 
-                <HexText
-                  classes="smd-pad-2"
-                  value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                />
-                 
-              </small>
-            </div>
-          </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Block
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                9
-              </small>
-            </div>
-          </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Peers
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                0
-              </small>
-            </div>
-          </div>
-        </div>,
+        </div>
+        <hr />
         <Blueprint.Collapse
           component="div"
           isOpen={false}
@@ -419,529 +363,35 @@ ShallowWrapper {
           transitionDuration={200}
         >
           <withRouter(Connect(PeersCard)) />
-        </Blueprint.Collapse>,
-      ],
+        </Blueprint.Collapse>
+      </div>,
     },
     "ref": null,
-    "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": Array [
-            <div
-              className="row"
-            >
-              <div
-                className="col-xs-9"
-              >
-                <h5>
-                  LOCALHOST
-                </h5>
-              </div>
-              <span
-                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-              />
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Coinbase
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                   
-                  <HexText
-                    classes="smd-pad-2"
-                    value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                  />
-                   
-                </small>
-              </div>
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Block
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  9
-                </small>
-              </div>
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Peers
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
-            </div>,
-          ],
-          "className": "pt-card pt-elevation-2 node-success pt-interactive",
-          "onClick": [Function],
-        },
-        "ref": null,
-        "rendered": Array [
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-9"
-                >
-                  <h5>
-                    LOCALHOST
-                  </h5>
-                </div>,
-                <span
-                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                />,
-              ],
-              "className": "row",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <h5>
-                    LOCALHOST
-                  </h5>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "LOCALHOST",
-                  },
-                  "ref": null,
-                  "rendered": "LOCALHOST",
-                  "type": "h5",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": "span",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Coinbase
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                    />
-                     
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Coinbase
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Coinbase",
-                  },
-                  "ref": null,
-                  "rendered": "Coinbase",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                    />
-                     
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": Array [
-                      " ",
-                      <HexText
-                        classes="smd-pad-2"
-                        value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                      />,
-                      " ",
-                    ],
-                  },
-                  "ref": null,
-                  "rendered": Array [
-                    " ",
-                    Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "class",
-                      "props": Object {
-                        "classes": "smd-pad-2",
-                        "value": "82069cc441c42b2706fa5d3129deeb677812e5a5",
-                      },
-                      "ref": null,
-                      "rendered": null,
-                      "type": [Function],
-                    },
-                    " ",
-                  ],
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Block
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    9
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Block
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Block",
-                  },
-                  "ref": null,
-                  "rendered": "Block",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    9
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": 9,
-                  },
-                  "ref": null,
-                  "rendered": 9,
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Peers
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Peers
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Peers",
-                  },
-                  "ref": null,
-                  "rendered": "Peers",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    0
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": 0,
-                  },
-                  "ref": null,
-                  "rendered": 0,
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-        ],
-        "type": "div",
-      },
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "class",
-        "props": Object {
-          "children": <withRouter(Connect(PeersCard)) />,
-          "component": "div",
-          "isOpen": false,
-          "keepChildrenMounted": false,
-          "transitionDuration": 200,
-        },
-        "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "function",
-          "props": Object {},
-          "ref": null,
-          "rendered": null,
-          "type": [Function],
-        },
-        "type": [Function],
-      },
-    ],
-    "type": "div",
-  },
-  Symbol(enzyme.__nodes__): Array [
-    Object {
+    "rendered": Object {
       "instance": null,
       "key": undefined,
       "nodeType": "host",
       "props": Object {
         "children": Array [
           <div
-            className="pt-card pt-elevation-2 node-success pt-interactive"
-            onClick={[Function]}
+            className="row"
           >
             <div
-              className="row"
+              className="col-sm-6"
             >
-              <div
-                className="col-xs-9"
-              >
-                <h5>
-                  LOCALHOST
-                </h5>
-              </div>
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
               <span
                 className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-              />
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
               >
-                <small>
-                  Coinbase
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                   
-                  <HexText
-                    classes="smd-pad-2"
-                    value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                  />
-                   
-                </small>
-              </div>
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Block
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  9
-                </small>
-              </div>
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Peers
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
+                Expand
+              </span>
             </div>
           </div>,
+          <hr />,
           <Blueprint.Collapse
             component="div"
             isOpen={false}
@@ -951,6 +401,8 @@ ShallowWrapper {
             <withRouter(Connect(PeersCard)) />
           </Blueprint.Collapse>,
         ],
+        "className": "pt-card pt-elevation-2 node-success pt-interactive",
+        "onClick": [Function],
       },
       "ref": null,
       "rendered": Array [
@@ -959,407 +411,88 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": Array [
-              <div
-                className="row"
+            "children": <div
+              className="col-sm-6"
+            >
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
+              <span
+                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
               >
-                <div
-                  className="col-xs-9"
-                >
-                  <h5>
-                    LOCALHOST
-                  </h5>
-                </div>
-                <span
-                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                />
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Coinbase
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                    />
-                     
-                  </small>
-                </div>
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Block
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    9
-                  </small>
-                </div>
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Peers
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>
-              </div>,
-            ],
-            "className": "pt-card pt-elevation-2 node-success pt-interactive",
-            "onClick": [Function],
+                Expand
+              </span>
+            </div>,
+            "className": "row",
           },
           "ref": null,
-          "rendered": Array [
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-9"
-                  >
-                    <h5>
-                      LOCALHOST
-                    </h5>
-                  </div>,
-                  <span
-                    className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                  />,
-                ],
-                "className": "row",
-              },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <h5>
-                      LOCALHOST
-                    </h5>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "LOCALHOST",
-                    },
-                    "ref": null,
-                    "rendered": "LOCALHOST",
-                    "type": "h5",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": "span",
-                },
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": Array [
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>,
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>,
               ],
-              "type": "div",
+              "className": "col-sm-6",
             },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Coinbase
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                       
-                      <HexText
-                        classes="smd-pad-2"
-                        value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                      />
-                       
-                    </small>
-                  </div>,
+            "ref": null,
+            "rendered": Array [
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    "Peers (",
+                    0,
+                    ")",
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  "Peers (",
+                  0,
+                  ")",
                 ],
-                "className": "row pt-text-muted",
+                "type": "h3",
               },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Coinbase
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Coinbase",
-                    },
-                    "ref": null,
-                    "rendered": "Coinbase",
-                    "type": "small",
-                  },
-                  "type": "div",
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Expand",
+                  "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
                 },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                       
-                      <HexText
-                        classes="smd-pad-2"
-                        value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                      />
-                       
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
-                        " ",
-                        <HexText
-                          classes="smd-pad-2"
-                          value="82069cc441c42b2706fa5d3129deeb677812e5a5"
-                        />,
-                        " ",
-                      ],
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      " ",
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "class",
-                        "props": Object {
-                          "classes": "smd-pad-2",
-                          "value": "82069cc441c42b2706fa5d3129deeb677812e5a5",
-                        },
-                        "ref": null,
-                        "rendered": null,
-                        "type": [Function],
-                      },
-                      " ",
-                    ],
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Block
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                      9
-                    </small>
-                  </div>,
-                ],
-                "className": "row pt-text-muted",
+                "ref": null,
+                "rendered": "Expand",
+                "type": "span",
               },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Block
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Block",
-                    },
-                    "ref": null,
-                    "rendered": "Block",
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      9
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": 9,
-                    },
-                    "ref": null,
-                    "rendered": 9,
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Peers
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                      0
-                    </small>
-                  </div>,
-                ],
-                "className": "row pt-text-muted",
-              },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Peers
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Peers",
-                    },
-                    "ref": null,
-                    "rendered": "Peers",
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      0
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": 0,
-                    },
-                    "ref": null,
-                    "rendered": 0,
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-          ],
+            ],
+            "type": "div",
+          },
           "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": "hr",
         },
         Object {
           "instance": null,
@@ -1387,6 +520,203 @@ ShallowWrapper {
       ],
       "type": "div",
     },
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": <div
+          className="pt-card pt-elevation-2 node-success pt-interactive"
+          onClick={[Function]}
+        >
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-6"
+            >
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
+              <span
+                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+              >
+                Expand
+              </span>
+            </div>
+          </div>
+          <hr />
+          <Blueprint.Collapse
+            component="div"
+            isOpen={false}
+            keepChildrenMounted={false}
+            transitionDuration={200}
+          >
+            <withRouter(Connect(PeersCard)) />
+          </Blueprint.Collapse>
+        </div>,
+      },
+      "ref": null,
+      "rendered": Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="row"
+            >
+              <div
+                className="col-sm-6"
+              >
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>
+              </div>
+            </div>,
+            <hr />,
+            <Blueprint.Collapse
+              component="div"
+              isOpen={false}
+              keepChildrenMounted={false}
+              transitionDuration={200}
+            >
+              <withRouter(Connect(PeersCard)) />
+            </Blueprint.Collapse>,
+          ],
+          "className": "pt-card pt-elevation-2 node-success pt-interactive",
+          "onClick": [Function],
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="col-sm-6"
+              >
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>
+              </div>,
+              "className": "row",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <h3>
+                    Peers (
+                    0
+                    )
+                  </h3>,
+                  <span
+                    className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                  >
+                    Expand
+                  </span>,
+                ],
+                "className": "col-sm-6",
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      "Peers (",
+                      0,
+                      ")",
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    "Peers (",
+                    0,
+                    ")",
+                  ],
+                  "type": "h3",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Expand",
+                    "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
+                  },
+                  "ref": null,
+                  "rendered": "Expand",
+                  "type": "span",
+                },
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {},
+            "ref": null,
+            "rendered": null,
+            "type": "hr",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "class",
+            "props": Object {
+              "children": <withRouter(Connect(PeersCard)) />,
+              "component": "div",
+              "isOpen": false,
+              "keepChildrenMounted": false,
+              "transitionDuration": 200,
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "function",
+              "props": Object {},
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
+            "type": [Function],
+          },
+        ],
+        "type": "div",
+      },
+      "type": "div",
+    },
   ],
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
@@ -1410,6 +740,7 @@ ShallowWrapper {
         "contractsCount": 0,
         "healthStatus": false,
         "lastBlockNumber": 0,
+        "shardCount": 0,
         "transactionTypes": Array [],
         "transactionsCount": Array [],
         "uptime": 0,
@@ -1438,85 +769,29 @@ ShallowWrapper {
     "key": undefined,
     "nodeType": "host",
     "props": Object {
-      "children": Array [
+      "children": <div
+        className="pt-card pt-elevation-2 node-success pt-interactive"
+        onClick={[Function]}
+      >
         <div
-          className="pt-card pt-elevation-2 node-warning pt-interactive"
-          onClick={[Function]}
+          className="row"
         >
           <div
-            className="row"
+            className="col-sm-6"
           >
-            <div
-              className="col-xs-9"
-            >
-              <h5>
-                LOCALHOST
-              </h5>
-            </div>
+            <h3>
+              Peers (
+              0
+              )
+            </h3>
             <span
               className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-            />
+            >
+              Expand
+            </span>
           </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Coinbase
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                 
-                <HexText
-                  classes="smd-pad-2"
-                  value={null}
-                />
-                 
-              </small>
-            </div>
-          </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Block
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                0
-              </small>
-            </div>
-          </div>
-          <div
-            className="row pt-text-muted"
-          >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Peers
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <small>
-                0
-              </small>
-            </div>
-          </div>
-        </div>,
+        </div>
+        <hr />
         <Blueprint.Collapse
           component="div"
           isOpen={false}
@@ -1524,529 +799,35 @@ ShallowWrapper {
           transitionDuration={200}
         >
           <withRouter(Connect(PeersCard)) />
-        </Blueprint.Collapse>,
-      ],
+        </Blueprint.Collapse>
+      </div>,
     },
     "ref": null,
-    "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": Array [
-            <div
-              className="row"
-            >
-              <div
-                className="col-xs-9"
-              >
-                <h5>
-                  LOCALHOST
-                </h5>
-              </div>
-              <span
-                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-              />
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Coinbase
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                   
-                  <HexText
-                    classes="smd-pad-2"
-                    value={null}
-                  />
-                   
-                </small>
-              </div>
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Block
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
-            </div>,
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Peers
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
-            </div>,
-          ],
-          "className": "pt-card pt-elevation-2 node-warning pt-interactive",
-          "onClick": [Function],
-        },
-        "ref": null,
-        "rendered": Array [
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-9"
-                >
-                  <h5>
-                    LOCALHOST
-                  </h5>
-                </div>,
-                <span
-                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                />,
-              ],
-              "className": "row",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <h5>
-                    LOCALHOST
-                  </h5>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "LOCALHOST",
-                  },
-                  "ref": null,
-                  "rendered": "LOCALHOST",
-                  "type": "h5",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": "span",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Coinbase
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value={null}
-                    />
-                     
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Coinbase
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Coinbase",
-                  },
-                  "ref": null,
-                  "rendered": "Coinbase",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value={null}
-                    />
-                     
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": Array [
-                      " ",
-                      <HexText
-                        classes="smd-pad-2"
-                        value={null}
-                      />,
-                      " ",
-                    ],
-                  },
-                  "ref": null,
-                  "rendered": Array [
-                    " ",
-                    Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "class",
-                      "props": Object {
-                        "classes": "smd-pad-2",
-                        "value": null,
-                      },
-                      "ref": null,
-                      "rendered": null,
-                      "type": [Function],
-                    },
-                    " ",
-                  ],
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Block
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Block
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Block",
-                  },
-                  "ref": null,
-                  "rendered": "Block",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    0
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": 0,
-                  },
-                  "ref": null,
-                  "rendered": 0,
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": Array [
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Peers
-                  </small>
-                </div>,
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>,
-              ],
-              "className": "row pt-text-muted",
-            },
-            "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    Peers
-                  </small>,
-                  "className": "col-xs-3",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Peers",
-                  },
-                  "ref": null,
-                  "rendered": "Peers",
-                  "type": "small",
-                },
-                "type": "div",
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <small>
-                    0
-                  </small>,
-                  "className": "col-xs-9",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": 0,
-                  },
-                  "ref": null,
-                  "rendered": 0,
-                  "type": "small",
-                },
-                "type": "div",
-              },
-            ],
-            "type": "div",
-          },
-        ],
-        "type": "div",
-      },
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "class",
-        "props": Object {
-          "children": <withRouter(Connect(PeersCard)) />,
-          "component": "div",
-          "isOpen": false,
-          "keepChildrenMounted": false,
-          "transitionDuration": 200,
-        },
-        "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "function",
-          "props": Object {},
-          "ref": null,
-          "rendered": null,
-          "type": [Function],
-        },
-        "type": [Function],
-      },
-    ],
-    "type": "div",
-  },
-  Symbol(enzyme.__nodes__): Array [
-    Object {
+    "rendered": Object {
       "instance": null,
       "key": undefined,
       "nodeType": "host",
       "props": Object {
         "children": Array [
           <div
-            className="pt-card pt-elevation-2 node-warning pt-interactive"
-            onClick={[Function]}
+            className="row"
           >
             <div
-              className="row"
+              className="col-sm-6"
             >
-              <div
-                className="col-xs-9"
-              >
-                <h5>
-                  LOCALHOST
-                </h5>
-              </div>
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
               <span
                 className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-              />
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
               >
-                <small>
-                  Coinbase
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                   
-                  <HexText
-                    classes="smd-pad-2"
-                    value={null}
-                  />
-                   
-                </small>
-              </div>
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Block
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
-            </div>
-            <div
-              className="row pt-text-muted"
-            >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Peers
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <small>
-                  0
-                </small>
-              </div>
+                Expand
+              </span>
             </div>
           </div>,
+          <hr />,
           <Blueprint.Collapse
             component="div"
             isOpen={false}
@@ -2056,6 +837,8 @@ ShallowWrapper {
             <withRouter(Connect(PeersCard)) />
           </Blueprint.Collapse>,
         ],
+        "className": "pt-card pt-elevation-2 node-success pt-interactive",
+        "onClick": [Function],
       },
       "ref": null,
       "rendered": Array [
@@ -2064,407 +847,88 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": Array [
-              <div
-                className="row"
+            "children": <div
+              className="col-sm-6"
+            >
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
+              <span
+                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
               >
-                <div
-                  className="col-xs-9"
-                >
-                  <h5>
-                    LOCALHOST
-                  </h5>
-                </div>
-                <span
-                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                />
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Coinbase
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                     
-                    <HexText
-                      classes="smd-pad-2"
-                      value={null}
-                    />
-                     
-                  </small>
-                </div>
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Block
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>
-              </div>,
-              <div
-                className="row pt-text-muted"
-              >
-                <div
-                  className="col-xs-3"
-                >
-                  <small>
-                    Peers
-                  </small>
-                </div>
-                <div
-                  className="col-xs-9"
-                >
-                  <small>
-                    0
-                  </small>
-                </div>
-              </div>,
-            ],
-            "className": "pt-card pt-elevation-2 node-warning pt-interactive",
-            "onClick": [Function],
+                Expand
+              </span>
+            </div>,
+            "className": "row",
           },
           "ref": null,
-          "rendered": Array [
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-9"
-                  >
-                    <h5>
-                      LOCALHOST
-                    </h5>
-                  </div>,
-                  <span
-                    className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
-                  />,
-                ],
-                "className": "row",
-              },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <h5>
-                      LOCALHOST
-                    </h5>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "LOCALHOST",
-                    },
-                    "ref": null,
-                    "rendered": "LOCALHOST",
-                    "type": "h5",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": "span",
-                },
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": Array [
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>,
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>,
               ],
-              "type": "div",
+              "className": "col-sm-6",
             },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Coinbase
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                       
-                      <HexText
-                        classes="smd-pad-2"
-                        value={null}
-                      />
-                       
-                    </small>
-                  </div>,
+            "ref": null,
+            "rendered": Array [
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    "Peers (",
+                    0,
+                    ")",
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  "Peers (",
+                  0,
+                  ")",
                 ],
-                "className": "row pt-text-muted",
+                "type": "h3",
               },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Coinbase
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Coinbase",
-                    },
-                    "ref": null,
-                    "rendered": "Coinbase",
-                    "type": "small",
-                  },
-                  "type": "div",
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Expand",
+                  "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
                 },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                       
-                      <HexText
-                        classes="smd-pad-2"
-                        value={null}
-                      />
-                       
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
-                        " ",
-                        <HexText
-                          classes="smd-pad-2"
-                          value={null}
-                        />,
-                        " ",
-                      ],
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      " ",
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "class",
-                        "props": Object {
-                          "classes": "smd-pad-2",
-                          "value": null,
-                        },
-                        "ref": null,
-                        "rendered": null,
-                        "type": [Function],
-                      },
-                      " ",
-                    ],
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Block
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                      0
-                    </small>
-                  </div>,
-                ],
-                "className": "row pt-text-muted",
+                "ref": null,
+                "rendered": "Expand",
+                "type": "span",
               },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Block
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Block",
-                    },
-                    "ref": null,
-                    "rendered": "Block",
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      0
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": 0,
-                    },
-                    "ref": null,
-                    "rendered": 0,
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": Array [
-                  <div
-                    className="col-xs-3"
-                  >
-                    <small>
-                      Peers
-                    </small>
-                  </div>,
-                  <div
-                    className="col-xs-9"
-                  >
-                    <small>
-                      0
-                    </small>
-                  </div>,
-                ],
-                "className": "row pt-text-muted",
-              },
-              "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      Peers
-                    </small>,
-                    "className": "col-xs-3",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Peers",
-                    },
-                    "ref": null,
-                    "rendered": "Peers",
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <small>
-                      0
-                    </small>,
-                    "className": "col-xs-9",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": 0,
-                    },
-                    "ref": null,
-                    "rendered": 0,
-                    "type": "small",
-                  },
-                  "type": "div",
-                },
-              ],
-              "type": "div",
-            },
-          ],
+            ],
+            "type": "div",
+          },
           "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": "hr",
         },
         Object {
           "instance": null,
@@ -2490,6 +954,203 @@ ShallowWrapper {
           "type": [Function],
         },
       ],
+      "type": "div",
+    },
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": <div
+          className="pt-card pt-elevation-2 node-success pt-interactive"
+          onClick={[Function]}
+        >
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-6"
+            >
+              <h3>
+                Peers (
+                0
+                )
+              </h3>
+              <span
+                className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+              >
+                Expand
+              </span>
+            </div>
+          </div>
+          <hr />
+          <Blueprint.Collapse
+            component="div"
+            isOpen={false}
+            keepChildrenMounted={false}
+            transitionDuration={200}
+          >
+            <withRouter(Connect(PeersCard)) />
+          </Blueprint.Collapse>
+        </div>,
+      },
+      "ref": null,
+      "rendered": Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="row"
+            >
+              <div
+                className="col-sm-6"
+              >
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>
+              </div>
+            </div>,
+            <hr />,
+            <Blueprint.Collapse
+              component="div"
+              isOpen={false}
+              keepChildrenMounted={false}
+              transitionDuration={200}
+            >
+              <withRouter(Connect(PeersCard)) />
+            </Blueprint.Collapse>,
+          ],
+          "className": "pt-card pt-elevation-2 node-success pt-interactive",
+          "onClick": [Function],
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="col-sm-6"
+              >
+                <h3>
+                  Peers (
+                  0
+                  )
+                </h3>
+                <span
+                  className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                >
+                  Expand
+                </span>
+              </div>,
+              "className": "row",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <h3>
+                    Peers (
+                    0
+                    )
+                  </h3>,
+                  <span
+                    className="col-xs-3 text-right pt-icon-standard pt-icon-caret-down"
+                  >
+                    Expand
+                  </span>,
+                ],
+                "className": "col-sm-6",
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      "Peers (",
+                      0,
+                      ")",
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    "Peers (",
+                    0,
+                    ")",
+                  ],
+                  "type": "h3",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Expand",
+                    "className": "col-xs-3 text-right pt-icon-standard pt-icon-caret-down",
+                  },
+                  "ref": null,
+                  "rendered": "Expand",
+                  "type": "span",
+                },
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {},
+            "ref": null,
+            "rendered": null,
+            "type": "hr",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "class",
+            "props": Object {
+              "children": <withRouter(Connect(PeersCard)) />,
+              "component": "div",
+              "isOpen": false,
+              "keepChildrenMounted": false,
+              "transitionDuration": 200,
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "function",
+              "props": Object {},
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
+            "type": [Function],
+          },
+        ],
+        "type": "div",
+      },
       "type": "div",
     },
   ],

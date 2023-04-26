@@ -39,15 +39,14 @@ describe('ContractQuery: saga', () => {
 
   describe('queryCirrus generator', () => {
     const action = {
-      contractName: "Bid",
+      tableName: "Bid",
       queryString: "",
-      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
       type: QUERY_CIRRUS_REQUEST
     }
 
     test('inspection', () => {
       const gen = queryCirrus(action);
-      expect(gen.next().value).toEqual(call(queryCirrusRequest, action.contractName, action.queryString, action.chainId));
+      expect(gen.next().value).toEqual(call(queryCirrusRequest, action.tableName, action.queryString));
       expect(gen.next(queryCirrusMock).value).toEqual(put(queryCirrusSuccess(queryCirrusMock)));
       expect(gen.throw(error).value).toEqual(put(queryCirrusFailure(error)));
       expect(gen.next().done).toBe(true);
@@ -79,7 +78,8 @@ describe('ContractQuery: saga', () => {
     expect(gen.next().done).toBe(true);
   });
 
-  describe('queryCirrusVars generator', () => {
+  // skipped since we don't fetch cirrus vars anymore in a separate call
+  xdescribe('queryCirrusVars generator', () => {
 
     const action = {
       type: QUERY_CIRRUS_VARS_REQUEST,

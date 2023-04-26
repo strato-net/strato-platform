@@ -36,6 +36,11 @@ import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.re
 import chainsReducer from './components/Chains/chains.reducer'
 import createChainReducer from './components/CreateChain/createChain.reducer';
 import oauthAccountsReducer from './components/Accounts/components/OauthAccounts/oauthAccounts.reducer';
+import searchQueryReducer from './components/SearchResults/searchresults.reducer';
+import appMetadataReducer from './App/app.reducer'
+import peersReducer from './components/PeersCard/peers.reducer'
+
+import contractCardReducer from './components/Contracts/components/ContractCard/contractCard.reducer'
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -46,15 +51,16 @@ import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import {watchFetchUser, watchFetchPubKey} from './components/User/user.saga';
+import {watchFetchUser, watchFetchPubKey, watchuserCert} from './components/User/user.saga';
 import {
   watchFetchState,
   watchFetchCirrusContracts,
-  watchAccount
+  watchAccount,
+  watchFetchInfo,
 } from './components/Contracts/components/ContractCard/contractCard.saga';
+
 import {
   watchMethodCall,
-  watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 import {watchExecuteQuery, watchTransactionResult} from './components/QueryEngine/queryEngine.saga';
 import { watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
@@ -65,6 +71,10 @@ import watchSendTokens from './components/Accounts/components/SendTokens/sendTok
 import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
+import watchSearchQuery from './components/SearchResults/searchresults.saga';
+import watchAppMetadata from './App/app.saga'
+import watchGetPeerIdentity from './components/PeersCard/peers.saga';
+
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
 
 const rootReducer = combineReducers({
@@ -85,6 +95,7 @@ const rootReducer = combineReducers({
   chains: chainsReducer,
   contracts: contractsReducer,
   contractQuery: contractQueryReducer,
+  contractCard: contractCardReducer,
   createContract: createContractReducer,
   deployDapp: deployDappReducer,
   methodCall: methodCallReducer,
@@ -104,7 +115,10 @@ const rootReducer = combineReducers({
   // verify: verifyReducer,
   // download: downloadReducer,
   createChain: createChainReducer,
-  oauthAccounts: oauthAccountsReducer
+  oauthAccounts: oauthAccountsReducer,
+  search: searchQueryReducer,
+  appMetadata: appMetadataReducer, 
+  peers: peersReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -118,7 +132,7 @@ const rootSaga = function* startForeman() {
     fork(watchFetchContracts),
     fork(watchCompileContract),
     fork(watchFetchState),
-    fork(watchFetchArgs),
+    fork(watchFetchInfo),
     fork(watchMethodCall),
     fork(watchFetchCirrusContracts),
     fork(watchExecuteQuery),
@@ -130,12 +144,16 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchFetchPubKey),
+    fork(watchuserCert),
     // fork(watchCreateBlocUser),
     // fork(watchUploadFile),
     // fork(watchFetchUpload),
     fork(watchFetchChains),
     fork(watchCreateChain),
     fork(watchOauthAccountActions),
+    fork(watchSearchQuery),
+    fork(watchAppMetadata),
+    fork(watchGetPeerIdentity),
   ])
 };
 

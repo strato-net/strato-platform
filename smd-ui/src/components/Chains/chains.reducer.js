@@ -10,7 +10,8 @@ import {
   FETCH_CHAINS_IDS_SUCCESS,
   GET_LABEL_IDS,
   SELECT_CHAIN,
-  FETCH_CHAINS_FAILURE
+  FETCH_CHAINS_FAILURE,
+  FETCH_SELECT_CHAIN_DETAIL_SUCCESS
 } from './chains.actions';
 
 const initialState = {
@@ -90,6 +91,26 @@ const reducer = function (state = initialState, action) {
         labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
+      }
+    case FETCH_SELECT_CHAIN_DETAIL_SUCCESS:
+      const chainLabelIds_2 = {};
+      action.detail.forEach((chain) => {
+        const id = chain.id;
+        const label = chain.info.label;
+        if (!chainLabelIds_2[label]) {
+          chainLabelIds_2[label] = {};
+          chainLabelIds_2[label][id] = {};
+        } else {
+          chainLabelIds_2[label][id] = {};
+        }
+      });
+      return {
+        ...state,
+        chains: chainLabelIds_2,
+        labelIds: chainLabelIds_2,
+        chainIds: [action.detail[0], ...state.chainIds],
+        selectedChain: action.detail[0].id,
+        isLoading: false,
       }
     case RESET_CHAIN_ID:
       return {

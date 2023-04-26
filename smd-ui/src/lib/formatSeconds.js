@@ -14,7 +14,6 @@ export function sec2Date(sec){
     const minutesString = mnts.toString().padStart(2, "0");
     seconds  -= mnts*60;
     const secondsString = Math.floor(seconds).toString().padStart(2, "0");
-    // console.log(daysString, hoursString, minutesString, secondsString)
     const ret = <div>
         Uptime {days > 0 ? <span>{daysString}d:</span> : null}
          <span>

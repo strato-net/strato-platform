@@ -7,7 +7,7 @@ import {
   toUsernameChange
 } from './sendTokens.actions';
 import { fetchAccounts, fetchUserAddresses, fetchBalanceRequest } from '../../accounts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, AnchorButton, Popover, PopoverInteractionKind, Position } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -269,7 +269,7 @@ class SendTokens extends Component {
           <div className="row">
             <div className="col-sm-4 text-right">
               <label className="pt-label smd-pad-4">
-                Chain
+                Shard
               </label>
             </div>
             <div className="col-sm-8 smd-pad-4">
@@ -298,7 +298,7 @@ class SendTokens extends Component {
           <div className="row">
             <div className="col-sm-4 text-right">
               <label className="pt-label smd-pad-4">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className="col-sm-8 smd-pad-4">
@@ -334,18 +334,33 @@ class SendTokens extends Component {
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
       : [];
-
     return (
       <div className="smd-pad-16">
-        <Button onClick={() => {
-          mixpanelWrapper.track("send_ether_open_click");
-          // TODO: remove public mode
-          isModeOauth && (this.props.initialValues.fromAddress != "Certification Pending") && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
-          this.props.fetchChainIds();
-          this.props.sendTokensOpenModal();
-          this.props.reset();
-        }} className="pt-intent-primary pt-icon-add"
-          text="Send Tokens" />
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
+        >
+          <AnchorButton 
+            onClick={() => {
+              mixpanelWrapper.track("send_ether_open_click");
+              // TODO: remove public mode
+              isModeOauth && (this.props.initialValues.fromAddress != "Verification Pending") && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
+              this.props.fetchChainIds();
+              this.props.sendTokensOpenModal();
+              this.props.reset();
+            }} 
+            className="pt-intent-primary pt-icon-add"
+            disabled={!this.props.userCertificate}
+            text={"Send Tokens"} 
+          />
+        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -470,7 +485,8 @@ export function mapStateToProps(state) {
     },
     balance: state.accounts.currentUserBalance,
     chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
+    chainLabelIds: state.chains.listLabelIds,
+    userCertificate: state.user.userCertificate,
   };
 }
 

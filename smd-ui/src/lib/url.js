@@ -19,7 +19,7 @@ function createQuery(url, query) {
 
   keys.forEach((key, index) => {
     if (query[key]) {
-      if (index === 0) {
+      if (url.indexOf("?") < 0) {
         url += '?';
       } else {
         url += '&';
