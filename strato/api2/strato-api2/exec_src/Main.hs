@@ -33,8 +33,8 @@ import           Options                         ()
 import           SelectAccessible                ()
 import           SQLM
 
-hoistCoreServer :: SQLEnv -> Server API
-hoistCoreServer sqlEnv = hoistServer (Proxy :: Proxy API) (convertErrors runM) server
+hoistCoreServer :: Server API
+hoistCoreServer = hoistServer (Proxy :: Proxy API) (convertErrors runM) server
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -43,7 +43,7 @@ hoistCoreServer sqlEnv = hoistServer (Proxy :: Proxy API) (convertErrors runM) s
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
       runLoggingT .
-        runSQLMUsingEnv sqlEnv .
+        runSQLM .
         runVaultM "http://localhost:8013/strato/v2.3" $ f
 
 api :: Proxy API
@@ -62,15 +62,13 @@ main = do
 
   --print theDoc
   blockappsInit "core-api"
-
-  sqlEnv <- createSQLEnv
   
-  run 3001 $ app sqlEnv theDoc
+  run 3001 $ app theDoc
 
 type DocAPI =   "docs" :> "v2.0" :> SwaggerSchemaUI "swagger-ui" "swagger.json"
 
-app :: SQLEnv -> Swagger -> Application
-app sqlEnv theDoc = 
+app :: Swagger -> Application
+app theDoc = 
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
@@ -78,4 +76,4 @@ app sqlEnv theDoc =
 --  $ serve (Proxy :: Proxy (API :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ addPathsTo404
   $ serve (Proxy :: Proxy (API :<|> DocAPI))
-  $ hoistCoreServer sqlEnv :<|> swaggerSchemaUIServer theDoc
+  $ hoistCoreServer :<|> swaggerSchemaUIServer theDoc
