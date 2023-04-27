@@ -119,8 +119,7 @@ getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': 
 getBlocTransactionResult' hashes@(txh:_) resolve =
   if resolve
     then do
-      promises <- forM hashes $ \h -> async (getBlocTransactionResult h True)
-      results <- mapM wait promises
+      results <- forM hashes $ \h -> withAsync (getBlocTransactionResult h True) $ \e -> wait e
       $logDebugLS "getBlocTransactionResult'/results" results
       case results of 
         [] -> throwIO $ AnError "Empty list provided: results is empty"
