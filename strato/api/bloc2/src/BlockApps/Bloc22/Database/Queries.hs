@@ -28,6 +28,7 @@ module BlockApps.Bloc22.Database.Queries
 
 import           Blockchain.Data.AddressStateDB  (AddressState, unsafeResolveCodePtrSelect)
 import           Control.Arrow
+import           Control.DeepSeq
 import           Control.Monad
 import qualified Control.Monad.Change.Alter      as A
 import           Control.Monad.Logger
@@ -166,7 +167,6 @@ insertContractDetailsQuery sourceList =
     
           A.insert (A.Proxy @SourceMap) srcHash sourceList
 
-
 getContractDetailsFromDB
   :: (HasSQL m)
   => CodePtr
@@ -243,9 +243,10 @@ getContractDetailsByCodeHash codePtr = do
             detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap True
             case Map.lookup name detailsMap of
                 Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-                Just d -> pure d
-          Just d -> pure d 
-      case mDetails of
+                Just d -> pure $! d
+          Just d -> pure $! d 
+      let !mDetails' = force mDetails
+      case mDetails' of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
           liftIO $ Cache.insert srcCache codePtr details
