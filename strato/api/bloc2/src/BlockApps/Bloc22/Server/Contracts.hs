@@ -135,11 +135,10 @@ getContractsContract name addr chainId = do
         Left e -> throwIO $ UserError e
         Right details -> pure details{contractdetailsAccount=Just (Account addr (unChainId <$> chainId))}
 
+-- Only for EVM, unimplemented for SolidVM
 translateStorageMap :: [StorageAddress] -> S.Storage
 translateStorageMap storage' =
-  let storageMap = Map.fromList $ map (\StorageAddress{..} -> case kind of
-        EVM -> (hexStorageToWord256 key, hexStorageToWord256 value)
-        SolidVM -> error "translateStorageMap: undefined for SolidVM") storage'
+  let storageMap = Map.fromList $ map (\StorageAddress{..} -> (hexStorageToWord256 key, hexStorageToWord256 value)) storage'
 
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
@@ -186,8 +185,7 @@ getContractsState _ address chainId mName mCount mOffset mLength = do
       in join <$> mapM (getStorageRange address) ranges
 
   let storage = translateStorageMap storage'
-  
-  $logInfoS "DEBUG" $ Text.pack $ show $ decodeSolidVMValues $ map (key &&& value) storage'
+
   ret <- case (storage', mName) of
     (StorageAddress{kind=SolidVM}:_, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $ Text.unlines

@@ -901,7 +901,9 @@ cacheLookup :: (Hashable k)
             -> TimeSpec
             -> k
             -> STM (Maybe v)
-cacheLookup c t k = Cache.lookupSTM True k c t
+cacheLookup c t k = do
+  Cache.purgeExpiredSTM c t
+  Cache.lookupSTM True k c t
 
 genNonces :: (MonadLogger m, HasBlocEnv m, HasSQL m) =>
              Show a
