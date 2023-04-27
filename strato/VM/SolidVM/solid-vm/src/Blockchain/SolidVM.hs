@@ -2755,8 +2755,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
     case theType of
       SVMType.Mapping _ _ _-> return ()
       SVMType.Array _ _-> return ()
-      SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
-      _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
+      t -> do 
+        defVal <- createDefaultValue cc contract' t
+        markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ toBasic defVal
+      -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
