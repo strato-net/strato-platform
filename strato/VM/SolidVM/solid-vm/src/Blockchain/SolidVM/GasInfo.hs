@@ -12,7 +12,8 @@
 module Blockchain.SolidVM.GasInfo (
   GasInfo(..),
   gasLeft,
-  gasInitalAllotment,
+  gasUsed,
+  gasInitialAllotment,
   gasMetadata
   ) where
 
@@ -24,7 +25,8 @@ import Blockchain.Strato.Model.Gas
 
 data GasInfo = GasInfo {
     _gasLeft :: Gas,
-    _gasInitalAllotment :: Gas, 
+    _gasUsed :: Gas,
+    _gasInitialAllotment :: Gas, 
     _gasMetadata :: String
   } deriving (Show, Generic, NFData)
 

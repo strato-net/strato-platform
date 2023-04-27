@@ -1,8 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 
 module Text.Tools (
   box,
   boringBox,
+  formatBool,
   grayBox,
+  multilineLog,
   setTitle,
   shorten,
   tab,
@@ -10,7 +13,10 @@ module Text.Tools (
   wrap
   ) where
 
-import Text.Colors as C
+import           BlockApps.Logging
+import           Control.Monad
+import qualified Data.Text as T
+import           Text.Colors as C
 
 box :: [String] -> String
 box = boxWithProperty C.magenta
@@ -36,8 +42,11 @@ printedLength = go False
     go False (_:t) = 1 + go False t
     go _ [] = 0
 
-
-
+multilineLog :: MonadLogger m =>
+                T.Text -> String -> m ()
+multilineLog source theLines = do
+  forM_ (lines theLines) $ \theLine ->
+    $logInfoS source $ T.pack theLine
 
 boringBox :: [String] -> String
 boringBox strings = unlines $
@@ -45,6 +54,10 @@ boringBox strings = unlines $
   ++ map (\s -> C.magenta "| " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " |") strings
   ++ [C.magenta (replicate width '=')]
   where width = maximum (map printedLength strings) + 4
+
+formatBool :: Bool -> String
+formatBool True = C.green "True"
+formatBool False = C.red "False"
 
 tab::String->String
 tab s = ' ':' ':' ':' ':tab' s
@@ -59,7 +72,6 @@ tab' (c:rest)    = c:tab' rest
 setTitle :: String->IO()
 setTitle value = do
   putStr $ "\ESC]0;" ++ value ++ "\007"
-
 
 shorten :: Int -> String -> String
 shorten maxLen s | length s <= maxLen = s

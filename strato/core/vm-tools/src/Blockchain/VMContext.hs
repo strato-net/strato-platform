@@ -27,6 +27,7 @@ module Blockchain.VMContext
     , Context(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , GasCap(..)
     , stateDB
     , hashDB
     , codeDB
@@ -43,6 +44,7 @@ module Blockchain.VMContext
     , memDBs
     , baggerState
     , bestBlockInfo
+    , vmGasCap
     , hasBlockstanbul
     , blockRequested
     , txRunResultsCache
@@ -123,6 +125,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Data.RLP
@@ -141,6 +144,9 @@ newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
   deriving (Generic, NFData, Show)
 
 newtype IsBlockstanbul = IsBlockstanbul { unIsBlockstanbul :: Bool }
+  deriving (Generic, NFData, Show, Eq)
+
+newtype GasCap = GasCap { unVmGasCap :: Gas }
   deriving (Generic, NFData, Show, Eq)
 
 instance NFData RBDB.RedisConnection where
@@ -184,6 +190,7 @@ data ContextState = ContextState
   { _memDBs            :: !MemDBs
   , _baggerState       :: !BaggerState
   , _bestBlockInfo     :: !ContextBestBlockInfo
+  , _vmGasCap          :: !Gas
   , _hasBlockstanbul   :: !Bool
   , _blockRequested    :: !Bool
   , _txRunResultsCache :: TRC.Cache
@@ -196,6 +203,7 @@ instance Default ContextState where
     { _memDBs            = def
     , _baggerState       = defaultBaggerState
     , _bestBlockInfo     = Unspecified
+    , _vmGasCap          = 13500900000 * 2 -- 13500900000 is the most gas used in a tx on STRATO Mercata as of 4/11/23
     , _hasBlockstanbul   = True
     , _blockRequested    = False
     , _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache"
@@ -223,6 +231,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
                 , Mod.Modifiable CurrentBlockHash m
+                , Mod.Modifiable GasCap m
                 , HasMemAddressStateDB m
                 , A.Selectable Word256 ParentChainIds m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
@@ -465,7 +474,7 @@ lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
     mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
-    $logInfoS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
+    $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
     case mAccount of
         Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
         _ -> pure Nothing
@@ -503,6 +512,13 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
     mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
+
+instance Mod.Modifiable GasCap ContextM where
+  get _ = contextGets (GasCap . _vmGasCap)
+
+  put _ (GasCap g) = do 
+    contextModify (vmGasCap .~ g)
+    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
 
 runTestContextM :: ( MonadUnliftIO m
                    , HasStateDB (ReaderT Context (ResourceT m))
@@ -557,6 +573,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _baggerState       = defaultBaggerState
             , _bestBlockInfo     = Unspecified
             , _hasBlockstanbul   = False
+            , _vmGasCap          = fromIntegral (maxBound :: Int)
             , _blockRequested    = False
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing

@@ -79,7 +79,7 @@ import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
-import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
+import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), GasCap(..), baggerState, putContextBestBlockInfo, vmGasCap)
 import           Blockchain.Options()
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
@@ -107,6 +107,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
+import           Blockchain.Strato.RedisBlockDB       (RedisConnection)
 import           Blockchain.VMContext                 (lookupX509AddrFromCBHash)
 import qualified Blockchain.TxRunResultCache           as TRC
 
@@ -207,6 +208,9 @@ instance Mod.Accessible PublicKey (MonadTest m) where
 
 instance Mod.Accessible PublicKey (MonadP2PTest m) where
   access _ = error "pubkey"
+
+instance MonadIO m => Mod.Accessible RedisConnection (MonadTest m) where
+  access _ = liftIO $ error "should not be called"
 
 instance {-# OVERLAPPING #-} MonadIO m => State.MonadState TestContext (MonadTest m) where
   state f = asks _p2pTestContext >>= \ctx -> liftIO . atomically $ do
@@ -532,11 +536,11 @@ instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
-  
+
   getPub = do
     pk <- use prvKey
     return $ derivePublicKey pk
-  
+
   getShared pub = do
     pk <- use prvKey
     return $ deriveSharedKey pk pub
@@ -647,6 +651,10 @@ instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
   get _    = gets $ Lens.view debugSettings
   put _ ds = modify $ debugSettings .~ ds
 
+instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
+  get _ = GasCap <$> gets (Lens.view vmGasCap)
+  put _ (GasCap g) = modify $ vmGasCap .~ g
+
 instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
   access _ = get
 
@@ -720,7 +728,7 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
 
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
-      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
       mCertAddress <- lookupX509AddrFromCBHash k
       fmap join . for mCertAddress $ \certAddress ->
         maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
@@ -728,7 +736,7 @@ instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certific
 
 instance (MonadIO m, MonadLogger m) => ((Address,T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
   select _ (k,t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
@@ -1038,7 +1046,7 @@ instance (ChainMemberParsedSet `A.Selectable` IsValidator) m => (ChainMemberPars
   select p cm = lift $ A.select p cm
 
 instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadTest m) where
-  select _ cm = M.lookup cm <$> use parsedSetToX509Map 
+  select _ cm = M.lookup cm <$> use parsedSetToX509Map
 
 instance (ChainMemberParsedSet `A.Selectable` X509CertInfoState) m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadP2PTest m) where
   select p cm = lift $ A.select p cm
@@ -1111,7 +1119,7 @@ newBlockstanbulContext paddr as =
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext emptyChainMember []
-  
+
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
   -- loopCh <- atomically newTMChan
@@ -1208,7 +1216,7 @@ runNodeWithoutP2P p = do
     (concurrently_ (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
                                   (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
                    (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
-    (concurrently_ 
+    (concurrently_
       (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
                      (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
       (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
@@ -1447,7 +1455,7 @@ data P2PConnection = P2PConnection
   , _serverP2PPeer   :: P2PPeer
   , _clientP2PPeer   :: P2PPeer
   , _server          :: TestContextM (Maybe SomeException)
-  , _client          :: TestContextM (Maybe SomeException) 
+  , _client          :: TestContextM (Maybe SomeException)
   , _serverException :: TVar (Maybe SomeException)
   , _clientException :: TVar (Maybe SomeException)
   }

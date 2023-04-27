@@ -94,6 +94,7 @@ import           Blockchain.Timing
 
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
+import           Text.Tools
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
 --   deriving (Eq, Ord, Show)
@@ -172,9 +173,15 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
             else not makeLazyBlocks || hasTxs)
     $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
-    $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
-        "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
-         (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
+    multilineLog "evm/loop/newBlock" $ boringBox [
+        CL.yellow "Decision making for block creation:",
+        "isCaughtUp: " ++ formatBool isCaughtUp,
+        "pbft: " ++ formatBool pbft,
+        "reqd: " ++ formatBool reqd,
+        "hasTxs: " ++ formatBool hasTxs,
+        "makeLazyBlocks: " ++ formatBool makeLazyBlocks,
+        "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
+      ]
     when (pbft && shouldOutputBlocks) $
       Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
