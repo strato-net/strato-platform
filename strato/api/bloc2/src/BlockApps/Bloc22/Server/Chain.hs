@@ -266,7 +266,7 @@ waitForChainInfos chainIds = waitFor go
 getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
                 ChainId -> m ChainIdChainOutput
 
-getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing
+getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing Nothing
 
 
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>

@@ -252,6 +252,7 @@ type PostChainInfos = "chains"
 
 type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId
+  :> QueryParam "label" Text
   :> QueryParam "limit" Integer
   :> QueryParam "offset" Integer
   :> Get '[JSON] [ChainIdChainOutput]
