@@ -162,6 +162,12 @@ instance ToSchema ChainInput where
 instance ToParam (QueryParams "chainid" ChainId) where
   toParam _ = DocQueryParam "chainid" [] "chain ID to be looked up" Normal
 
+instance ToParam (QueryParam "label" Text) where
+  toParam _ = DocQueryParam "label" [] "Label look up" Normal
+
+instance ToParam (QueryParams "label" Text) where
+  toParam _ = DocQueryParam "label" [] "Label look up" Normal
+
 instance ToParam (QueryParams "limit" Integer) where
   toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
 
