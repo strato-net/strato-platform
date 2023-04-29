@@ -44,9 +44,9 @@ import Data.Text (Text)
 import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
 
-import BlockApps.Bloc22.Database.Queries
-import BlockApps.Bloc22.Monad
-import BlockApps.Bloc22.Server.Utils
+import Bloc.Database.Queries
+import Bloc.Monad
+import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Parse.Parser
@@ -206,7 +206,7 @@ lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
 
--- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
+-- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers.
 getEVMDetailsForRow :: ( MonadLogger m
                        , Accessible BlocEnv m
                        , HasBlocSQL m
@@ -241,7 +241,7 @@ getEVMDetailsForRow row = liftM2 (<|>)
   --                         ,("nohistory", disableHistoryTable)
   --                         ]
   -- return $ fmap OLD.contractdetailsCodeHash detailsMap
-  -- where 
+  -- where
   --   go m (k,f) = runMaybeT $ do
   --       v <- lookupT k $ actionMetadata row
   --       let contracts' = filter (not . T.null) $ T.splitOn "," v
@@ -272,7 +272,7 @@ getEVMDetailsForRow row = liftM2 (<|>)
 --   --         $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ (show codePtr)
 --   --         lift $ f gref $ historyTableName (actionOrganization row) (actionApplication row) (T.pack name)
 
---   infoMap <- do 
+--   infoMap <- do
 --     mMap <- getSolidVMInfoForRow gref row
 --     case mMap of
 --       Nothing -> error "SolidVMInfo should be in the cache, but adjustGlobals didn't find them"
@@ -322,8 +322,8 @@ rowToHistories _ abiId actions cont oldState = do
 -- createEvents events' org app = do
 --   return $ map makeEvent $ Map.toList events'
 --   where
---     makeEvent :: (Text, OLD.Event) -> EventTable 
---     makeEvent (name, event) = 
+--     makeEvent :: (Text, OLD.Event) -> EventTable
+--     makeEvent (name, event) =
 --       EventTable
 --       { eventOrganization = org
 --       , eventApplication  = app
@@ -441,7 +441,7 @@ processTheMessages env sqlEnv conn g messages = do
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc' <- getCC cp ccString
     case cc' of
-      Right cc -> do 
+      Right cc -> do
               $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
 
 
@@ -472,13 +472,13 @@ processTheMessages env sqlEnv conn g messages = do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
               pure $ Right deferredForeignKeys -- Either String String
-              
-      Left cc -> do 
+
+      Left cc -> do
         $logInfoS "processTheMessages" $ T.pack cc
         pure $ Left cc -- Either String String
-  
+
   let fkeys = rights fkeys'
-  
+
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
       let row = combineActions actions
@@ -539,4 +539,4 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
-  
+

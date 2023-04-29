@@ -18,7 +18,7 @@ stack.yaml.lock
 configurationCache.log
 dryrun.log
 targets.log
-strato/x509-generator/subject.json
-strato/genesis-builder/certs.json
+strato/tools/x509-generator/subject.json
+strato/tools/genesis-builder/certs.json
 *.cabal
 *~
