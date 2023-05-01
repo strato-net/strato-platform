@@ -14,7 +14,7 @@ dependencies:
 executables:
   strato-api:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         exec_src
     other-modules:
     - Options
     - SelectAccessible
@@ -57,7 +57,7 @@ executables:
 
   strato-api-init:
     main:                StratoAPIInit.hs
-    source-dirs:         app
+    source-dirs:         exec_src
     other-modules:
     - SelectAccessible
     dependencies:
@@ -66,7 +66,7 @@ executables:
 
   post-raw-transaction:
     main:                PostRawTransaction.hs
-    source-dirs:         app
+    source-dirs:         exec_src
     other-modules:
     - Options
     dependencies:

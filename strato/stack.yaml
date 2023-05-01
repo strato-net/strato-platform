@@ -1,10 +1,9 @@
 packages:
-- api/bloc2
-- api/bloc2api
-- api/core-api2
+- api/bloc/bloc2
+- api/bloc/bloc2api
+- api/core
 - api/ethereum-jsonrpc
 - api/strato-api
-- api2/strato-api2
 
 - core/blockapps-data
 - core/blockapps-datadefs
@@ -118,7 +117,7 @@ extra-lib-dirs:
 allow-newer: true
 allow-different-user: true
 ghc-options:
-  "$locals": -Wall -Werror -fwarn-redundant-constraints 
+  "$locals": -Wall -Werror -fwarn-redundant-constraints
 
 
 # Increase the number of ticks the simplifier is allowed to use by passing the flag -fsimpl-tick-factor=N (where N is a larger number) to GHC when building your project
