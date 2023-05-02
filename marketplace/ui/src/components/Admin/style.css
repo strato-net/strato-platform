@@ -1,0 +1,10 @@
+#accept.ant-btn-default:not(:disabled):hover{
+    border-color: #109B2E;
+    color: #109B2E;
+}
+
+
+#reject.ant-btn-default:not(:disabled):hover{
+    border-color: #FF0000;
+    color: #FF0000;
+}

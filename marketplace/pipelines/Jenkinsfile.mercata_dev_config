@@ -1,0 +1,125 @@
+withCredentials([
+    usernamePassword(credentialsId: 'tcommerce-dev1-mercata-keycloak-client', passwordVariable: 'TCOMMERCE_DEV1_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TCOMMERCE_DEV1_KEYCLOAK_CLIENT_ID'),
+    usernamePassword(credentialsId: 'tcommerce-dev2-mercata-keycloak-client', passwordVariable: 'TCOMMERCE_DEV2_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TCOMMERCE_DEV2_KEYCLOAK_CLIENT_ID'),
+    usernamePassword(credentialsId: 'tcommerce-dev4-mercata-keycloak-client', passwordVariable: 'TCOMMERCE_DEV4_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TCOMMERCE_DEV4_KEYCLOAK_CLIENT_ID'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-admin', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_USERNAME'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-seller', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_SELLER_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_SELLER_USERNAME'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-buyer', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_BUYER_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_BUYER_USERNAME'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-tradingentity', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_USERNAME'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-certifier', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_USERNAME'),
+    usernamePassword(credentialsId: 'tcommerce-mercata-keycloak-bayer', passwordVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_BAYER_PASSWORD', usernameVariable: 'TCOMMERCE_MERCATA_KEYCLOAK_BAYER_USERNAME')
+]) {
+  NODE_DATA = [
+      //MONITOR: [
+      //  NETWORK_HEALTH_URL: 'https://monitor.example.com/health'
+      //],
+      NODE1: [
+        //   NUMBER             : "1",
+        //   APP_HOST           : "node1.tcommerce-dev-td3ar4a.blockapps.net",
+        //   APP_IP             : "44.194.147.96",
+        //   STRATO_HOSTNAME    : "strato-node1.tcommerce-dev-td3ar4a.blockapps.net",
+        //   STRATO_PORT        : 443,
+        //   STRATO_ADDRESS     : '2f0604e15312f567d92d3394b1095ea0dd542c02',
+        //   STRATO_PUBKEY      : '042b33619135009c0fc17013441a8b6ead84f14e7f7754922074d6f0c4a3fcabfe4f41e260e2ca38f33e87d0ec97164361f729b94440b08b87cc417fa5452eacca',
+        //   //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
+        //   //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
+        //   OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration",
+        //   OAUTH_CLIENT_ID    : "${TCOMMERCE_DEV1_KEYCLOAK_CLIENT_ID}",
+        //   OAUTH_CLIENT_SECRET: "${TCOMMERCE_DEV1_KEYCLOAK_CLIENT_SECRET}",
+        //   ORG_NAME           : "BlockApps",
+        //   ADMIN_NAME         : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_USERNAME}",
+        //   ADMIN_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_PASSWORD}",
+        //   SELLER_ORG         : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_USERNAME}",
+        //   SELLER_PASSWORD    : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_PASSWORD}"
+      ],
+      NODE2: [
+          NUMBER             : "2",
+          APP_HOST           : "node2.tcommerce-dev-td3ar4a.blockapps.net",
+          APP_IP             : "54.147.84.166",
+          STRATO_HOSTNAME    : "strato-node1.tcommerce-dev-td3ar4a.blockapps.net",
+          STRATO_PORT        : 443,
+          STRATO_ADDRESS     : '2f0604e15312f567d92d3394b1095ea0dd542c02',
+          STRATO_PUBKEY      : '042b33619135009c0fc17013441a8b6ead84f14e7f7754922074d6f0c4a3fcabfe4f41e260e2ca38f33e87d0ec97164361f729b94440b08b87cc417fa5452eacca',
+          //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
+          //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
+          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration",
+          OAUTH_CLIENT_ID    : "${TCOMMERCE_DEV1_KEYCLOAK_CLIENT_ID}",
+          OAUTH_CLIENT_SECRET: "${TCOMMERCE_DEV1_KEYCLOAK_CLIENT_SECRET}",
+          ORG_NAME           : "BlockApps",
+          ADMIN_NAME         : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_USERNAME}",
+          ADMIN_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_PASSWORD}",
+          SELLER_ORG         : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_USERNAME}",
+          SELLER_PASSWORD    : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_PASSWORD}",
+          BUYER_ORG          : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_USERNAME}",
+          BUYER_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_PASSWORD}",
+          TRADINGENTITY_ORG  : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_USERNAME}",
+          TRADINGENTITY_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_PASSWORD}",
+          CERTIFIER_ORG      : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_USERNAME}",
+          CERTIFIER_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_PASSWORD}",
+          BAYER_ADMIN_ORG    : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_USERNAME}",
+          BAYER_ADMIN_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_PASSWORD}"
+      ],
+      NODE3: [
+          NUMBER             : "3",
+          APP_HOST           : "node3.tcommerce-dev-td3ar4a.blockapps.net",
+          APP_IP             : "52.1.114.109",
+          STRATO_HOSTNAME    : "strato-node1.tcommerce-dev-td3ar4a.blockapps.net",
+          STRATO_PORT        : 443,
+          STRATO_ADDRESS     : '2f0604e15312f567d92d3394b1095ea0dd542c02',
+          STRATO_PUBKEY      : '042b33619135009c0fc17013441a8b6ead84f14e7f7754922074d6f0c4a3fcabfe4f41e260e2ca38f33e87d0ec97164361f729b94440b08b87cc417fa5452eacca',
+          //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
+          //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
+          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration",
+          OAUTH_CLIENT_ID    : "${TCOMMERCE_DEV2_KEYCLOAK_CLIENT_ID}",
+          OAUTH_CLIENT_SECRET: "${TCOMMERCE_DEV2_KEYCLOAK_CLIENT_SECRET}",
+          ORG_NAME           : "BlockApps",
+          ADMIN_NAME         : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_USERNAME}",
+          ADMIN_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_PASSWORD}",
+          SELLER_ORG         : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_USERNAME}",
+          SELLER_PASSWORD    : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_PASSWORD}",
+          BUYER_ORG          : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_USERNAME}",
+          BUYER_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_PASSWORD}",
+          TRADINGENTITY_ORG  : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_USERNAME}",
+          TRADINGENTITY_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_PASSWORD}",
+          CERTIFIER_ORG      : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_USERNAME}",
+          CERTIFIER_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_PASSWORD}",
+          BAYER_ADMIN_ORG    : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_USERNAME}",
+          BAYER_ADMIN_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_PASSWORD}"
+      ],
+
+      NODE4: [
+          NUMBER             : "4",
+          APP_HOST           : "node4.tcommerce-dev-td3ar4a.blockapps.net",
+          APP_IP             : "52.20.86.134",
+          STRATO_HOSTNAME    : "strato-node1.tcommerce-dev-td3ar4a.blockapps.net",
+          STRATO_PORT        : 443,
+          STRATO_ADDRESS     : '2f0604e15312f567d92d3394b1095ea0dd542c02',
+          STRATO_PUBKEY      : '042b33619135009c0fc17013441a8b6ead84f14e7f7754922074d6f0c4a3fcabfe4f41e260e2ca38f33e87d0ec97164361f729b94440b08b87cc417fa5452eacca',
+          //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
+          //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
+          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration",
+          OAUTH_CLIENT_ID    : "${TCOMMERCE_DEV4_KEYCLOAK_CLIENT_ID}",
+          OAUTH_CLIENT_SECRET: "${TCOMMERCE_DEV4_KEYCLOAK_CLIENT_SECRET}",
+          ORG_NAME           : "BlockApps",
+          ADMIN_NAME         : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_USERNAME}",
+          ADMIN_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_ADMIN_PASSWORD}",
+          SELLER_ORG         : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_USERNAME}",
+          SELLER_PASSWORD    : "${TCOMMERCE_MERCATA_KEYCLOAK_SELLER_PASSWORD}",
+          BUYER_ORG          : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_USERNAME}",
+          BUYER_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_BUYER_PASSWORD}",
+          TRADINGENTITY_ORG  : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_USERNAME}",
+          TRADINGENTITY_PASSWORD     : "${TCOMMERCE_MERCATA_KEYCLOAK_TRADINGENTITY_PASSWORD}",
+          CERTIFIER_ORG      : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_USERNAME}",
+          CERTIFIER_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_CERTIFIER_PASSWORD}",
+          BAYER_ADMIN_ORG    : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_USERNAME}",
+          BAYER_ADMIN_PASSWORD : "${TCOMMERCE_MERCATA_KEYCLOAK_BAYER_PASSWORD}"
+      ],
+
+
+
+
+
+  ]
+}
+
+return this

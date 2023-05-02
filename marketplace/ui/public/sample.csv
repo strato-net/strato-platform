@@ -1,0 +1,7 @@
+ItemSerialNumber,RawMaterialProductName,RawMaterialProductId,RawMaterialSerialNumber1,RawMaterialSerialNumber2,RawMaterialSerialNumber3,RawMaterialSerialNumber4,RawMaterialSerialNumber5,RawMaterialSerialNumber6,RawMaterialSerialNumber7,RawMaterialSerialNumber8
+A123,Cotton Fabric,CF1,X561,X7666,X7667,,,,,
+A123,Cotton Thread,CT1,U89889,,,,,,,
+A124,Cotton Fabric,CF1,X561,X7666,U89889,X7667,,,,
+A124,Cotton Thread,CT1,Y202,,,,,,,
+A126,Cotton Fabric,CF1,X7666,U89889,,,,,,
+A126,Cotton Thread,CT1,Y202,,,,,,,

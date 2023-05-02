@@ -1,0 +1,6 @@
+url: https://strato-node1.tcommerce-dev-td3ar4a.blockapps.net
+dapp:
+  contract:
+    name: Dapp
+    address: '0000000000000000000000000000000000000100'
+    appChainId: 57976a1e1b0275030fc56cc9518875f4e5e9e7c364a3873e44e554b99870c343

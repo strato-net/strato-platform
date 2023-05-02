@@ -1,0 +1,142 @@
+pipeline {
+  agent { label "tcommerce-dev3" }
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+  }
+  parameters {
+    string(name: 'TCOMMERCE_REPO_REFSPEC', defaultValue: 'develop', description: 'Refspec of blockapps/tcommerce git repo. E.g. a branch name or the commit hash.')
+    booleanParam(name: 'CLEAN_TCOMMERCE_DATA', defaultValue: false, description: 'Either to remove the docker volumes and deploy tcommerce from scratch')
+  }
+
+  stages {
+    stage('Preconfigure') {
+      steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            try {
+              currentBuild.description = "tcommerce_refspec:${env.TCOMMERCE_REPO_REFSPEC} CLEAN_TCOMMERCE_DATA: ${env.CLEAN_TCOMMERCE_DATA} // ${BUILD_USER_FIRST_NAME}"
+            } catch (e) {
+              currentBuild.description = "tcommerce_refspec:${env.TCOMMERCE_REPO_REFSPEC} CLEAN_TCOMMERCE_DATA: ${env.CLEAN_TCOMMERCE_DATA} // anon"
+            }
+          }
+        }
+
+        script {
+          lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
+          NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.mercata_dev_config").NODE_DATA
+        }
+      }
+    }
+
+    stage('Collect nodes metadata') {
+      parallel {
+        stage('Get address of tcommerce-dev3') {
+          // agent { label "tcommerce-dev3" } is default
+          steps {
+            script {
+              def addressAndPubkey = lib.getCurrentNodeAddressAndPubkey(NODE_DATA.NODE3)
+              NODE_DATA.NODE3._ADDRESS = addressAndPubkey.address
+              NODE_DATA.NODE3._PUBKEY = addressAndPubkey.pubkey
+            }
+          }
+        }
+      }
+    }
+
+    stage('Run app on bootnode (dev3)') {
+      // agent { label "tcommerce-dev2" } // is default
+      steps {
+        script {
+          lib.runAppBootNode(NODE_DATA.NODE3, NODE_DATA, env.TCOMMERCE_REPO_REFSPEC, params.CLEAN_TCOMMERCE_DATA)
+        }
+      }
+    }
+
+  //  stage('Run app on secondary nodes') {
+  //    parallel {
+  //      stage('Run app on tcommerce-dev2') {
+  //        agent { label "tcommerce-dev2" }
+  //        steps {
+  //          script {
+  //            lib.runAppSecondaryNode(NODE_DATA.NODE2, env.TCOMMERCE_REPO_REFSPEC, params.CLEAN_TCOMMERCE_DATA)
+  //          }
+  //        }
+  //      }
+      //  stage('Run app on tcommerce-dev3') {
+      //    agent { label "tcommerce-dev3" }
+      //    steps {
+      //      script {
+      //        lib.runAppSecondaryNode(NODE_DATA.NODE3, env.TCOMMERCE_REPO_REFSPEC, params.CLEAN_TCOMMERCE_DATA)
+      //      }
+      //    }
+      //  }
+  //    }
+  //  }
+
+  //  stage('Wait for secondary nodes to be healthy') {
+  //    parallel {
+  //      stage('Wait for tcommerce-dev2 to be healthy') {
+  //        agent { label "tcommerce-dev2" }
+  //        steps {
+  //          script {
+  //            dir('tcommerce') {
+  //              lib.waitForHealthyDappContainers()
+  //            }
+  //          }
+  //        }
+  //      }
+      //  stage('Wait for tcommerce-dev3 to be healthy') {
+      //    agent { label "tcommerce-dev3" }
+      //    steps {
+      //      script {
+      //        dir('tcommerce') {
+      //          lib.waitForHealthyDappContainers()
+      //        }
+      //      }
+      //    }
+      //  }
+  //    }
+  //  }
+
+  }
+  
+  post {
+
+    success {
+      slackSend(
+          color: 'good',
+          message: "tcommerce-dev3 TCOMMERCE APP was redeployed successfully with TCOMMERCE_REPO_REFSPEC '${env.TCOMMERCE_REPO_REFSPEC}': Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#dev-tcommerce-ci',
+          color: 'good',
+          message: "tcommerce-dev3 TCOMMERCE APP was redeployed successfully with TCOMMERCE_REPO_REFSPEC '${env.TCOMMERCE_REPO_REFSPEC}': Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#dev-tcommerce',
+          color: 'good',
+          message: "tcommerce-dev3 TCOMMERCE APP was redeployed successfully with TCOMMERCE_REPO_REFSPEC '${env.TCOMMERCE_REPO_REFSPEC}': Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+
+    failure {
+      slackSend(
+          color: 'danger',
+          message: "tcommerce-dev3 TCOMMERCE APP redeployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#dev-tcommerce-ci',
+          color: 'danger',
+          message: "tcommerce-dev3 TCOMMERCE APP redeployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#dev-tcommerce',
+          color: 'danger',
+          message: "tcommerce-dev3 TCOMMERCE APP redeployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}
+
+

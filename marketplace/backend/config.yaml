@@ -1,0 +1,31 @@
+apiDebug: true
+timeout: 600000
+VM: SolidVM
+configDirPath: ./config
+deployFilename: localhost.deploy.yaml
+orgDeployFilename: org.deploy.yaml
+serverHost: 
+serverIP: 
+orgName: blockapps
+bootMembersFilename: boot_members.yaml
+cacheNonce: true
+
+nodes:
+  - id: 0
+    label: mercata-testnet-node1
+    url: https://strato-node1.tcommerce-dev-td3ar4a.blockapps.net
+    port: 30303
+    oauth:
+      appTokenCookieName: asset_framework_session
+      appTokenCookieMaxAge: 7776000000
+      openIdDiscoveryUrl: >-
+        https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration
+      clientId: localhost
+      clientSecret: 21092de3-a166-4ae3-90ca-4d5cc09d8dba
+      scope: email openid
+      serviceOAuthFlow: 
+      redirectUri: http://localhost/api/v1/authentication/callback
+      logoutRedirectUri: http://localhost
+      tokenField: 
+      tokenUsernameProperty: 
+      tokenUsernamePropertyServiceFlow: 
