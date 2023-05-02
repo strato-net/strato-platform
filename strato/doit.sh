@@ -50,19 +50,19 @@ fi
 
 
 function newnode {
-  
+
   # if alternative log in methods are provided then use them
   mkdir -p logs
-  
+
   VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
   VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
 
   echo "trying to see if the alternative OAUTH parameters are available"
 
-  if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
+  if [[ -z ${VPACI} || -z ${VPACS} ]]; then
     echo "Could not obtain OAUTH parameters for Vault Proxy"
     exit 2
-  else 
+  else
     echo "OAUTH parameters for Vault Proxy are available"
   fi
 
@@ -237,13 +237,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
-
-  if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
-      echo "Starting strato-api2"
-      # Leave the +RTS -N1, it is important
-      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
-  fi
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
@@ -371,7 +365,6 @@ function doInit {
       strato-api-init
   fi
 
-
   #we need to create the private key for the faucet
   mkdir config
 
@@ -473,7 +466,7 @@ fi
 #else
 #    if [[ "$VAULT_URL" == *"172.17.0.1"* ]]; then
 #        echo "VAULT_URL provided is http with local docker ip for debugging."
-#    else 
+#    else
 #        echo "VAULT_URL provided is not valid, expected the value starting with 'https://' or 'http://172.17.0.1'"
 #        exit 3
 #    fi

@@ -4,6 +4,9 @@ export const GET_OR_CREATE_OAUTH_USER_FAILURE = 'GET_OR_CREATE_OAUTH_USER_FAILUR
 export const FETCH_USER_PUBLIC_KEY_REQUEST = "FETCH_USER_PUBLIC_KEY_REQUEST";
 export const FETCH_USER_PUBLIC_KEY_SUCCESS = "FETCH_USER_PUBLIC_KEY_SUCCESS";
 export const FETCH_USER_PUBLIC_KEY_FAILURE = "FETCH_USER_PUBLIC_KEY_FAILURE";
+export const FETCH_USER_CERT_REQUEST = "FETCH_USER_PUBLIC_KEY_REQUEST";
+export const FETCH_USER_CERT_SUCCESS = "FETCH_USER_CERT_SUCCESS";
+export const FETCH_USER_CERT_FAILURE = "FETCH_USER_CERT_FAILURE";
 
 export const getOrCreateOauthUserRequest = function () {
   return {
@@ -41,6 +44,27 @@ export const fetchUserPubKeySuccess = function(publicKey) {
 export const fetchUserPubKeyFailure = function(error) {
   return {
     type : FETCH_USER_PUBLIC_KEY_FAILURE,
+    error
+  }
+}
+
+export const getUserCertificateRequest = function(userAddress) {
+  return {
+    type : FETCH_USER_CERT_REQUEST,
+    userAddress
+  }
+}
+
+export const getUserCertificateSuccess = function(cert) {
+  return {
+    type : FETCH_USER_CERT_SUCCESS,
+    cert
+  }
+}
+
+export const getUserCertificateFailure = function(error) {
+  return {
+    type : FETCH_USER_CERT_FAILURE,
     error
   }
 }

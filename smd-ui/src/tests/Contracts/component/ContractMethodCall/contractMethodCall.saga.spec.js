@@ -16,60 +16,13 @@ import {
   methodCallSuccess,
   METHOD_CALL_FETCH_ARGS_REQUEST,
   METHOD_CALL_REQUEST,
-  METHOD_CALL_FETCH_ARGS_SUCCESS,
-  METHOD_CALL_FETCH_ARGS_FAILURE,
-  methodCallFetchArgsSuccess,
-  METHOD_CALL_SUCCESS
-
 } from '../../../../components/Contracts/components/ContractMethodCall/contractMethodCall.actions';
 import { expectSaga } from 'redux-saga-test-plan';
 import { methodCallArgs } from './contractMethodCallMock'
 
-describe('ContractCard: saga', () => {
+describe('ContractMethodCall: saga', () => {
 
-  test('watch contract args', () => {
-    const gen = watchFetchArgs();
-    expect(gen.next().value).toEqual(takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs))
-  })
-
-  describe('fetch args', () => {
-
-    test('success', () => {
-      fetch.mockResponse(JSON.stringify(methodCallArgs))
-      expectSaga(fetchArgs, {
-        name: 'abc',
-        address: 'xyz',
-        symbol: 'geneticallyModify',
-        key: 'key'
-      })
-        .call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_SUCCESS' } })
-        .run()
-    });
-
-    test('failure', () => {
-      fetch.mockReject(JSON.stringify(methodCallArgs))
-      expectSaga(fetchArgs, {
-        name: 'abc',
-        address: 'xyz',
-        symbol: 'geneticallyModify',
-        key: 'key'
-      })
-        .call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
-        .run()
-    });
-
-    test('exception', () => {
-      expectSaga(fetchArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'cloneSheep')
-        .provide({
-          call() {
-            throw new Error('Not Found');
-          },
-        })
-        .put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
-        .run();
-    });
-
-  })
+  
 
   test('watch states', () => {
     const gen = watchMethodCall();

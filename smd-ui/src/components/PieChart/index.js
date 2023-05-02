@@ -19,7 +19,7 @@ class PieChart extends Component {
     const self = this;
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
-    colorScale.range(["#FA9B4E", "#5279C7"]);
+    colorScale.range(["#FF3300", "#3452FF"]);
 
     // eslint-disable-next-line
     this.state.dataset = new Plottable.Dataset(this.props.data);
@@ -85,7 +85,7 @@ class PieChart extends Component {
   componentDidUpdate() {
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
-    colorScale.range(["#FA9B4E", "#5279C7"]);
+    colorScale.range(["#F0C452", "#00AEEF"]);
 
 
     this.state.plot
@@ -100,7 +100,7 @@ class PieChart extends Component {
       <div className="pt-card pt-dark">
         <div className="row">
           <div className="col-sm-12 text-center">
-            <h4>Transaction Type</h4>
+            <h4>Last 15 Transactions by Type</h4>
           </div>
         </div>
         <div className="row">

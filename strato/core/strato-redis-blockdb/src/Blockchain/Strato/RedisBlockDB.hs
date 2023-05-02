@@ -42,6 +42,7 @@ module Blockchain.Strato.RedisBlockDB
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     , getSyncStatus, putSyncStatus, getSyncStatusNow
+    , getVmGasCap, putVmGasCap
     ) where
 
 import           BlockApps.X509.Certificate
@@ -56,6 +57,7 @@ import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import qualified Blockchain.Strato.Model.ChainMember   as CM
+import           Blockchain.Strato.Model.Gas
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
@@ -975,8 +977,27 @@ worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
 
+vmGasCapKey :: S8.ByteString
+vmGasCapKey = "<vmGasCap>"
+{-# INLINE vmGasCapKey #-}
+
 getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
+
+getVmGasCap :: Redis (Maybe Gas)
+getVmGasCap = get vmGasCapKey >>= \case
+    Left x  -> do
+        liftLog $ $logErrorS "getVmGasCap" . T.pack $ "got Left " ++ show x
+        return Nothing
+    Right r -> case r of
+        Nothing -> return Nothing
+        Just g -> return . Just . Gas . fromValue $ g
+
+putVmGasCap :: Gas -> Redis (Maybe Gas)
+putVmGasCap g = set vmGasCapKey (toValue . toInteger $ g) >>=
+    \case
+        Left _ -> return Nothing
+        Right _ -> return . Just $ g
 
 updateWorldBestBlockInfo :: Keccak256 -> Integer -> Integer -> Redis (Either Reply Bool)
 updateWorldBestBlockInfo sha num tdiff = withRetryCount 0

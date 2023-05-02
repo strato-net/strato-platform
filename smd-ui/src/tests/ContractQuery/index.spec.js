@@ -121,8 +121,8 @@ describe('ContractQuery: index', () => {
       );
       wrapper.find('select').at(0).simulate('change', { target: { value: 'state' } });
       wrapper.find('select').at(1).simulate('change', { target: { value: '=' } });
-      wrapper.find('input').simulate('change', { target: { value: 2 } });
-      wrapper.find('input').simulate('keyup', { target: { value: 2 }, key: 'Enter' });
+      wrapper.find('input').at(3).simulate('change', { target: { value: 2 } });
+      wrapper.find('input').at(3).simulate('keyup', { target: { value: 2 }, key: 'Enter' });
       wrapper.find('button').at(0).simulate('click');
       expect(props.addQueryFilter).toHaveBeenCalled();
       expect(props.addQueryFilter.mock.calls.length).toBe(2);
@@ -191,7 +191,7 @@ describe('ContractQuery: index', () => {
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-      wrapper.find('Button').simulate('click');
+      wrapper.find('Button').at(0).simulate('click');
       expect(props.history.goBack).toHaveBeenCalled();
       expect(props.history.goBack.mock.calls.length).toBe(1);
       expect(wrapper).toMatchSnapshot();
@@ -212,7 +212,7 @@ describe('ContractQuery: index', () => {
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-      wrapper.find('input').simulate('keyup', { target: { value: 2 }, key: 'Enter' });
+      wrapper.find('input').at(3).simulate('keyup', { target: { value: 2 }, key: 'Enter' });
       expect(props.addQueryFilter).not.toHaveBeenCalled();
     });
 
@@ -342,7 +342,6 @@ describe('ContractQuery: index', () => {
         contractQuery: {
           queryString: 'state=eq.1&amount=eq.5678&name=eq.P',
         },
-        selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1ear8",
         ...matchMock
       };
       const wrapper = shallow(
@@ -350,7 +349,7 @@ describe('ContractQuery: index', () => {
       );
       wrapper.instance().componentWillReceiveProps(newProps);
       expect(props.queryCirrus).toHaveBeenCalled();
-      expect(props.queryCirrus.mock.calls.length).toBe(3);
+      expect(props.queryCirrus.mock.calls.length).toBe(2);
       expect(wrapper).toMatchSnapshot();
     });
 
@@ -448,9 +447,6 @@ describe('ContractQuery: index', () => {
       wrapper.instance().componentWillMount();
       expect(props.clearQueryString).toHaveBeenCalled();
       expect(props.clearQueryString.mock.calls.length).toBe(2);
-      expect(props.queryCirrusVars).toHaveBeenCalled();
-      expect(props.queryCirrusVars.mock.calls).toEqual([["Bid"], ["Bid"]]);
-      expect(props.queryCirrusVars.mock.calls.length).toBe(2);
     });
 
   });

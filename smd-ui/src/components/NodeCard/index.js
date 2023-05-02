@@ -7,7 +7,6 @@ import PeersCard from '../PeersCard';
 import HexText from '../HexText';
 import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 import {
-  GET_COINBASE,
   GET_PEERS
 } from '../../sockets/rooms'
 
@@ -21,12 +20,10 @@ class NodeCard extends Component {
   }
 
   componentDidMount() {
-    this.props.subscribeRoom(GET_COINBASE)
     this.props.subscribeRoom(GET_PEERS)
   }
 
   componentWillUnmount() {
-    this.props.unSubscribeRoom(GET_COINBASE)
     this.props.unSubscribeRoom(GET_PEERS)
   }
 
@@ -38,8 +35,7 @@ class NodeCard extends Component {
     const node = this.props.node;
     const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
     const blockNumber = this.props.dashboard.lastBlockNumber;
-    let className = 'pt-card pt-elevation-2 ';
-    className += node && node.coinbase ?  'node-success pt-interactive' : 'node-warning pt-interactive';
+    let className = 'pt-card pt-elevation-2 node-success pt-interactive';
     let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
     arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
@@ -47,39 +43,17 @@ class NodeCard extends Component {
       <div>
         <div className={className} onClick={this.handleClick}>
           <div className="row">
-            <div className="col-xs-9">
-              <h5>{node.name}</h5>
-            </div>
-            <span className={arrowIcon}></span>
-          </div>
-          <div className="row pt-text-muted">
-            <div className="col-xs-3">
-              <small>Coinbase</small>
-            </div>
-            <div className="col-xs-9">
-              <small> <HexText value={node && node.coinbase && node.coinbase.coinbase} classes="smd-pad-2" /> </small>
+            <div className='col-sm-6'>
+
+              <h3>Peers ({peers.length})</h3>
+              <span className={arrowIcon}>{this.state.isOpen ? "Close" : "Expand"}</span>
             </div>
           </div>
-          <div className="row pt-text-muted">
-            <div className="col-xs-3">
-              <small>Block</small>
-            </div>
-            <div className="col-xs-9">
-              <small>{blockNumber}</small>
-            </div>
-          </div>
-          <div className="row pt-text-muted">
-            <div className="col-xs-3">
-              <small>Peers</small>
-            </div>
-            <div className="col-xs-9">
-              <small>{peers.length}</small>
-            </div>
-          </div>
-        </div>
+        <hr/>
         <Collapse isOpen={this.state.isOpen}>
           <PeersCard />
         </Collapse>
+        </div>
       </div>
     );
   }

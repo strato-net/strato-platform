@@ -15,7 +15,8 @@ import {
   GET_COINBASE,
   BLOCKS_FREQUENCY,
   GET_NODE_UPTIME,
-  GET_HEALTH
+  GET_HEALTH,
+  GET_SHARD_COUNT
 } from '../../sockets/rooms';
 
 describe('Socket: action', () => {
@@ -70,9 +71,12 @@ describe('Socket: action', () => {
       expect(subscribeRoom(GET_HEALTH)).toMatchSnapshot();
     });
 
-
     test('uptime', () => {
       expect(subscribeRoom(GET_NODE_UPTIME)).toMatchSnapshot();
+    });
+
+    test('shard count', () => {
+      expect(subscribeRoom(GET_SHARD_COUNT)).toMatchSnapshot();
     });
   })
 
@@ -122,14 +126,16 @@ describe('Socket: action', () => {
       expect(unSubscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
     });
 
-
     test('health', () => {
       expect(unSubscribeRoom(GET_HEALTH)).toMatchSnapshot();
     });
 
-
     test('uptime', () => {
       expect(unSubscribeRoom(GET_NODE_UPTIME)).toMatchSnapshot();
+    });
+
+    test('shard count', () => {
+      expect(unSubscribeRoom(GET_SHARD_COUNT)).toMatchSnapshot();
     });
 
 

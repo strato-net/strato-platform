@@ -8,6 +8,9 @@ export const FETCH_CIRRUS_INSTANCES_FAILURE = 'FETCH_CIRRUS_INSTANCES_FAILURE';
 export const FETCH_ACCOUNT_REQUEST = 'FETCH_ACCOUNT_REQUEST';
 export const FETCH_ACCOUNT_SUCCESS = 'FETCH_ACCOUNT_SUCCESS';
 export const FETCH_ACCOUNT_FAILURE = 'FETCH_ACCOUNT_FAILURE';
+export const FETCH_CONTRACT_INFO_REQUEST = 'FETCH_CONTRACT_INFO_REQUEST';
+export const FETCH_CONTRACT_INFO_SUCCESS = 'FETCH_CONTRACT_INFO_SUCCESS';
+export const FETCH_CONTRACT_INFO_FAILURE = 'FETCH_CONTRACT_INFO_FAILURE';
 
 export const fetchState = function (name, address, chainId) {
   return {
@@ -89,5 +92,30 @@ export const fetchAccountFailure = function (contractName, contractAddress, erro
     name: contractName,
     address: contractAddress,
     error: error
+  }
+}
+
+export const fetchContractInfoRequest = function(key, contractName, contractAddress, chainId) {
+  return {
+    type: FETCH_CONTRACT_INFO_REQUEST,
+    key,
+    contractName,
+    contractAddress,
+    chainId,
+  }
+}
+export const fetchContractInfoSuccess = function(key, data) {
+  return {
+    type: FETCH_CONTRACT_INFO_SUCCESS,
+    key,
+    data,
+  }
+}
+
+export const fetchContractInfoFailure = function(key, error) {
+  return {
+    type: FETCH_CONTRACT_INFO_FAILURE,
+    key,
+    error
   }
 }

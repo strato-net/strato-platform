@@ -150,7 +150,7 @@ exports[`AddIntegration: index render component (Oauth mode) with empty values 1
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">
@@ -216,7 +216,7 @@ exports[`AddIntegration: index render component (Oauth mode) with values 1`] = `
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">
@@ -373,7 +373,7 @@ exports[`AddIntegration: index render component (non Oauth mode) with empty valu
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">
@@ -457,7 +457,7 @@ exports[`AddIntegration: index render component (non Oauth mode) with values 1`]
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
+                Shard IDs
               </label>
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">

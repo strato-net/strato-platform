@@ -52,6 +52,7 @@ library:
   - strato-index
   - strato-model
   - strato-statediff
+  - strato-redis-blockdb
   - text
   - time
   - transformers

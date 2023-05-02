@@ -110,8 +110,9 @@ import           Blockchain.SolidVM.GasInfo
 import           BlockApps.X509.Certificate
 
 import qualified SolidVM.Model.CodeCollection as CC
-import           Blockchain.Data.BlockSummary 
+import           Blockchain.Data.BlockSummary
 import           Text.Format
+import qualified Text.Colors                  as CL
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -310,6 +311,7 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
 runSM :: ( MonadUnliftIO m
          , MonadLogger m
          , Mod.Modifiable ContextState m
+         , Mod.Modifiable GasCap m
          )
       => (Maybe ByteString)
       -> Env.Environment
@@ -319,7 +321,8 @@ runSM :: ( MonadUnliftIO m
       -> m (Either SolidException a)
 runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
-
+  GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
+  $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState {
         env = env,
@@ -327,7 +330,7 @@ runSM maybeCode env gi chainId' f = do
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi
+        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
         }
 
   eValState <- try $ runStateT f startingState
@@ -347,7 +350,6 @@ runSM maybeCode env gi chainId' f = do
     Right (value, sstateAfter) -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
-
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.

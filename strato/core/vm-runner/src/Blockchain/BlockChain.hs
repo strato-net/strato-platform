@@ -176,7 +176,7 @@ addBlocks unfiltered = do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb <- readIORef replacedBest
         yield . OutIndexEvent $ NewBestBlock nbb
-        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
+        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs" timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
@@ -597,12 +597,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 
-multilineLog :: MonadLogger m =>
-                T.Text -> String -> m ()
-multilineLog source theLines = do
-  forM_ (lines theLines) $ \theLine ->
-    $logInfoS source $ T.pack theLine
-
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe Word256 ->  m ()
 printTransactionMessage ot@OutputTx{otSigner=tAddr, otHash=theHash} (Left errMsg) deltaT cid = do
@@ -708,7 +702,7 @@ calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, Keccak256) -> 
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
       chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
-  $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
+  multilineLog "calculateAndEmitChainDiffs" $ "Calculating ChainDiffs for:\n" ++ boringBox chainIds
   runConduit $ yieldMany chainList
             .| awaitForever (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
             .| mapM_C (yield . OutStateDiff)
@@ -752,7 +746,6 @@ completeDiff :: ( MonadLogger m
                 )
              => MP.StateRoot -> MP.StateRoot -> Keccak256 -> Integer -> ConduitT a VmOutEvent m ()
 completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
-  $logInfoS "calculateAndEmitStateDiffs" . T.pack $
-      "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
+  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src, "to", format dst]
   runConduit $ SD.stateDiff Nothing num hsh src dst
             .| mapM_C (yield . OutStateDiff)

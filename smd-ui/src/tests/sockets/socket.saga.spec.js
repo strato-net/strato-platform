@@ -115,6 +115,11 @@ mockServer.on('connection', server => {
       server.emit('PRELOAD_NODE_UPTIME', 0)
     }, 1000);
   })
+  server.on('SUBSCRIBE/GET_SHARD_COUNT', (data) => {
+    setTimeout(() => {
+      server.emit('PRELOAD_GET_SHARD_COUNT', 0)
+    }, 1000);
+  })
 
 });
 
@@ -267,6 +272,15 @@ describe('Socket: saga', () => {
       setTimeout(() => {
         socket.emit('SUBSCRIBE/GET_NODE_UPTIME')
         socket.on('PRELOAD_NODE_UPTIME', (uptime) => {
+          done()
+        })
+      }, 1000);
+    });
+
+    test('shards count', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_SHARD_COUNT')
+        socket.on('PRELOAD_GET_SHARD_COUNT', (count) => {
           done()
         })
       }, 1000);

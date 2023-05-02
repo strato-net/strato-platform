@@ -144,7 +144,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         sh 'chmod +x run-vault.sh'
         sh './run-vault.sh'
       }
-  
+
       // TODO: run node on https (also update check_availability function)
       writeFile file: "run.sh", text: """#!/bin/bash
         sudo \\
@@ -163,14 +163,14 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
           certInfo='${nodeData.CERT_INFO}' \\
-          ./strato 
+          ./strato
       """
       sh 'chmod +x run.sh'
       sh './run.sh'
     }
     sh "until curl --silent localhost:8080; do sleep 1; done"
     sh "sudo docker ps"
-    
+
     // Few quick tests
     sh '''#!/bin/bash -le
       check_availability() {
@@ -187,18 +187,18 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         done
         echo "STRATO health endpoint is available through nginx - node is running"
       }
-      
+
       check_availability
     '''
   }
-  
+
   // Generate genesis-block.json only when it's the root node
   // Generate genesis-block.json to add to strato-getting-started/
   if (rootNodeAddress == null){
     generateGenesisBlock('.', 'strato-getting-started', nodeData)
     stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
   }
-  
+
   dir("strato-getting-started") {
     if (rootNodeAddress == null){
       sh './strato --wipe'
@@ -221,9 +221,9 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
       usernamePassword(credentialsId: 'beanstalk-internal-aws-test-user', passwordVariable: 'AWS_BEANSTALK_INTERNAL_TEST_USER_PASSWORD', usernameVariable: 'AWS_BEANSTALK_INTERNAL_TEST_USER_KEY'),
       usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID')
   ]) {
-    
+
     sh 'sudo rm -rf beanstalk'
-    
+
     if(appName == 'traceharvest') {
         sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git"
     } else {
@@ -417,7 +417,7 @@ docker-compose up -d --build
         if (postgresViewsPrefix) {
           sh "sed -i 's/#POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL/export POSTGRES_VIEWS_PREFIX=${postgresViewsPrefix}/g' run-app.sh"
         }
-        
+
         if (wipeApp) {
           //sh 'sudo docker volume rm beanstalk_config || true'
           sh 'sudo docker-compose down -v -t 0 --remove-orphans'
@@ -672,7 +672,7 @@ def runMonitor(nodeData, nodeConfig) {
                 //scope: 'optional'
               }
             }
-          ];"""     
+          ];"""
 
     } else if (nodeConfig == 'nodeChainUpgrade') {
       initialNodes = """
@@ -747,7 +747,7 @@ def runMonitor(nodeData, nodeConfig) {
                 //scope: 'optional'
               }
             }
-          ];"""     
+          ];"""
     } else if (nodeConfig == 'removedChainUpgrade') {
       initialNodes = """
           module.exports = [
@@ -807,7 +807,7 @@ def runMonitor(nodeData, nodeConfig) {
                 //scope: 'optional'
               }
             }
-          ];"""     
+          ];"""
     } else if (nodeConfig == 'networkSynctoDevnet') {
       initialNodes = """
           module.exports = [
@@ -1078,7 +1078,7 @@ def removeBeanstalkApp() {
  * @return
  */
 def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started',nodeData) {
-  
+
   // (using tmp files to avoid replacing quotes with dobule-quotes which makes escapes even worse)
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
   sh "echo ${stratoGSPath} > _stratogs_path_tmp"
@@ -1088,8 +1088,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       cd $(<_stratogs_path_tmp)
       myPub=$(./strato --get-pubkey)
       cd ..
-      sudo docker cp $(<_platform_path_tmp)/strato/genesis-builder strato_strato_1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/x509-generator strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
       sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
       sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
@@ -1117,8 +1117,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       token=$(curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/beanstalk/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic YmVhbnN0YWxrLWludGVybmFsLW5vZGVzOjViOTEzMGUwLTAxYzctNGM4Yy1iMjgxLTg4MmUxNDNhMjQ0Yg==' --data-urlencode 'grant_type=password' --data-urlencode 'username=admin' --data-urlencode 'password=1234' | jq -r .access_token)
       userPub=$(curl -X POST -H "Authorization: Bearer $token" -H "Accept: application/json" "https://multinode101.ci.blockapps.net:8080/strato/v2.3/key" | jq -r .pubkey)
       cd ..
-      sudo docker cp $(<_platform_path_tmp)/strato/genesis-builder strato_strato_1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/x509-generator strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
       sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
       sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
