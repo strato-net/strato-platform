@@ -250,7 +250,7 @@ contractResult :: ( A.Selectable Account AddressState m
                -> TransactionResult
                -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult i txHash txResult mmd = do
+contractResult i txHash txResult@TransactionResult{..} mmd = do
   name <- case mmd of
     Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
     Just md -> case Map.lookup "name" md of
@@ -259,13 +259,13 @@ contractResult i txHash txResult mmd = do
   let
     accountMaybe = do
       str <- listToMaybe $
-        Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
+        Text.splitOn "," (Text.pack $ transactionResultContractsCreated)
       readMaybe (Text.unpack str)
   case accountMaybe of
-    Nothing -> case transactionResultMessage txResult of
-      "Success!" -> do
+    Nothing -> case transactionResultStatus of
+      Success -> do
         let mDelAddr = readMaybe @Account . Text.unpack =<<
-              (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
+              (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
@@ -286,13 +286,13 @@ functionResult :: ( A.Selectable Account AddressState m
                -> Maybe (Map Text Text)
                -> Account
                -> StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult mmd toAccount = do
-  case transactionResultKind txResult of
+functionResult i txHash txResult@TransactionResult{..} mmd toAccount = do
+  case transactionResultKind of
     -- Check if it is a solidVm first
     -- If it is, we can reduce calls to get ContractDetails
-    Just SolidVM -> case transactionResultMessage txResult of
+    Just SolidVM -> case transactionResultStatus of
         "Success!" -> do
-              let txResp = transactionResultResponse txResult
+              let txResp = transactionResultResponse
               mFormattedResponse <- convertSvmResultResToVals txResp
               formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
               return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
@@ -323,7 +323,7 @@ functionResult i txHash txResult mmd toAccount = do
               either (throwIO . UserError . Text.pack) return $
                 xabiTypeToType xabi indexedTypeType
           let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-              txResp = transactionResultResponse txResult
+              txResp = transactionResultResponse
             -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
             -- workaround for enums
           mFormattedResponse <- pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
