@@ -263,7 +263,7 @@ contractResult i txHash txResult@TransactionResult{..} mmd = do
       readMaybe (Text.unpack str)
   case accountMaybe of
     Nothing -> case transactionResultStatus of
-      Success -> do
+      "Success!" -> do
         let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
         case mDelAddr of
