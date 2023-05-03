@@ -36,7 +36,8 @@ describe('ContractCard: index', () => {
         fetchCirrusInstances: jest.fn(),
         fetchAccount: jest.fn(),
         fetchState: jest.fn(),
-        selectContractInstance: jest.fn()
+        selectContractInstance: jest.fn(),
+        fetchContractInfoRequest: jest.fn(),
       }
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
@@ -65,7 +66,8 @@ describe('ContractCard: index', () => {
         fetchCirrusInstances: jest.fn(),
         fetchAccount: jest.fn(),
         fetchState: jest.fn(),
-        selectContractInstance: jest.fn()
+        selectContractInstance: jest.fn(),
+        fetchContractInfoRequest: jest.fn(),
       }
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
@@ -98,7 +100,8 @@ describe('ContractCard: index', () => {
         fetchCirrusInstances: jest.fn(),
         fetchAccount: jest.fn(),
         fetchState: jest.fn(),
-        selectContractInstance: jest.fn()
+        selectContractInstance: jest.fn(),
+        fetchContractInfoRequest: jest.fn(),
       }
       let wrapper = shallow(
         <ContractCard.WrappedComponent {...props} />
@@ -107,6 +110,7 @@ describe('ContractCard: index', () => {
       expect(props.fetchAccount).toHaveBeenCalled();
       expect(props.fetchState).toHaveBeenCalled();
       expect(props.selectContractInstance).toHaveBeenCalled();
+      expect(props.fetchContractInfoRequest).toHaveBeenCalled();
       expect(wrapper).toMatchSnapshot();
     });
 
@@ -118,7 +122,8 @@ describe('ContractCard: index', () => {
       fetchCirrusInstances: jest.fn().mockReturnValue('fetchCirrusInstances'),
       fetchAccount: jest.fn().mockReturnValue('fetchAccount'),
       fetchState: jest.fn().mockReturnValue('fetchState'),
-      selectContractInstance: jest.fn().mockReturnValue('selectContractInstance')
+      selectContractInstance: jest.fn().mockReturnValue('selectContractInstance'),
+      fetchContractInfoRequest: jest.fn().mockReturnValue('fetchContractInfoRequest'),
     }
     const wrapper = shallow(
       <ContractCard.WrappedComponent {...props} />
@@ -127,12 +132,16 @@ describe('ContractCard: index', () => {
     expect(wrapper.instance().props.fetchAccount()).toBe('fetchAccount');
     expect(wrapper.instance().props.fetchState()).toBe('fetchState');
     expect(wrapper.instance().props.selectContractInstance()).toBe('selectContractInstance');
+    expect(wrapper.instance().props.fetchContractInfoRequest()).toBe('fetchContractInfoRequest');
   });
 
   test('mapStateToProps with default values', () => {
     expect(mapStateToProps({
       chains: {
         selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
+      },
+      contractCard: {
+        contractInfos: {}
       }
     })).toMatchSnapshot();
   });
@@ -143,12 +152,13 @@ describe('ContractCard: index', () => {
       fetchCirrusInstances: jest.fn().mockReturnValue('fetchCirrusInstances'),
       fetchAccount: jest.fn().mockReturnValue('fetchAccount'),
       fetchState: jest.fn().mockReturnValue('fetchState'),
-      selectContractInstance: jest.fn().mockReturnValue('selectContractInstance')
+      selectContractInstance: jest.fn().mockReturnValue('selectContractInstance'),
+      fetchContractInfoRequest: jest.fn().mockReturnValue('fetchContractInfoRequest'),
     }
     const wrapper = shallow(
       <ContractCard.WrappedComponent {...props} />
     );
-    wrapper.find('Button').simulate('click');
+    wrapper.find('Button').at(1).simulate('click');
     expect(wrapper.instance().state.isOpen).toBe(true);
   });
 

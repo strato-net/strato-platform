@@ -1,6 +1,16 @@
 @import "../../node_modules/@blueprintjs/core/dist/variables.scss";
 @import "../../node_modules/plottable/plottable.css";
 
+:root {
+  --blockapps-primary-navy: #001B71;
+  --blockapps-primary-blue: #3452FF;
+  --blockapps-primary-red: #FF3300;
+  --blockapps-secondary-blue: #00AEEF;
+  --blockapps-secondary-purple: #6B36C4;
+  --blockapps-secondary-yellow: #F0C452;
+  --blockapps-secondary-green: #36C487;
+}
+
 html {
   height: 100%;
 }
@@ -10,14 +20,6 @@ body {
   min-height: 100%;
   font-family: 'Roboto', sans-serif !important;
 }
-
-#outer-container {
-  position: relative;
-  top: 48px;
-  margin-left: 320px;
-  padding: 0px 12px;
-}
-
 
 .smd-full-width {
   width: 100%;
@@ -100,4 +102,117 @@ $multipliers: 5;
 }
 .h-align {
   vertical-align: middle;
+}
+
+.card-search-sl {
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 40px 0 rgba(0, 0, 0, 0.19);
+  margin: 10px 0;
+  padding: 0 5px;
+}
+
+.card-search-action:hover {
+  color: #fff;
+  background: #E26D5C;
+  -webkit-animation: pulse 1.5s infinite;
+}
+
+.card-search-heading {
+  font-size: 18px;
+  font-weight: bold;
+  background: rgba(0,0,0,0.15);
+  padding: 5px 10px;
+
+}
+
+.card-search-text {
+  padding: 10px 15px;
+  background:  rgba(0,0,0,0.15);
+  font-size: 16px;
+  color: #fff;
+}
+
+.card-search-button {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  width: 300px;
+  height: 100px;
+  background-color: pt-dark-app-background-color;
+  color: #fff;
+  border-radius: 0 0 8px 8px;
+  object-fit: cover;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
+
+.card-search-button:hover {
+  text-decoration: none;
+  background-color: #404b58;
+  color: #fff;
+  
+
+}
+
+ /* Card Styles */
+
+ .card-sl {
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 40px 0 rgba(0, 0, 0, 0.19);
+  padding: 15px;
+}
+
+.card-image img {
+  max-height: 100%;
+  max-width: 100%;
+  border-radius: 8px 8px 0px 0;
+  object-fit: cover;
+
+}
+
+.card-action:hover {
+  color: #fff;
+  background: #E26D5C;
+  -webkit-animation: pulse 1.5s infinite;
+}
+
+.card-heading {
+  font-size: 18px;
+  font-weight: bold;
+  background: rgba(0,0,0,0.15);
+  padding: 5px 10px;
+
+}
+
+.card-text {
+  padding: 10px 15px;
+  background:  rgba(0,0,0,0.15);
+  font-size: 16px;
+  color: #fff;
+}
+
+.card-button {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  width: 300px;
+  height: 100px;
+  background-color: pt-dark-app-background-color;
+  color: #fff;
+  border-radius: 0 0 8px 8px;
+  object-fit: cover;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
+
+.card-button:hover {
+  text-decoration: none;
+  background-color: #404b58;
+  color: #fff;
+
+
 }

@@ -1,10 +1,9 @@
 packages:
-- api/bloc2
-- api/bloc2api
-- api/core-api2
+- api/bloc/bloc2
+- api/bloc/bloc2api
+- api/core
 - api/ethereum-jsonrpc
 - api/strato-api
-- api2/strato-api2
 
 - core/blockapps-data
 - core/blockapps-datadefs

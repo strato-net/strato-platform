@@ -6,7 +6,8 @@ import {
   selectContractInstance,
   fetchState,
   fetchCirrusInstances,
-  fetchAccount
+  fetchAccount,
+  fetchContractInfoRequest
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -14,15 +15,12 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
 import HexText from '../../../HexText';
 import { Tooltip, Position } from '@blueprintjs/core';
+import ContractSource from './ContractSource';
 
 class ContractCard extends Component {
   constructor(props) {
     super(props);
     this.state = { isOpen: false };
-  }
-
-  componentWillMount() {
-    this.props.fetchCirrusInstances(this.props.contract.name, this.props.selectedChain);
   }
 
   render() {
@@ -46,20 +44,13 @@ class ContractCard extends Component {
               mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
+              self.props.fetchContractInfoRequest(`card-data-${instance.address}-${self.props.selectedChain}`, name, instance.address, self.props.selectedChain)
               self.props.selectContractInstance(name, instance.address);
             }}
             key={`card-data-${instance.address}-${index}`}
           >
             <td style={{ border: 'none' }}>
               <HexText value={instance.address} classes="small smd-pad-4" />
-            </td>
-            <td style={{ border: 'none' }}>
-              {instance.fromBloc ?
-                <span className="pt-tag pt-intent-success smd-margin-right-4">Bloc</span> : ''
-              }
-              {instance.fromCirrus ?
-                <span className="pt-tag pt-intent-primary">Cirrus</span> : ''
-              }
             </td>
           </tr>
         );
@@ -77,6 +68,8 @@ class ContractCard extends Component {
 
     if (selectedInstance.length > 0 && selectedInstance[0].state) {
       const instance = selectedInstance[0];
+      const contractKey = `card-data-${instance.address}-${self.props.selectedChain}`
+      const contractInfo = this.props.contractInfos && this.props.contractInfos[contractKey] ? this.props.contractInfos[contractKey] : {}
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
       if ((typeof instance.state !== 'string') && symbols.length > 0) {
@@ -87,12 +80,28 @@ class ContractCard extends Component {
           const symbolState = instance.state[symbol];
           symbolTable.push(
             <tr key={symbol + ' ' + i}>
+              {
+                typeof symbolState === 'string' && symbolState.startsWith('function') ?
+                <td style={{ verticalAlign: 'middle' }}>
+                  <ContractMethodCall
+                    key={'methodCall' + symbol + instance.address}
+                    contractKey={contractKey}
+                    methodKey={'methodCall' + symbol + instance.address}
+                    contractName={name}
+                    contractAddress={instance.address}
+                    symbolName={symbol}
+                    fromCirrus={instance.fromCirrus}
+                    fromBloc={instance.fromBloc}
+                    chainId={self.props.selectedChain}
+                  />
+                </td>
+                :
               <td
                 style={{
                   verticalAlign: 'middle',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  maxWidth: '90px'
+                  maxWidth: '120px'
                 }}>
                 <Tooltip
                   content={symbol}
@@ -100,7 +109,8 @@ class ContractCard extends Component {
                   {symbol}
                 </Tooltip>
               </td>
-              <td style={{ maxWidth: '300px' }}>
+              }
+              <td style={{ maxWidth: '500px' }}>
                 <pre>
                   {
                     typeof symbolState === 'string' ?
@@ -109,22 +119,7 @@ class ContractCard extends Component {
                   }
                 </pre>
               </td>
-              <td style={{ verticalAlign: 'middle' }}>
-                {
-                  typeof symbolState === 'string' && symbolState.startsWith('function') ?
-                    <ContractMethodCall
-                      key={'methodCall' + symbol + instance.address}
-                      lookup={'methodCall' + symbol + instance.address}
-                      contractName={name}
-                      contractAddress={instance.address}
-                      symbolName={symbol}
-                      fromCirrus={instance.fromCirrus}
-                      fromBloc={instance.fromBloc}
-                      chainId={self.props.selectedChain}
-                    />
-                    : null
-                }
-              </td>
+              
             </tr>
           );
         })
@@ -132,9 +127,17 @@ class ContractCard extends Component {
       }
       state = (
         <div className="pt-card pt-elevation-2">
-          <div className="row">
-            <div className="col-sm-12 text-right">
-              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div> : ''} </span>
+
+            <div className="row">
+            <div className='col-sm-6'>
+              { contractInfo &&
+                <ContractSource
+                  contract={contractInfo}
+                  />
+              }
+            </div>
+            <div className="col-sm-6 text-right">
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Contract Balance: {instance.balance} wei </div> : ''} </span>
             </div>
           </div>
           <div className="row">
@@ -164,8 +167,7 @@ class ContractCard extends Component {
         </div>
       );
     }
-
-
+    
     return (
       <div className="row">
         <div className="col-sm-6">
@@ -174,21 +176,22 @@ class ContractCard extends Component {
               <div className="col-sm-4"><h4>{name}</h4></div>
               <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
-                  {
-                    showQueryBuilder ?
-                      <Link to={'/contracts/' + name + '/query'}>
-                        <Button type="Button" className="pt-intent-primary">
-                          Query Builder
-                        </Button>
-                      </Link>
-                      : null
-                  }
+                    <Button 
+                      type="Button" 
+                      className="pt-intent-primary pt-icon-th" 
+                      onClick={() => {
+                        this.props.history.push('/contracts/' + name + '/query')
+                      }}
+                    >
+                      Tabular Data
+                    </Button>
                   <Button type="button"
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
                       mixpanelWrapper.track("contracts_toggle_collapse_click");
-                      if(this.state.isOpen)
+                      if(this.state.isOpen) {
                         this.props.selectContractInstance(name, null);
+                      }
                       this.setState({
                         isOpen: !this.state.isOpen
                       })
@@ -208,7 +211,6 @@ class ContractCard extends Component {
                     <thead>
                       <tr>
                         <th>Contract Address</th>
-                        <th></th>
                       </tr>
                     </thead>
                     <tbody>{cardData}</tbody>
@@ -227,8 +229,9 @@ class ContractCard extends Component {
   }
 }
 
-export function mapStateToProps(state) {
+export function mapStateToProps(state, ownProps) {
   return {
+    contractInfos: state.contractCard.contractInfos,
     selectedChain: state.chains.selectedChain
   };
 }
@@ -236,6 +239,7 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps, {
     selectContractInstance,
+    fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
     fetchAccount

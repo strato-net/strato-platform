@@ -8,7 +8,7 @@ import {
   chainNameChange,
   resetError
 } from './deployDapp.actions';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -357,15 +357,29 @@ class DeployDapp extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Button onClick={() => {
-          mixpanelWrapper.track("deploy_dapp_open_click");
-          this.props.deployDappOpenModal();
-        }}
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
+        >
+
+        <AnchorButton 
+          onClick={() => {
+            mixpanelWrapper.track("deploy_dapp_open_click");
+            this.props.deployDappOpenModal();
+          }}
           id="tour-deploy-dapp-button"
           className="pt-intent-primary pt-icon-add"
-          text="Deploy DApp"
-          disabled={(this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) ? true : false}
-        />
+          text={"Deploy DApp"}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
+          />
+        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -564,6 +578,7 @@ export function mapStateToProps(state) {
     codeType: state.codeEditor.codeType,
     initialValues: {
     },
+    userCertificate: state.user.userCertificate,
   };
 }
 

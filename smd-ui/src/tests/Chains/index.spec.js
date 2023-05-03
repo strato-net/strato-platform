@@ -87,10 +87,10 @@ describe('Chains: index', () => {
       <Chains.WrappedComponent {...props} />
     );
 
-    wrapper.find('div').at(17).simulate('click');
+    wrapper.find('div').at(19).simulate('click');
     expect(props.fetchChainDetail).toHaveBeenCalled();
     expect(props.fetchChainDetail).toHaveBeenCalledTimes(1);
-    wrapper.find('div').at(17).simulate('click');
+    wrapper.find('div').at(19).simulate('click');
     expect(props.resetChainId).toHaveBeenCalled();
     expect(props.resetChainId).toHaveBeenCalledTimes(1);
   });

@@ -50,7 +50,7 @@ import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, catch, SomeException)
 
-import           BlockApps.Bloc22.Server.Utils   (partitionWith)
+import           Bloc.Server.Utils   (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
@@ -165,7 +165,7 @@ dbQuery conn insrt = do
 
 handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (IORef Globals,TableName,TableColumns) -> SomeException -> m ()
 handlePostgresError' myStuff e =
-  case myStuff of 
+  case myStuff of
     Nothing -> handlePostgresError e
     Just (x,y,z) -> do
       setTableCreated x y z
@@ -241,14 +241,14 @@ tableNameToText (IndexTableName o a c) =
                    then o <> tableSeparator
                    else o <> tableSeparator <> a <> tableSeparator
   in prefix <> c
-tableNameToText (HistoryTableName o a c) = 
+tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
                    then o <> tableSeparator
                    else o <> tableSeparator <> a <> tableSeparator
   in "history@" <> prefix <> c
-tableNameToText (EventTableName o a c e) = 
+tableNameToText (EventTableName o a c e) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
@@ -303,11 +303,11 @@ createExpandHistoryTable g c nameParts = do
     expandHistoryTable g c nameParts
 
 getDeferredForeignKeys :: TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
-getDeferredForeignKeys tableName c o a = 
+getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
-  flip map [(theName, x) | (theName, VariableDecl{_varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+  flip map [(theName, x) | (theName, VariableDecl{_varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) ->
     ForeignKeyInfo {
       tableName=tableName,
       columnName=labelToText theName,
@@ -349,7 +349,7 @@ createHistoryTable' globalsIORef contract (o, a, n) = do
   when (not tableExists) $ do
     incNumHistoryTables
     yield $ ((createHistoryTableQuery contract (o, a, n)), Nothing)
-    yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (o, a, n)) 
+    yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (o, a, n))
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
@@ -375,7 +375,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     setTableCreated globalsIORef tableName list
 
 
--- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
+-- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
@@ -404,8 +404,8 @@ expandContractTable' globalsIORef contract tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
-      $logErrorLS "expandTable" $ T.concat 
-          [ "Table " 
+      $logErrorLS "expandTable" $ T.concat
+          [ "Table "
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
@@ -429,7 +429,7 @@ expandContractTable' globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
+            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) ->
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
@@ -448,8 +448,8 @@ expandContractTable globalsIORef contract tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
-      $logErrorLS "expandTable" $ T.concat 
-          [ "Table " 
+      $logErrorLS "expandTable" $ T.concat
+          [ "Table "
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
@@ -473,7 +473,7 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
+            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) ->
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
@@ -481,12 +481,12 @@ expandContractTable globalsIORef contract tableName = do
                                  in indexTableName o a' $ labelToText foreignName
               }
           _ -> []
-        
+
 expandTableQuery :: TableName ->  TableColumns -> Text
 expandTableQuery tableName cols = T.concat
   [ "ALTER TABLE "
   , tableNameToDoubleQuoteText tableName
-   , " ADD COLUMN " 
+   , " ADD COLUMN "
   , T.intercalate ", ADD COLUMN " cols
   , ";"
   ]
@@ -501,7 +501,7 @@ insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
 insertForeignKeys conn contracts = do
   forM_ contracts $ \c -> do
-    let tableName = indexTableName 
+    let tableName = indexTableName
                             (organization c)
                             (application c)
                             (contractName c)
@@ -513,23 +513,23 @@ insertForeignKeys conn contracts = do
     --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
       dbQuery conn $
-            "UPDATE " <> 
-            tableNameToDoubleQuoteText tableName <> 
-            " SET " <> 
-            wrapDoubleQuotes theName <> 
-            "=" <> 
-            wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
-            " WHERE record_id=" <> 
+            "UPDATE " <>
+            tableNameToDoubleQuoteText tableName <>
+            " SET " <>
+            wrapDoubleQuotes theName <>
+            "=" <>
+            wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <>
+            " WHERE record_id=" <>
             wrapSingleQuotes (makeAccount c)  <>
             ";"
       `catch` \(e :: SomeException) -> do
             $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
             dbQueryCatchError conn $
-              "UPDATE " <> 
-              tableNameToDoubleQuoteText tableName <> 
-              " SET " <> 
-              wrapDoubleQuotes theName <> 
-              "=null WHERE record_id=" <> 
+              "UPDATE " <>
+              tableNameToDoubleQuoteText tableName <>
+              " SET " <>
+              wrapDoubleQuotes theName <>
+              "=null WHERE record_id=" <>
               wrapSingleQuotes (makeAccount c)
 
 insertHistoryTable :: OutputM m
@@ -573,15 +573,15 @@ addHistoryUnique (o, a, n) =
       historyName' = HistoryTableName org app cname
       historyName = tableNameToDoubleQuoteText historyName'
       indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')
-  in  ["CREATE UNIQUE INDEX IF NOT EXISTS " <> 
+  in  ["CREATE UNIQUE INDEX IF NOT EXISTS " <>
         wrapDoubleQuotes indexName <>
-        "\n  ON " <> 
-        historyName <> 
+        "\n  ON " <>
+        historyName <>
         " (address, \"chainId\", block_hash, transaction_hash);",
-      "ALTER TABLE " <> 
-      historyName <> 
-      " ADD PRIMARY KEY USING INDEX " <> 
-      wrapDoubleQuotes indexName <> 
+      "ALTER TABLE " <>
+      historyName <>
+      " ADD PRIMARY KEY USING INDEX " <>
+      wrapDoubleQuotes indexName <>
       ";"]
 
 insertIndexTableQuery :: [ProcessedContract] -> [Text]
@@ -672,9 +672,9 @@ createEventTables :: OutputM m
                   => IORef Globals
                   -> [EventTable]
                   -> ConduitM () Text m ()
-createEventTables globalsIORef events = do 
+createEventTables globalsIORef events = do
   yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
-   
+
 createEventTable :: OutputM m
                  => IORef Globals
                  -> EventTable
@@ -685,13 +685,13 @@ createEventTable globalsIORef ev = do
           (eventApplication ev)
           (eventContractName ev)
       eventTable = EventTableName org app cname (escapeQuotes $ eventName ev)
-  
+
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  if eventAlreadyCreated then 
+  if eventAlreadyCreated then
     return Nothing
   else do
     setTableCreated globalsIORef eventTable $ eventFields ev
-    return (Just $ createEventTableQuery ev) 
+    return (Just $ createEventTableQuery ev)
 
 createEventTableQuery :: EventTable -> Text
 createEventTableQuery ev =
@@ -701,10 +701,10 @@ createEventTableQuery ev =
           (eventContractName ev)
       tableName = EventTableName org app cname (escapeQuotes $ eventName ev)
 
-      cols = csv $ ["id SERIAL NOT NULL", "address text"] ++ 
-                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
-  in T.concat   
-      [ "CREATE TABLE IF NOT EXISTS " 
+      cols = csv $ ["id SERIAL NOT NULL", "address text"] ++
+                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev)
+  in T.concat
+      [ "CREATE TABLE IF NOT EXISTS "
       , tableNameToDoubleQuoteText tableName
       ," ("
       , cols
@@ -739,8 +739,8 @@ expandEventTables globalsIORef (x:xs) = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
-      $logErrorLS "expandEventTable" $ T.concat 
-          [ "Table " 
+      $logErrorLS "expandEventTable" $ T.concat
+          [ "Table "
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
@@ -783,7 +783,7 @@ insertEventTable globalsIORef ev = do
   else return Nothing
 
 insertEventTableQuery :: Action.Event -> Text
-insertEventTableQuery ev = 
+insertEventTableQuery ev =
  let (org, app, cname) = constructTableNameParameters
           (T.pack $ Action.evContractOrganization ev)
           (T.pack $ Action.evContractApplication ev)
@@ -855,7 +855,7 @@ valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQ
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $  case decodeUtf8' bytes of 
+valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $  case decodeUtf8' bytes of
   Left _ -> decodeUtf8 $ Base16.encode bytes
   Right x -> x
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index

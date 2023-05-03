@@ -13,8 +13,8 @@ import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
-import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
-import { getUserFromLocal } from '../lib/localStorage';
+import { getOrCreateOauthUserRequest, getUserCertificateRequest } from '../components/User/user.actions';
+import { fetchHealth, fetchMetadata } from './app.actions';
 import ReactGA from "react-ga4";
 
 ReactGA.initialize("G-PWGS3Z6YNQ");
@@ -24,17 +24,31 @@ mixpanelWrapper.identify(env.NODE_NAME);
 class App extends Component {
 
   componentDidMount() {
-    if (isOauthEnabled() && !getUserFromLocal()) {
+    if (isOauthEnabled()) {
       this.props.getOrCreateOauthUserRequest();
+    }
+    this.props.fetchMetadata()
+    this.props.fetchHealth()
+  }
+
+  constructor(){
+    super()
+    this.state = {
+      isCollapsed: true
     }
   }
 
+  toggleCollapse = () => {
+    this.setState(prevState => ({isCollapsed: !prevState.isCollapsed}))
+  }
+
   render() {
+    const collapsePoint = 800; //in px
     return (
       <div className="App" >
         <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
-        <MenuBar />
-        <SideBar />
+        <MenuBar isCollapsed={this.state.isCollapsed} toggleCollapse={this.toggleCollapse}/>
+        <SideBar isCollapsed={this.state.isCollapsed} toggleCollapse={this.toggleCollapse}/>
         <main id="outer-container">
           {scenes}
         </main>
@@ -43,10 +57,17 @@ class App extends Component {
   }
 }
 
-export function mapStateToProps() {
-  return ({})
+// connect user cert state to props
+export function mapStateToProps(state) {
+  return ({
+    oauthUser: state.user.oauthUser,
+    userCertificate: state.user.userCertificate,
+    appMetadata: state.appMetadata,
+  })
 }
 
 export default withRouter(connect(mapStateToProps, {
-  getOrCreateOauthUserRequest
+  getOrCreateOauthUserRequest,
+  fetchHealth,
+  fetchMetadata
 })(App));

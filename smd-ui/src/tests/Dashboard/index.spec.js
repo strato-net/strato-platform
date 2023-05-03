@@ -25,7 +25,14 @@ describe('Dashboard: index', () => {
           "coinbase": ""
         },
         subscribeRoom: jest.fn(),
-        unSubscribeRoom: jest.fn()
+        unSubscribeRoom: jest.fn(),
+        appMetadata: {
+          error: undefined,
+          loading: false,
+          health: undefined,
+          metadata: undefined,
+          nodeInfo: undefined,
+        },
       }
       const wrapper = shallow(
         <Dashboard.WrappedComponent {...props} />
@@ -37,6 +44,13 @@ describe('Dashboard: index', () => {
       const props = {
         dashboard,
         node,
+        appMetadata: {
+          error: undefined,
+          loading: false,
+          health: undefined,
+          metadata: undefined,
+          nodeInfo: undefined,
+        },
         subscribeRoom: jest.fn(),
         unSubscribeRoom: jest.fn()
       };
@@ -52,6 +66,13 @@ describe('Dashboard: index', () => {
     const props = {
       dashboard,
       node,
+      appMetadata: {
+        error: undefined,
+        loading: false,
+        health: undefined,
+        metadata: undefined,
+        nodeInfo: undefined,
+      },
       subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
       unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
     };
@@ -66,6 +87,13 @@ describe('Dashboard: index', () => {
     const props = {
       dashboard,
       node,
+      appMetadata: {
+        error: undefined,
+        loading: false,
+        health: undefined,
+        metadata: undefined,
+        nodeInfo: undefined,
+      },
       subscribeRoom: jest.fn(),
       unSubscribeRoom: jest.fn()
     };
@@ -82,6 +110,13 @@ describe('Dashboard: index', () => {
     const props = {
       dashboard,
       node,
+      appMetadata: {
+        error: undefined,
+        loading: false,
+        health: undefined,
+        metadata: undefined,
+        nodeInfo: undefined,
+      },
       subscribeRoom: jest.fn()
     };
     const wrapper = shallow(
@@ -94,7 +129,14 @@ describe('Dashboard: index', () => {
   test('mapStateToProps', () => {
     const state = {
       dashboard,
-      node
+      node,
+      appMetadata: {
+        error: undefined,
+        loading: false,
+        health: undefined,
+        metadata: undefined,
+        nodeInfo: undefined,
+      },
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
   });

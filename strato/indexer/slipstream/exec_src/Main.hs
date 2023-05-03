@@ -31,7 +31,7 @@ import Network.Wai.Middleware.Prometheus
 import Text.Printf
 import Text.RawString.QQ
 
-import BlockApps.Bloc22.Monad (BlocEnv(..))
+import Bloc.Monad (BlocEnv(..))
 import BlockApps.Init
 import BlockApps.Logging
 
@@ -93,7 +93,7 @@ main = do
     -- The in memory state gets wiped
     -- This causes cirrus issues
     -- like not adding Certs to cirrus
-    -- Below scrapes the cirrus table names 
+    -- Below scrapes the cirrus table names
     -- and the respective column names
     -- converts the information to the proper types
     -- to restore the in memeory state
@@ -108,19 +108,19 @@ main = do
     allTableNamesInByteString :: IO [B.ByteString] <- return $
                         mapMaybe (convertFromPGTextValueToShowable id).
                         concat <$>
-                        (pgQuery conn ([r|select table_name from information_schema.tables where 
-                            table_name like '%-%' or 
-                            table_name like '%Certificate%' or 
+                        (pgQuery conn ([r|select table_name from information_schema.tables where
+                            table_name like '%-%' or
+                            table_name like '%Certificate%' or
                             table_name like '%Mercata%' |] :: BC.ByteString) :: IO [PGValues])
 
     let sqlStatement x     = encodeUtf8 "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> x <> (encodeUtf8 "\';")   :: B.ByteString
-    
+
     tableNamesWithPgValues :: IO [(TableName, [PGValues])] <- return $
                                 join $
                                 mapM
                                     (\tableNam -> ((parseStringToTableName $ T.unpack . decodeUtf8 $ tableNam ,)  <$>) $ getPGValues . sqlStatement $ tableNam )  <$> allTableNamesInByteString
     let createdTables = M.map ( mapMaybe (convertFromPGTextValueToShowable  decodeUtf8) . concat) . M.fromList <$> tableNamesWithPgValues
-    -- Scrape Finished 
+    -- Scrape Finished
 
     -- There are three permanent connections/pools to postgres:
     -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background
