@@ -84,7 +84,7 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
     let pStr = pPeerString peer -- display string will show up as dns name
-    attempt :: Maybe SomeException <- withActivePeer peer $
+    attempt :: Maybe SomeException <- withCertifiedPeer peer . withActivePeer peer $
       runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
                           (c ^. peerSource)
                           (c ^. peerSink)
@@ -177,6 +177,11 @@ stratoP2PClient runner = runner $ \_ -> do
                     lengthenPeerDisable thePeer
                    e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
                    e' | Just NetworkIDMismatch <- fromException e' -> do
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    lengthenPeerDisable thePeer
+                   e' | Just NoPeerCertificate <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
