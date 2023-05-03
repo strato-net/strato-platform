@@ -23,7 +23,7 @@ import qualified LabeledError
 
 derivePersistField "Integer"
 derivePersistField "Point"
-derivePersistField "Xabi"
+derivePersistFieldJSON "Xabi"
 
 integerCap :: Integer
 integerCap = 1000

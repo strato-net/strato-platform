@@ -98,7 +98,7 @@ ContractDetailsRef
     codeHash CodePtr
     name Text
     xabi Xabi
-    deriving Eq Read Show
+    deriving Eq Show
 
 TransactionResult json
     blockHash Keccak256
