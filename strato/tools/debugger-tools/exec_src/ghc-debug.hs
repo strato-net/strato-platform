@@ -34,6 +34,18 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Language.Dot
 
+{- Some resources to help you on your journey:
+
+Documentation: http://ghc.gitlab.haskell.org/ghc-debug/
+
+Haskage: https://hackage.haskell.org/package/ghc-debug-client
+
+Example debugger: https://gitlab.haskell.org/ghc/ghc-debug/-/blob/master/test/Test.hs
+
+Some extra reading on memory analysis: https://github.com/well-typed/memory-usage-zurihac-2021
+
+-}
+
 -- Functions that output files will ouput to the /tmp directory inside the strato_strato_1 container.
 -- Note: It is also suggested to add your own debug functions if these do not fulfill your needs.
 main :: IO ()
