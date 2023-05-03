@@ -236,12 +236,9 @@ main = do
 
   let stateFetchLimit'=100
       nonceCounterTimeout=10
-      sourceCacheTimeout=60
       txQueueSize=4096
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-  codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
-  sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
 
   blocSQLEnv <- createBlocSQLEnv "postgres" 5432 "postgres" "api"
@@ -252,8 +249,6 @@ main = do
           evmCompatible= flags_evmCompatible,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
-          globalCodePtrCache = codePtrCache,
-          globalSourceCache = sourceCache,
           txTBQueue = tbqueue
           }
   run 3000 $ app env blocSQLEnv theDoc

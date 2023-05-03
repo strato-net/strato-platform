@@ -109,7 +109,6 @@ getContractsContract :: ( A.Selectable Account AddressState m
                         , MonadLogger m
                         , HasBlocSQL m
                         , HasSQL m
-                        , HasBlocEnv m
                         )
                      => ContractName -> Address -> Maybe ChainId -> m ContractDetails
 getContractsContract name addr chainId = do
@@ -252,7 +251,6 @@ getContractsDetails' :: ( A.Selectable Account AddressState m
                         , MonadLogger m
                         , HasSQL m
                         , HasBlocSQL m
-                        , HasBlocEnv m
                         )
                      => Address -> Maybe ChainId -> m ContractDetails
 getContractsDetails' contractAddress chainId = do
@@ -280,7 +278,6 @@ getContractsDetails :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
@@ -291,7 +288,6 @@ getContractXabi :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasSQL m
-                   , HasBlocEnv m
                    , HasBlocSQL m
                    )
                 => Account -> m Xabi
@@ -301,7 +297,6 @@ getContractsFunctions :: ( A.Selectable Account AddressState m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , MonadLogger m
                          , HasSQL m
-                         , HasBlocEnv m
                          , HasBlocSQL m
                          )
                       => ContractName -> Address -> Maybe ChainId -> m [FunctionName]
@@ -313,7 +308,6 @@ getContractsSymbols :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        )
                     => ContractName -> Address -> Maybe ChainId -> m [SymbolName]
@@ -325,7 +319,6 @@ getContractsEnum :: ( A.Selectable Account AddressState m
                     , (Keccak256 `A.Alters` SourceMap) m
                     , MonadLogger m
                     , HasSQL m
-                    , HasBlocEnv m
                     , HasBlocSQL m
                     )
                  => ContractName -> Address -> EnumName -> Maybe ChainId -> m [EnumValue]

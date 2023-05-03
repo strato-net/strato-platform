@@ -59,8 +59,6 @@ createBlocEnv = liftIO $ do
                  , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
-                 , globalSourceCache=error("globalSourceCache shouldn't be needed in slipstream, it is undefined")
-                 , globalCodePtrCache=error("globalCodePtrCache shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }
 

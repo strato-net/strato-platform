@@ -872,13 +872,8 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
       cacheKey = Account addr (unChainId <$> chainId)
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration nonceCache
   mCachedNonce <- case cacheNonce of
-    Do CacheNonce -> atomically $ do
-      Cache.purgeExpiredSTM nonceCache now
-      r <- Cache.lookupSTM True cacheKey nonceCache now
-      for_ r $ \v -> Cache.insertSTM cacheKey v nonceCache later
-      pure r  
+    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
     Don't CacheNonce -> pure Nothing
   nonceMap <- case mCachedNonce of
                 Just n -> pure $ Map.singleton chainId n
@@ -1046,7 +1041,6 @@ getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Obje
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        , HasSQL m
                        )
