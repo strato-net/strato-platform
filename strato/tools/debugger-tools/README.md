@@ -17,5 +17,7 @@ Also, pass in the environment variable `GHC_DEBUG_SOCKET="/tmp/ghc-debug"` to yo
 
 Example: `GHC_DEBUG_SOCKET="/tmp/ghc-debug" runBackgroundProcess strato-api  --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 `
 
+Note: This does not work when built with profiling. `-hT` and `hi` will still work.
+
 To use debugger-tools in a docker container, run the following commands:
 `docker exec -it strato_strato_1 ghc-debug`

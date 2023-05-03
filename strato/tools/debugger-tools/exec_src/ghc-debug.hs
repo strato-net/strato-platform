@@ -1,49 +1,57 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+module Main where
 
-import Language.Dot
-
-import GHC.Debug.Client
-import GHC.Debug.Profile
-import GHC.Debug.Snapshot
-import GHC.Debug.TypePointsFrom hiding (detectLeaks)
-import GHC.Debug.Types.Ptr
-import Control.Monad.RWS
-import Control.Monad.State
 import Control.Concurrent
 import Control.Monad.Identity
+import Control.Monad.RWS
+import Control.Monad.State
+import GHC.Debug.Client
+import GHC.Debug.Fragmentation
+import GHC.Debug.Profile
+import GHC.Debug.Retainers
+import GHC.Debug.Snapshot
+import GHC.Debug.Trace
+import GHC.Debug.TypePointsFrom hiding (detectLeaks)
+import GHC.Debug.Types.Ptr
+import qualified Data.Foldable as F
+import Data.List (sortOn, sortBy)
+import qualified Data.Map as Map
 import qualified Data.Map.Internal as M
-import Data.List (sortOn)
+import Data.Maybe
+import Data.Ord
 import qualified Data.Set as S
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import Language.Dot
 
 -- Functions that output files will ouput to the /tmp directory inside the strato_strato_1 container.
 -- Note: It is also suggested to add your own debug functions if these do not fulfill your needs.
 main :: IO ()
-main = withDebuggeeConnect "/tmp/ghc-debug" (\d -> do 
+main = withDebuggeeConnect "/tmp/ghc-debug" $ \d -> do 
   makeSnapshot d "/tmp/ghc-debug-snapshot" -- Creates a snapshot of the heap for offline (program does not have to be running) analysis
 
   -- detectLeaks 10 d -- Experimental leak detection algorithm
 
   -- analyseFragmentation 5_000_000 d -- Heap fragmentation analysis
 
-  -- doThunkAnalysis d
-  )
+  -- doThunkAnalysis d -- Thunk analysis
 
-doThunkAnalysis e = do
-  pause e
-  res <- runTrace e $ do
-    precacheBlocks
-    rs <- gcRoots
-    res <- thunkAnalysis rs
-    return res
-  printResult res
-  resume e
+
+
+
 
 -- -----------------------------------------------------------------------
--- Below are some prewritten debugging functions copied over from the ghc-debug debugger example program that I found to be useful.
+-- Below are some prewritten debugging functions copied/modified over from the ghc-debug debugger example program that I found to be useful.
 
 -- Copyright (c) 2019, Ben Gamari
 
@@ -76,6 +84,40 @@ doThunkAnalysis e = do
 -- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 -- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+doThunkAnalysis :: Debuggee -> IO ()
+doThunkAnalysis e = do
+  pause e
+  res <- runTrace e $ do
+    pb <- precacheBlocks
+    rs <- gcRoots
+    res <- thunkAnalysis rs
+    return res
+  _ <- printResult res
+  resume e
+
+censusClosureTypeF :: (ClosurePtr -> Bool) -> [ClosurePtr] -> DebugM _
+censusClosureTypeF p = closureCensusBy go
+  where
+    go :: ClosurePtr -> SizedClosure
+       -> DebugM (Maybe (BlockPtr, CensusStats))
+    go cp s | p cp = do
+      d <- addConstrDesc s
+      let siz :: Size
+          siz = dcSize d
+          v =  mkCS siz
+      return $ Just (applyMBlockMask cp, v)
+    go _ _ = return Nothing
+
+printResult :: Show a => Map.Map a Count -> IO [a]
+printResult m = do
+  putStrLn $ "TOTAL: " ++ show total
+  mapM_ show_line top10
+  return (map fst top10)
+  where
+    show_line (k, Count v) = T.putStrLn (T.pack (show k) <> ": " <> T.pack (show v))
+    top10 = take 100 $ reverse (sortBy (comparing snd) (Map.toList m))
+    total = F.fold (Map.elems m)
+
 thunkAnalysis :: [ClosurePtr] -> DebugM (Map.Map _ Count)
 thunkAnalysis rroots = (\(_, r, _) -> r) <$> runRWST (traceFromM funcs rroots) () (Map.empty)
   where
@@ -89,7 +131,7 @@ thunkAnalysis rroots = (\(_, r, _) -> r) <$> runRWST (traceFromM funcs rroots) (
     closAccum cp sc k = do
           case (noSize sc) of
             ThunkClosure {} ->  do
-              loc <- lift $ getSourceLoc sc
+              loc <- lift $ getSourceInfo (tableId (info (noSize sc)))
               modify' (Map.insertWith (<>) loc (Count 1))
               k
             _ -> k
@@ -105,22 +147,22 @@ analyseFragmentation interval e = loop
         -- Get all known blocks
         bs <- precacheBlocks
         rs <- gcRoots
-        traceWrite ("ROOTS", length rs)
+        traceWrite ((T.pack "ROOTS"), length rs)
         mb_census <- censusPinnedBlocks bs rs
         mbb_census <- censusByMBlock rs
         mbb_census2 <- censusByBlock rs
-        let is_small (CS _ (Size s) _) = fromIntegral s < 4096 * 0.9
+        let is_small (CS _ (Size s) _) = fromIntegral s < (4096 * 0.9 :: Double)
         let small_blocks = S.fromList (Map.keys (Map.filter is_small mbb_census2))
-        let pred cp = applyBlockMask cp `S.member` small_blocks
-        cen <- censusClosureTypeF (not . pred) rs
-        rets <- findRetainers (Just 10) rs (\cp _ -> return $ pred cp)
+        let pre cp = applyBlockMask cp `S.member` small_blocks
+        cen <- censusClosureTypeF (not . pre) rs
+        rets <- findRetainers (Just 10) rs (\cp _ -> return $ pre cp)
         rets' <- traverse addLocationToStack rets
         let bads = findBadPtrs mb_census
         -- Print how many objects there are in the badly fragmented blocks
-        traceWrite ("FRAG_OBJECTS", (foldl1 (<>) (map (fst . fst) bads)))
+        traceWrite ((T.pack "FRAG_OBJECTS"), (foldl1 (<>) (map (fst . fst) bads)))
         -- Only take 5 bad results as otherwise can take a long time as
         -- each call to `doAnalysis` will perform a full heap traversal.
-        as <- mapM (doAnalysis rs) ([(l, ptrs) | ((c, ptrs), l) <- bads])
+        as <- mapM (doAnalysis rs) ([(l, pts) | ((c, pts), l) <- bads])
         return (mb_census, mbb_census, mbb_census2, cen, bs, as, rets')
       resume e
       summariseBlocks bs
@@ -134,6 +176,19 @@ analyseFragmentation interval e = loop
       displayRetainerStack' (catMaybes rs)
       putStrLn "------------------------"
       -- loop -- Uncomment this if you want to loop
+
+-- Given the roots and bad closures, find out why they are being retained
+doAnalysis :: [ClosurePtr] -> (String, [ClosurePtr]) -> DebugM(Maybe (String, [(ClosurePtr, SizedClosureP, Maybe SourceInformation)]))
+doAnalysis cp (l, cptrs) = do
+  rs <- findRetainersOf (Just 1) cp cptrs
+  stack <- case rs of
+    [] -> traceWrite (T.pack "EMPTY RETAINERS") >> return Nothing
+    (r:_) -> do
+      cs <- dereferenceClosures r
+      cs' <- mapM dereferenceToClosurePtr cs
+      locs <- mapM (\c -> getSourceInfo (tableId (info (noSize c)))) cs'
+      return $ Just (zip3 r cs' locs)
+  return ((l,) <$> stack)
 
 detectLeaks :: Int -> Debuggee -> IO ()
 detectLeaks interval e = loop Nothing (M.empty, M.empty) 0
