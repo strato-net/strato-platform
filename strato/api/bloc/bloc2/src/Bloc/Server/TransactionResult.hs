@@ -262,7 +262,7 @@ contractResult i txHash txResult@TransactionResult{..} mmd = do
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated)
       readMaybe (Text.unpack str)
   case accountMaybe of
-    Nothing -> case transactionResultStatus of
+    Nothing -> case transactionResultMessage of
       "Success!" -> do
         let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
@@ -290,7 +290,7 @@ functionResult i txHash txResult@TransactionResult{..} mmd toAccount = do
   case transactionResultKind of
     -- Check if it is a solidVm first
     -- If it is, we can reduce calls to get ContractDetails
-    Just SolidVM -> case transactionResultStatus of
+    Just SolidVM -> case transactionResultMessage of
         "Success!" -> do
               let txResp = transactionResultResponse
               mFormattedResponse <- convertSvmResultResToVals txResp
