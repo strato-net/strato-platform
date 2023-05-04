@@ -291,12 +291,18 @@ postBlocTransaction' :: ( MonadLogger m
 postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
+  accountNonceLimit <- fmap accountNonceLimit getBlocEnv
   case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just jwtToken -> do
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $  getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
+      nonceMap <- getAccountNonce addr (S.singleton chainId)
+      accountNonce <- case Map.lookup chainId nonceMap of
+        Nothing -> pure $ 0
+        Just (Nonce n) -> pure $ toInteger n
+      when (accountNonce >= accountNonceLimit) $ throwIO NonceLimitExceededError
       let src' :: ContractPayload -> Maybe SourceMap
           src' p = if contractpayloadSrc p == mempty
                      then Nothing

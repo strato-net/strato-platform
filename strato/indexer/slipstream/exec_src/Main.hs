@@ -58,6 +58,7 @@ createBlocEnv = liftIO $ do
   return BlocEnv { stateFetchLimit = 0
                  , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
+                 , accountNonceLimit=0
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , globalSourceCache=error("globalSourceCache shouldn't be needed in slipstream, it is undefined")
                  , globalCodePtrCache=error("globalCodePtrCache shouldn't be needed in slipstream, it is undefined")
