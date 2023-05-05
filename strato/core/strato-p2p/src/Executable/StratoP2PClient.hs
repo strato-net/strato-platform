@@ -61,7 +61,7 @@ runPeer :: (RunsClient m, MonadP2P m)
 runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
-
+  
   myPublic <- getPub
   
   otherPubKey <- case (pPeerPubkey peer) of
@@ -127,6 +127,7 @@ runPeerInList :: ( MonadP2P m
               -> ConduitM () P2pEvent m ()
               -> m (Either SomeException ())
 runPeerInList thePeer sSource = do
+  $logInfoS "runPeerInList" "nonviolentDisable of peer"
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
@@ -167,7 +168,9 @@ stratoP2PClient runner = runner $ \sSource -> do
 
       handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case
-        Left e | Just (ErrorCall x) <- fromException e -> error x
+        Left e | Just (ErrorCall x) <- fromException e -> do
+          $logErrorLS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Fatal error: " ++ show x 
+          error x
         Left e -> do
           $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
           recordException thePeer e

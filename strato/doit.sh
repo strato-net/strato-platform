@@ -278,7 +278,7 @@ function newnode {
   fi
 
   echo "Configuring log rotation..."
-  runBackgroundProcess logRotation
+  # runBackgroundProcess logRotation
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
