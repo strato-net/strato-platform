@@ -145,7 +145,7 @@ txWorker = forever $ do
 
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
 
-postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
+postBlocTransactionRaw :: (MonadLogger m, HasSQL m, HasBlocEnv m) =>
                           Maybe Text     -- username (unused)
                        -> Maybe ChainId
                        -> Bool           -- hash
@@ -154,6 +154,7 @@ postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
                        -> m BlocChainOrTransactionResult
 postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
   checkIsSynced
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
   -- so, if 'v' is not provided, we have to figure out what 'v' is here
 
@@ -212,7 +213,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
       , blocTransactionData = Nothing
       }
     else do
-      txHash <- postTransaction rawTx
+      txHash <- postTransaction (Just txSizeLimit) rawTx
       trds <- recurseTRDs resolve [txHash]
       case trds of
         [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
@@ -480,6 +481,7 @@ postUsersSend' :: ( A.Selectable Account AddressState m
                => Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters{..} jwtToken = do
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
+    txSizeLimit <- fmap txSizeLimit getBlocEnv 
     tx <- signAndPrepare jwtToken fromAddress metadata $
       TransactionHeader
         (Just toAddress)
@@ -488,7 +490,7 @@ postUsersSend' cacheNonce TransferParameters{..} jwtToken = do
         (Wei (fromIntegral $ unStrung value))
         (Code ByteString.empty)
         chainId
-    txHash <- postTransaction tx
+    txHash <- postTransaction (Just txSizeLimit) tx
     getResultAndRespond [txHash] resolve
 
 postUsersContractEVM' :: ( MonadLogger m
@@ -502,6 +504,7 @@ postUsersContractEVM' :: ( MonadLogger m
                       => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} jwtToken = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
   (cName,ContractDetails{..}) <- getContractDetailsForContract "EVM" src contract >>= \case
@@ -526,7 +529,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} jwtToken = blocTransacti
       (Code $ bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
-  txHash <- postTransaction tx
+  txHash <- postTransaction (Just txSizeLimit) tx
   $logInfoLS "postUsersContractEVM'/hash" txHash
   getResultAndRespond [txHash] resolve
 
@@ -541,6 +544,7 @@ postUsersContractSolidVM' :: ( MonadLogger m
                           => Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
   (cName,ContractDetails{..}) <- getContractDetailsForContract "SolidVM"  src contract >>= \case
@@ -562,7 +566,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = blocTrans
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
-  txHash <- postTransaction tx
+  txHash <- postTransaction (Just txSizeLimit) tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
   getResultAndRespond [txHash] resolve
 
@@ -577,6 +581,7 @@ postUsersUploadListSolidVM' :: ( MonadLogger m
                             => Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
@@ -601,7 +606,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
       return (name,tx)
   let
     txs = map snd namesTxs
-  hashes <- postTransactionList txs
+  hashes <- postTransactionList (Just txSizeLimit) txs
   getBatchBlocTransactionResult' hashes resolve
 
 evmUploadListError :: Text
@@ -625,6 +630,7 @@ postUsersUploadListEVM' :: ( MonadLogger m
 postUsersUploadListEVM' cacheNonce ContractListParameters{..} jwtToken = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name src args params value cid md) -> do
       mtuple <- use $ at name
@@ -653,7 +659,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} jwtToken = do
             cid
       return (name,tx)
   let txs = snd <$> namesCmIdsTxs
-  hashes <- postTransactionList txs
+  hashes <- postTransactionList (Just txSizeLimit) txs
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' :: ( MonadLogger m
@@ -668,6 +674,7 @@ postUsersSendList' :: ( MonadLogger m
 postUsersSendList' cacheNonce TransferListParameters{..} jwtToken = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
   txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
+  txSizeLimit <- fmap txSizeLimit getBlocEnv 
   txs'' <- mapM
     (\(SendTransaction toAddr (Strung value) params cid md) -> do
         let header = TransactionHeader
@@ -679,7 +686,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} jwtToken = do
               cid
         signAndPrepare jwtToken fromAddr md header
     ) txsWithParams
-  hashes <- postTransactionList txs''
+  hashes <- postTransactionList (Just txSizeLimit) txs''
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethodList' :: ( MonadLogger m
@@ -698,6 +705,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
     else do
       let txsWithChainids = map (methodcallChainid %~ (<|> chainId)) txs
       txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
+      txSizeLimit <- fmap txSizeLimit getBlocEnv 
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
           let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
@@ -738,7 +746,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
           return (tx,methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames
       mapM_ ($logDebugLS "postUsersContractMethodList'/txs") finalTxs
-      hashes <- postTransactionList finalTxs
+      hashes <- postTransactionList (Just txSizeLimit) finalTxs
       mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
       getBatchBlocTransactionResult' hashes resolve
 
@@ -754,6 +762,7 @@ postUsersContractMethod' :: ( MonadLogger m
                          => Should CacheNonce -> FunctionParameters -> Text -> m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+    txSizeLimit <- fmap txSizeLimit getBlocEnv 
 
     let err = CouldNotFind $ Text.concat
                 [ "postUsersContractMethod': Couldn't find contract details for contract at address "
@@ -789,7 +798,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
         (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
-    txHash <- postTransaction tx
+    txHash <- postTransaction (Just txSizeLimit) tx
     $logInfoLS "postUsersContractMethod'/hash" txHash
     getResultAndRespond [txHash] resolve
 

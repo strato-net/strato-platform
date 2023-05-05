@@ -250,6 +250,7 @@ main = do
         BlocEnv{
           gasOn = flags_gasOn,
           evmCompatible= flags_evmCompatible,
+          txSizeLimit = flags_txSizeLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           globalCodePtrCache = codePtrCache,

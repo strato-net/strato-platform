@@ -78,6 +78,7 @@ data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
   , evmCompatible      :: Bool
+  , txSizeLimit        :: Int
   , globalNonceCounter :: Cache Account Nonce
   , globalSourceCache  :: Cache (Text, SourceMap) (Map Text ContractDetails)
   , globalCodePtrCache :: Cache CodePtr ContractDetails
