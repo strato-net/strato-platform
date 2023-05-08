@@ -41,6 +41,7 @@ data ApiError
   | VaultWrapperError ClientError
   | DBError Text
   | UserError Text
+  | TxSizeError Text
   | NonceLimitExceededError
   | CouldNotFind Text
   | AnError Text
@@ -126,6 +127,11 @@ apiErrorToServantErr = \case
                    ]}
   CirrusError err -> err500{errBody = JSON.encode (show err)}
   UserError err -> err400{errBody = JSON.encode err}
+  TxSizeError err -> err400{errBody = JSON.encode $ unlines 
+                            [
+                              "Transaction size too large!",
+                              T.unpack err
+                            ]}
   NonceLimitExceededError -> err400{errBody = JSON.encode $ unlines ["You have reached your transaction limit."]}
   AlreadyExists err -> err409{errBody = JSON.encode err}
   CouldNotFind err -> err400{errBody = JSON.encode err}
