@@ -45,7 +45,7 @@ import           Data.Set                          (isSubsetOf)
 import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
-import qualified Data.Text.Encoding                as Text
+-- import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Text.Format
 import           Text.Read                         (readMaybe)
@@ -112,15 +112,13 @@ getBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                              , MonadLogger m
                              , HasBlocSQL m
                              , HasSQL m
-                             , HasBlocEnv m
                              )
                           => [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
   if resolve
     then do
-      promises <- forM hashes $ \h -> async (getBlocTransactionResult h True)
-      results <- mapM wait promises
+      results <- forM hashes $ \h -> withAsync (getBlocTransactionResult h True) $ \e -> wait e
       $logDebugLS "getBlocTransactionResult'/results" results
       case results of
         [] -> throwIO $ AnError "Empty list provided: results is empty"
@@ -135,7 +133,6 @@ getBlocTransactionResult :: ( (Keccak256 `A.Alters` SourceMap) m
                             , MonadLogger m
                             , HasBlocSQL m
                             , HasSQL m
-                            , HasBlocEnv m
                             )
                          => Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
@@ -146,7 +143,6 @@ getBatchBlocTransactionResult' :: ( (Keccak256 `A.Alters` SourceMap) m
                                   , MonadLogger m
                                   , HasBlocSQL m
                                   , HasSQL m
-                                  , HasBlocEnv m
                                   )
                                => [Keccak256] -> Bool -> m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
@@ -159,7 +155,6 @@ postBlocTransactionResults :: ( (Keccak256 `A.Alters` SourceMap) m
                               , MonadLogger m
                               , HasBlocSQL m
                               , HasSQL m
-                              , HasBlocEnv m
                               )
                            => Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
@@ -227,7 +222,7 @@ evalAndReturn :: ( (Keccak256 `A.Alters` SourceMap) m
                  , A.Selectable Account AddressState m
                  , MonadLogger m
                  , HasBlocSQL m
-                 , HasBlocEnv m
+                 , HasSQL m
                  )
               => [TRD] -> m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
@@ -237,7 +232,7 @@ evalAndReturn list = forStateT emptyBatchState list $
         Success -> case mtxr of
           Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
           Just (r@RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
-            (Nothing, code) -> contractResult i txHash code txr (Map.fromList <$> rawTransactionMetadata)
+            (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
             (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
             (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
@@ -248,62 +243,42 @@ nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
       | otherwise       = Text.pack (show $ n + 1) <> "th"
 
 contractResult :: ( A.Selectable Account AddressState m
-                  , (Keccak256 `A.Alters` SourceMap) m
-                  , MonadLogger m
                   , HasBlocSQL m
-                  , HasBlocEnv m
                   )
                => Integer
                -> Keccak256
-               -> Code
                -> TransactionResult
                -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult i txHash code txResult mmd = do
-  ~(name, src, vm) <- case mmd of
+contractResult i txHash txResult@TransactionResult{..} mmd = do
+  name <- case mmd of
     Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
     Just md -> case Map.lookup "name" md of
       Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
-        "EVM" -> case Map.lookup "src" md of
-          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-          Just src -> pure (name, src, "EVM")
-        vm -> case code of
-          Code bs -> pure (name, Text.decodeUtf8 bs, vm)
-          PtrToCode codePtr -> lift $ getContractDetailsByCodeHash codePtr >>= \case
-            Left e -> throwIO $ UserError e
-            Right ContractDetails{..} -> pure (name, serializeSourceMap contractdetailsSrc, vm)
+      Just n -> pure n
   let
     accountMaybe = do
       str <- listToMaybe $
-        Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
+        Text.splitOn "," (Text.pack $ transactionResultContractsCreated)
       readMaybe (Text.unpack str)
   case accountMaybe of
-    Nothing -> case transactionResultMessage txResult of
+    Nothing -> case transactionResultMessage of
       "Success!" -> do
         let mDelAddr = readMaybe @Account . Text.unpack =<<
-              (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
+              (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
-      let cn = ContractName name
-      mdetails <- use $ contractDetailsMap . at cn
-      details <- case mdetails of
-        Just details' -> return details'{contractdetailsAccount = Just acct}
-        Nothing -> do
-          cds <- lift $ getContractDetailsForContract vm (deserializeSourceMap src) (Just name)
-          case cds of
-            Nothing -> lift . throwIO . UserError $ "Could not get details for contract" <> name
-            Just (_, ds) -> contractDetailsMap . at cn <?= ds{contractdetailsAccount = Just acct}
+      let details = UploadContractDetails{contractName = name, contractAccount = Just $ acct}
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
 functionResult :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
                   , MonadLogger m
                   , HasBlocSQL m
-                  , HasBlocEnv m
+                  , HasSQL m
                   )
                => Integer
                -> Keccak256
@@ -311,43 +286,49 @@ functionResult :: ( A.Selectable Account AddressState m
                -> Maybe (Map Text Text)
                -> Account
                -> StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult mmd toAccount = do
-  funcName <- case mmd of
-    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-    Just md -> case Map.lookup "funcName" md of
-      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just funcName -> pure funcName
-  mxabi <- use $ functionXabiMap . at (toAccount, funcName)
-  xabi <- case mxabi of
-    Just xabi' -> return xabi'
-    Nothing -> do
-      mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
-      xabi' <- case mch of
-        Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
-        Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
-          Left e -> throwIO $ UserError e
-          Right d -> pure $ contractdetailsXabi d
-      functionXabiMap . at (toAccount, funcName) <?= xabi'
-  let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
-      orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-  orderedResultTypes <- lift $
-    for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-      either (throwIO . UserError . Text.pack) return $
-        xabiTypeToType xabi indexedTypeType
-
-  let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-      txResp = transactionResultResponse txResult
-    -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-    -- workaround for enums
-  mFormattedResponse <- case transactionResultKind txResult of
-    Just SolidVM -> convertSvmResultResToVals txResp
-    _ -> pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
-
-  case transactionResultMessage txResult of
-    "Success!" -> do
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
-      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
-    stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
+functionResult i txHash txResult@TransactionResult{..} mmd toAccount = do
+  case transactionResultKind of
+    -- Check if it is a solidVm first
+    -- If it is, we can reduce calls to get ContractDetails
+    Just SolidVM -> case transactionResultMessage of
+        "Success!" -> do
+              let txResp = transactionResultResponse
+              mFormattedResponse <- convertSvmResultResToVals txResp
+              formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
+              return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
+        stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
+    -- Note the below can be removed if one day
+    -- EVM is decided to be taken out
+    _ -> do
+          funcName <- case mmd of
+            Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+            Just md -> case Map.lookup "funcName" md of
+              Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+              Just funcName -> pure funcName
+          mxabi <- use $ functionXabiMap . at (toAccount, funcName)
+          xabi <- case mxabi of
+            Just xabi' -> return xabi'
+            Nothing -> do
+              mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
+              xabi' <- case mch of
+                Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
+                Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
+                  Left e -> throwIO $ UserError e
+                  Right d -> pure $ contractdetailsXabi d
+              functionXabiMap . at (toAccount, funcName) <?= xabi'
+          let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
+              orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+          orderedResultTypes <- lift $
+            for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+              either (throwIO . UserError . Text.pack) return $
+                xabiTypeToType xabi indexedTypeType
+          let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
+              txResp = transactionResultResponse
+            -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+            -- workaround for enums
+          mFormattedResponse <- pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
+          formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
+          return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case

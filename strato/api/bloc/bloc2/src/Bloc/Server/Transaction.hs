@@ -513,8 +513,8 @@ postUsersContractEVM' cacheNonce ContractParameters{..} jwtToken = blocTransacti
       Right val -> return val
       _ -> throwIO $ AnError "Couldn't decode binary"
 
-  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
-
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap src),("name", cName)]
+  
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare jwtToken fromAddr metadata' $
@@ -558,7 +558,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
+      (Code $ Text.encodeUtf8 $ serializeSourceMap src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
@@ -584,8 +584,8 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
         cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
           Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
           Just x -> pure x
-        at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
-
+        at name <?= (srcs, contractdetailsXabi cd)
+                  
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
@@ -879,13 +879,8 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
       cacheKey = Account addr (unChainId <$> chainId)
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration nonceCache
   mCachedNonce <- case cacheNonce of
-    Do CacheNonce -> atomically $ do
-      Cache.purgeExpiredSTM nonceCache now
-      r <- Cache.lookupSTM True cacheKey nonceCache now
-      for_ r $ \v -> Cache.insertSTM cacheKey v nonceCache later
-      pure r
+    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
     Don't CacheNonce -> pure Nothing
   nonceMap <- case mCachedNonce of
                 Just n -> pure $ Map.singleton chainId n
@@ -908,7 +903,9 @@ cacheLookup :: (Hashable k)
             -> TimeSpec
             -> k
             -> STM (Maybe v)
-cacheLookup c t k = Cache.lookupSTM True k c t
+cacheLookup c t k = do
+  Cache.purgeExpiredSTM c t
+  Cache.lookupSTM True k c t
 
 genNonces :: (MonadLogger m, HasBlocEnv m, HasSQL m) =>
              Show a
@@ -1051,7 +1048,6 @@ getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Obje
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        , HasSQL m
                        )
