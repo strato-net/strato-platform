@@ -247,6 +247,7 @@ main = do
         BlocEnv{
           gasOn = flags_gasOn,
           evmCompatible= flags_evmCompatible,
+          accountNonceLimit = flags_accountNonceLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue

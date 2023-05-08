@@ -74,6 +74,7 @@ data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
   , evmCompatible      :: Bool
+  , accountNonceLimit  :: Integer
   , globalNonceCounter :: Cache Account Nonce
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
