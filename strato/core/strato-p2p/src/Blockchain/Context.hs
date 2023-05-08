@@ -506,6 +506,9 @@ instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (Reader
 instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
   res <- action
@@ -561,6 +564,7 @@ type MonadP2P m = ( MonadIO m
                       '[ '(PPeer, TcpEnableTime)
                        , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
+                       , '(PPeer, T.Text)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)

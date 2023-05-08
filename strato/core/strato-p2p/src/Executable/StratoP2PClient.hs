@@ -174,21 +174,36 @@ stratoP2PClient runner = runner $ \_ -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    disErr <- storeDisableException thePeer (T.pack "WrongGenesisBlock")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisable thePeer
-                   e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just HeadMacIncorrect  <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "HeadMacIncorrect")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    lengthenPeerDisable thePeer
                    e' | Just NetworkIDMismatch <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    disErr <- storeDisableException thePeer (T.pack "NetworkIDMismatch")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisable thePeer
-                   e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable thePeer
-                   e' | Just TimeoutException <- fromException e' -> lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
+                   e' | Just PeerDisconnected <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    lengthenPeerDisable thePeer
+                   e' | Just TimeoutException <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "TimeoutException")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                    e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do
                         udpErr <- disableUDPPeerForSeconds thePeer 86400
                         whenLeft udpErr $ \theUDPErr -> do
                           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                        disErr <-storeDisableException thePeer (T.pack "ioErrType: NoSuchThing")
+                        whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                         lengthenPeerDisable thePeer
                       _ -> return $ Right ()
                    _  -> return $ Right ()
