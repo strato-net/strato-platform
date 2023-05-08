@@ -37,12 +37,10 @@ module Bloc.Monad (
 import           Control.Monad.Reader
 import           Data.Cache
 import           Data.Foldable
-import           Data.Map.Strict                    (Map)
 import           Data.Pool                          (withResource)
 import           Data.Profunctor.Product.Default
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
-import           Data.Source.Map
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
@@ -57,9 +55,7 @@ import           Bloc.API.Transaction
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Nonce
-import           BlockApps.Solidity.Xabi
 
 import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
@@ -79,9 +75,8 @@ data BlocEnv = BlocEnv
   , gasOn              :: Bool
   , evmCompatible      :: Bool
   , txSizeLimit        :: Int
+  , accountNonceLimit  :: Integer
   , globalNonceCounter :: Cache Account Nonce
-  , globalSourceCache  :: Cache (Text, SourceMap) (Map Text ContractDetails)
-  , globalCodePtrCache :: Cache CodePtr ContractDetails
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 

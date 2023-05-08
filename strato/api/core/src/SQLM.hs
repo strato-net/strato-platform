@@ -42,6 +42,7 @@ data ApiError
   | DBError Text
   | UserError Text
   | TxSizeError Text
+  | NonceLimitExceededError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
@@ -131,6 +132,7 @@ apiErrorToServantErr = \case
                               "Transaction size too large!",
                               T.unpack err
                             ]}
+  NonceLimitExceededError -> err400{errBody = JSON.encode $ unlines ["You have reached your transaction limit."]}
   AlreadyExists err -> err409{errBody = JSON.encode err}
   CouldNotFind err -> err400{errBody = JSON.encode err}
   UnavailableError err -> err503{errBody = JSON.encode err}

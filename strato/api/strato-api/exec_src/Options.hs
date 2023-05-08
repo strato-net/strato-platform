@@ -20,3 +20,4 @@ import           HFlags
 defineFlag "gasOn" (True :: Bool) "Whether or not to throw an error if an account sending a TX has no balance - used in conjunction with the VM gasOn flag"
 defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhancements or not"
 defineFlag "txSizeLimit" (100000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
+defineFlag "accountNonceLimit" (500::Integer) "The maximum number of transactions an account can make"

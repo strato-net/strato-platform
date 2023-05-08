@@ -51,15 +51,15 @@ instance ToSchema XabiKind where
     & mapped.schema.example ?~ toJSON ContractKind
 
 data Xabi = Xabi
-  { xabiFuncs     :: Map Text Func
+  { xabiFuncs     :: !(Map Text Func)
   , xabiConstr    :: Maybe Func
-  , xabiVars      :: Map Text Xabi.VarType
-  , xabiTypes     :: Map Text Xabi.Def
-  , xabiModifiers :: Map Text Modifier
-  , xabiEvents    :: Map Text Event
+  , xabiVars      :: !(Map Text Xabi.VarType)
+  , xabiTypes     :: !(Map Text Xabi.Def)
+  , xabiModifiers :: !(Map Text Modifier)
+  , xabiEvents    :: !(Map Text Event)
   , xabiKind      :: XabiKind
-  , xabiUsing     :: Map Text Using
-  } deriving (Eq,Show,Generic,NFData)
+  , xabiUsing     :: !(Map Text Using)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -156,8 +156,8 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data Func = Func
-  { funcArgs :: Map Text Xabi.IndexedType
-  , funcVals :: Map Text Xabi.IndexedType
+  { funcArgs :: !(Map Text Xabi.IndexedType)
+  , funcVals :: !(Map Text Xabi.IndexedType)
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
@@ -227,7 +227,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic,NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Visibility
 instance FromJSON Visibility
@@ -242,11 +242,11 @@ instance ToSchema Visibility where
       ex = Public
 
 data Modifier = Modifier
-  { modifierArgs     :: Map Text Xabi.IndexedType
+  { modifierArgs     :: !(Map Text Xabi.IndexedType)
   , modifierSelector :: Text
-  , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierVals     :: !(Map Text Xabi.IndexedType)
   , modifierContents :: Maybe Text
-  } deriving (Eq,Show,Generic,NFData)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Modifier where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -273,7 +273,7 @@ instance ToSchema Modifier where
 data Event = Event { eventAnonymous :: Bool
                    , eventLogs :: [(Text, Xabi.IndexedType)]
                    }
-              deriving (Eq,Show,Generic,NFData)
+              deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Event where
   toJSON e = object [
@@ -304,7 +304,7 @@ instance ToSchema Event where
           ]
         }
 
-newtype Using = Using String deriving (Eq,Show,Generic,NFData)
+newtype Using = Using String deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Using where
   toJSON (Using dec) = String . Text.pack $ dec
@@ -326,13 +326,13 @@ instance ToSchema Using where
 
 
 data ContractDetails = ContractDetails
-  { contractdetailsBin        :: Text
-  , contractdetailsAccount    :: Maybe Account
-  , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: CodePtr
-  , contractdetailsName       :: Text
-  , contractdetailsSrc        :: SourceMap
-  , contractdetailsXabi       :: Xabi
+  { contractdetailsBin        :: !Text
+  , contractdetailsAccount    :: !(Maybe Account)
+  , contractdetailsBinRuntime :: !Text
+  , contractdetailsCodeHash   :: !CodePtr
+  , contractdetailsName       :: !Text
+  , contractdetailsSrc        :: !SourceMap
+  , contractdetailsXabi       :: !Xabi
   } deriving (Show,Eq,Generic,NFData)
 
 instance ToJSON ContractDetails where

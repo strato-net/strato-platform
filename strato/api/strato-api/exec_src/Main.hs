@@ -95,6 +95,7 @@ instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
          , HasBlocSQL m
+         , HasSQL m
          ) => Selectable Account ContractDetails (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
@@ -200,8 +201,8 @@ fullServer = coreServer :<|> bloc
 ----------------
 
 
-hoistCoreServer :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Server FullAPI
-hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> BlocSQLEnv -> Server FullAPI
+hoistCoreServer blocEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -210,7 +211,7 @@ hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI)
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
       runLoggingT .
-        runSQLMUsingEnv sqlEnv .
+        runSQLM .
         flip runReaderT blocEnv .
         runBlocSQLMUsingEnv blocSQLEnv .
         runVaultM "http://localhost:8013/strato/v2.3" .
@@ -235,15 +236,11 @@ main = do
 
   let stateFetchLimit'=100
       nonceCounterTimeout=10
-      sourceCacheTimeout=60
       txQueueSize=4096
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-  codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
-  sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
 
-  sqlEnv <- createSQLEnv
   blocSQLEnv <- createBlocSQLEnv "postgres" 5432 "postgres" "api"
 
   let env =
@@ -251,16 +248,15 @@ main = do
           gasOn = flags_gasOn,
           evmCompatible= flags_evmCompatible,
           txSizeLimit = flags_txSizeLimit,
+          accountNonceLimit = flags_accountNonceLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
-          globalCodePtrCache = codePtrCache,
-          globalSourceCache = sourceCache,
           txTBQueue = tbqueue
           }
-  run 3000 $ app env sqlEnv blocSQLEnv theDoc
+  run 3000 $ app env blocSQLEnv theDoc
 
-app :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Swagger -> Application
-app blocEnv sqlEnv blocSQLEnv theDoc =
+app :: BlocEnv -> BlocSQLEnv -> Swagger -> Application
+app blocEnv blocSQLEnv theDoc =
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
@@ -268,7 +264,7 @@ app blocEnv sqlEnv blocSQLEnv theDoc =
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ addPathsTo404
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
-  $ hoistCoreServer blocEnv sqlEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc
+  $ hoistCoreServer blocEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc
 
 
 
