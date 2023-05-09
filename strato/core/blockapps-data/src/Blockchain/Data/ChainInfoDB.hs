@@ -33,11 +33,14 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 
-getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
-getChainInfo (ChainId chainId) = do
-  sqlQuery $ do
+getChainInfo :: HasSQLDB m =>  Maybe T.Text -> ChainId  -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
+getChainInfo mLabel (ChainId chainId)  = do
+  sqlQuery $ do 
     entChainInfos <- E.select . E.from $ \cRef -> do
-      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      case mLabel of 
+        Nothing -> E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+        Just label -> E.where_ ((cRef E.^. ChainInfoRefChainLabel) E.==. E.val (T.unpack label)
+                E.&&. cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
       return cRef
     case entChainInfos of
       []  -> return Nothing
@@ -200,13 +203,9 @@ getChainInfosByLabel  label = do
 
 getChainInfos :: HasSQLDB m => [ChainId] -> Maybe T.Text -> Integer -> Integer -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChainInfos chainIds mLabel limit offset = do
-  chainInfos <- case mLabel of        
-      Just label  -> do
-          chainsInfoByLabel <- getChainInfosByLabel label
-          case chainIds of 
-            [] -> return chainsInfoByLabel
-            _  -> return $ filter (\case Nothing -> False; Just namedTup ->  (( fst . unNamedTuple $ namedTup ) `elem`  chainIds))  chainsInfoByLabel
-      Nothing -> do
+  chainInfos <- case (chainIds , mLabel) of        
+      ([], Just label)  -> getChainInfosByLabel label
+      _ -> do
         cids <- case chainIds of
           [] -> sqlQuery $ do
             chains <- E.select . E.from $ \cRef -> do
@@ -217,7 +216,7 @@ getChainInfos chainIds mLabel limit offset = do
               [] -> return []
               cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
           cIds -> return cIds
-        mapM getChainInfo cids
+        mapM (getChainInfo  mLabel) cids
   let cInfos = sequence $ filter isJust chainInfos
   case cInfos of
     Nothing -> return []
