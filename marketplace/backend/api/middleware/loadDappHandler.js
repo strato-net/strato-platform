@@ -9,7 +9,7 @@ const options = { config }
 
 const loadDapp = async (req, res, next) => {
   const { app, username } = req
-  const accessToken = {token: req.headers['x-user-access-token']};
+  const accessToken = { token: req.headers['x-user-access-token'] };
   const userCredentials = {
     username,
     ...accessToken,
@@ -38,25 +38,26 @@ const loadDapp = async (req, res, next) => {
         return next()
       }
 
-    // unexpected error
-    return next(e)
+      // unexpected error
+      return next(e)
+    }
+
+    const user = {
+      ...userCredentials,
+      node: config.nodes[0],
+      address,
+    }
+
+    const deploy = app.get(constants.deployParamName)
+
+    req.user = user
+    req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
+      chainIds: [deploy.dapp.contract.appChainId],
+      ...options
+    })
+
+    return next()
   }
-
-  const user = {
-    ...userCredentials,
-    node: config.nodes[0],
-    address,
-  }
-
-  const deploy = app.get(constants.deployParamName)
-
-  req.user = user
-  req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-    chainIds: [deploy.dapp.contract.appChainId],
-    ...options
-  })
-
-  return next()
 }
 
 export default loadDapp

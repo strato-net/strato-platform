@@ -9,21 +9,21 @@ const router = express.Router();
 
 router.get(
   Event.getInventoryEventTypes,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventController.getInventoryEventTypes
 );
 
 router.get(
   Event.getInventoryEventTypeDetails,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventController.getInventoryEventTypeDetails
 );
 
 router.get(
   Event.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventController.getAll
 );
@@ -51,7 +51,7 @@ router.put(
 
 router.get(
   Event.audit,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventController.audit
 )

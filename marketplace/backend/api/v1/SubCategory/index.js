@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get(
   SubCategory.get,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   SubCategoryController.get
@@ -16,7 +16,7 @@ router.get(
 
 router.get(
   SubCategory.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   SubCategoryController.getAll

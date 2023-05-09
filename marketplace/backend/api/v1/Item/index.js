@@ -16,7 +16,7 @@ const router = express.Router();
 
 router.get(
   Item.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ItemController.getAll
@@ -24,7 +24,7 @@ router.get(
 
 router.get(
   Item.ownershipHistory,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ItemController.getOwnershipHistory
@@ -56,7 +56,7 @@ router.put(
 
 router.get(
   Item.audit,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ItemController.audit
@@ -64,7 +64,7 @@ router.get(
 
 router.get(
   Item.getRawMaterials,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ItemController.getAllRawMaterials

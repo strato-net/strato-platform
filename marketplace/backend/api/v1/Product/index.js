@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get(
   Product.get,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ProductController.get
@@ -17,7 +17,7 @@ router.get(
 
 router.get(
   Product.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   ProductController.getAll
@@ -25,7 +25,7 @@ router.get(
 
 router.get(
   Product.getAllProductNames,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   ProductController.getAllProductNames
 );
