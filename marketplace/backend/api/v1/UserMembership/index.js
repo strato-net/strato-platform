@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get(
   UserMembership.get,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   UserMembershipController.get
@@ -17,7 +17,7 @@ router.get(
 
 router.get(
   UserMembership.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   UserMembershipController.getAll
@@ -79,7 +79,7 @@ router.put(
 
 router.get(
   UserMembership.getAllCertifiers,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   UserMembershipController.getAllCertifiers

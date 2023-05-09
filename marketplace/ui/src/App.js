@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import AuthenticatedRoutes from "./AuthenticatedRoutes";
+import { useAuthenticateState, useAuthenticateDispatch } from "./contexts/authentication/index.js";
+import { actions } from "./contexts/authentication/actions";
 import "@shopify/polaris/build/esm/styles.css";
 import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
@@ -11,8 +13,13 @@ import { UsersProvider } from "./contexts/users";
 const { Content } = Layout;
 
 const App = () => {
-    const user = {commonName: "fred"}
-    const users = [];
+
+  const dispatch = useAuthenticateDispatch()
+  const { user, users } = useAuthenticateState()
+
+  useEffect(() => {
+    actions.fetchUsers(dispatch)
+  }, [dispatch])
 
   return (
     <BrowserRouter>
@@ -21,7 +28,7 @@ const App = () => {
           <HeaderComponent user={user} users={users} />
         </UsersProvider>
         <Content>
-          <AuthenticatedRoutes />
+          <AuthenticatedRoutes user={user} users={users} />
         </Content>
       </Layout>
     </BrowserRouter>

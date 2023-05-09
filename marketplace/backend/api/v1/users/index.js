@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get(
   Users.me,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   attachMembership,
   UsersController.me
@@ -17,7 +17,7 @@ router.get(
 
 router.get(
   Users.get,
-  authHandler.authorizeRequest(), 
+  // authHandler.authorizeRequest(), 
   loadDapp, 
   attachMembership,
   UsersController.get
@@ -25,7 +25,7 @@ router.get(
 
 router.get(
   Users.getAll,
-  authHandler.authorizeRequest(), 
+  // authHandler.authorizeRequest(), 
   loadDapp, 
   attachMembership,
   UsersController.getAll
