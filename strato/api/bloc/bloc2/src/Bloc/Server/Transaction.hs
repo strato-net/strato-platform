@@ -236,33 +236,28 @@ postBlocTransactionBody :: ( MonadLogger m
                              -> m [BlocTransactionBodyResult]  -- ^ Signed tx hash & raw tx data
 postBlocTransactionBody Nothing _ _ = throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
 postBlocTransactionBody _ _ (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr ttxs txParams _) = do
+postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList txParams _) = do
   addr <- case mAddr of
-    Nothing -> fmap unAddress . blocVaultWrapper $  getKey (Just jwt) Nothing
+    Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
     Just addr' -> return addr'
-  fmap join . forM (partitionWith transactionType ttxs) $ \(ttype, txs) -> case ttype of
+  fmap join . forM (partitionWith transactionType txList) $ \(ttype, txs) -> case ttype of
       TRANSFER -> do
         txs' <- mapM fromTransfer txs
-        let TransferListParameters fromAddr ts _ _ = TransferListParameters
-                    addr
-                    (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) txs')
-                    cid
-                    False
+        let ts = map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) txs'
             txsWithChainids = map (sendtransactionChainid %~ (<|> cid)) ts
-        txsWithParams <- genNonces (Don't CacheNonce) fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
+        txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams txsWithChainids
         txs'' <- mapM
           (\(SendTransaction toAddr (Strung value) params cid' md) -> do
               let header = TransactionHeader
                     (Just toAddr)
-                    fromAddr
+                    addr
                     (fromMaybe emptyTxParams params)
                     (Wei $ fromIntegral value)
                     (Code ByteString.empty)
                     cid'
-              signAndPrepare jwt fromAddr md header
-          ) txsWithParams
-        forM txs'' (\r -> return $ BlocTransactionBodyResult (txHash' r) (Just r))
-          where txHash' = transactionHash . rawTX2TX . rtPrimeToRt
+              signAndPrepare jwt addr md header) txsWithParams
+        forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
+          where hash' = transactionHash . rawTX2TX . rtPrimeToRt
       CONTRACT -> return []
                   -- let cp@ContractParameters{..} = handleContractParameters txs' txParams cid
                   -- params <- getAccountTxParams (Don't CacheNonce) fromAddr cid cp
