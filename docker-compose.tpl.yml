@@ -93,7 +93,7 @@ services:
         max-file: "3"
   marketplace-ui:
     depends_on:
-      - marketplace-ui
+      - marketplace-backend
     environment:
       - NODE_ENV=${NODE_ENV:-production}
     build: .
