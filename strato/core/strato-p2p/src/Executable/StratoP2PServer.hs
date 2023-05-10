@@ -66,7 +66,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
-          (attempt :: Maybe SomeException) <- withActivePeer p $
+          (attempt :: Maybe SomeException) <- withCertifiedPeer p . withActivePeer p $
             runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
@@ -80,6 +80,11 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                  lengthenPeerDisable p
                 e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable p
                 e' | Just NetworkIDMismatch <- fromException e' -> do
+                 udpErr <- disableUDPPeerForSeconds p 86400
+                 whenLeft udpErr $ \theUDPErr -> do
+                  $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
+                 lengthenPeerDisable p
+                e' | Just NoPeerCertificate <- fromException e' -> do
                  udpErr <- disableUDPPeerForSeconds p 86400
                  whenLeft udpErr $ \theUDPErr -> do
                   $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
