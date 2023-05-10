@@ -97,20 +97,17 @@ attemptBond = do
       case getHostAddress serverAddr of
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
-          if (pPeerLastMsg p == T.pack "Ping") then do
-            disErr <- storeDisableException p (T.pack "attemptBond")
-            whenLeft disErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to store disable exception: " ++ show err
+          when (pPeerLastMsg p == T.pack "Ping") $ do -- if we've pinged before w/o a response, wait longer before next ping
             eErr <- lengthenPeerDisable' p
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
-          else do
-            updateLastMessage (T.pack "Ping") p
-            sendPacket peerAddr $
-                  Ping 4
-                    (Endpoint hostAddress udpPort tcpPort)
-                    (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
-                              peerUdpPort
-                              (TCPPort . fromIntegral $ pPeerTcpPort p))
-                    (time+50)
+          updateLastMessage (T.pack "Ping") p
+          sendPacket peerAddr $
+                Ping 4
+                  (Endpoint hostAddress udpPort tcpPort)
+                  (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
+                            peerUdpPort
+                            (TCPPort . fromIntegral $ pPeerTcpPort p))
+                  (time+50)
 
 udpHandshakeServer :: MonadDiscovery m => Int -> m ()
 udpHandshakeServer minPeers = do
@@ -148,6 +145,10 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
         addPeer' otherUdpPort' otherTcpPort
         time <- liftIO $ round `fmap` getPOSIXTime
         sendPacket addr $ Pong ep 4 (time+50)
+        eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
+        whenLeft eErr' $ \ err -> do
+            $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+            throwM err
 
     Pong{} -> do
         let ip = sockAddrToIP addr
