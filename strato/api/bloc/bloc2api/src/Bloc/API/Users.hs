@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeOperators              #-}
 
 module Bloc.API.Users (
+    BlocTransactionBodyResult(..),
     BlocTransactionResult(..),
     BlocTransactionStatus(..),
     PostUsersFill,
@@ -64,6 +65,7 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 
 import           Blockchain.Data.TransactionResult
+import           Blockchain.Data.Json              (RawTransaction')
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -161,6 +163,11 @@ instance ToSchema BlocTransactionData where
         ex :: BlocTransactionData
         ex = Call [] -- probably make a better ToSchema example
 
+data BlocTransactionBodyResult = BlocTransactionBodyResult
+  { blocTransactionHash :: Keccak256
+  , blocTransactionRaw  :: Maybe RawTransaction'
+  } deriving (Eq, Show, Generic)
+
 data BlocTransactionResult = BlocTransactionResult
   { blocTransactionStatus   :: BlocTransactionStatus
   , blocTransactionHash     :: Keccak256
@@ -177,12 +184,23 @@ instance ToJSON BlocTransactionResult where
 instance FromJSON BlocTransactionResult where
   parseJSON = genericParseJSON (aesonDrop 15 camelCase)
 
+instance ToJSON BlocTransactionBodyResult where
+  toJSON = genericToJSON (aesonDrop 15 camelCase)
+
+instance FromJSON BlocTransactionBodyResult where
+  parseJSON = genericParseJSON (aesonDrop 15 camelCase)
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
     , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
+    }
+
+instance ToSample BlocTransactionBodyResult where
+  toSamples _ = singleSample BlocTransactionBodyResult
+    { blocTransactionHash = hash "foobarbaz"
+    , blocTransactionRaw = Nothing
     }
 
 instance ToSchema BlocTransactionResult where
@@ -197,6 +215,14 @@ instance ToSchema BlocTransactionResult where
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
+
+instance ToSchema BlocTransactionBodyResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Transaction body result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: BlocTransactionBodyResult
+      ex = BlocTransactionBodyResult (hash "foobarbaz") Nothing -- ^ TODO: replace Nothing with Something
 
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
