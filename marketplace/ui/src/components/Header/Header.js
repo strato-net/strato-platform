@@ -22,7 +22,7 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
-import { USER_ROLES } from "../../helpers/constants";
+// import { USER_ROLES } from "../../helpers/constants";
 
 const { Header } = Layout;
 
@@ -46,34 +46,34 @@ const HeaderComponent = ({ user }) => {
 
   const navItems = [
     {
-      role: USER_ROLES[1],
+      role: 0,
       items: [
         "Marketplace",
         "Orders",
         "Inventory",
         "Products",
         "Events",
-        "Admin"
+        // "Admin"
       ]
     },
     {
-      role: USER_ROLES[2],
+      role: 1,
       items: [
         "Marketplace",
-        "Orders",
-        "Inventory",
-        "Products",
-        "Events"
+        // "Orders",
+        // "Inventory",
+        // "Products",
+        // "Events"
       ]
     },
-    {
-      role: USER_ROLES[3],
-      items: []
-    },
-    {
-      role: "",
-      items: []
-    },
+    // {
+    //   role: USER_ROLES[3],
+    //   items: []
+    // },
+    // {
+    //   role: "",
+    //   items: []
+    // },
   ];
 
   const navUrls = [
@@ -101,12 +101,13 @@ const HeaderComponent = ({ user }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } else if (pathName.includes("/admin")) {
-      setSelectedTab("5");
-    }
+    } 
+    // else if (pathName.includes("/admin")) {
+    //   setSelectedTab("5");
+    // }
   }, [window.location.pathname]);
 
-  const items = user?.roles.includes(USER_ROLES[1]) ? [
+  const items = user ? [
     {
       key: '2',
       label: (
@@ -134,7 +135,7 @@ const HeaderComponent = ({ user }) => {
       label: (
         <div>
           <p>
-            {user == null ? "" : user.commonName}
+            
           </p>
           <p className="text-xs">
             {user == null ? "" : user.preferred_username}
@@ -142,24 +143,24 @@ const HeaderComponent = ({ user }) => {
         </div>
       ),
     },
-    {
-      key: '3',
-      label: (
-        <div onClick={() => { navigate(routes.ManageRole.url) }}>
-          <p>
-            Manage Role
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: '1',
-      label: (
-        <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
-          Logout
-        </div>
-      ),
-    },
+    // {
+    //   key: '3',
+    //   label: (
+    //     <div onClick={() => { navigate(routes.ManageRole.url) }}>
+    //       <p>
+    //         Manage Role
+    //       </p>
+    //     </div>
+    //   ),
+    // },
+    // {
+    //   key: '1',
+    //   label: (
+    //     <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
+    //       Logout
+    //     </div>
+    //   ),
+    // },
   ];
 
   useEffect(() => {
@@ -175,11 +176,11 @@ const HeaderComponent = ({ user }) => {
   }, [user])
 
   useEffect(() => {
-    if (user?.roles.includes(USER_ROLES[1])) setRoleIndex(0)
-    else if (user?.roles.length === 1 && user?.roles.includes(USER_ROLES[3])) setRoleIndex(2)
+    if ( user ) setRoleIndex(0)
+    else setRoleIndex(1)
     // else if (user?.roles.includes("Trading Entity")) setRoleIndex(0)
-    else if (user?.roles.length === 0) setRoleIndex(3);
-    else if (user?.roles) setRoleIndex(1)
+    // else if (user?.roles.length === 0) setRoleIndex(3);
+    // else if (user?.roles) setRoleIndex(1)
 
   }, [user])
 
@@ -188,13 +189,11 @@ const HeaderComponent = ({ user }) => {
       <Space>
         <div
           className="mt-6 cursor-pointer"
-          onClick={() => {
-            if (roleIndex !== 2 && roleIndex !== 3) navigate(routes.Marketplace.url)
-          }}
+          onClick={() => { navigate(routes.Marketplace.url) }}
         >
           <Image src={Images.logo} width={35} preview={false} />
         </div>
-        {roleIndex === undefined || roleIndex === 2 || roleIndex === 3 ? null : <div className="ml-7 w-72">
+        {roleIndex === undefined || roleIndex === 1 ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -223,7 +222,7 @@ const HeaderComponent = ({ user }) => {
         })}
       </Menu>
       <Space size="large">
-        {roleIndex === undefined || roleIndex === 2 || roleIndex === 3 ? null : <Badge
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
           onClick={() => navigate("/marketplace/checkout")}
