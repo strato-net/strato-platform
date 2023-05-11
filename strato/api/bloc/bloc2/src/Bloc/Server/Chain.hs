@@ -265,14 +265,13 @@ waitForChainInfos chainIds = waitFor go
 getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
                 ChainId -> m ChainIdChainOutput
 
-getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing
+getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing Nothing
 
 
 getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>
-                [ChainId] -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
-getChainInfo chainIds lim off = do
-  chainIdChainInfos <- getChain chainIds lim off
-  return $ map convertChainInfo chainIdChainInfos
+                [ChainId] -> Maybe Text -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
+getChainInfo chainIds mChainLabel lim off = --do
+  (getChain  chainIds mChainLabel lim off) >>= (\chainIdChainInfos -> return $ map convertChainInfo chainIdChainInfos)
     where
       convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
