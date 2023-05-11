@@ -197,6 +197,8 @@ stratoP2PClient runner = runner $ \_ -> do
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                    e' | Just NoPeerCertificate <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "NoPeerCertificate")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr

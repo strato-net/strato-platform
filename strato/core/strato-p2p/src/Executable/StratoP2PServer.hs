@@ -100,6 +100,8 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                   whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                   lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                 e' | Just NoPeerCertificate <- fromException e' -> do
+                 disErr <- storeDisableException p (T.pack "NoPeerCertificate")
+                 whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                  udpErr <- disableUDPPeerForSeconds p 86400
                  whenLeft udpErr $ \theUDPErr -> do
                   $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
