@@ -73,6 +73,8 @@ class ProductController {
       const result = await dapp.createProduct(body)
       rest.response.status200(res, result)
 
+      console.log("*Seller added product*");
+
       return next()
     } catch (e) {
       return next(e)

@@ -59,6 +59,8 @@ class OrderController {
       const result = await dapp.createOrder(body)
       rest.response.status200(res, result)
 
+      console.log("*Buyer placed order*");
+
       return next()
     } catch (e) {
       return next(e)

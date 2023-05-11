@@ -56,6 +56,8 @@ class UserMembershipController {
 
       rest.response.status201(res, result)
 
+      console.log("*User added by admin*");
+
       return next()
     } catch (e) {
       return next(e)
@@ -130,6 +132,9 @@ class UserMembershipController {
       const result = await dapp.updateUserMembershipRequest(body, options)
 
       rest.response.status200(res, result)
+
+      console.log("*User membership request updated*");
+
       return next()
     } catch (e) {
       return next(e)
