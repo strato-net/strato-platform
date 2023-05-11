@@ -3,7 +3,7 @@ import InventoryController from "./inventory.controller";
 import { Inventory } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
-import attachMembership from "../../middleware/loadMembership";
+// import attachMembership from "../../middleware/loadMembership";
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.get(
   Inventory.get,
   // authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   InventoryController.get
 );
 
@@ -19,7 +19,7 @@ router.get(
   Inventory.getAll,
   // authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   InventoryController.getAll
 );
 
@@ -27,7 +27,7 @@ router.post(
   Inventory.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   InventoryController.create
 );
 
@@ -42,7 +42,7 @@ router.put(
   Inventory.update,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   InventoryController.update
 )
 

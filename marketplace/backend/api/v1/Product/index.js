@@ -3,7 +3,7 @@ import ProductController from "./product.controller";
 import { Product } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
-import attachMembership from "../../middleware/loadMembership";
+// import attachMembership from "../../middleware/loadMembership";
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.get(
   Product.get,
   // authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   ProductController.get
 );
 
@@ -19,7 +19,7 @@ router.get(
   Product.getAll,
   // authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   ProductController.getAll
 );
 
@@ -34,7 +34,7 @@ router.post(
   Product.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   ProductController.create
 );
 
@@ -49,7 +49,7 @@ router.put(
   Product.update,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   ProductController.update
 )
 
@@ -57,7 +57,7 @@ router.put(
   Product.delete,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   ProductController.delete
 )
 

@@ -448,7 +448,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.Admin.url}
         element={
@@ -458,8 +458,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </RolesProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.SelectRole.url}
         element={
@@ -469,8 +469,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </RolesProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.ManageRole.url}
         element={
@@ -480,8 +480,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </RolesProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.WaitingApproval.url}
         element={
@@ -489,34 +489,34 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <WaitingApproval user={user} users={users} />
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         path="/"
         element={<Navigate
-          to={navigateUrlUserOnboarding(user)}
+          to={"/marketplace"}
           replace />}
       />
       <Route
         path="*"
         element={<Navigate
-          to={navigateUrlUserOnboarding(user)}
+          to={"/marketplace"}
           replace />}
       />
     </Routes>
   );
 };
 
-const navigateUrlUserOnboarding = (user) => {
-  if (user?.roles.length === 0 && user.pendingMembershipRequests.length !== 0) {
-    return routes.WaitingApproval.url;
-  } else if (user?.roles.length === 0) {
-    return routes.SelectRole.url;
-  } else if (user?.roles.includes(USER_ROLES["3"]) && user?.roles.length === 1) {
-    return routes.Certifier.url;
-  } else {
-    return routes.Marketplace.url;
-  }
-}
+// const navigateUrlUserOnboarding = (user) => {
+//   if (user?.roles.length === 0 && user.pendingMembershipRequests.length !== 0) {
+//     return routes.WaitingApproval.url;
+//   } else if (user?.roles.length === 0) {
+//     return routes.SelectRole.url;
+//   } else if (user?.roles.includes(USER_ROLES["3"]) && user?.roles.length === 1) {
+//     return routes.Certifier.url;
+//   } else {
+//     return routes.Marketplace.url;
+//   }
+// }
 
 
 export default AuthenticatedRoutes;
