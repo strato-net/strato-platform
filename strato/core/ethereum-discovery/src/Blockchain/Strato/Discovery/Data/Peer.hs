@@ -66,6 +66,7 @@ PPeer
     bondState Int
     activeState Int
     version T.Text
+    disableException T.Text
     nextDisableWindowSeconds Int default=5
     nextUdpDisableWindowSeconds Int default=5
     disableExpiration UTCTime default=now()
@@ -215,6 +216,12 @@ instance A.Replaceable PPeer PeerUdpDisable IO where
                                  , PPeerDisableExpiration SQL.=. currentTime
                                  ]
 
+instance A.Replaceable PPeer T.Text IO where
+  replace _ peer' exception = withGlobalSQLPool $ \sqldb -> do
+    let peer = peer'{pPeerTcpPort=30303}
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+
 instance A.Replaceable T.Text PPeer IO where
   replace _ message peer = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
@@ -250,6 +257,7 @@ buildPeerPoint (pubkeyMaybe, ip, _) =
         pPeerBondState=0,
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix
+        pPeerDisableException = T.pack "None",
         pPeerNextDisableWindowSeconds = 5,
         pPeerNextUdpDisableWindowSeconds = 5,
         pPeerDisableExpiration = jamshidBirth,
@@ -359,6 +367,12 @@ lengthenPeerDisable' peer' = try $ do
                   then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer) `addUTCTime` currentTime) 2
                   else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerUdpDisable) peer disable
+
+storeDisableException :: (MonadUnliftIO m, A.Replaceable PPeer T.Text m)
+                      => PPeer -> T.Text -> m (Either SomeException ())
+storeDisableException peer' e = try $ do
+  let peer = peer'{pPeerTcpPort=30303}
+  A.replace (A.Proxy) peer e               
 
 -- TODO: Allow an empty public key in the Enode type
 peerToEnode :: PPeer -> Maybe Enode

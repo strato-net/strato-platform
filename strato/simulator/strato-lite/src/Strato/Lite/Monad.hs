@@ -1102,6 +1102,10 @@ instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadT
 instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
+instance MonadIO m => A.Replaceable PPeer T.Text (MonadTest m) where
+  replace _ peer' e = do
+    stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerDisableException = e})
+
 instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
   replace _ peer' d = case d of
     ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
@@ -1110,6 +1114,9 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
       stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
 
 instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance (Monad m, A.Replaceable PPeer T.Text m) => A.Replaceable PPeer T.Text (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where
