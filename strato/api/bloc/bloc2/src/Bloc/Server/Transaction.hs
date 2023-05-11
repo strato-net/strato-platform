@@ -261,7 +261,6 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                     cid'
               signAndPrepare jwt addr md header) txsWithParams
         forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
-          where hash' = transactionHash . rawTX2TX . rtPrimeToRt
       CONTRACT -> do
         ps <- mapM fromContract txs
         let srcMap :: ContractPayload -> Maybe SourceMap
@@ -306,7 +305,6 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                   (Code $ Text.encodeUtf8 $ serializeSourceMap src)
                   cid'
             return $ BlocTransactionBodyResult (hash' tx) (Just tx)
-              where hash' = transactionHash . rawTX2TX . rtPrimeToRt
       FUNCTION -> do
         p <- mapM fromFunction txs
         let mapMethodCalls = map (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
@@ -348,9 +346,9 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 (Code $ sel <> argsBin)
                 _methodcallChainid
             return $ BlocTransactionBodyResult (hash' tx) (Just tx)
-              where hash' = transactionHash . rawTX2TX . rtPrimeToRt
-      GENESIS -> return []
-  where fromTransfer = \case
+      GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
+  where hash' = transactionHash . rawTX2TX . rtPrimeToRt
+        fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
         fromContract = \case
@@ -359,11 +357,6 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
         fromFunction = \case
           BlocFunction f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
-{-        fromGenesis = \case
-          BlocGenesis f -> return f
-          _ -> throwIO $ UserError "Could not decode function arguments from body"
-       hash' = transactionHash . rawTX2TX . rtPrimeToRt
--}
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
