@@ -699,13 +699,10 @@ withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
 
-withCertifiedPeer :: ( MonadIO m
-                     , A.Selectable Address X509CertInfoState m
+withCertifiedPeer :: ( Monad m
                      )
                   => PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer p f = getPeerX509 p >>= \case
-  Just x | isValid x -> f
-  _ -> pure . Just $ toException NoPeerCertificate
+withCertifiedPeer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
