@@ -84,7 +84,7 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
     let pStr = pPeerString peer -- display string will show up as dns name
-    attempt :: Maybe SomeException <- withActivePeer peer $
+    attempt :: Maybe SomeException <- withCertifiedPeer peer . withActivePeer peer $
       runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
                           (c ^. peerSource)
                           (c ^. peerSink)
@@ -196,6 +196,11 @@ stratoP2PClient runner = runner $ \_ -> do
                     disErr <- storeDisableException thePeer (T.pack "TimeoutException")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
+                   e' | Just NoPeerCertificate <- fromException e' -> do
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    lengthenPeerDisable thePeer
                    e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do

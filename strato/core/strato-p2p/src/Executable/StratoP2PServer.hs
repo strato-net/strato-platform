@@ -66,7 +66,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
-          (attempt :: Maybe SomeException) <- withActivePeer p $
+          (attempt :: Maybe SomeException) <- withCertifiedPeer p . withActivePeer p $
             runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
@@ -99,6 +99,11 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                   disErr <- storeDisableException p (T.pack "TimeoutException")
                   whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                   lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                e' | Just NoPeerCertificate <- fromException e' -> do
+                 udpErr <- disableUDPPeerForSeconds p 86400
+                 whenLeft udpErr $ \theUDPErr -> do
+                  $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
+                 lengthenPeerDisable p
                 e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                  case ioErrType of
                    NoSuchThing -> do

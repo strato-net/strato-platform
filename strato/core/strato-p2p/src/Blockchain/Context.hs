@@ -64,6 +64,7 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , withCertifiedPeer
     , getPeerX509
     , getMyX509
     , getPeerByParsedSet
@@ -75,6 +76,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
+import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
@@ -109,6 +111,7 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
@@ -695,6 +698,14 @@ withActivePeer :: ( MonadUnliftIO m
 withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
+
+withCertifiedPeer :: ( MonadIO m
+                     , A.Selectable Address X509CertInfoState m
+                     )
+                  => PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeer p f = getPeerX509 p >>= \case
+  Just x | isValid x -> f
+  _ -> pure . Just $ toException NoPeerCertificate
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
