@@ -227,16 +227,20 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
 
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody :: ( MonadLogger m
+                           -- , A.Selectable Account ContractDetails m
+                           , A.Selectable Account AddressState m
+                           , (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocEnv m
+                           , HasBlocSQL m
                            , HasSQL m
                            , HasVault m
                            ) => Maybe Text                     -- ^ jwt
                              -> Maybe ChainId                  -- ^ shard id
                              -> PostBlocTransactionRequest     -- ^ SolidVM transactions
-                             -> m [BlocTransactionBodyResult]  -- ^ Signed tx hash & raw tx data
+                             -> m [BlocTransactionBodyResult]  -- ^ tx hash & raw tx data
 postBlocTransactionBody Nothing _ _ = throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
 postBlocTransactionBody _ _ (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList txParams _) = do
+postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
   addr <- case mAddr of
     Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
     Just addr' -> return addr'
@@ -258,38 +262,67 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               signAndPrepare jwt addr md header) txsWithParams
         forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
           where hash' = transactionHash . rawTX2TX . rtPrimeToRt
-      CONTRACT -> return []
-                  -- let cp@ContractParameters{..} = handleContractParameters txs' txParams cid
-                  -- params <- getAccountTxParams (Don't CacheNonce) fromAddr cid cp
-                  -- signAndPrepare jwt fromAddress metadata $
-                      -- TransactionHeader
-                        -- (Just toAddress)
-                        -- fromAddress
-                        -- params
-                        -- (Wei (fromIntegral $ unStrung value))
-                        -- (Code ByteString.empty)
-                        -- chainId
+      CONTRACT -> do
+        ps <- mapM fromContract txs
+        let srcMap :: ContractPayload -> Maybe SourceMap
+            srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+            src' :: ContractPayload -> Maybe SourceMap
+            src' p = if contractpayloadSrc p == mempty
+                        then Nothing
+                        else Just $ contractpayloadSrc p
+            getSrc p = fromMaybe mempty $ src' p <|> srcMap p
+            mapUploadList = map (\p@(ContractPayload _ c a v x cid' m) -> do
+                            let cn = fromMaybe "unnamed_contract" c
+                            UploadListContract (fromJust c)
+                                                (getSrc p)
+                                                (fromMaybe Map.empty a)
+                                                (mergeTxParams x txParams)
+                                                v
+                                                cid'
+                                                (case m of
+                                                  Nothing -> Just $ Map.singleton "history" cn
+                                                  Just h -> Just $ Map.insert "history" cn h))
+                                                ps
+            bclp = ContractListParameters addr mapUploadList cid False
+            contracts' = map (uploadlistcontractChainid %~ (<|> cid)) (contracts bclp)
+        txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams contracts'
+        forStateT Map.empty txsWithParams $
+          \(UploadListContract name srcs args params value cid' md) -> do
+            (src, xabi) <- do
+              cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+                Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+                Just x -> pure x
+              at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
+
+            let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+            (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
+
+            let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+            tx <- lift . signAndPrepare jwt addr metadata' $
+                TransactionHeader
+                  Nothing
+                  addr
+                  (fromMaybe emptyTxParams params)
+                  (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                  (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                  cid'
+            return $ BlocTransactionBodyResult (hash' tx) (Just tx)
+              where hash' = transactionHash . rawTX2TX . rtPrimeToRt
       FUNCTION -> return []
       GENESIS  -> return []
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
-{-        fromContract = \case
+        fromContract = \case
           BlocContract c -> return c
           _ -> throwIO $ UserError "Could not decode contract arguments from body"
-        fromFunction = \case
+{-      fromFunction = \case
           BlocFunction f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
         fromGenesis = \case
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
-        src' :: ContractPayload -> Maybe SourceMap
-        src' p = if contractpayloadSrc p == mempty
-                    then Nothing
-                    else Just $ contractpayloadSrc p
-        srcMap :: ContractPayload -> Maybe SourceMap
-        srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
-        getSrc p = fromMaybe mempty $ src' p <|> srcMap p
+       hash' = transactionHash . rawTX2TX . rtPrimeToRt
 -}
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
