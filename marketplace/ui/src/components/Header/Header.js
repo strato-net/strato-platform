@@ -13,7 +13,7 @@ import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import { Wallet } from "../../images/SVGComponents";
 import "./header.css";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
@@ -26,7 +26,7 @@ import { useAuthenticateDispatch } from "../../contexts/authentication";
 
 const { Header } = Layout;
 
-const HeaderComponent = ({ user }) => {
+const HeaderComponent = ({ user, loginUrl }) => {
   const navigate = useNavigate();
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
@@ -53,6 +53,7 @@ const HeaderComponent = ({ user }) => {
         "Inventory",
         "Products",
         "Events",
+        // No more admin user role
         // "Admin"
       ]
     },
@@ -60,6 +61,7 @@ const HeaderComponent = ({ user }) => {
       role: 1,
       items: [
         "Marketplace",
+        // Public users should not have access to these routes
         // "Orders",
         // "Inventory",
         // "Products",
@@ -101,7 +103,7 @@ const HeaderComponent = ({ user }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } 
+    }
     // else if (pathName.includes("/admin")) {
     //   setSelectedTab("5");
     // }
@@ -133,14 +135,7 @@ const HeaderComponent = ({ user }) => {
     {
       key: '2',
       label: (
-        <div>
-          <p>
-            
-          </p>
-          <p className="text-xs">
-            {user == null ? "" : user.preferred_username}
-          </p>
-        </div>
+        <Link to={loginUrl}> Login </Link>
       ),
     },
     // {
@@ -176,7 +171,7 @@ const HeaderComponent = ({ user }) => {
   }, [user])
 
   useEffect(() => {
-    if ( user ) setRoleIndex(0)
+    if (user) setRoleIndex(0)
     else setRoleIndex(1)
     // else if (user?.roles.includes("Trading Entity")) setRoleIndex(0)
     // else if (user?.roles.length === 0) setRoleIndex(3);
@@ -235,11 +230,16 @@ const HeaderComponent = ({ user }) => {
           />
         </Badge>
         }
-        <Dropdown  menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-          <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
-            {initials}
-          </a>
-        </Dropdown>
+        {
+          roleIndex === undefined || roleIndex === 1 ? (
+            loginUrl ? <Link to={loginUrl} className="text-base text-white"> Login / Register </Link> : null
+          ) :
+            <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
+                {initials}
+              </a>
+            </Dropdown>
+        }
       </Space>
     </Header>
   );

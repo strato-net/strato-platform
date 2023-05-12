@@ -15,7 +15,8 @@ const { Content } = Layout;
 const App = () => {
 
   const dispatch = useAuthenticateDispatch()
-  const { user, users } = useAuthenticateState()
+  const { user, users, loginUrl } = useAuthenticateState()
+  console.log('loginUrl', loginUrl)
 
   useEffect(() => {
     actions.fetchUsers(dispatch)
@@ -25,7 +26,7 @@ const App = () => {
     <BrowserRouter>
       <Layout>
         <UsersProvider>
-          <HeaderComponent user={user} users={users} />
+          <HeaderComponent user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />
