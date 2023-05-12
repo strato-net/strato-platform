@@ -249,6 +249,7 @@ main = do
           evmCompatible= flags_evmCompatible,
           txSizeLimit = flags_txSizeLimit,
           accountNonceLimit = flags_accountNonceLimit,
+          gasLimit = flags_gasLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue

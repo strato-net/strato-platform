@@ -85,6 +85,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Gas           (Gas (..))
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
@@ -428,7 +429,7 @@ runChainConstructors cId cInfo = do
             ""
             0
             0 --block number
-            100000000000
+            (toInteger flags_gasLimit)
             0
             (bSumTimestamp curBlockSummary)
             ""
@@ -441,7 +442,7 @@ runChainConstructors cId cInfo = do
          0 --value
          1 --gasPrice
          ""
-         1000000000000 --availableGas
+         (Gas $ toInteger flags_gasLimit) --availableGas
          sender
          (Keccak256.unsafeCreateKeccak256FromWord256 0)
          (Just cId)

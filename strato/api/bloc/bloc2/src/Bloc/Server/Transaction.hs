@@ -809,14 +809,14 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
     getResultAndRespond [txHash] resolve
 
 
-prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
-prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
+prepareUnsignedTx :: Integer -> TransactionHeader -> UnsignedTransaction
+prepareUnsignedTx gasLimit TransactionHeader{..} = UnsignedTransaction
   { unsignedTransactionNonce =
       fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
   , unsignedTransactionGasPrice =
       fromMaybe (Wei 1) (txparamsGasPrice transactionheaderTxParams)
   , unsignedTransactionGasLimit =
-      fromMaybe (Gas 100000000) (txparamsGasLimit transactionheaderTxParams)
+      fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams)
   , unsignedTransactionTo = transactionheaderToAddr
   , unsignedTransactionValue = transactionheaderValue
   , unsignedTransactionInitOrData = transactionheaderCode
@@ -862,12 +862,13 @@ preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t{transactionMetadata = m}
 
-signAndPrepare :: (MonadIO m, MonadLogger m, HasVault m) =>
+signAndPrepare :: (MonadIO m, MonadLogger m, HasVault m, HasBlocEnv m) =>
                   Text -> Address -> Maybe (Map Text Text) -> TransactionHeader -> m RawTransaction'
 signAndPrepare jwtToken from md th = do
   let sign' = callSignature jwtToken
+  gasLimit <- fmap gasLimit getBlocEnv 
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from . addMetadata md) . sign' $ prepareUnsignedTx th
+  fmap (preparePostTx time from . addMetadata md) . sign' $ prepareUnsignedTx gasLimit th
 
 
 constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
