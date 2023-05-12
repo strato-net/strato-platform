@@ -1,5 +1,6 @@
 import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { checkAuthorization } from "../../helpers/authorization";
 
 const actionDescriptors = {
   createInventory: "create_inventory",
@@ -248,6 +249,8 @@ const actions = {
       });
 
       const body = await response.json();
+
+      checkAuthorization(response, body)
 
       if (response.status === RestStatus.OK) {
         dispatch({
