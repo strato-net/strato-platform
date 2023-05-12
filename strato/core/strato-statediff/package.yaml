@@ -15,6 +15,7 @@ library:
     - common-log
     - conduit
     - containers
+    - deepseq
     - ethereum-rlp
     - format
     - lens

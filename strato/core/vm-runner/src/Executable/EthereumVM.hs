@@ -106,7 +106,7 @@ import           Text.Tools
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
-    deployActorThatCommitsSqlDiffs
+    deployCommitsSqlDiffs -- Runs a thread to proccess all OutStateDiff
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
@@ -753,23 +753,23 @@ getUnprocessedKafkaEvents offset = do
     return ret'
 
 -- This function lives on its own thread
-checkQueueForever ::  ContextM ()
-checkQueueForever =   do
+checkQueueAndCommitsSqlDiffsForever ::  ContextM ()
+checkQueueAndCommitsSqlDiffsForever =   do
   context' <- ask
   let que = _stateDiffQueue context'
   !bool' <- liftIO (atomically $ isEmptyTQueue que) 
   (if bool'
-    then (void . liftIO $ threadDelay 500) >> checkQueueForever
+    then (void . liftIO $ threadDelay 50) 
     else
       do 
           !stateDiff' <- dequeue que
           (commitSqlDiffs stateDiff')
-          checkQueueForever)
+          ) >> checkQueueAndCommitsSqlDiffsForever
 
-deployActorThatCommitsSqlDiffs :: ContextM ()
-deployActorThatCommitsSqlDiffs = do
+deployCommitsSqlDiffs :: ContextM ()
+deployCommitsSqlDiffs = do
   context' <- ask
-  !_ <- liftIO $ forkIO $ runNoLoggingT . runResourceT .  flip   runReaderT context' $ do  checkQueueForever 
+  !_ <- liftIO $ forkIO $ runNoLoggingT . runResourceT .  flip   runReaderT context' $ do  checkQueueAndCommitsSqlDiffsForever 
   return ()
 
 -- Add an element to the end of the queue
