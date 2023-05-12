@@ -15,6 +15,7 @@
 module Bloc.Server.Transaction (
   postBlocTransaction,
   postBlocTransactionRaw,
+  postBlocTransactionBody,
   postBlocTransactionParallel,
   ) where
 
@@ -225,8 +226,138 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
                   }
         _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
 
+-- | postBlocTransactionBody(jwt, chain ID, [Transactions])
+postBlocTransactionBody :: ( MonadLogger m
+                           , A.Selectable Account ContractDetails m
+                           , A.Selectable Account AddressState m
+                           , (Keccak256 `A.Alters` SourceMap) m
+                           , HasBlocEnv m
+                           , HasBlocSQL m
+                           , HasSQL m
+                           , HasVault m
+                           ) => Maybe Text                     -- ^ jwt
+                             -> Maybe ChainId                  -- ^ shard id
+                             -> PostBlocTransactionRequest     -- ^ SolidVM transactions
+                             -> m [BlocTransactionBodyResult]  -- ^ tx hash & raw tx data
+postBlocTransactionBody Nothing _ _ = throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+postBlocTransactionBody _ _ (PostBlocTransactionRequest _ [] _ _) = return []
+postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+  addr <- case mAddr of
+    Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
+    Just addr' -> return addr'
+  fmap join . forM (partitionWith transactionType txList) $ \(ttype, txs) -> case ttype of
+      TRANSFER -> do
+        txs' <- mapM fromTransfer txs
+        let ts = map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) txs'
+            txsWithChainids = map (sendtransactionChainid %~ (<|> cid)) ts
+        txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams txsWithChainids
+        txs'' <- mapM
+          (\(SendTransaction toAddr (Strung value) params cid' md) -> do
+              let header = TransactionHeader
+                    (Just toAddr)
+                    addr
+                    (fromMaybe emptyTxParams params)
+                    (Wei $ fromIntegral value)
+                    (Code ByteString.empty)
+                    cid'
+              signAndPrepare jwt addr md header) txsWithParams
+        forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
+      CONTRACT -> do
+        ps <- mapM fromContract txs
+        let srcMap :: ContractPayload -> Maybe SourceMap
+            srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+            src' :: ContractPayload -> Maybe SourceMap
+            src' p = if contractpayloadSrc p == mempty
+                        then Nothing
+                        else Just $ contractpayloadSrc p
+            getSrc p = fromMaybe mempty $ src' p <|> srcMap p
+            mapUploadList = map (\p@(ContractPayload _ c a v x cid' m) -> do
+                            let cn = fromMaybe "unnamed_contract" c
+                            UploadListContract (fromJust c)
+                                                (getSrc p)
+                                                (fromMaybe Map.empty a)
+                                                (mergeTxParams x txParams)
+                                                v
+                                                cid'
+                                                (case m of
+                                                  Nothing -> Just $ Map.singleton "history" cn
+                                                  Just h -> Just $ Map.insert "history" cn h))
+                                                ps
+            contracts' = map (uploadlistcontractChainid %~ (<|> cid)) mapUploadList
+        txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams contracts'
+        forStateT Map.empty txsWithParams $
+          \(UploadListContract name srcs args params value cid' md) -> do
+            (src, xabi) <- do
+              cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+                Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+                Just x -> pure x
+              at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
 
+            let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+            (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
+            let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+            tx <- lift . signAndPrepare jwt addr metadata' $
+                TransactionHeader
+                  Nothing
+                  addr
+                  (fromMaybe emptyTxParams params)
+                  (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                  (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                  cid'
+            return $ BlocTransactionBodyResult (hash' tx) (Just tx)
+      FUNCTION -> do
+        p <- mapM fromFunction txs
+        let mapMethodCalls = map (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+            txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
+        txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
+        forStateT Map.empty txsWithParams $
+          \MethodCall{..} -> do
+            let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+            mXabi <- use $ at theAccount
+            xabi <- case mXabi of
+              Just x -> pure x
+              Nothing -> do
+                mXabi' <- lift $ fmap contractdetailsXabi <$> A.select (A.Proxy @ContractDetails) theAccount
+                x <- case mXabi' of
+                  Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                  Just x -> pure x
+                at theAccount <?= x
+            contract' <- case xAbiToContract xabi of
+              Left err -> throwIO . AnError $ Text.pack err
+              Right c -> return c
+            let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
+            sel <-
+              case maybeFunc of
+              Just (_, TypeFunction selector _ _) -> return selector
+              _ -> lift $ throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+            let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
+            (argsBin, argsAsSource) <-
+              lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+            let methodcallMetadataWithCallInfo = Just $
+                  Map.insert "funcName" methodcallMethodName
+                  $ Map.insert "args" argsAsSource
+                  $ fromMaybe Map.empty methodcallMetadata
+            tx <- lift . signAndPrepare jwt addr methodcallMetadataWithCallInfo $
+              TransactionHeader
+                (Just methodcallContractAddress)
+                addr
+                (fromMaybe emptyTxParams _methodcallTxParams)
+                (Wei (fromIntegral $ unStrung methodcallValue))
+                (Code $ sel <> argsBin)
+                _methodcallChainid
+            return $ BlocTransactionBodyResult (hash' tx) (Just tx)
+      GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
+  where hash' = transactionHash . rawTX2TX . rtPrimeToRt
+        fromTransfer = \case
+          BlocTransfer t -> return t
+          _ -> throwIO $ UserError "Could not decode transfer arguments from body"
+        fromContract = \case
+          BlocContract c -> return c
+          _ -> throwIO $ UserError "Could not decode contract arguments from body"
+        fromFunction = \case
+          BlocFunction f -> return f
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
@@ -346,11 +477,10 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
-                        {-
-                          History tables are always enabled
-                          'contractpayloadContract p' should always return a name but in the case that it doesn't
-                            it will go in the history table unnamed
-                        -}
+
+                        -- | History tables are always enabled. 'contractpayloadContract p' should
+                        -- always return a name but in the case that it doesn't it will go in the
+                        -- history table unnamed.
                         (case md of
                           Nothing -> Just $ Map.singleton "history" cn
                           Just m -> Just $ Map.insert "history" cn m)

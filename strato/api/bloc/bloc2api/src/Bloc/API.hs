@@ -62,6 +62,7 @@ type BlocAPI =
   -- /transaction endpoints
   :<|> PostBlocTransactionParallel
   :<|> PostBlocTransactionRaw
+  :<|> PostBlocTransactionBody
   :<|> PostBlocTransaction
 
 --Unsure what this will break if anything but remove later
