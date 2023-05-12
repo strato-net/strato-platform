@@ -18,6 +18,7 @@ dependencies:
   - milena-tools
   - strato-conf
   - strato-model
+  - strato-statediff
 
 library:
   source-dirs: src/

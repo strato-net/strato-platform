@@ -18,10 +18,14 @@ module Executable.EthereumVM (
 import           Conduit
 import           Control.Applicative                   ((<|>))
 import           Control.Arrow                         ((&&&), (***))
+import           Control.Concurrent                    hiding (yield)
+
+import           Control.Concurrent.STM                (TQueue, atomically, readTQueue, isEmptyTQueue, writeTQueue)
 import           Control.Lens                          hiding (Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader                  (ask, runReaderT)           
 import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import qualified Data.ByteString                       as BS
@@ -102,6 +106,7 @@ import           Text.Tools
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
+    deployActorThatCommitsSqlDiffs
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
@@ -578,7 +583,10 @@ sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
   void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
+sendOutEvent (OutStateDiff diff) = lift $ do
+  contx <- ask
+  !_ <- liftIO $ enqueue (_stateDiffQueue contx) diff
+  return ()
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
 sendOutEvent (OutTXR tr) = yield tr
@@ -743,3 +751,30 @@ getUnprocessedKafkaEvents offset = do
 
         !ret' = eventLimit . countLimit $ ret
     return ret'
+
+-- This function lives on its own thread
+checkQueueForever ::  ContextM ()
+checkQueueForever =   do
+  context' <- ask
+  let que = _stateDiffQueue context'
+  !bool' <- liftIO (atomically $ isEmptyTQueue que) 
+  (if bool'
+    then (void . liftIO $ threadDelay 500) >> checkQueueForever
+    else
+      do 
+          !stateDiff' <- dequeue que
+          (commitSqlDiffs stateDiff')
+          checkQueueForever)
+
+deployActorThatCommitsSqlDiffs :: ContextM ()
+deployActorThatCommitsSqlDiffs = do
+  context' <- ask
+  !_ <- liftIO $ forkIO $ runNoLoggingT . runResourceT .  flip   runReaderT context' $ do  checkQueueForever 
+  return ()
+
+-- Add an element to the end of the queue
+enqueue :: TQueue a -> a -> IO ()
+enqueue queue item = atomically $ writeTQueue queue item
+
+dequeue ::MonadIO m => TQueue a -> m a
+dequeue queue = liftIO $ atomically $ readTQueue queue

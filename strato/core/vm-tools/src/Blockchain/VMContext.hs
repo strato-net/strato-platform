@@ -51,6 +51,7 @@ module Blockchain.VMContext
     , debugSettings
     , dbs
     , state
+    , stateDiffQueue
     , contextGet
     , contextGets
     , contextPut
@@ -128,6 +129,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Strato.StateDiff        (StateDiff)
 import           Blockchain.Data.RLP
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VM.SolidException
@@ -211,9 +213,10 @@ instance Default ContextState where
     }
 
 data Context = Context
-  { _dbs   :: ContextDBs
-  , _state :: IORef ContextState
-  } deriving (Generic, NFData)
+  { _dbs            :: ContextDBs
+  , _state          :: IORef ContextState
+  , _stateDiffQueue :: (TQueue StateDiff)
+  } deriving (Generic)
 makeLenses ''Context
 
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
@@ -578,10 +581,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
             }
-
+      que <- newTQueueIO 
       let ctx = Context
             { _dbs   = cdbs
             , _state = cstate
+            , _stateDiffQueue = que
             }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
@@ -625,10 +629,11 @@ runContextM dSettings f = do
                          & txRunResultsCache .~ cache
                          & debugSettings .~ dSettings
                          & hasBlockstanbul .~ flags_blockstanbul
-
+      que <- newTQueueIO
       let ctx = Context
             { _dbs   = cdbs
             , _state = cstate
+            , _stateDiffQueue = que
             }
       a <- runReaderT f ctx
       cstate' <- readIORef cstate
