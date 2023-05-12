@@ -125,7 +125,7 @@ instance Mod.Accessible AvailablePeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- liftIO getCurrentTime
     fmap (AvailablePeers . map SQL.entityVal) $ flip runSqlPool sqldb $
-      SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
+      SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 instance (A.Replaceable (IPAsText, TCPPort) ActivityState) IO where
   replace _ (IPAsText ip, TCPPort port) state = withGlobalSQLPool . runSqlPool $ do

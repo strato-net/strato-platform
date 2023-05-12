@@ -203,7 +203,7 @@ handleEvents peer = awaitForever $ \case
                              then num - fromIntegral max'
                              else 1
           mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-          let count = (1 + skip') * min mrh (fromIntegral num)
+          let count = (1 + skip') * min mrh (fromIntegral max')
           chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
           yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 
