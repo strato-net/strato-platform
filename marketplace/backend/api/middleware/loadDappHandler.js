@@ -22,7 +22,10 @@ const loadDapp = async (req, res, next) => {
     const serviceUserToken = await oauthHelper.getServiceToken()
     const deploy = app.get(constants.deployParamName)
 
-    req.dapp = await dappJs.bind({ token: serviceUserToken }, deploy.dapp.contract, options)
+    req.dapp = await dappJs.bind({ token: serviceUserToken }, deploy.dapp.contract, {
+      chainIds: [deploy.dapp.contract.appChainId],
+      ...options
+    })
 
     return next()
 
