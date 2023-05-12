@@ -139,7 +139,7 @@ stratoP2PClient runner = runner $ \_ -> do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    ePeers <- getAvailablePeers
+    ePeers <- getBondedPeers
     case ePeers of
       Left err -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
