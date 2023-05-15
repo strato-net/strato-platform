@@ -67,14 +67,14 @@ pipeline {
           // TODO: run node on https (also update check_availability function)
           // sh 'INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)'
 
-          def INSTANCEID = sh(
+          def INSTANCE_ID = sh(
             returnStdout: true,
-            script: 'curl http://169.254.169.254/latest/meta-data/instance-id'
+            script: "curl http://169.254.169.254/latest/meta-data/instance-id"
           ).trim()
 
           def SERVER_IP = sh(
             returnStdout: true,
-            script: 'aws ec2 describe-instances --instance-ids ${INSTANCEID} --query "Reservations[*].Instances[*].PublicIpAddress" --output text'
+            script: "aws ec2 describe-instances --instance-ids ${INSTANCE_ID} --query 'Reservations[*].Instances[*].PublicIpAddress' --output text"
           ).trim()
 
           // sh 'SERVER_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[*].Instances[*].PublicIpAddress" --output text)'
@@ -90,7 +90,7 @@ pipeline {
               VAULT_PROXY_DEBUG=true \\
               requireCerts=false \\
               certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-              SERVER_IP=${SERVERIP} \\
+              SERVER_IP=${SERVER_IP} \\
               ./strato --single
           """
           sh 'chmod +x run.sh'
