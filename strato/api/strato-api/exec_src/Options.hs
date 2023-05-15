@@ -21,4 +21,4 @@ defineFlag "gasOn" (True :: Bool) "Whether or not to throw an error if an accoun
 defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhancements or not"
 defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions an account can make"
-defineFlag "gasLimit" (8000000 :: Integer) "The maximum amount of gas a transaction can use"
+defineFlag "gasLimit" (13500900000 :: Integer) "The maximum amount of gas a transaction can use"
