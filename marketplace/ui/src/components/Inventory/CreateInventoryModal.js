@@ -84,7 +84,9 @@ const CreateInventoryModal = ({
     validationSchema: schema,
     onSubmit: function (values) {
       if (
-        values.serialNumber.serialNumArr.length === parseInt(values.quantity)
+        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) || 
+        // Serial numbers are optional, we can submit the form if there are none. 
+        (values.serialNumber.serialNumArr.length === 0)
       ) {
         handleCreateFormSubmit(values);
       } else {

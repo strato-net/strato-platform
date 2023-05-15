@@ -54,7 +54,7 @@ class InventoryController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
-
+      console.log('Is this the right controller? ========> ')
       InventoryController.validateCreateInventoryArgs(body)
 
       const result = await dapp.createInventory(body)
@@ -115,19 +115,24 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
-      serialNumber: Joi.array().length(Joi.ref('quantity')).required().items(Joi.object({
+
+      // TODO: If serial numbers are optional, does a user have to enter all of them or can they enter some?
+      // This will no longer validate if all serial numbers are entered. It will check the max amount based on the quantity entered.
+      // Can possibly use alternatives.conditional(condition, options) to if exact quantity needs to be entered.
+      serialNumber: Joi.array().max(Joi.ref('quantity')).items(Joi.object({
         itemSerialNumber: Joi.string().required(),
         rawMaterials: Joi.array().items(Joi.object({
           rawMaterialProductName: Joi.string().required(),
           rawMaterialProductId: Joi.string().required(),
           rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
         })).required()
-      })).required()
+      })).optional()
     });
 
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
+      console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Inventory Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })

@@ -462,7 +462,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     </div>
                   }
                 </div>
-                <Text className="text-primaryB">Please upload serial number(s) and enter the fulfillment date to close the order</Text>
+                <Text className="text-primaryB">Please upload serial number(s) (if any) and/or enter the fulfillment date to close the order</Text>
               </div>
               <Button
                 id="save-button"
