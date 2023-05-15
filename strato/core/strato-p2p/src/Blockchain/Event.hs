@@ -15,7 +15,8 @@ module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
-  checkPeerIsMember
+  checkPeerIsMember,
+  cleanUpGlobalHeadersCache
   ) where
 
 import           Control.Arrow                         ((&&&), second)
@@ -487,6 +488,7 @@ handleEvents peer = awaitForever $ \case
                 maxTime <- fromIntegral . unConnectionTimeout <$> lift (access (Proxy @ConnectionTimeout))
                 liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
                 when (diffTime > maxTime) $ do
+                    lift cleanUpGlobalHeadersCache
                     yieldR $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
@@ -499,6 +501,11 @@ handleEvents peer = awaitForever $ \case
       $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
       yieldR $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
+
+cleanUpGlobalHeadersCache :: MonadP2P m => m ()
+cleanUpGlobalHeadersCache = do
+  putBlockHeaders []
+  putRemainingBHeaders [] 
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadLogger m
