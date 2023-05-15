@@ -26,14 +26,14 @@ const App = () => {
 
   const dispatch = useAuthenticateDispatch();
 
-//  const { isAuthenticated, hasChecked, user, loginUrl, users } =
-//    useAuthenticateState();
+ const { isAuthenticated, hasChecked, user, loginUrl, users } =
+   useAuthenticateState();
 
-    const isAuthenticated = true;            // These are dummy hardcoded values, they need to be set properly
-    const hasChecked = true;
-    const user = {commonName: "fred"}
-    const loginUrl = "abcd"
-    const users = [];
+    // const isAuthenticated = true;            // These are dummy hardcoded values, they need to be set properly
+    // const hasChecked = true;
+    // const user = {commonName: "fred"}
+    // const loginUrl = "abcd"
+    // const users = [];
 
     
   useEffect(() => {
@@ -42,11 +42,11 @@ const App = () => {
     }
   }, [isAuthenticated, hasChecked, loginUrl]);
 
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     actions.fetchUsers(dispatch);
-  //   }
-  // }, [isAuthenticated]);
+  useEffect(() => {
+    if (isAuthenticated) {
+      actions.fetchUsers(dispatch);
+    }
+  }, [isAuthenticated]);
 
   return (
     <BrowserRouter>

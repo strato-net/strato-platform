@@ -7,8 +7,7 @@ import config from '/load.config'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  const { app, username } = req
-  const accessToken = {token: req.headers['x-user-access-token']};
+  const { app, accessToken, username } = req
   const userCredentials = {
     username,
     ...accessToken,
