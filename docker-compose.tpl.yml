@@ -87,11 +87,11 @@ services:
     - ADMIN_PASSWORD=${ADMIN_PASSWORD:-} # TODO: figure out what to use
     - STRIPE_PUBLISHABLE_KEY='pk_test_51Ma27ZKRjQhi20SKEfR6ganfwqianD3pSEJaQP2dhdXmQEVdlAmtTuybS52tFogwHuZGGs4psbhQwLGT7tGSZoCe00wJpwJ6bA'
     - STRIPE_SECRET_KEY='sk_test_aD9bKDRfx2AU5PYFRTnDEkT6'
-    - CLIENT_URL=${NODE_HOST}
-    - GLOBAL_ADMIN_NAME=admin@tcommerce.mercata
-    - GLOBAL_ADMIN_PASSWORD=%9V37!P$dfTE
-    - BAYER_ADMIN_NAME=vijay_rajasekaran@blockapps.net
-    - BAYER_ADMIN_PASSWORD=Software101
+    - CLIENT_URL='${NODE_HOST}'
+    - GLOBAL_ADMIN_NAME='admin@tcommerce.mercata'
+    - GLOBAL_ADMIN_PASSWORD='%9V37!P$dfTE'
+    - BAYER_ADMIN_NAME='vijay_rajasekaran@blockapps.net'
+    - BAYER_ADMIN_PASSWORD='Software101'
     - ORG_NAME='BlockApps'
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
