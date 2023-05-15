@@ -1152,9 +1152,11 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
 }
 
 def get_server_ip() {
-  sh 'INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)'
-  sh 'SERVER_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[*].Instances[*].PublicIpAddress" --output text)'
-  sh 'echo "SERVER_IP is: ${SERVER_IP}"'
+  sh '''#!/bin/bash -le
+     INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+     SERVER_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+     echo "SERVER_IP is: ${SERVER_IP}"
+  '''
 }
 
 return this
