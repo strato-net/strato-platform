@@ -66,7 +66,7 @@ pipeline {
   
           // TODO: run node on https (also update check_availability function)
           script {
-            lib.get_server_ip()
+            def SERVER_IP = lib.get_server_ip()
           }
 
           writeFile file: "run.sh", text: """#!/bin/bash
