@@ -68,7 +68,7 @@ services:
     - CONFIG_DIR_PATH=/config
     - DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-marketplace.deploy.yaml} # TODO: will be obsolete once DAPP_CHAIN_ID is implemented
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
-    - SERVER_HOST=${NODE_HOST}/marketplace/ # TODO: /marketplace/ path suffix should be added in the app code instead
+    - SERVER_HOST=http://${NODE_HOST}/marketplace/ # TODO: /marketplace/ path suffix should be added in the app code instead
     - SERVER_IP=${SERVER_IP} # TODO: used for enode addresses (still required?)
     - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used in config.yaml)
     - STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL:-http} # TODO: hardcode 'http' in code, have 'CUSTOM_STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL}' here
