@@ -1159,7 +1159,7 @@ def get_server_ip() {
 
   def SERVER_IP = sh(
     returnStdout: true,
-    script: "aws ec2 describe-instances --instance-ids ${INSTANCE_ID} --query "Reservations[*].Instances[*].PublicIpAddress" --output text"
+    script: "aws ec2 describe-instances --instance-ids ${INSTANCE_ID} --query 'Reservations[*].Instances[*].PublicIpAddress' --output text"
   ).trim()
 
   return SERVER_IP
