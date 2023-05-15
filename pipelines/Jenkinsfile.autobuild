@@ -66,7 +66,8 @@ pipeline {
   
           // TODO: run node on https (also update check_availability function)
           sh 'INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)'
-          sh 'SERVER_IP=$(aws ec2 describe-instances --instance-ids i-093e7e3689180f1fd --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)'
+
+          sh 'SERVER_IP=$(aws ec2 describe-instances --instance-ids i-093e7e3689180f1fd --query 'Reservations[*]\.Instances[*]\.PublicIpAddress' --output text)'
           writeFile file: "run.sh", text: """#!/bin/bash
             sudo \\
               NODE_HOST=\$(</host) \\
