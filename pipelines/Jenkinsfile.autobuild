@@ -65,7 +65,9 @@ pipeline {
           sh './run-vault.sh'
   
           // TODO: run node on https (also update check_availability function)
-          lib.get_server_ip()
+          script {
+            lib.get_server_ip()
+          }
 
           writeFile file: "run.sh", text: """#!/bin/bash
             sudo \\
