@@ -8,14 +8,12 @@ const router = express.Router();
 
 router.get(
   Order.get,
-  // authHandler.authorizeRequest(),
   loadDapp,
   OrderController.get
 );
 
 router.get(
   Order.getAll,
-  // authHandler.authorizeRequest(),
   loadDapp,
   OrderController.getAll
 );

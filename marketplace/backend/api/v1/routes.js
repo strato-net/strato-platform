@@ -18,7 +18,6 @@ import image from './Image'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
-// import userMembership from "./UserMembership"
 
 import {
   Authentication,
@@ -35,7 +34,6 @@ import {
   Image,
   Marketplace,
   OrderLine,
-  // UserMembership,
   PaymentService,
 } from './endpoints'
 
@@ -56,7 +54,6 @@ router.use(Event.prefix, event)
 router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
-// router.use(UserMembership.prefix, userMembership)
 router.use(PaymentService.prefix, paymentService)
 
 

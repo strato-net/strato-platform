@@ -1,5 +1,4 @@
 import { actionDescriptors } from "./actions";
-// import { USER_ROLES } from "../../helpers/constants";
 
 const reducer = (state, action) => {
   switch (action.type) {

@@ -128,13 +128,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
     appChainID = deployment.dapp.contract.appChainId
   })
 
-  // it('Should create and assign admin role', async () => {
-  //   await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
-  //   if (adminUser.address !== bayer.address) {
-  //     await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: bayer.address })
-  //   }
-  // })
-
   it('Should populate categories and subCategories', async () => {
     let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options, chainIds: [dapp.chainId] })
     const result = await SeederJs.createCategoriesWithSubCategories(_dapp)

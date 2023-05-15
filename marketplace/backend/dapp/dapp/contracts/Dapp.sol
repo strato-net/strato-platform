@@ -14,7 +14,6 @@ import "/dapp/assets/Order/contracts/OrderLine.sol";
 import "/dapp/assets/Order/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
 import "/dapp/items/contracts/ItemManager.sol";
-// import "/dapp/userMemberships/contracts/UserMembershipManager.sol";
 import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 /**
@@ -49,7 +48,6 @@ contract Dapp {
     ProductManager public productManager;
     CategoryManager categoryManager;
     EventTypeManager_10 eventTypeManager;
-    // UserMembershipManager userMembershipManager;
     PaymentManager paymentManager;
 
     account public bootUserAccount;
@@ -71,7 +69,6 @@ contract Dapp {
         productManager = new ProductManager(address(permissionManager));
         categoryManager = new CategoryManager(address(permissionManager));
         eventTypeManager = new EventTypeManager_10(address(permissionManager));
-        // userMembershipManager = new UserMembershipManager(address(permissionManager));
         paymentManager = new PaymentManager();
 
     }

@@ -22,7 +22,6 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
-// import { USER_ROLES } from "../../helpers/constants";
 
 const { Header } = Layout;
 
@@ -53,29 +52,15 @@ const HeaderComponent = ({ user, loginUrl }) => {
         "Inventory",
         "Products",
         "Events",
-        // No more admin user role
-        // "Admin"
       ]
     },
     {
       role: 1,
       items: [
         "Marketplace",
-        // Public users should not have access to these routes
-        // "Orders",
-        // "Inventory",
-        // "Products",
-        // "Events"
+
       ]
     },
-    // {
-    //   role: USER_ROLES[3],
-    //   items: []
-    // },
-    // {
-    //   role: "",
-    //   items: []
-    // },
   ];
 
   const navUrls = [
@@ -104,9 +89,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
     }
-    // else if (pathName.includes("/admin")) {
-    //   setSelectedTab("5");
-    // }
   }, [window.location.pathname]);
 
   const items = user ? [
@@ -138,24 +120,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
         <Link to={loginUrl}> Login </Link>
       ),
     },
-    // {
-    //   key: '3',
-    //   label: (
-    //     <div onClick={() => { navigate(routes.ManageRole.url) }}>
-    //       <p>
-    //         Manage Role
-    //       </p>
-    //     </div>
-    //   ),
-    // },
-    // {
-    //   key: '1',
-    //   label: (
-    //     <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
-    //       Logout
-    //     </div>
-    //   ),
-    // },
   ];
 
   useEffect(() => {
@@ -173,10 +137,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
   useEffect(() => {
     if (user) setRoleIndex(0)
     else setRoleIndex(1)
-    // else if (user?.roles.includes("Trading Entity")) setRoleIndex(0)
-    // else if (user?.roles.length === 0) setRoleIndex(3);
-    // else if (user?.roles) setRoleIndex(1)
-
   }, [user])
 
   return (

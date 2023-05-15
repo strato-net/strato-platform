@@ -15,7 +15,7 @@ contract CategoryManager is RestStatus{
      appPermissionManager=AppPermissionManager(_permissionManager);
     }
 
-    function createCategory(string _appChainId, string _name, string _description,string _imageKey, uint _createdDate) public returns(uint256, address){
+    function createCategory(string _appChainId, string _name, string _description, string _imageKey, uint _createdDate) public returns(uint256, address){
         if(!appPermissionManager.canCreateCategory(tx.origin)){
             return (RestStatus.UNAUTHORIZED,address(0));
         }
