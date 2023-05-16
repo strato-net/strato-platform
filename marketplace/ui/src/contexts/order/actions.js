@@ -1,6 +1,5 @@
 import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import { checkAuthorization } from "../../helpers/authorization";
 
 const actionDescriptors = {
   createOrder: "create_order",
@@ -84,8 +83,6 @@ const actions = {
 
       const body = await response.json();
 
-      checkAuthorization(response, body)
-
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.createOrderSuccessful,
@@ -125,8 +122,6 @@ const actions = {
       });
 
       const body = await response.json();
-
-      checkAuthorization(response, body)
 
       if (response.status === RestStatus.OK) {
         dispatch({

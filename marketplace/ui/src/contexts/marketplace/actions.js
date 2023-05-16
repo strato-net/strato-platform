@@ -1,6 +1,5 @@
 import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import { checkAuthorization } from "../../helpers/authorization";
 
 const actionDescriptors = {
   fetchMarketplace: "fetch_marketplace",
@@ -164,8 +163,6 @@ const actions = {
       );
 
       const body = await response.json();
-
-      checkAuthorization(response, body)
       
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -203,9 +200,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
-
-      checkAuthorization(response, body)
+      const body = await response.json();      
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -241,8 +236,6 @@ const actions = {
       });
 
       const body = await response.json();
-
-      checkAuthorization(response, body)
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -286,9 +279,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
-
-      checkAuthorization(response, body)
+      const body = await response.json();   
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -331,8 +322,6 @@ const actions = {
       );
 
       const body = await response.json();
-
-      checkAuthorization(response, body)
 
       if (response.status === RestStatus.OK) {
         dispatch({
