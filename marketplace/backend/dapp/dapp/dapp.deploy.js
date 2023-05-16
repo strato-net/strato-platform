@@ -96,7 +96,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
 
   })
 
-
   it('Deploy Dapp and Add Bootmembers', async () => {
     let members = []
     if (config.bootMembersFilename) {
@@ -114,18 +113,12 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
 
 
     // temporary - to force proper table namespacing
-    const mainChainContract = await dappJs.uploadMainChainContract(adminUser, options)
-
-    dapp = await dappJs.uploadDappChain(adminUser, mainChainContract.address, members, options)
-
-    assert.isDefined(dapp.chainId)
+    const dapp = await dappJs.uploadDappContract(adminUser, options)
 
     const deployArgs = { deployFilePath: `${config.configDirPath}/${config.deployFilename}` }
     const deployment = dapp.deploy(deployArgs)
     assert.isDefined(deployment)
     assert.equal(deployment.dapp.contract.address, dapp.address)
-    assert.isDefined(deployment.dapp.contract.appChainId)
-    appChainID = deployment.dapp.contract.appChainId
   })
 
   it('Should create and assign admin role', async () => {
@@ -136,10 +129,9 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
   })
 
   it('Should populate categories and subCategories', async () => {
-    let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options, chainIds: [dapp.chainId] })
+    let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options })
     const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
     assert(Array.isArray(result), 'result should be an array')
     assert.equal(result.length, SeederJson.categories.length)
   })
-
 })
