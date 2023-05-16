@@ -34,7 +34,7 @@ describe('Product Manager', function () {
     const updatefactoryArgs = (address) => ({ ...(factory.updateProductArgs(address, util.uid())) });
     const inventoryFactoryArgs = () => ({ ...(factory.getInventoryArgs(util.uid())) });
     const updateinventoryFactoryArgs = (address, inventoryAddress) => ({ ...(factory.updateInventoryArgs(address, inventoryAddress, util.uid())) });
-    const updateInventoriesQuantitiesFactoryArgs=(inventoryAddress,quantity)=>({...(factory.updateInventoriesQuantitiesArgs(inventoryAddress,quantity))})
+    const updateInventoriesQuantitiesFactoryArgs = (inventoryAddress, quantity) => ({ ...(factory.updateInventoriesQuantitiesArgs(inventoryAddress, quantity)) })
 
     before(async () => {
         assert.isDefined(
@@ -89,7 +89,7 @@ describe('Product Manager', function () {
             certifierResponse.message
         )
         certifier = { ...certifierResponse.user, ...certifierCredentials }
-        
+
         const tradingEntityCert = await certificateJs.getCertificateMe(tradingEntity)
         tradingEntityOrganization = tradingEntityCert.organization;
 
@@ -101,26 +101,26 @@ describe('Product Manager', function () {
 
         // deploy permission manager
         permissionManagerContract = await appPermissionManagerJs.uploadContract(
-        tradingEntity,
-        {
-            admin: tradingEntity.address,
-            master: tradingEntity.address,
-        },
-        options
+            tradingEntity,
+            {
+                admin: tradingEntity.address,
+                master: tradingEntity.address,
+            },
+            options
         );
 
 
         await permissionManagerContract.grantTradingEntityRole({
-            user:tradingEntity
+            user: tradingEntity
         })
 
         await permissionManagerContract.grantCertifierRole({
-            user:certifier
+            user: certifier
         })
 
         contract = await productManagerJs.uploadContract(tradingEntity, {
-            permissionManager:permissionManagerContract.address
-         }, newOptions);
+            permissionManager: permissionManagerContract.address
+        }, newOptions);
     });
 
     it('Create a product', async () => {
@@ -189,6 +189,8 @@ describe('Product Manager', function () {
         // Check if Inventory was created
         const inventory = await contract.getInventory({ address: inventoryResponse[1] }, newOptions)
 
+        delete inventoryArgs.serialNumbers
+
         assert.deepInclude(
             // Convert the Inventory data into strings as the args are in strings
             R.map(v => '' + v, inventory),
@@ -215,6 +217,8 @@ describe('Product Manager', function () {
 
         // Check if Inventory was created
         const inventory = await contract.getInventory({ address: inventoryResponse[1] }, newOptions)
+
+        delete inventoryArgs.serialNumbers
 
         assert.deepInclude(
             // Convert the Inventory data into strings as the args are in strings
@@ -279,13 +283,17 @@ describe('Product Manager', function () {
         const inventoryData3 = await contract.getInventory({ address: inventory3 }, newOptions);
         const inventoryData4 = await contract.getInventory({ address: inventory4 }, newOptions);
 
+        delete inventoryArgs1.serialNumbers
+        delete inventoryArgs2.serialNumbers
+        delete inventoryArgs3.serialNumbers
+        delete inventoryArgs4.serialNumbers
+
         // Our logic shouldn't mix up inventories
         assert.deepInclude(R.map(v => '' + v, inventoryData1), R.map(v => '' + v, inventoryArgs1));
         assert.deepInclude(R.map(v => '' + v, inventoryData2), R.map(v => '' + v, inventoryArgs2));
         assert.deepInclude(R.map(v => '' + v, inventoryData3), R.map(v => '' + v, inventoryArgs3));
         assert.deepInclude(R.map(v => '' + v, inventoryData4), R.map(v => '' + v, inventoryArgs4));
     })
-
 
     it('Create inventory for product and update quantity', async () => {
         // Create Product via upload
@@ -304,15 +312,14 @@ describe('Product Manager', function () {
         const inventoryArgs = inventoryFactoryArgs();
         const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
         assert.equal(inventoryResponse[0], RestStatus.OK);
-        
-        
-        // Check if Inventory was created
-        const updateInventoryArgs=updateInventoriesQuantitiesFactoryArgs(inventoryResponse[1],0);
-        const [status,] = await contract.updateInventoriesQuantities(updateInventoryArgs, newOptions)
-        const inventoryData = await contract.getInventory({address:inventoryResponse[1]},newOptions);
-        assert.equal(status,RestStatus.OK);
-    });
 
+
+        // Check if Inventory was created
+        const updateInventoryArgs = updateInventoriesQuantitiesFactoryArgs(inventoryResponse[1], 0);
+        const [status,] = await contract.updateInventoriesQuantities(updateInventoryArgs, newOptions)
+        const inventoryData = await contract.getInventory({ address: inventoryResponse[1] }, newOptions);
+        assert.equal(status, RestStatus.OK);
+    });
 
     it('create Product - 401', async () => {
         const args = getfactoryArgs(certifier);
@@ -321,7 +328,7 @@ describe('Product Manager', function () {
             contract.address,
             newOptions
         )
-             
+
 
         await assert.restStatus(async () => {
             await _contract.createProduct({ ...args.productArgs });

@@ -16,16 +16,16 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
      appPermissionManager=AppPermissionManager(_permissionManager);
     }
 
-    function addProduct(string _appChainId, string _name, string _description, string _manufacturer, 
+    function addProduct(string _name, string _description, string _manufacturer, 
         UnitOfMeasurement _unitOfMeasurement, string _userUniqueProductCode, uint _uniqueProductCode, int _leastSellableUnit, 
         string _imageKey, bool _isActive, address _categoryId, 
         address _subCategoryId, uint _createdDate) 
         returns (uint256, address) {
-        if(!appPermissionManager.canCreateProduct(tx.origin)){
-            return (RestStatus.UNAUTHORIZED,address(0));
-        }
+        // if(!appPermissionManager.canCreateProduct(tx.origin)){
+        //     return (RestStatus.UNAUTHORIZED,address(0));
+        // }
         
-        Product_3 product = new Product_3(_appChainId, _name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
+        Product_3 product = new Product_3( _name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
         _uniqueProductCode, _leastSellableUnit, _imageKey, _isActive, _categoryId, 
         _subCategoryId, _createdDate, tx.origin);
 
@@ -38,18 +38,18 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
 
     function updateProduct (address _productAddress, string _description, string _imageKey, bool _isActive, string _userUniqueProductCode, uint _scheme) 
         returns (uint256) {
-         if(!appPermissionManager.canUpdateProduct(tx.origin)){
-            return (RestStatus.UNAUTHORIZED);
-        }
+        //  if(!appPermissionManager.canUpdateProduct(tx.origin)){
+        //     return (RestStatus.UNAUTHORIZED);
+        // }
 
         Product_3 product = Product_3(_productAddress);
         return product.update(_description, _imageKey, _isActive, _userUniqueProductCode, _scheme);
     }
 
     function deleteProduct (address _productAddress) returns (uint256, string) {
-        if(!appPermissionManager.canDeleteProduct(tx.origin)){
-            return (RestStatus.UNAUTHORIZED,'Not Authorized');
-        }
+        // if(!appPermissionManager.canDeleteProduct(tx.origin)){
+        //     return (RestStatus.UNAUTHORIZED,'Not Authorized');
+        // }
 
         Product_3 product = Product_3(_productAddress);
         return product.deleteProduct();
@@ -57,9 +57,9 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
 
     function addInventory (address _productAddress, int _quantity, int _pricePerUnit, string _batchId, 
         InventoryStatus _status, uint _createdDate, string[] _serialNumbers) returns (uint256, address) {
-        if(!appPermissionManager.canCreateInventory(tx.origin)){
-           return (RestStatus.UNAUTHORIZED,address(0));
-        }
+        // if(!appPermissionManager.canCreateInventory(tx.origin)){
+        //    return (RestStatus.UNAUTHORIZED,address(0));
+        // }
 
         for (uint256 i = 0; i < _serialNumbers.length; i++) {
            if(uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[i]]){
@@ -78,9 +78,9 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
     function updateInventory (address _productAddress, address _inventory, int _pricePerUnit, 
         InventoryStatus _status, uint _scheme) 
         returns (uint256) {
-        if(!appPermissionManager.canUpdateInventory(tx.origin)){
-           return (RestStatus.UNAUTHORIZED);
-        }
+        // if(!appPermissionManager.canUpdateInventory(tx.origin)){
+        //    return (RestStatus.UNAUTHORIZED);
+        // }
 
         Product_3 product = Product_3(_productAddress);
         return product.updateInventory(_inventory, _pricePerUnit, _status, _scheme);

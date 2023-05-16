@@ -5,7 +5,6 @@ const factory = {
     getProductArgs(uid) {
         const args = {
             productArgs: {
-                appChainId: `${uid}`,
                 name: `name_${uid}`,
                 description: `description_${uid}`,
                 manufacturer: `manufacturer_${uid}`,
@@ -41,6 +40,7 @@ const factory = {
             quantity: uid,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,
+            serialNumbers: [`A1${uid}`, `A2${uid}`],
             status: 2,
             createdDate: 1673251301
         }
