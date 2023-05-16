@@ -19,6 +19,8 @@ import {
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
+import { actions as userActions } from "../../contexts/authentication/actions";
 
 const { Title, Text } = Typography;
 
@@ -31,8 +33,8 @@ const TopSellingProductCard = () => {
     Images.topSelling3,
   ];
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { topSellingProducts, isTopSellingProductsLoading, cartList } =
-    useMarketplaceState();
+  const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
+  let { user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
@@ -67,6 +69,12 @@ const TopSellingProductCard = () => {
         key: 1,
       });
     }
+  };
+
+  const userDispatch = useAuthenticateDispatch();
+
+  const logout = () => {
+    userActions.logout(userDispatch);
   };
 
   const addItemToCart = (product) => {
@@ -169,16 +177,24 @@ const TopSellingProductCard = () => {
                       <Button
                         className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                         onClick={() => {
-                          addItemToCart(topSellingProduct);
-                          navigate("/marketplace/checkout");
+                          if (user) {
+                            addItemToCart(topSellingProduct);
+                            navigate("/marketplace/checkout");
+                          } else {
+                            logout()
+                          }
                         }}
                       >
                         Buy now
                       </Button>
                       <div
                         onClick={() => {
-                          addItemToCart(topSellingProduct);
-                          navigate("/marketplace/checkout");
+                          if (user) {
+                            addItemToCart(topSellingProduct);
+                            navigate("/marketplace/checkout");
+                          } else {
+                            logout()
+                          }
                         }}
                         className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"
                       >
