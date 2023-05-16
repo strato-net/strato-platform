@@ -2,6 +2,8 @@
 #strato-getting-started-min-version:4.0
 version: "3"
 volumes:
+  marketplacedata:
+   driver: local
   pgdata:
     driver: local
   prometheusdata:
@@ -60,13 +62,13 @@ services:
     depends_on:
     - nginx
     environment:
-    - IS_BOOTNODE=${IS_BOOTNODE:-false}
+    - IS_BOOTNODE=${IS_BOOTNODE:-true}
     - DAPP_CHAIN_ID=${DAPP_CHAIN_ID} # TODO: when running IS_BOOTNODE=false (default), the app needs to know which dapp chain to use. Also requires app-side changes to use DAPP_CHAIN_ID instead of deploy.yaml file
     - API_DEBUG=${API_DEBUG:-false}
     - CONFIG_DIR_PATH=/config
     - DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-marketplace.deploy.yaml} # TODO: will be obsolete once DAPP_CHAIN_ID is implemented
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
-    - SERVER_HOST=${NODE_HOST}/marketplace/ # TODO: /marketplace/ path suffix should be added in the app code instead
+    - SERVER_HOST=http://${NODE_HOST}/marketplace/ # TODO: /marketplace/ path suffix should be added in the app code instead
     - SERVER_IP=${SERVER_IP} # TODO: used for enode addresses (still required?)
     - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used in config.yaml)
     - STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL:-http} # TODO: hardcode 'http' in code, have 'CUSTOM_STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL}' here
@@ -83,6 +85,14 @@ services:
     - ORG_NAME=${ORG_NAME:-} # TODO: figure out what to use
     - ADMIN_NAME=${ADMIN_NAME:-} # TODO: figure out what to use
     - ADMIN_PASSWORD=${ADMIN_PASSWORD:-} # TODO: figure out what to use
+    - STRIPE_PUBLISHABLE_KEY='pk_test_51Ma27ZKRjQhi20SKEfR6ganfwqianD3pSEJaQP2dhdXmQEVdlAmtTuybS52tFogwHuZGGs4psbhQwLGT7tGSZoCe00wJpwJ6bA'
+    - STRIPE_SECRET_KEY='sk_test_aD9bKDRfx2AU5PYFRTnDEkT6'
+    - CLIENT_URL='${NODE_HOST}'
+    - GLOBAL_ADMIN_NAME='admin@tcommerce.mercata'
+    - GLOBAL_ADMIN_PASSWORD='%9V37!P$dfTE'
+    - BAYER_ADMIN_NAME='vijay_rajasekaran@blockapps.net'
+    - BAYER_ADMIN_PASSWORD='Software101'
+    - ORG_NAME='BlockApps'
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped
@@ -91,6 +101,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+    volumes:
+       - marketplacedata:/config:rw
   marketplace-ui:
     depends_on:
       - marketplace-backend

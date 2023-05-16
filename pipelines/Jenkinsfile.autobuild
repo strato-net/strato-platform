@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "test"
+    label "test4"
   }
   stages {
     stage('Prepare') {
@@ -65,20 +65,25 @@ pipeline {
           sh './run-vault.sh'
   
           // TODO: run node on https (also update check_availability function)
-          writeFile file: "run.sh", text: """#!/bin/bash
-            sudo \\
-              NODE_HOST=\$(</host) \\
-              BLOC_DEBUG=true \\
-              SLIPSTREAM_OPTIONAL=false \\
-              OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-              OAUTH_CLIENT_ID=dev \\
-              OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
-              VAULT_URL=https://\$(</host):8093 \\
-              VAULT_PROXY_DEBUG=true \\
-              requireCerts=false \\
-              certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-              ./strato --single
-          """
+          script {
+            def SERVER_IP = lib.get_server_ip()
+            writeFile file: "run.sh", text: """#!/bin/bash
+              sudo \\
+                NODE_HOST=\$(</host) \\
+                BLOC_DEBUG=true \\
+                SLIPSTREAM_OPTIONAL=false \\
+                OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+                OAUTH_CLIENT_ID=dev \\
+                OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
+                VAULT_URL=https://\$(</host):8093 \\
+                VAULT_PROXY_DEBUG=true \\
+                requireCerts=false \\
+                certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
+                SERVER_IP=${SERVER_IP} \\
+                ./strato --single
+            """
+          }
+
           sh 'chmod +x run.sh'
       
           sh './run.sh'
