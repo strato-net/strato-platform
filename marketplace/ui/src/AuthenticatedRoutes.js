@@ -33,7 +33,6 @@ import { EventsProvider } from "./contexts/event";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
-import Admin from "./components/Admin";
 import Certifier from "./components/Certifier";
 import { MarketplaceProvider } from "./contexts/marketplace";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"

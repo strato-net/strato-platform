@@ -31,7 +31,6 @@ describe('User tests', function () {
     const user = await contract.getState();
     assert.equal(user.account, args.account, 'account');
     assert.equal(user.username, args.username, 'username');
-    assert.equal(user.role, args.role, 'role');
   });
 
   it('Search Contract', async function () {
@@ -43,7 +42,6 @@ describe('User tests', function () {
     const user = await getUser(args.username);
     assert.equal(user.account, args.account, 'account');
     assert.equal(user.username, args.username, 'username');
-    assert.equal(user.role, args.role, 'role');
   });
 
 });

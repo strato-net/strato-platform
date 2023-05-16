@@ -69,7 +69,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    routes.Admin.url,
   ];
 
   const logout = () => {

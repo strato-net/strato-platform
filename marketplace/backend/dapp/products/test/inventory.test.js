@@ -8,7 +8,6 @@ import certificateJs from '/dapp/certificates/certificate'
 import RestStatus from 'http-status-codes';
 import inventoryJs from '../inventory';
 import factory from '../factory/inventory.factory';
-import {ROLE} from "../../../helpers/constants";
 
 const options = { config };
 
@@ -77,13 +76,6 @@ describe('Inventory', function () {
             org: adminOrganization,
             ...options
         }
-
-        await dapp.managers.userMembershipManager.createUserMembership({
-            appChainId:dapp.chainId,
-            username:`${process.env.GLOBAL_ADMIN_NAME}`,
-            userAddress:globalAdmin.address,
-            role:ROLE.TRADING_ENTITY
-          });
 
     });
 

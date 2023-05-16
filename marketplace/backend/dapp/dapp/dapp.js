@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, ROLE, SERVICE_PROVIDERS, USERMEBERSHIP_STATUS } from "/helpers/constants";
+import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
@@ -23,7 +23,6 @@ import eventJs from "/dapp/assets/Event/event";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import userAddressJs from "/dapp/addresses/userAddress.js";
 import { orderLineItemArgs } from "../../test/v1/factories/orderLineItem";
 import { RestError } from "blockapps-rest/dist/util/rest.util";
@@ -204,7 +203,6 @@ async function uploadContract(token, options) {
 
 async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
-  const appPermissionManager = await appPermissionManagerJs.bindAddress(admin, state.permissionManager, options)
   const categoryManager = categoryManagerJs.bindAddress(admin, state.categoryManager, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
@@ -213,7 +211,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, appPermissionManager, categoryManager, productManager, eventTypeManager, itemManager, paymentManager };
+  return { cirrusOrg, categoryManager, productManager, eventTypeManager, itemManager, paymentManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions) {
@@ -296,20 +294,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
-  };
-
-  // ------------------------------ ROLES --------------------------------
-
-  contract.grantAdminRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantAdmin(args, options);
-  };
-
-  contract.grantTradingEntityRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantTradingEntityRole(args, options);
-  };
-
-  contract.grantCertifierRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantCertifierRole(args, options);
   };
 
   // ------------------------------ ITEMS --------------------------------

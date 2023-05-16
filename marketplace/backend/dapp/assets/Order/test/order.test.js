@@ -8,7 +8,6 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderJs from '../order';
 import orderChainJs from '../orderChain';
 import orderLineJS from '../orderLine'
@@ -93,6 +92,8 @@ describe('Order', function () {
         // Create Order via upload
         const args = factoryArgs(globalAdmin)
         contract = await orderJs.uploadContract(globalAdmin, args, {...newOptions,app:''});
+        
+        // TODO: Update this test. This contract.get is returning undefined
         const orderData = await contract.get();
 
         assert.deepInclude(
@@ -175,6 +176,7 @@ describe('Order', function () {
             },RestStatus.FORBIDDEN);
         });
     
+        // TODO: Update this test, it is failing
         it('update a seller details - 200', async () => {
             // Create our Order
             const args = factoryArgs(globalAdmin);

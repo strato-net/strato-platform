@@ -9,18 +9,21 @@ const router = express.Router();
 
 router.get(
   Event.getInventoryEventTypes,
+  authHandler.authorizeRequest(),
   loadDapp,
   EventController.getInventoryEventTypes
 );
 
 router.get(
   Event.getInventoryEventTypeDetails,
+  authHandler.authorizeRequest(),
   loadDapp,
   EventController.getInventoryEventTypeDetails
 );
 
 router.get(
   Event.getAll,
+  authHandler.authorizeRequest(),
   loadDapp,
   EventController.getAll
 );

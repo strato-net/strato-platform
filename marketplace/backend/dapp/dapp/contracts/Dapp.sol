@@ -14,7 +14,6 @@ import "/dapp/assets/Order/contracts/OrderLine.sol";
 import "/dapp/assets/Order/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
 import "/dapp/items/contracts/ItemManager.sol";
-import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 /**
  * Single entry point to all the project's contracts
@@ -41,7 +40,6 @@ contract Dapp {
 
     // ---- here are some other managers we have, you can import and use them if you want
     // OrganizationManager organizationManager;
-    // AppPermissionManager permissionManager;
     // MembershipManager membershipManager;
     // UserManager userManager;
     ItemManager itemManager;
@@ -54,21 +52,19 @@ contract Dapp {
     string public bootUserCommonName;
     string public bootUserOrganization;
     string public bootUserOrganizationalUnit;
-    AppPermissionManager public permissionManager;
 
     constructor() public {
         bootUserAccount = account(tx.origin, "main");
         mapping (string => string) userCert = getUserCert(bootUserAccount);
-        permissionManager=new AppPermissionManager(msg.sender,msg.sender);
 
         // TODO initialize manager contract here to check permissions
         bootUserCommonName = userCert["commonName"];
         bootUserOrganization = userCert["organization"];
         bootUserOrganizationalUnit = userCert["organizationalUnit"];
-        itemManager = new ItemManager(address(permissionManager));
-        productManager = new ProductManager(address(permissionManager));
-        categoryManager = new CategoryManager(address(permissionManager));
-        eventTypeManager = new EventTypeManager_10(address(permissionManager));
+        itemManager = new ItemManager();
+        productManager = new ProductManager();
+        categoryManager = new CategoryManager();
+        eventTypeManager = new EventTypeManager_10();
         paymentManager = new PaymentManager();
 
     }

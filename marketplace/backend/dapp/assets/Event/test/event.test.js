@@ -7,7 +7,6 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import eventJs from '../event';
 import eventChainJs from '../eventChain';
 import factory from './event.factory.js';
@@ -168,15 +167,6 @@ describe.skip('Event', function () {
         // Check if Event was created
         const eventData = await event.get();
         assert.deepInclude(R.map(v => '' + v, eventData), R.map(v => '' + v, args));
-
-        // Create App Permission Manager
-        const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
-            admin: globalAdmin.address,
-            master: globalAdmin.address,
-        }, options);
-
-        // assign role
-        await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
 
         let addrToBeTransferedTo = 0x0 // TODO FILL THIS IN
 
