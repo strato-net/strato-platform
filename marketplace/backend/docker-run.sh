@@ -85,7 +85,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<deployFilename_value>*'"${DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<orgDeployFilename_value>*'"${ORG_DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<serverIP_value>*'"${SERVER_IP}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_publicKey_value>*'"${NODE_PUBLIC_KEY}"'*g' /tmp/tmp.config.yaml

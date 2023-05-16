@@ -4,8 +4,7 @@ VM: SolidVM
 configDirPath: <configDirPath_value>
 deployFilename: <deployFilename_value>
 orgDeployFilename: <orgDeployFilename_value>
-serverHost: <serverHost_value>
-serverIP: <serverIP_value>
+serverHost: <serverHost_value>/marketplace/
 orgName: <orgName_value>
 
 nodes:

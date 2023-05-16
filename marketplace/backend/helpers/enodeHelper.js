@@ -4,19 +4,19 @@ import config from "../load.config";
 import { fsUtil } from "blockapps-rest";
 import { util } from "../blockapps-rest-plus";
 
-const { serverIP } = config
+// const { serverIP } = config
 const port = 30303
-const localIp = serverIP || ip.address()
+// const localIp = serverIP || ip.address()
 
 const CACHED_DATA = {
   nodePublicKey : null, 
   nodeAddress : null,
 }
 
-export const getCurrentEnode = async () => {
-  const publicKey = await getPublicKey()
-  return `enode://${publicKey}@${localIp}:${port}`
-}
+// export const getCurrentEnode = async () => {
+//   const publicKey = await getPublicKey()
+//   return `enode://${publicKey}@${localIp}:${port}`
+// }
 
 const KEY_ENDPOINT = "/strato/v2.3/key";
 
