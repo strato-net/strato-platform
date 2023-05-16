@@ -131,14 +131,16 @@ runEthServerConduit p pSource pSink seqSrc peerStr = do
   
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
-  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
-  
-  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx
-  fmap (either Just (const Nothing)) . try . runConduit $ eventSource
-                  .| handleMsgServerConduit myPubkey p
-                  .| eventSink
-                  .| pSink
+  mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
+  case mConnectionResult of 
+    Nothing -> throwIO $ HandshakeException "handshake timed out"
+    Just (_, (outCtx, inCtx)) -> do     
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSink <- mkEthP2PEventConduit peerStr outCtx
+      fmap (either Just (const Nothing)) . try . runConduit $ eventSource
+                      .| handleMsgServerConduit myPubkey p
+                      .| eventSink
+                      .| pSink
 
 stratoP2PServer :: (MonadP2P n, RunsServer n (LoggingT IO))
                 => PeerRunner n (LoggingT IO) () -> LoggingT IO ()

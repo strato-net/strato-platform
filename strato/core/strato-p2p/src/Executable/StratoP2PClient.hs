@@ -108,14 +108,16 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
 
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
-
-  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx 
-  fmap (either Just (const Nothing)) . try . runConduit $ eventSource
-                  .| handleMsgClientConduit myPublic peer
-                  .| eventSink
-                  .| pSink
+  mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
+  case mConnectionResult of
+    Nothing -> throwIO $ HandshakeException "handshake timed out"
+    Just (_, (outCtx, inCtx)) -> do
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSink <- mkEthP2PEventConduit peerStr outCtx 
+      fmap (either Just (const Nothing)) . try . runConduit $ eventSource
+                      .| handleMsgClientConduit myPublic peer
+                      .| eventSink
+                      .| pSink
 
 
 runPeerInList :: ( MonadP2P m
