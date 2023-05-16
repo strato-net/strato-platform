@@ -37,10 +37,10 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 112
   fi
   
-  if [ -z "${SERVER_IP}" ]; then
-    echo "SERVER_IP is empty but is a required value"
-    exit 12
-  fi
+  # if [ -z "${SERVER_IP}" ]; then
+  #   echo "SERVER_IP is empty but is a required value"
+  #   exit 12
+  # fi
   
   if [ -z "${NODE_LABEL}" ]; then
     echo "NODE_LABEL is empty but is a required value"
