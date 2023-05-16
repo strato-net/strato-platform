@@ -65,8 +65,11 @@ pipeline {
           sh './run-vault.sh'
   
           // TODO: run node on https (also update check_availability function)
-          script {
-            def SERVER_IP = lib.get_server_ip()
+          withCredentials([
+            usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
+            usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_NAME', usernameVariable: 'GLOBAL_ADMIN_PASSWORD'),
+            usernamePassword(credentialsId: 'marketplace-buyer-admin', passwordVariable: 'BUYER_ADMIN_NAME', usernameVariable: 'BUYER_ADMIN_PASSWORD')
+          ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
@@ -79,7 +82,6 @@ pipeline {
                 VAULT_PROXY_DEBUG=true \\
                 requireCerts=false \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                SERVER_IP=${SERVER_IP} \\
                 ./strato --single
             """
           }
