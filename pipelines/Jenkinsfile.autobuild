@@ -82,12 +82,12 @@ pipeline {
                 VAULT_PROXY_DEBUG=true \\
                 requireCerts=false \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}'
-                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}'
-                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}'
-                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}'
-                BAYER_ADMIN_NAME='${BAYER_ADMIN_NAME}'
-                BAYER_ADMIN_PASSWORD='${BAYER_ADMIN_PASSWORD}'
+                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
+                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
+                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
+                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
+                BAYER_ADMIN_NAME='${BAYER_ADMIN_NAME}' \\
+                BAYER_ADMIN_PASSWORD='${BAYER_ADMIN_PASSWORD}' \\
                 ./strato --single
             """
           }
