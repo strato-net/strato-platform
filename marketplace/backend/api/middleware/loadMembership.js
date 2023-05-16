@@ -14,14 +14,15 @@ const attachMembership = async (req, res, next) => {
     let defaultMembershipStatus = { isAdmin: false, isTradingEntity: false, isCertifier: false }
 
     try {
-        userMemberships = await dapp.getUserMemberships({ appChainId: dapp.chainId, userAddress: address });
+        // userMemberships = await dapp.getUserMemberships({userAddress: address });
+        userMemberships = await dapp.getUserMemberships({ userAddress: address });
         // check if user is already have permissions
         // const isUserExist = await dapp.managers.appPermissionManager.exists({ address })
 
         if (userMemberships.length === 0) {
             try {
                 await dapp.createUserMembership({ userAddress: address, ...defaultMembershipStatus });
-                // userMemberships = await dapp.getUserMemberships({userAddress: address,appChainId: dapp.chainId});
+                // userMemberships = await dapp.getUserMemberships({userAddress: address});
                 // return rest.response.status(RestStatus.FORBIDDEN, res, "User doesn't has necessary permission.");
             } catch (error) {
                 const msg = 'Failed to create membership'
@@ -36,7 +37,7 @@ const attachMembership = async (req, res, next) => {
         // if (!defaultMembershipStatus.isAdmin && !defaultMembershipStatus.isTradingEntity && !defaultMembershipStatus.isCertifier) {
         //     // TODO fetchUserMembershipRequests and set the flag accordingly
         //     await dapp.getAllUserMembershipRequest({ userAddress: address, state: USERMEBERSHIP_STATUS.NEW })
-            
+
         //     return rest.response.status(RestStatus.FORBIDDEN, res, "User doesn't has necessary permission.");
         // }
 
@@ -68,10 +69,10 @@ const attachMembership = async (req, res, next) => {
         // }
         // req.members = userMemberships
         // req.roles = { ...defaultMembershipStatus }
-        let roleArray=[];
-        Object.entries(defaultMembershipStatus).forEach(([key,value],index)=>{
-            if(value==true){
-                roleArray.push(index+1);
+        let roleArray = [];
+        Object.entries(defaultMembershipStatus).forEach(([key, value], index) => {
+            if (value == true) {
+                roleArray.push(index + 1);
             }
         });
         req.roles = roleArray;
