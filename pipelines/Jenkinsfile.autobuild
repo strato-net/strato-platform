@@ -68,7 +68,7 @@ pipeline {
           withCredentials([
             usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
             usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_NAME', usernameVariable: 'GLOBAL_ADMIN_PASSWORD'),
-            usernamePassword(credentialsId: 'marketplace-buyer-admin', passwordVariable: 'BUYER_ADMIN_NAME', usernameVariable: 'BUYER_ADMIN_PASSWORD')
+            usernamePassword(credentialsId: 'marketplace-bayer-admin', passwordVariable: 'BAYER_ADMIN_NAME', usernameVariable: 'BAYER_ADMIN_PASSWORD')
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
@@ -82,6 +82,12 @@ pipeline {
                 VAULT_PROXY_DEBUG=true \\
                 requireCerts=false \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
+                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}'
+                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}'
+                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}'
+                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}'
+                BAYER_ADMIN_NAME='${BAYER_ADMIN_NAME}'
+                BAYER_ADMIN_PASSWORD='${BAYER_ADMIN_PASSWORD}'
                 ./strato --single
             """
           }
