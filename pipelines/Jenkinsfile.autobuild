@@ -65,20 +65,33 @@ pipeline {
           sh './run-vault.sh'
   
           // TODO: run node on https (also update check_availability function)
-          writeFile file: "run.sh", text: """#!/bin/bash
-            sudo \\
-              NODE_HOST=\$(</host) \\
-              BLOC_DEBUG=true \\
-              SLIPSTREAM_OPTIONAL=false \\
-              OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-              OAUTH_CLIENT_ID=dev \\
-              OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
-              VAULT_URL=https://\$(</host):8093 \\
-              VAULT_PROXY_DEBUG=true \\
-              requireCerts=false \\
-              certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-              ./strato --single
-          """
+          withCredentials([
+            usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
+            usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_NAME', usernameVariable: 'GLOBAL_ADMIN_PASSWORD'),
+            usernamePassword(credentialsId: 'marketplace-bayer-admin', passwordVariable: 'BAYER_ADMIN_NAME', usernameVariable: 'BAYER_ADMIN_PASSWORD')
+          ]) {
+            writeFile file: "run.sh", text: """#!/bin/bash
+              sudo \\
+                NODE_HOST=\$(</host) \\
+                BLOC_DEBUG=true \\
+                SLIPSTREAM_OPTIONAL=false \\
+                OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+                OAUTH_CLIENT_ID=dev \\
+                OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
+                VAULT_URL=https://\$(</host):8093 \\
+                VAULT_PROXY_DEBUG=true \\
+                requireCerts=false \\
+                certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
+                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
+                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
+                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
+                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
+                BAYER_ADMIN_NAME='${BAYER_ADMIN_NAME}' \\
+                BAYER_ADMIN_PASSWORD='${BAYER_ADMIN_PASSWORD}' \\
+                ./strato --single
+            """
+          }
+
           sh 'chmod +x run.sh'
       
           sh './run.sh'
