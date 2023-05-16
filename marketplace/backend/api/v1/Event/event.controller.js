@@ -39,7 +39,7 @@ class EventController {
 
       if (inventoryId) {
         args = { inventoryId, eventTypeId }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const result = await dapp.getInventoryEventTypeDetails(args, chainOptions)
