@@ -3,7 +3,6 @@ import { assert } from 'chai'
 import { rest } from 'blockapps-rest'
 import config from "../../load.config"
 import oauthHelper from "../../helpers/oauthHelper"
-// import { getCurrentEnode } from '/helpers/enodeHelper/'
 import { getMembershipStates } from '/helpers/enums'
 import { yamlWrite } from '/helpers/config'
 import RestStatus from "http-status-codes"
