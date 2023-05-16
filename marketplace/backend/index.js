@@ -62,7 +62,7 @@ app.use(
   })
 );
 
-if (process.env.OAUTH_DEV_MODE !== "true") {
+if (process.env.OAUTH_DEV_MODE === "true") {
   app.oauth = authHandler.initOauth()
 }
 

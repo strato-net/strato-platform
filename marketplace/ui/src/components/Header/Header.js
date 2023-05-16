@@ -106,7 +106,7 @@ const HeaderComponent = ({ user }) => {
     }
   }, [window.location.pathname]);
 
-  const items = user?.roles.includes(USER_ROLES[1]) ? [
+  const items = user?.roles?.includes(USER_ROLES[1]) ? [
     {
       key: '2',
       label: (
@@ -175,10 +175,10 @@ const HeaderComponent = ({ user }) => {
   }, [user])
 
   useEffect(() => {
-    if (user?.roles.includes(USER_ROLES[1])) setRoleIndex(0)
-    else if (user?.roles.length === 1 && user?.roles.includes(USER_ROLES[3])) setRoleIndex(2)
+    if (user?.roles?.includes(USER_ROLES[1])) setRoleIndex(0)
+    else if (user?.roles?.length === 1 && user?.roles?.includes(USER_ROLES[3])) setRoleIndex(2)
     // else if (user?.roles.includes("Trading Entity")) setRoleIndex(0)
-    else if (user?.roles.length === 0) setRoleIndex(3);
+    else if (user?.roles?.length === 0) setRoleIndex(3);
     else if (user?.roles) setRoleIndex(1)
 
   }, [user])
