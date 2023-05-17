@@ -19,7 +19,7 @@ class SubCategoryController {
         args = { address }
       }
   
-      chainOptions = { ...options, chainIds: [dapp.chainId] }
+      chainOptions = { ...options }
 
       const result = await dapp.getSubCategory(args, chainOptions)
       rest.response.status200(res, result)
