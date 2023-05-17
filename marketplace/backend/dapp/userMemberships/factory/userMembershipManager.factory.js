@@ -3,7 +3,6 @@ const factory = {
     /** Sample arguments for creating a UserMembership contract. Use util.uid() to generate a uid. */
     getUserMembershipArgs(uid, userAddress) {
         const args = {
-            appChainId: `${uid}`,
             isAdmin: false,
             isTradingEntity: false,
             isCertifier: false,
@@ -21,7 +20,6 @@ const factory = {
     },
     getUserMembershipRequestArgs(uid,userAddress,userMembershipAddress){
         const args = {
-            appChainId: `${uid}`,
             userAddress,
             userMembershipAddress,
             roles: [2],
