@@ -20,13 +20,13 @@ contract CategoryManager is RestStatus{
         //     return (RestStatus.UNAUTHORIZED,address(0));
         // }
 
-        if(categoriesMap[_name] != 0) {
-            return (RestStatus.CONFLICT,address(0));
-        }
+        // if(categoriesMap[_name] != 0) {
+        //     return (RestStatus.CONFLICT,address(0));
+        // }
 
         Category category = new Category( _name, _description,_imageKey, _createdDate);
         categories.push(category);
-        categoriesMap[_name]=categories.length;
+        // categoriesMap[_name]=categories.length;
         return (RestStatus.CREATED, address(category));
     }
 
