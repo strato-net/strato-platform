@@ -67,8 +67,8 @@ pipeline {
           // TODO: run node on https (also update check_availability function)
           withCredentials([
             usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
-            usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_NAME', usernameVariable: 'GLOBAL_ADMIN_PASSWORD'),
-            usernamePassword(credentialsId: 'marketplace-bayer-admin', passwordVariable: 'BAYER_ADMIN_NAME', usernameVariable: 'BAYER_ADMIN_PASSWORD')
+            usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
+            usernamePassword(credentialsId: 'marketplace-bayer-admin', passwordVariable: 'BAYER_ADMIN_PASSWORD', usernameVariable: 'BAYER_ADMIN_NAME')
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
