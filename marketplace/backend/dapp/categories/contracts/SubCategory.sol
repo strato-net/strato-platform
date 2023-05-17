@@ -8,7 +8,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract SubCategory {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -29,13 +28,11 @@ contract SubCategory {
 
 
     constructor(
-        string _appChainId,
             string _name
         ,   string _description
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         name = _name;
         description = _description;

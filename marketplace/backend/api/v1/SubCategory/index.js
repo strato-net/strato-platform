@@ -10,7 +10,7 @@ router.get(
   SubCategory.get,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   SubCategoryController.get
 );
 
@@ -18,7 +18,7 @@ router.get(
   SubCategory.getAll,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   SubCategoryController.getAll
 );
 
@@ -26,7 +26,7 @@ router.post(
   SubCategory.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   SubCategoryController.create
 );
 
@@ -34,7 +34,7 @@ router.put(
   SubCategory.update,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   SubCategoryController.update
 )
 
