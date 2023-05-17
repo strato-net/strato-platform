@@ -7,12 +7,14 @@ const router = express.Router();
 
 router.get(
   SubCategory.get,
+  authHandler.authorizeRequest(),
   loadDapp,
   SubCategoryController.get
 );
 
 router.get(
   SubCategory.getAll,
+  authHandler.authorizeRequest(),
   loadDapp,
   SubCategoryController.getAll
 );

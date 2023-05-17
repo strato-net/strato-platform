@@ -17,21 +17,7 @@ const loadDapp = async (req, res, next) => {
   console.log('userCredentials: \n\n\n\n\n', userCredentials)
   let address
 
-  // For public use...If there is no accessToken use the serviceUserToken to handle the request. 
-  if (!accessToken) {
-    const serviceUserToken = await oauthHelper.getServiceToken()
-    const deploy = app.get(constants.deployParamName)
-
-    req.dapp = await dappJs.bind({ token: serviceUserToken }, deploy.dapp.contract, {
-      chainIds: [deploy.dapp.contract.appChainId],
-      ...options
-    })
-
-    return next()
-
-  } else {
-
-    try {
+  try {
       address = await rest.getKey(userCredentials, options)
     } catch (e) {
       // user isn't created in STRATO
@@ -59,7 +45,6 @@ const loadDapp = async (req, res, next) => {
     })
 
     return next()
-  }
 }
 
 export default loadDapp
