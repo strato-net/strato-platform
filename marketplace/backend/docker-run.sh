@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+STRATO_PORT_API=${STRATO_PORT_API:-3000}
+stratoRoot=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+echo 'Waiting for strato to be available...'
+until curl --silent --output /dev/null --fail --location ${stratoRoot}/uuid
+do
+  echo "Check at $(date)"
+  sleep 1
+done
+echo 'strato is available now'
+
 # Validate configuration
 if [ "${IS_BOOTNODE}" = "false" ]; then
   if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
