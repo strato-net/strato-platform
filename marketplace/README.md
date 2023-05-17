@@ -42,9 +42,6 @@ cd tCommerce/backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-BAYER_ADMIN_NAME=<bayerUsername>
-BAYER_ADMIN_PASSWORD=<bayerPassword>
-
 EXT_STORAGE_S3_ACCESS_KEY_ID=<s3Key>
 EXT_STORAGE_S3_SECRET_ACCESS_KEY=<s3AccessKey>
 EXT_STORAGE_S3_BUCKET=<s3Bucket>
