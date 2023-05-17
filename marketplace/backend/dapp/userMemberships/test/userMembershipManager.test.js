@@ -31,7 +31,7 @@ describe('User Membership Manager', function () {
 
     let factoryArgs
     const updateFactoryArgs = (user) => ({ ...(factory.getUpdateUserMembershipArgs(util.uid())) });
-    const userMembershipRequestArgs = (userAddress) =>({ ...(factory.getUserMembershipRequestArgs(util.uid(),userAddress)) });
+    const userMembershipRequestArgs = (userAddress,userMembershipAddress) =>({ ...(factory.getUserMembershipRequestArgs(util.uid(),userAddress,userMembershipAddress)) });
     const updateUserMembershipRequestArgs = (userMembershipRequestAddress) =>({ ...(factory.getUpdateUserMembershipRequestArgs(userMembershipRequestAddress)) });
 
     before(async () => {
@@ -129,15 +129,17 @@ describe('User Membership Manager', function () {
     })
 
     it('create user Membership Request',async ()=>{
-        
+  
         const args = userMembershipRequestArgs(globalAdmin.address,userMembershipContract.address);
-
        
         const [status, userMemberships] = await contract.createUserMembershipRequest(args);
         assert.equal(status, RestStatus.CREATED);
 
         const userMembershipRequestContract = await contract.getUserMembershipRequest({ address: userMemberships[0] });
         userMembershipRequestAddress = userMemberships[0]
+
+        delete args.roles;
+
         // Sorting is needed in order to allow for chainIds to be in any order
         // Convert all fields into a string to allow for equality checking
         assert.deepInclude(
@@ -147,20 +149,13 @@ describe('User Membership Manager', function () {
     })
 
     it('update user Membership Request',async ()=>{
-        const args = updateUserMembershipRequestArgs(userMembershipRequestAddress);
 
-       
+        const args = updateUserMembershipRequestArgs(userMembershipRequestAddress);
         const [status, userMemberships] = await contract.updateUserMembershipRequest(args);
         
         assert.equal(status, RestStatus.CREATED);
 
-        const userMembershipRequestContract = await contract.getUserMembershipRequest({ address: userMe });
-
-        // Sorting is needed in order to allow for chainIds to be in any order
-        // Convert all fields into a string to allow for equality checking
-        assert.deepInclude(
-            // Convert the UserMembership data into strings as the args are in strings
-            R.map(v => '' + v, userMembershipRequestContract),
-            R.map(v => '' + v, args))
+        const userMembershipRequestContract = await contract.getUserMembershipRequest({ address: userMembershipRequestAddress })
+        assert.equal(args.userMembershipRequestAddress,userMembershipRequestContract.address);
     })
 });

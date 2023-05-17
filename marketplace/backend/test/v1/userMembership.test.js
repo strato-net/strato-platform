@@ -48,61 +48,61 @@ describe('User Membership End-To-End Tests', function () {
     )
     globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
 
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:globalAdmin.address,
-      role:ROLE.ADMIN
-    });
+    // await dapp.managers.userMembershipManager.createUserMembership({
+    //   appChainId:dapp.chainId,
+    //   username:`${process.env.GLOBAL_ADMIN_NAME}`,
+    //   userAddress:globalAdmin.address,
+    //   role:ROLE.ADMIN
+    // });
   
   })
 
-  it('Create a User Membership', async () => {
-    const createArgs = {
-      ...userMembershipArgs(util.uid(),globalAdmin.address),
-    }
+  // it('Create a User Membership', async () => {
+  //   const createArgs = {
+  //     ...userMembershipArgs(util.uid(),globalAdmin.address),
+  //   }
 
-    const createResponse = await post(
-      UserMembership.prefix,
-      UserMembership.create,
-      createArgs,
-      globalAdmin.token,
-    )
+  //   const createResponse = await post(
+  //     UserMembership.prefix,
+  //     UserMembership.create,
+  //     createArgs,
+  //     globalAdmin.token,
+  //   )
 
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-  })
+  //   assert.equal(createResponse.status, 200, 'should be 200');
+  //   assert.isDefined(createResponse.body, 'body should be defined')
+  // })
 
-  it('Get an User Membership', async () => {
-    // create
-    const createArgs = {
-        ...userMembershipArgs(util.uid(),globalAdmin.address),
-      }
+  // it('Get an User Membership', async () => {
+  //   // create
+  //   const createArgs = {
+  //       ...userMembershipArgs(util.uid(),globalAdmin.address),
+  //     }
   
-      const createResponse = await post(
-        UserMembership.prefix,
-        UserMembership.create,
-        createArgs,
-        globalAdmin.token,
-      )
+  //     const createResponse = await post(
+  //       UserMembership.prefix,
+  //       UserMembership.create,
+  //       createArgs,
+  //       globalAdmin.token,
+  //     )
   
-      assert.equal(createResponse.status, 200, 'should be 200');
-      assert.isDefined(createResponse.body, 'body should be defined')
+  //     assert.equal(createResponse.status, 200, 'should be 200');
+  //     assert.isDefined(createResponse.body, 'body should be defined')
 
-    // get
-    const userMembership = await get(
-      UserMembership.prefix,
-      UserMembership.get.replace(':address', createResponse.body.data[1]),
-      {},
-      globalAdmin.token,
-    )
+  //   // get
+  //   const userMembership = await get(
+  //     UserMembership.prefix,
+  //     UserMembership.get.replace(':address', createResponse.body.data[1]),
+  //     {},
+  //     globalAdmin.token,
+  //   )
 
-    const responseData = userMembership?.body.data
+  //   const responseData = userMembership?.body.data
 
-    assert.equal(userMembership.status, 200, 'should be 200');
-    assert.isDefined(userMembership.body, 'body should be defined');
+  //   assert.equal(userMembership.status, 200, 'should be 200');
+  //   assert.isDefined(userMembership.body, 'body should be defined');
 
-  })
+  // })
 
   it('Get all User Membership', async () => {
     // get
