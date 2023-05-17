@@ -23,7 +23,7 @@ contract UserMembershipManager is
      userMembershipFSM = new UserMembershipFSM();
     }
 
-    function createUserMembershipAndPermissions(string _appChainId, bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress) returns (uint){
+    function createUserMembershipAndPermissions(bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress) returns (uint){
 
         mapping(string => string) userCert = getUserCert(_userAddress);
         string userOrganization = userCert["organization"];
@@ -35,7 +35,7 @@ contract UserMembershipManager is
             return (RestStatus.FORBIDDEN);
         }
        
-        (uint restStatus, address _userMembership) = createUserMembership(_appChainId, _isAdmin, _isTradingEntity, _isCertifier, _userAddress);
+        (uint restStatus, address _userMembership) = createUserMembership(_isAdmin, _isTradingEntity, _isCertifier, _userAddress);
         
         if(restStatus != uint(RestStatus.CREATED)){
             return (RestStatus.BAD_REQUEST);
@@ -47,17 +47,17 @@ contract UserMembershipManager is
         return (grantRoleStatus);
     }
 
-    function _createUserMembershipRequest(string _appChainId, address _userAddress, UserMembershipState _state, Role _role, uint _createdDate, address _userMembershipAddress, address _owner) public returns(uint, address){
+    function _createUserMembershipRequest(address _userAddress, UserMembershipState _state, Role _role, uint _createdDate, address _userMembershipAddress, address _owner) public returns(uint, address){
 
-       UserMembershipRequest userMembershipRequest = new UserMembershipRequest(_appChainId, _userAddress, _state, _role, _createdDate, _userMembershipAddress, _owner);
+       UserMembershipRequest userMembershipRequest = new UserMembershipRequest(_userAddress, _state, _role, _createdDate, _userMembershipAddress, _owner);
        return (RestStatus.CREATED, address(userMembershipRequest));
     }
 
-    function createUserMembershipRequest(string _appChainId, address _userAddress, Role[] _roles, uint _createdDate, address _userMembershipAddress) public returns(uint, address[]){
+    function createUserMembershipRequest(address _userAddress, Role[] _roles, uint _createdDate, address _userMembershipAddress) public returns(uint, address[]){
         address[] userMembershipRequests;
 
         for(uint i=0;i<_roles.length;i++){
-        (,address _userMembershipRequest)=_createUserMembershipRequest(_appChainId, _userAddress, UserMembershipState.NEW, _roles[i], _createdDate, _userMembershipAddress, address(this));
+        (,address _userMembershipRequest)=_createUserMembershipRequest(_userAddress, UserMembershipState.NEW, _roles[i], _createdDate, _userMembershipAddress, address(this));
             userMembershipRequests.push(_userMembershipRequest);
         }
 
@@ -88,7 +88,7 @@ contract UserMembershipManager is
         return (restStatusState, newState);
     }
 
-    function _createUserMembership(string _appChainId, bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress, address _owner) public returns(uint, address){
+    function _createUserMembership(bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress, address _owner) public returns(uint, address){
         // Check if user already has a membership   
         if (userMemberships[_userAddress] != address(0)) {
             return (RestStatus.CONFLICT, address(0));
@@ -96,16 +96,16 @@ contract UserMembershipManager is
         //  if(!appPermissionManager.canCreateUserMembership(tx.origin)){
         //     return (RestStatus.UNAUTHORIZED,address(0));
         // }
-        UserMembership_2 userMembership = new UserMembership_2(_appChainId, _isAdmin, _isTradingEntity, _isCertifier, _userAddress, _owner);
+        UserMembership_2 userMembership = new UserMembership_2(_isAdmin, _isTradingEntity, _isCertifier, _userAddress, _owner);
         // Store the new membership in the mapping
         userMemberships[_userAddress] = address(userMembership);
         
         return (RestStatus.CREATED, address(userMembership));
     }
 
-    function createUserMembership(string _appChainId, bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress) public returns(uint, address){
+    function createUserMembership(bool _isAdmin, bool _isTradingEntity, bool _isCertifier, address _userAddress) public returns(uint, address){
 
-        (uint restStatus, address userMembership) = _createUserMembership(_appChainId, _isAdmin, _isTradingEntity, _isCertifier, _userAddress, address(this));
+        (uint restStatus, address userMembership) = _createUserMembership(_isAdmin, _isTradingEntity, _isCertifier, _userAddress, address(this));
         
         return (restStatus, userMembership); 
     }
