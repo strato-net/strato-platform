@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+STRATO_PORT_API=${STRATO_PORT_API:-3000}
+stratoRoot=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+echo 'Waiting for strato to be available...'
+until curl --silent --output /dev/null --fail --location ${stratoRoot}/uuid
+do
+  echo "Check at $(date)"
+  sleep 1
+done
+echo 'strato is available now'
+
 # Validate configuration
 if [ "${IS_BOOTNODE}" = "false" ]; then
   if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
@@ -37,10 +48,10 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 112
   fi
   
-  if [ -z "${SERVER_IP}" ]; then
-    echo "SERVER_IP is empty but is a required value"
-    exit 12
-  fi
+  # if [ -z "${SERVER_IP}" ]; then
+  #   echo "SERVER_IP is empty but is a required value"
+  #   exit 12
+  # fi
   
   if [ -z "${NODE_LABEL}" ]; then
     echo "NODE_LABEL is empty but is a required value"
@@ -85,7 +96,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<deployFilename_value>*'"${DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<orgDeployFilename_value>*'"${ORG_DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<serverIP_value>*'"${SERVER_IP}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_publicKey_value>*'"${NODE_PUBLIC_KEY}"'*g' /tmp/tmp.config.yaml

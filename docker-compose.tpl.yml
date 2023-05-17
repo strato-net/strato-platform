@@ -2,6 +2,8 @@
 #strato-getting-started-min-version:4.0
 version: "3"
 volumes:
+  marketplacedata:
+   driver: local
   pgdata:
     driver: local
   prometheusdata:
@@ -50,6 +52,60 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  marketplace-backend:
+    depends_on:
+    - nginx
+    environment:
+    - IS_BOOTNODE=${IS_BOOTNODE:-true}
+    - DAPP_CHAIN_ID=${DAPP_CHAIN_ID} # TODO: when running IS_BOOTNODE=false (default), the app needs to know which dapp chain to use. Also requires app-side changes to use DAPP_CHAIN_ID instead of deploy.yaml file
+    - API_DEBUG=${API_DEBUG:-false}
+    - CONFIG_DIR_PATH=/config
+    - DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-marketplace.deploy.yaml} # TODO: will be obsolete once DAPP_CHAIN_ID is implemented
+    - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
+    - SERVER_HOST=http://${NODE_HOST}/marketplace/ # TODO: /marketplace/ path suffix should be added in the app code instead
+    - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used in config.yaml)
+    - STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL:-http} # TODO: hardcode 'http' in code, have 'CUSTOM_STRATO_NODE_PROTOCOL=${CUSTOM_STRATO_NODE_PROTOCOL}' here
+    - STRATO_NODE_HOST=${CUSTOM_STRATO_NODE_HOST:-nginx} # TODO: hardcode 'nginx' in code, have 'CUSTOM_STRATO_NODE_HOST=${CUSTOM_STRATO_NODE_HOST}' here
+    - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
+    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} # should only be used for client credentials flow in the app going forward. Use same client id as vault-proxy in strato container (in case if client-credentials flow is not supported by same client as auth code grant in nginx, e.g. for AWS Cognito)
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
+    - OAUTH_SERVICE_OAUTH_FLOW=client-credential
+    - OAUTH_TOKEN_FIELD=access_token
+    - OAUTH_TOKEN_USERNAME_PROPERTY=${OAUTH_TOKEN_USERNAME_PROPERTY:-email}
+    - OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW=${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:-sub}
+    - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - CLIENT_URL=${NODE_HOST}
+    - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
+    - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+    - BAYER_ADMIN_NAME=${BAYER_ADMIN_NAME}
+    - BAYER_ADMIN_PASSWORD=${BAYER_ADMIN_PASSWORD}
+    - ORG_NAME='BlockApps'
+    build: .
+    image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    volumes:
+       - marketplacedata:/config:rw
+  marketplace-ui:
+    depends_on:
+      - marketplace-backend
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+    build: .
+    image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -213,6 +269,8 @@ services:
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
+    - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
+    - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}

@@ -2,7 +2,6 @@ import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 
 import { getYamlFile } from '/helpers/config';
-import { getCurrentEnode } from '/helpers/enodeHelper';
 import { waitForAddress, waitForOwner, setSearchQueryOptions, searchOne } from '/helpers/utils'
 import certificateJs from '/dapp/certificates/certificate'
 import orderJs from './order';
