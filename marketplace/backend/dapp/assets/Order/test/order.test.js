@@ -80,7 +80,7 @@ describe('Order', function () {
 
         dapp = await dappJs.loadFromDeployment({ token: adminUserToken }, `${config.configDirPath}/${config.deployFilename}`, options);
         newOptions={
-            app:'MyApp',
+            // app:'MyApp',
             org:dapp.managers.cirrusOrg,
             ...options
         }
@@ -92,7 +92,7 @@ describe('Order', function () {
     it('Create Order - 201', async () => {
         // Create Order via upload
         const args = factoryArgs(globalAdmin)
-        contract = await orderJs.uploadContract(globalAdmin, args, {...newOptions,app:''});
+        contract = await orderJs.uploadContract(globalAdmin, args, newOptions);
         const orderData = await contract.get();
 
         assert.deepInclude(
@@ -105,7 +105,7 @@ describe('Order', function () {
 
         it('createOrder (Private chain)', async () => {
             const args = factoryArgs(globalAdmin);
-            const order = await orderChainJs.createOrder(globalAdmin, args, newOptions);
+            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
             const orderData = await order.get();
             // Sorting is needed in order to allow for chainIds to be in any order
             // Convert all fields into a string to allow for equality checking
@@ -120,10 +120,10 @@ describe('Order', function () {
             const args2 = factoryArgs(globalAdmin);
             const args3 = factoryArgs(globalAdmin);
             const args4 = factoryArgs(globalAdmin);
-            const order1 = await orderChainJs.createOrder(globalAdmin, args1, newOptions);
-            const order2 = await orderChainJs.createOrder(globalAdmin, args2, newOptions);
-            const order3 = await orderChainJs.createOrder(globalAdmin, args3, newOptions);
-            const order4 = await orderChainJs.createOrder(globalAdmin, args4, newOptions);
+            const order1 = await orderJs.uploadContract(globalAdmin, args1, newOptions);
+            const order2 = await orderJs.uploadContract(globalAdmin, args2, newOptions);
+            const order3 = await orderJs.uploadContract(globalAdmin, args3, newOptions);
+            const order4 = await orderJs.uploadContract(globalAdmin, args4, newOptions);
             const orderData1 = await order1.get();
             const orderData2 = await order2.get();
             const orderData3 = await order3.get();
@@ -138,7 +138,7 @@ describe('Order', function () {
         it('addOrderLine of order - 403', async () => {
             // create the order
             const args = factoryArgs(globalAdmin);
-            const order = await orderChainJs.createOrder(globalAdmin, args, newOptions);
+            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
     
             // Check if order was created
             const orderData = await order.get();
@@ -162,7 +162,7 @@ describe('Order', function () {
         it('update a buyer details - 403', async () => {
             // Create our Order
             const args = factoryArgs(globalAdmin);
-            const order = await orderChainJs.createOrder(globalAdmin, args, newOptions);
+            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
       
             // Check if Order was created
             const orderData = await order.get();
@@ -178,7 +178,7 @@ describe('Order', function () {
         it('update a seller details - 200', async () => {
             // Create our Order
             const args = factoryArgs(globalAdmin);
-            const order = await orderChainJs.createOrder(globalAdmin, args, newOptions);
+            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
       
             // Check if Order was created
             const orderData = await order.get();
