@@ -17,7 +17,7 @@ if [ "${MP_IS_BOOTNODE}" = "false" ]; then
     exit 53
   else
     if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
-      cp ./config/template.deploy.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
+      cp ./config/template.deploy.tpl.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
       sed -i 's*__DAPP_SHARD_ID__*'"${MP_DAPP_SHARD_ID}"'*g' "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"
       sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
     fi
