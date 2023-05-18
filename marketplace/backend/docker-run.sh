@@ -127,8 +127,9 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
     echo "deploy file exists - secondary node - nothing to deploy"
-    CONFIG=generated yarn deploy:secondary-org
-    cp ./config/generated.config.yaml /config/config.yaml
+    # TODO: replace with `yarn addToDapp params` once all nodes have certs
+    #CONFIG=generated yarn deploy:secondary-org  # Obsolete?
+    cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
   else
     echo "deploy file does not exist - bootnode - running 'deploy'"
     CONFIG=generated yarn deploy
