@@ -12,7 +12,7 @@ echo 'STRATO is available via nginx'
 
 # Validate configuration
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
-  if [ -z ${MP_SHARD_CHAIN_ID} ]; then
+  if [ -z ${MP_DAPP_SHARD_ID} ]; then
     echo "MP_IS_BOOTNODE=false but there was no MP_DAPP_SHARD_ID value provided. Exit."
     exit 53
   else
