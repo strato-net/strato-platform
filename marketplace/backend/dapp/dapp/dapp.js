@@ -993,7 +993,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
 
-      const createOptions = { ...optionsNoChainIds, org: managers.cirrusOrg, app: mainChainContractName }
+      const createOptions = { ...optionsNoChainIds, org: managers.cirrusOrg }
+      const orderOptions = { ..._defaultOptions, org: managers.cirrusOrg }
 
       if (paymentSessionId.length > 1) {
         const order = await orderJs.getAll(rawAdmin, { paymentSessionId }, createOptions);
@@ -1070,7 +1071,10 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           createdDate, paymentSessionId, shippingAddress
         }
 
-        const order = await orderChainJs.createOrder(rawAdmin, orderArgs, createOptions);
+        // console.log(createOptions)
+        // process.exit()
+
+        const order = await orderJs.uploadContract(rawAdmin, orderArgs, orderOptions);
         orders.push(order);
 
         // add orderLine for inventories
@@ -1080,8 +1084,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
           await order.addOrderLine({
-            orderChainId: order.chainIds[0],
-            inventoryOwner: inventoryObject.owner,
+            // inventoryOwner: inventoryObject.owner,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
             quantity: inventoryObject.quantity,
@@ -1181,11 +1184,11 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const { address, ...newArgs } = args;
 
-      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-      const optionsWithChainId = { ...options, org: managers.cirrusOrg, app: mainChainContractName, chainIds: [contract.chainId] };
+      const createOptions = { ...options, org: managers.cirrusOrg };
+      const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = orderJs.get(rawAdmin, args, createOptions);
-      const orderLines = orderLineJs.getAll(rawAdmin, newArgs, createOptions);
+      const orderLines = orderLineJs.getAll(rawAdmin, {address}, createOptions);
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, optionsWithChainId);
