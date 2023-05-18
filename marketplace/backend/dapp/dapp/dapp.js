@@ -717,7 +717,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   //     address: address,
   //   }
 
-  const chainOptions = { ...options }
+  // const chainOptions = { ...options }
 
   //   return inventoryJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner)
   // }
