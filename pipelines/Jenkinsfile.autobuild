@@ -68,7 +68,6 @@ pipeline {
           withCredentials([
             usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
             usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
-            usernamePassword(credentialsId: 'marketplace-bayer-admin', passwordVariable: 'BAYER_ADMIN_PASSWORD', usernameVariable: 'BAYER_ADMIN_NAME')
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
@@ -82,19 +81,18 @@ pipeline {
                 VAULT_PROXY_DEBUG=true \\
                 requireCerts=false \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
+                MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false} \\
                 STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
                 STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
-                BAYER_ADMIN_NAME='${BAYER_ADMIN_NAME}' \\
-                BAYER_ADMIN_PASSWORD='${BAYER_ADMIN_PASSWORD}' \\
                 ./strato --single
             """
           }
 
           sh 'chmod +x run.sh'
       
-          sh './run.sh'
+          sh 'MP_IS_BOOTNODE=false ./run.sh'
       
           sh 'docker ps'
       
@@ -124,8 +122,8 @@ pipeline {
 
         dir("strato-getting-started") {
           sh './strato --wipe'
-
-          sh './run.sh'
+  
+          sh 'MP_IS_BOOTNODE=true ./run.sh'
 
           sh 'docker ps'
 

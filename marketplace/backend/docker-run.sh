@@ -1,27 +1,31 @@
 #!/bin/bash
 set -e
 
-STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
-STRATO_PORT_API=${STRATO_PORT_API:-3000}
-stratoRoot=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
-echo 'Waiting for strato to be available...'
-until curl --silent --output /dev/null --fail --location ${stratoRoot}/uuid
-do
-  echo "Check at $(date)"
-  sleep 1
-done
-echo 'strato is available now'
+CONFIG_DIR_PATH=/config
+DEPLOY_FILE_NAME=marketplace.deploy.yaml
+STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
+STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
+
+echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
+until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
+echo 'STRATO is available via nginx'
 
 # Validate configuration
-if [ "${IS_BOOTNODE}" = "false" ]; then
-  if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
-    echo "IS_BOOTNODE=false but there was no ${DEPLOY_FILE_NAME} provided in tcommerce_config docker volume. Exit."
+if [ "${MP_IS_BOOTNODE}" = "false" ]; then
+  if [ -z ${MP_SHARD_CHAIN_ID} ]; then
+    echo "MP_IS_BOOTNODE=false but there was no MP_DAPP_SHARD_ID value provided. Exit."
     exit 53
+  else
+    if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
+      cp ./config/template.deploy.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
+      sed -i 's*__DAPP_SHARD_ID__*'"${MP_DAPP_SHARD_ID}"'*g' "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"
+      sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
+    fi
   fi
 else
   if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     if [ -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
-      echo "App misconfigured: IS_BOOTNODE=true, no config file but ${DEPLOY_FILE_NAME} is provided in docker volume. Exit."
+      echo "App misconfigured: MP_IS_BOOTNODE=true, no config file but ${DEPLOY_FILE_NAME} is provided in docker volume. Exit."
       exit 54
     fi
   fi
@@ -35,23 +39,23 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   
   # Validate the env vars
   # TODO: check if EVERY env var is provided (in the for loop - refactor)
-  if [ -z "${SERVER_HOST}" ]; then
-    echo "SERVER_HOST is empty but is a required value"
+  if [ -z "${MP_SERVER_HOST}" ]; then
+    echo "MP_SERVER_HOST is empty but is a required value"
     exit 11
   fi
-  if [[ "${SERVER_HOST}" != "http"* ]]; then
-    echo "SERVER_HOST must start with protocol (http:// or https://)"
+  if [[ "${MP_SERVER_HOST}" = "http"* ]]; then
+    echo "MP_SERVER_HOST must NOT start with protocol (http:// or https://)"
     exit 111
   fi
-  if [[ "${SERVER_HOST}" == *"\/" ]]; then
-    echo "SERVER_HOST must not contain the trailing slash"
+  if [[ "${MP_SERVER_HOST}" == *"\/" ]]; then
+    echo "MP_SERVER_HOST must not contain the trailing slash"
     exit 112
   fi
   
-  # if [ -z "${SERVER_IP}" ]; then
-  #   echo "SERVER_IP is empty but is a required value"
-  #   exit 12
-  # fi
+  if [ -z "${MP_SERVER_SSL}" ]; then
+    echo "ssl is empty but is a required value"
+    exit 12
+  fi
   
   if [ -z "${NODE_LABEL}" ]; then
     echo "NODE_LABEL is empty but is a required value"
@@ -91,11 +95,14 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     echo "Record was added to /etc/hosts: '${_ETC_HOSTS_RECORD}'"
   fi
   
-  sed -i 's*<apiDebug_value>*'"${API_DEBUG}"'*g' /tmp/tmp.config.yaml
+  [[ "${MP_SERVER_SSL}" = "true" ]] && SERVER_PROTOCOL="https" || SERVER_PROTOCOL="http"
+  SERVER_URL="${SERVER_PROTOCOL}://${MP_SERVER_HOST}"
+
+  sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<deployFilename_value>*'"${DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<orgDeployFilename_value>*'"${ORG_DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<serverHost_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_publicKey_value>*'"${NODE_PUBLIC_KEY}"'*g' /tmp/tmp.config.yaml
@@ -105,8 +112,8 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/api/v1/authentication/callback"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<oauth_redirectUri_value>*'"${MP_SERVER_HOST}/api/v1/authentication/callback"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<oauth_logoutRedirectUri_value>*'"${MP_SERVER_HOST}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
