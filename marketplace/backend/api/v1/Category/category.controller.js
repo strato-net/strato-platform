@@ -21,7 +21,7 @@ class CategoryController {
         args = { address }
       }
   
-      chainOptions = { ...options, chainIds: [dapp.chainId] }
+      chainOptions = { ...options }
 
       const category = await dapp.getCategory(args, chainOptions)
       const categoryImageUrl=getSignedUrlFromS3(category.imageKey, req.app.get(constants.s3ParamName))
@@ -38,7 +38,7 @@ class CategoryController {
     try {
       const { dapp, query } = req
       
-      const categories = await dapp.getCategories({ ...query, chainIds: [dapp.chainId] })
+      const categories = await dapp.getCategories({ ...query })
       const categoriesWithImageUrl=categories.map(category=>({
         ...category,
         imageUrl:getSignedUrlFromS3(category.imageKey,req.app.get(constants.s3ParamName))
