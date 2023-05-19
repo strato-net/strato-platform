@@ -11,7 +11,7 @@ router.get(
   Users.me,
   authHandler.authorizeRequest(),
   loadDapp,
-  // attachMembership,
+  attachMembership,
   UsersController.me
 );
 
@@ -19,7 +19,7 @@ router.get(
   Users.get,
   authHandler.authorizeRequest(), 
   loadDapp, 
-  // attachMembership,
+  attachMembership,
   UsersController.get
 );
 
@@ -27,7 +27,7 @@ router.get(
   Users.getAll,
   authHandler.authorizeRequest(), 
   loadDapp, 
-  // attachMembership,
+  attachMembership,
   UsersController.getAll
 );
 

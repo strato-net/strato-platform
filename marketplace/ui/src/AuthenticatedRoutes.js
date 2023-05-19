@@ -507,11 +507,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
 };
 
 const navigateUrlUserOnboarding = (user) => {
-  if (user?.roles?.length === 0 && user?.pendingMembershipRequests?.length !== 0) {
+  if (user?.roles.length === 0 && user.pendingMembershipRequests.length !== 0) {
     return routes.WaitingApproval.url;
-  } else if (user?.roles?.length === 0) {
+  } else if (user?.roles.length === 0) {
     return routes.SelectRole.url;
-  } else if (user?.roles?.includes(USER_ROLES["3"]) && user?.roles?.length === 1) {
+  } else if (user?.roles.includes(USER_ROLES["3"]) && user?.roles.length === 1) {
     return routes.Certifier.url;
   } else {
     return routes.Marketplace.url;

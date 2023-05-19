@@ -7,18 +7,8 @@ import config from '/load.config'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-
-  const { app, username } = req;
-  var accessToken
-
-  if (process.env.OAUTH_DEV_MODE === 'true') {
-    accessToken = req.accessToken;
-  }
-  else{
-    //const { app, username } = req
-    accessToken = {token: req.headers['x-user-access-token']};
-  }
-  
+  const { app, username } = req
+  const accessToken = {token: req.headers['x-user-access-token']};
   const userCredentials = {
     username,
     ...accessToken,
