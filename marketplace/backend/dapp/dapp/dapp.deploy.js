@@ -14,7 +14,7 @@ const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
 
-describe("tCommerce Dapp - deploy contracts, bootnode organization", function () {
+describe("Marketplace Dapp - deploy contracts, bootnode organization", function () {
   this.timeout(config.timeout)
 
   let adminCredentials

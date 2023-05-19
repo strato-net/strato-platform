@@ -14,7 +14,7 @@ import membershipManagerJs from '/dapp/memberships/membershipManager'
 
 const options = { config, logger: console }
 
-describe("tCommerce Dapp - deploy secondary org", function() {
+describe("Marketplace Dapp - deploy secondary org", function() {
   this.timeout(config.timeout)
   
   let MembershipStates
