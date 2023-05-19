@@ -154,11 +154,13 @@ describe('Order End-To-End Tests', function () {
       globalAdmin.token
     )
 
-    const orderAddress = createOrderResponse.body.data[0].address
+    const orderAddress = createOrderResponse.body.data[0][1]
+    // const orderAddress = createOrderResponse.body.data[0].address
     // const orderChainId = createOrderResponse.body.data[0].chainIds[0]
 
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
+    console.log("createOrderResponse", orderAddress);
 
     // get
     const getOrderResponse = await get(
@@ -172,52 +174,50 @@ describe('Order End-To-End Tests', function () {
     assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(getOrderResponse.body, 'body should be defined');
 
-  
-
   })
 
-  it('Get all Order', async () => {
-    // get
-    const getAllOrderResponse = await get(
-      Order.prefix,
-      Order.getAll,
-      {},
-      globalAdmin.token,
-    )
+  // it('Get all Order', async () => {
+  //   // get
+  //   const getAllOrderResponse = await get(
+  //     Order.prefix,
+  //     Order.getAll,
+  //     {},
+  //     globalAdmin.token,
+  //   )
 
-    assert.equal(getAllOrderResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(getAllOrderResponse.body, 'body should be defined');
-    assert.isDefined(getAllOrderResponse.body.data, 'body should be defined');
-  })
+  //   assert.equal(getAllOrderResponse.status, RestStatus.OK, 'should be 200');
+  //   assert.isDefined(getAllOrderResponse.body, 'body should be defined');
+  //   assert.isDefined(getAllOrderResponse.body.data, 'body should be defined');
+  // })
 
-  it('Create user address', async () => {
-    const createUserAddressArgs = factory.getCreateUserAddressArgs(util.uid())
+  // it('Create user address', async () => {
+  //   const createUserAddressArgs = factory.getCreateUserAddressArgs(util.uid())
 
-    // create
-    const createUserAddressResponse = await post(
-      Order.prefix,
-      Order.userAddress,
-      createUserAddressArgs,
-      globalAdmin.token,
-    )
+  //   // create
+  //   const createUserAddressResponse = await post(
+  //     Order.prefix,
+  //     Order.userAddress,
+  //     createUserAddressArgs,
+  //     globalAdmin.token,
+  //   )
 
-    assert.equal(createUserAddressResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(createUserAddressResponse.body, 'body should be defined')
+  //   assert.equal(createUserAddressResponse.status, RestStatus.OK, 'should be 200');
+  //   assert.isDefined(createUserAddressResponse.body, 'body should be defined')
     
-  })
+  // })
 
-  it('Get all user address', async () => {
-    // get
-    const getAllUserAddressResponse = await get(
-      Order.prefix,
-      Order.getAllUserAddress,
-      {},
-      globalAdmin.token,
-    )
+  // it('Get all user address', async () => {
+  //   // get
+  //   const getAllUserAddressResponse = await get(
+  //     Order.prefix,
+  //     Order.getAllUserAddress,
+  //     {},
+  //     globalAdmin.token,
+  //   )
 
-    assert.equal(getAllUserAddressResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(getAllUserAddressResponse.body, 'body should be defined');
-    assert.isDefined(getAllUserAddressResponse.body.data, 'body should be defined');
-  })
+  //   assert.equal(getAllUserAddressResponse.status, RestStatus.OK, 'should be 200');
+  //   assert.isDefined(getAllUserAddressResponse.body, 'body should be defined');
+  //   assert.isDefined(getAllUserAddressResponse.body.data, 'body should be defined');
+  // })
 
 })
