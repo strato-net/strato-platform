@@ -807,9 +807,9 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
-    console.log("dapp-getTopSellingProducts()", args, "options here", options)
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { appChainId: contract.chainId, ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
+    // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { appChainId: contract.chainId, ...args, notEqualsField: 'ownerOrganization', notEqualsValue: 'Blockapps'}, getOptions)
   }
 
   contract.getItem = async function (args, options = optionsNoChainIds) {

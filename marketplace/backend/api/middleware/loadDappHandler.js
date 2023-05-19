@@ -9,18 +9,17 @@ import jwtDecode from 'jwt-decode'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  console.log('loadDappHandler.js loadDapp() req: \n\n\n\n\n', req)
   const { app, accessToken, username } = req
   const userCredentials = {
     username,
     ...accessToken,
   }
-  // console.log('req: \n\n\n\n\n', req)
-  console.log('userCredentials: \n\n\n\n\n', userCredentials)
+  console.log('req: \n\n\n\n\n', req)
+
   let address
 
     // For public use...If there is no accessToken use the serviceUserToken to handle the request. 
-    if (!accessToken) {
+    if (accessToken === undefined) {
       const serviceUserToken = await oauthHelper.getServiceToken()
       const deploy = app.get(constants.deployParamName)
 
@@ -62,8 +61,6 @@ const loadDapp = async (req, res, next) => {
         ...options
       })
 
-
-      console.log('loadDappHandler.js loadDapp() req ======= serviceUser 2: \n\n\n\n\n', req)
     
       return next()
   
@@ -88,8 +85,6 @@ const loadDapp = async (req, res, next) => {
         address,
       }
       
-      console.log("user: \n\n\n\n\n", user)
-
       
       const deploy = app.get(constants.deployParamName)
   
@@ -98,8 +93,6 @@ const loadDapp = async (req, res, next) => {
         chainIds: [deploy.dapp.contract.appChainId],
         ...options
       })
-
-      console.log('loadDappHandler.js loadDapp() req ======= user.me 3: \n\n\n\n\n', req)
   
       return next()
     }
