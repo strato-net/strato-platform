@@ -62,9 +62,9 @@ services:
     depends_on:
     - nginx
     environment:
-    - MP_IS_BOOTNODE=${IS_BOOTNODE:-false}
+    - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
     - MP_DAPP_SHARD_ID=${MP_DAPP_SHARD_ID:-ab911cecd8f27ca623641e6f036c8711c94377b97b17c1762429337c0a7c77e0}
-    - MP_API_DEBUG=${API_DEBUG:-false}
+    - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
     - MP_SERVER_HOST=${NODE_HOST}
     - MP_SERVER_SSL=${ssl}
