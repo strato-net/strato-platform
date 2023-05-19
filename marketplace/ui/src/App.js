@@ -28,22 +28,12 @@ const App = () => {
 
  const { isAuthenticated, hasChecked, user, loginUrl, users } =
    useAuthenticateState();
-<<<<<<< HEAD
 
     // const isAuthenticated = true;            // These are dummy hardcoded values, they need to be set properly
     // const hasChecked = true;
     // const user = {commonName: "fred"}
     // const loginUrl = "abcd"
     // const users = [];
-=======
-
-    // const isAuthenticated = true;            // These are dummy hardcoded values, they need to be set properly
-    // const hasChecked = true;
-    // const user = {commonName: "fred"}
-    // const loginUrl = "abcd"
-    // const users = [];
-
->>>>>>> mkt-remove-usermembership
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
