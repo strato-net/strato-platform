@@ -3,7 +3,7 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/orders/contracts/Order.sol";
 import "./OrderStatus.sol";
-import "./OrderLine.sol";
+import "/dapp/orders/contracts/OrderLine.sol";
 import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 
 contract OrderManager is RestStatus,OrderStatus{
@@ -49,7 +49,11 @@ contract OrderManager is RestStatus,OrderStatus{
     function addOrderLine(address _orderAddress,address _productId, address _inventoryId, uint _quantity, uint _pricePerUnit, uint _shippingCharges
     , uint _tax, uint _createdDate ) public  returns(uint256, address){
         Order order = Order(_orderAddress);
-        return order.addOrderLine(_productId,_inventoryId,_quantity,_pricePerUnit,_shippingCharges,_tax,_createdDate);
+        return order.addOrderLine(_orderAddress,_productId,_inventoryId,_quantity,_pricePerUnit,_shippingCharges,_tax,_createdDate);
     }
 
+    function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate) public  returns(uint256, string, string){
+        OrderLine_2 orderLine = OrderLine_2(_orderLineId);
+        return orderLine.addOrderLineItems(_orderLineId,_items,_createdDate);
+    }
 }

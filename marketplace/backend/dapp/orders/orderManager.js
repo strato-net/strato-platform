@@ -10,6 +10,9 @@ import {
 import dayjs from "dayjs";
 
 import productJs from "./order";
+import orderJs from 'dapp/orders/order';
+import orderLineJs from 'dapp/orders/orderLine';
+import orderLineItemJs from 'dapp/orders/orderLineItem';
 
 const contractName = "OrderManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/OrderManager.sol`;
@@ -108,9 +111,9 @@ function bind(user, _contract, options) {
   };
   contract.getState = async () => getState(user, contract, options);
   contract.getOrder = async (args, _options = defaultOptions) =>
-    getOrder(user, args, _options);
+    orderJs.get(user, args, _options);
   contract.getOrders = async (args, _options = defaultOptions) =>
-    getOrders(user, args, _options);
+    orderJs.getAll(user, args, _options);
   contract.createOrder = async (args) =>
     createOrder(user, contract, args, options);
   contract.updateBuyerDetails = async (args) =>
@@ -121,6 +124,16 @@ function bind(user, _contract, options) {
     getInventoriesAndAvailableQuantity(user, contract, args, options);
   contract.addOrderLine = async (args) =>
     addOrderLine(user, contract, args, options);
+  contract.getOrderLine = async (args) =>
+    orderLineJs.get(user, contract, args, options);
+  contract.getOrderLines = async (args) =>
+    orderLineJs.getAll(user, contract, args, options);
+  contract.addOrderLineItems = async (args) =>
+    addOrderLineItems(user, contract, args, options);
+  contract.getOrderLineItem = async (args) =>
+    orderLineItemJs.get(user, contract, args, options);
+  contract.getOrderLineItems = async (args) =>
+    orderLineItemJs.getAll(user, contract, args, options);
   return contract;
 }
 
@@ -144,7 +157,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
     options
   );
 
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
+  if (parseInt(restStatus, 10) !== RestStatus.CREATED)
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, orderAddress];
@@ -246,7 +259,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
 
 
 /**
- * Add the oderLineItem for a order
+ * Add the oderLine for a order
  */
  async function addOrderLine(admin, contract, _args, baseOptions) {
   const callArgs = {
@@ -271,6 +284,34 @@ async function createOrder(admin, contract, _args, baseOptions) {
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, orderLineAddress];
+}
+
+/**
+ * Add the oderLineItems for a order
+ */
+ async function addOrderLineItems(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "addOrderLineItems",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, orderLineItemAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, orderLineItemAddress];
 }
 
 /**

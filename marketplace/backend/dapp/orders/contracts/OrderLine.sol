@@ -5,17 +5,18 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "./OrderLineItem.sol";
 import "./Order.sol";
 import "./OrderStatus.sol";
-import "../../../items/contracts/Item.sol";
-import "../../../items/contracts/ItemStatus.sol";
+import "/dapp/items/contracts/Item.sol";
+import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_1 is ItemStatus,OrderStatus{
+contract OrderLine_2 is ItemStatus,OrderStatus{
 
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
+    address public orderAddress;
     address public productId;
     address public inventoryId;
     uint public quantity;
@@ -27,7 +28,8 @@ contract OrderLine_1 is ItemStatus,OrderStatus{
 
     address[] public itemsAddresses;
     constructor(
-            address _productId
+            address _orderAddress
+        ,   address _productId
         ,   address _inventoryId
         ,   uint _quantity
         ,   uint _pricePerUnit
@@ -37,6 +39,7 @@ contract OrderLine_1 is ItemStatus,OrderStatus{
     ) public {
         owner = tx.origin;
 
+        orderAddress = _orderAddress;
         productId = _productId;
         inventoryId = _inventoryId;
         quantity = _quantity;
