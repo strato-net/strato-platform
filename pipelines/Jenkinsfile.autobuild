@@ -154,9 +154,8 @@ pipeline {
           '''
         }
         
-        // TODO: register certs for user1 and user2
+        // TODO: register cert for user1 to use in marketplace app?
         //script {
-        //  lib.registerUserCert('user1', 'org1')
         //  lib.registerUserCert('user1', 'org1')
         //}
 

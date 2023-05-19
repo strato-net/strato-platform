@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-CONFIG_DIR_PATH=/config
-DEPLOY_FILE_NAME=marketplace.deploy.yaml
-STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
-STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
+export CONFIG_DIR_PATH=/config
+export DEPLOY_FILE_NAME=marketplace.deploy.yaml
+export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
+export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
 
 echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
