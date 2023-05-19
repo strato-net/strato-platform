@@ -1590,6 +1590,35 @@ createConnection server' client' = do
     serverExceptionTVar
     clientExceptionTVar
 
+createGermophobicConnection :: P2PPeer
+                            -> P2PPeer
+                            -> IO P2PConnection
+createGermophobicConnection server' client' = do
+  serverToClientTQueue <- newTQueueIO
+  clientToServerTQueue <- newTQueueIO
+  clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
+  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server'
+  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
+  serverExceptionTVar <- newTVarIO Nothing
+  clientExceptionTVar <- newTVarIO Nothing
+  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
+      rServer = pure Nothing -- server is germophobic; will not conduct handshake
+      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
+      rClient = runEthClientConduit (_p2pPeerPPeer server')
+                                    (sourceTQueue serverToClientTQueue)
+                                    (sinkTQueue clientToServerTQueue)
+                                    (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                    ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+  pure $ P2PConnection
+    serverToClientTQueue
+    clientToServerTQueue
+    server'
+    client'
+    (runReaderT rServer serverCtx)
+    (runReaderT rClient clientCtx)
+    serverExceptionTVar
+    clientExceptionTVar
+
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)
 
