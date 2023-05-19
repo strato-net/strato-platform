@@ -807,6 +807,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
+    console.log("dapp-getTopSellingProducts()", args, "options here", options)
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
     return marketplaceJs.getTopSellingProducts(rawAdmin, { appChainId: contract.chainId, ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
   }

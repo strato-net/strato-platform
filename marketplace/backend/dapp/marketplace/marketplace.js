@@ -76,6 +76,7 @@ async function getAll(admin, args = {}, options) {
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
+    console.log("getTopSellingProducts marketplace.js: ", args, "admin: ", admin, "options: ", options)
     const { quantity, pricePerUnit, range = [], ...restArgs } = args
 
     const products = await productJs.getAll(admin, {

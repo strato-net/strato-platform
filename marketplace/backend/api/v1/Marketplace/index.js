@@ -8,14 +8,14 @@ const router = express.Router();
 
 router.get(
   Marketplace.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getAll
 );
 
 router.get(
   Marketplace.getTopSellingProducts,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getTopSellingProducts
 );

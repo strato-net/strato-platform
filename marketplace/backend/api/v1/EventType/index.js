@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get(
   EventType.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventTypeController.getAll
 );

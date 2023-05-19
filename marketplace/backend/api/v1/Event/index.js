@@ -23,7 +23,7 @@ router.get(
 
 router.get(
   Event.getAll,
-  authHandler.authorizeRequest(),
+  // authHandler.authorizeRequest(),
   loadDapp,
   EventController.getAll
 );

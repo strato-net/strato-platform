@@ -163,6 +163,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
+    console.log('getAll() inventory.js: \n\n\n\n\n', args, "admin: \n\n\n\n\n", admin, "options: \n\n\n\n\n", options)
     const inventories = await searchAllWithQueryArgs(contractName, args, options, admin)
     return inventories.map((inventory) => marshalOut(inventory))
 }

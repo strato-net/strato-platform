@@ -4,10 +4,12 @@ import dappJs from '/dapp/dapp/dapp'
 import constants from '../../helpers/constants'
 import config from '/load.config'
 import oauthHelper from '/helpers/oauthHelper'
+import jwtDecode from 'jwt-decode'
 
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
+  console.log('loadDappHandler.js loadDapp() req: \n\n\n\n\n', req)
   const { app, accessToken, username } = req
   const userCredentials = {
     username,
@@ -17,34 +19,90 @@ const loadDapp = async (req, res, next) => {
   console.log('userCredentials: \n\n\n\n\n', userCredentials)
   let address
 
-  try {
-      address = await rest.getKey(userCredentials, options)
-    } catch (e) {
-      // user isn't created in STRATO
-      if (e.response.status === RestStatus.BAD_REQUEST) {
-        rest.response.status(RestStatus.FORBIDDEN, res)
-        return next()
+    // For public use...If there is no accessToken use the serviceUserToken to handle the request. 
+    if (!accessToken) {
+      const serviceUserToken = await oauthHelper.getServiceToken()
+      const deploy = app.get(constants.deployParamName)
+
+      const serviceUserCredentials = {
+        username: 'serviceUser',
+        token: serviceUserToken,
       }
 
-      // unexpected error
-      return next(e)
+      try {
+        address = await rest.getKey(serviceUserCredentials, options)
+      } catch (e) {
+        // user isn't created in STRATO
+        if (e.response.status === RestStatus.BAD_REQUEST) {
+          rest.response.status(RestStatus.FORBIDDEN, res)
+          return next()
+        }
+        
+        // unexpected error
+        return next(e)
+      }
+
+      const user = {
+        ...serviceUserCredentials,
+        node: config.nodes[0],
+        address,
+      }
+
+      const decodedToken = jwtDecode(serviceUserToken)
+      
+      console.log("user: \n\n\n\n\n", user)
+
+      req.user = user
+      req.username = decodedToken.preferred_username
+      req.address = address
+      req.decodedToken = decodedToken
+      req.accessToken = {token: serviceUserToken}
+      req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
+        chainIds: [deploy.dapp.contract.appChainId],
+        ...options
+      })
+
+
+      console.log('loadDappHandler.js loadDapp() req ======= serviceUser 2: \n\n\n\n\n', req)
+    
+      return next()
+  
+    } else {
+  
+      try {
+        address = await rest.getKey(userCredentials, options)
+      } catch (e) {
+        // user isn't created in STRATO
+        if (e.response.status === RestStatus.BAD_REQUEST) {
+          rest.response.status(RestStatus.FORBIDDEN, res)
+          return next()
+        }
+  
+        // unexpected error
+        return next(e)
+      }
+  
+      const user = {
+        ...userCredentials,
+        node: config.nodes[0],
+        address,
+      }
+      
+      console.log("user: \n\n\n\n\n", user)
+
+      
+      const deploy = app.get(constants.deployParamName)
+  
+      req.user = user
+      req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
+        chainIds: [deploy.dapp.contract.appChainId],
+        ...options
+      })
+
+      console.log('loadDappHandler.js loadDapp() req ======= user.me 3: \n\n\n\n\n', req)
+  
+      return next()
     }
-
-    const user = {
-      ...userCredentials,
-      node: config.nodes[0],
-      address,
-    }
-
-    const deploy = app.get(constants.deployParamName)
-
-    req.user = user
-    req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-      chainIds: [deploy.dapp.contract.appChainId],
-      ...options
-    })
-
-    return next()
-}
-
-export default loadDapp
+  }
+  
+  export default loadDapp

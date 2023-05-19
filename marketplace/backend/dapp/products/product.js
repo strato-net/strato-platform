@@ -173,6 +173,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
+    console.log('getAll() products.js args: \n\n\n\n\n', args, 'Admin: \n\n\n\n\n', admin, 'Options: \n\n\n\n\n', options)
     const products = await searchAllWithQueryArgs(contractName, args, options, admin)
     return products.map((product) => marshalOut(product))
 }
