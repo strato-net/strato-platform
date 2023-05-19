@@ -3,6 +3,7 @@ import RestStatus from 'http-status-codes'
 import dappJs from '/dapp/dapp/dapp'
 import constants from '../../helpers/constants'
 import config from '/load.config'
+import oauthHelper from '/helpers/oauthHelper'
 
 const options = { config }
 
@@ -26,34 +27,35 @@ const loadDapp = async (req, res, next) => {
   // console.log('req: \n\n\n\n\n', req)
   console.log('userCredentials: \n\n\n\n\n', userCredentials)
   let address
+
   try {
-    address = await rest.getKey(userCredentials, options)
-  } catch (e) {
-    // user isn't created in STRATO
-    if (e.response.status === RestStatus.BAD_REQUEST) {
-      rest.response.status(RestStatus.FORBIDDEN, res)
-      return next()
+      address = await rest.getKey(userCredentials, options)
+    } catch (e) {
+      // user isn't created in STRATO
+      if (e.response.status === RestStatus.BAD_REQUEST) {
+        rest.response.status(RestStatus.FORBIDDEN, res)
+        return next()
+      }
+
+      // unexpected error
+      return next(e)
     }
 
-    // unexpected error
-    return next(e)
-  }
+    const user = {
+      ...userCredentials,
+      node: config.nodes[0],
+      address,
+    }
 
-  const user = {
-    ...userCredentials,
-    node: config.nodes[0],
-    address,
-  }
+    const deploy = app.get(constants.deployParamName)
 
-  const deploy = app.get(constants.deployParamName)
+    req.user = user
+    req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
+      chainIds: [deploy.dapp.contract.appChainId],
+      ...options
+    })
 
-  req.user = user
-  req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-    chainIds: [deploy.dapp.contract.appChainId],
-    ...options
-  })
-
-  return next()
+    return next()
 }
 
 export default loadDapp

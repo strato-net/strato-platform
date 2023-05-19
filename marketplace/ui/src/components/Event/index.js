@@ -19,7 +19,6 @@ import CreateEventModal from "./CreateEventModal";
 import CertifyEventsList from "../Certifier/CertifyEventsList";
 import CertifyEventModal from "../Certifier/certifyEventModal";
 import { useLocation } from "react-router-dom";
-import { USER_ROLES } from "../../helpers/constants";
 
 import { actions as eventTypeActions } from "../../contexts/eventType/actions";
 import { useEventTypeDispatch, useEventTypeState } from "../../contexts/eventType";
@@ -253,8 +252,7 @@ const Event = ({ user }) => {
                 key: "Events",
                 children: <EventsList />,
               },
-              (user?.roles.includes("Admin") ||
-                (user?.roles.includes("Certifier") && user?.roles.includes("Trading Entity"))) && {
+              {
                 label: (
                   <p id="certify-event-tab" className="font-medium text-base  text-primary">
                     Certify Events

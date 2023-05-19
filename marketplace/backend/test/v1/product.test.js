@@ -10,7 +10,6 @@ import dappJs from '../../dapp/dapp/dapp'
 import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
 import { Product, Inventory } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 
 const options = { config }
 
@@ -48,13 +47,6 @@ describe('Product End-To-End Tests', function () {
       adminResponse.message
     )
     admin = { ...adminResponse.user, ...adminCredentials }
-
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:admin.address,
-      role:ROLE.TRADING_ENTITY
-    });
   })
 
   it('Create a Product', async () => {

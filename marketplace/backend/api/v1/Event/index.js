@@ -51,7 +51,6 @@ router.put(
 
 router.get(
   Event.audit,
-  authHandler.authorizeRequest(),
   loadDapp,
   EventController.audit
 )

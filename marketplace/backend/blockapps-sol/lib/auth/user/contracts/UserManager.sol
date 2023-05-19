@@ -33,8 +33,7 @@ contract UserManager is RestStatus, Util {
 
   function createUser(
     address _account,
-    string _username,
-    uint _role) returns (uint, address) {
+    string _username) returns (uint, address) {
     // only owner can execute
     if (msg.sender != owner) {
       return (RestStatus.UNAUTHORIZED, 0);
@@ -45,7 +44,7 @@ contract UserManager is RestStatus, Util {
     // fail if username exists
     if (exists(_username)) return (RestStatus.BAD_REQUEST, 0);
     // add user
-    User user = new User(_account, _username, _role);
+    User user = new User(_account, _username);
     users.put(_username, user);
     return (RestStatus.CREATED, user);
   }

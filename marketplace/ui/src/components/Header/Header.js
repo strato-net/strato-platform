@@ -13,7 +13,7 @@ import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import { Wallet } from "../../images/SVGComponents";
 import "./header.css";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
@@ -22,11 +22,10 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
-import { USER_ROLES } from "../../helpers/constants";
 
 const { Header } = Layout;
 
-const HeaderComponent = ({ user }) => {
+const HeaderComponent = ({ user, loginUrl }) => {
   const navigate = useNavigate();
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
@@ -46,33 +45,21 @@ const HeaderComponent = ({ user }) => {
 
   const navItems = [
     {
-      role: USER_ROLES[1],
+      role: 0,
       items: [
         "Marketplace",
         "Orders",
         "Inventory",
         "Products",
         "Events",
-        "Admin"
       ]
     },
     {
-      role: USER_ROLES[2],
+      role: 1,
       items: [
         "Marketplace",
-        "Orders",
-        "Inventory",
-        "Products",
-        "Events"
+
       ]
-    },
-    {
-      role: USER_ROLES[3],
-      items: []
-    },
-    {
-      role: "",
-      items: []
     },
   ];
 
@@ -82,7 +69,6 @@ const HeaderComponent = ({ user }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    routes.Admin.url,
   ];
 
   const logout = () => {
@@ -101,12 +87,10 @@ const HeaderComponent = ({ user }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } else if (pathName.includes("/admin")) {
-      setSelectedTab("5");
     }
   }, [window.location.pathname]);
 
-  const items = user?.roles?.includes(USER_ROLES[1]) ? [
+  const items = user ? [
     {
       key: '2',
       label: (
@@ -132,32 +116,7 @@ const HeaderComponent = ({ user }) => {
     {
       key: '2',
       label: (
-        <div>
-          <p>
-            {user == null ? "" : user.commonName}
-          </p>
-          <p className="text-xs">
-            {user == null ? "" : user.preferred_username}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: '3',
-      label: (
-        <div onClick={() => { navigate(routes.ManageRole.url) }}>
-          <p>
-            Manage Role
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: '1',
-      label: (
-        <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
-          Logout
-        </div>
+        <Link to={loginUrl}> Login </Link>
       ),
     },
   ];
@@ -175,12 +134,8 @@ const HeaderComponent = ({ user }) => {
   }, [user])
 
   useEffect(() => {
-    if (user?.roles?.includes(USER_ROLES[1])) setRoleIndex(0)
-    else if (user?.roles?.length === 1 && user?.roles?.includes(USER_ROLES[3])) setRoleIndex(2)
-    // else if (user?.roles.includes("Trading Entity")) setRoleIndex(0)
-    else if (user?.roles?.length === 0) setRoleIndex(3);
-    else if (user?.roles) setRoleIndex(1)
-
+    if (user) setRoleIndex(0)
+    else setRoleIndex(1)
   }, [user])
 
   return (
@@ -188,13 +143,11 @@ const HeaderComponent = ({ user }) => {
       <Space>
         <div
           className="mt-6 cursor-pointer"
-          onClick={() => {
-            if (roleIndex !== 2 && roleIndex !== 3) navigate(routes.Marketplace.url)
-          }}
+          onClick={() => { navigate(routes.Marketplace.url) }}
         >
           <Image src={Images.logo} width={35} preview={false} />
         </div>
-        {roleIndex === undefined || roleIndex === 2 || roleIndex === 3 ? null : <div className="ml-7 w-72">
+        {roleIndex === undefined || roleIndex === 1 ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -223,7 +176,7 @@ const HeaderComponent = ({ user }) => {
         })}
       </Menu>
       <Space size="large">
-        {roleIndex === undefined || roleIndex === 2 || roleIndex === 3 ? null : <Badge
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
           onClick={() => navigate("/marketplace/checkout")}
@@ -236,11 +189,16 @@ const HeaderComponent = ({ user }) => {
           />
         </Badge>
         }
-        <Dropdown  menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-          <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
-            {initials}
-          </a>
-        </Dropdown>
+        {
+          roleIndex === undefined || roleIndex === 1 ? (
+            loginUrl ? <Link to={loginUrl} className="text-base text-white"> Login / Register </Link> : null
+          ) :
+            <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
+                {initials}
+              </a>
+            </Dropdown>
+        }
       </Space>
     </Header>
   );
