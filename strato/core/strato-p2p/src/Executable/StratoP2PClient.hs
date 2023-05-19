@@ -111,7 +111,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
   case mConnectionResult of
-    Nothing -> throwIO $ HandshakeException "handshake timed out"
+    Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
       !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
       !eventSink <- mkEthP2PEventConduit peerStr outCtx 
