@@ -17,9 +17,9 @@ class OrderLineController {
       
       if (address) {
         args = { address }
-        if (chainId) {
-          chainOptions = { ...options, chainIds: [chainId] }
-        }
+        // if (chainId) {
+        //   chainOptions = { ...options, chainIds: [chainId] }
+        // }
       }
 
       const result = await dapp.getOrderLine(args, chainOptions)

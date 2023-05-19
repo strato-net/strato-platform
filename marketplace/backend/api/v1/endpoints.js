@@ -67,7 +67,7 @@ export const Item = {
 
 export const Order = {
   prefix: '/order',
-  get: '/:address/:chainId/',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
@@ -81,12 +81,12 @@ export const Order = {
 
 export const OrderLine = {
   prefix: '/orderLine',
-  get: '/:address/:chainId/'
+  get: '/:address'
 }
 
 export const OrderLineItem = {
   prefix: '/orderLineItem',
-  get: '/:address/:chainId/',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
