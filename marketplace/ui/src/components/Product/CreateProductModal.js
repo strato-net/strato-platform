@@ -6,7 +6,6 @@ import { PictureOutlined } from "@ant-design/icons";
 import getSchema from "./ProductSchema";
 
 //sub-categories
-import { useSubCategoryState } from "../../contexts/subCategory";
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { unitOfMeasures } from "../../helpers/constants";
@@ -24,10 +23,6 @@ const CreateProductModal = ({
   const schema = getSchema();
   const [selectedImage, setSelectedImage] = useState(null);
   const dispatch = useProductDispatch();
-
-
-  //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useProductState();
@@ -78,8 +73,8 @@ const CreateProductModal = ({
           leastSellableUnit: parseInt(values.leastSellableUnit),
           imageKey: imageData.imageKey,
           isActive: values.active,
-          categoryId: values.category.address,
-          subCategoryId: values.subCategory.address,
+          category: values.category.name,
+          subCategory: values.subCategory.name,
           userUniqueProductCode:values.userUniqueProductCode,
         },
       };
@@ -226,25 +221,7 @@ const CreateProductModal = ({
                   name="category.name"
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    let selectedCategory = { address: "" };
-                    if (value) {
-                      selectedCategory = categorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue(
-                      "category.address",
-                      selectedCategory.address
-                    );
-
-                    if(formik.values.subCategory.name){
-                      formik.setFieldValue("subCategory.name", null);
-                      formik.setFieldValue(
-                        "subCategory.address",
-                        ""
-                      );
-                    }
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -273,28 +250,17 @@ const CreateProductModal = ({
                   placeholder="Select Sub Category"
                   allowClear
                   name="subCategory.name"
-                  loading={issubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    let selectedSubCategory = { address: "" };
-                    if (value) {
-                      selectedSubCategory = subCategorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("subCategory.name", value);
-                    formik.setFieldValue(
-                      "subCategory.address",
-                      selectedSubCategory.address
-                    );
                   }}
                 >
-                  {subCategorys.map((e, index) =>
-                    e.categoryId === formik.values.category.address ? (
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
                       <Option value={e.name} key={index}>
                         {e.name}
                       </Option>
-                    ) : null
+                    )) : null
                   )}
                 </Select>
                 {getIn(formik.touched, "subCategory.name") &&

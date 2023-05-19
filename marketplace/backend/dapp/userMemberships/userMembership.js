@@ -157,7 +157,7 @@ async function get(user, args, options) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
         userMembership = await searchOne(contractName, searchArgs, options, user);
     } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueCategoryID', value: uniqueCategoryID });
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueCategory', value: uniqueCategory });
         userMembership = await searchOne(contractName, searchArgs, options, user);
     }
     if (!userMembership) {

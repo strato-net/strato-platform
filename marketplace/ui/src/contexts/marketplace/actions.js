@@ -129,8 +129,8 @@ const actions = {
 
   fetchMarketplace: async (
     dispatch,
-    categoryIds,
-    subCategoryIds,
+    categorys,
+    subCategorys,
     products,
     manufacturers,
     minQty,
@@ -140,23 +140,23 @@ const actions = {
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
-    const categoryQuery = categoryIds ? `&categoryId[]=${categoryIds}` : "";
+    const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
-    const subCategoryQuery = subCategoryIds
-      ? `&subCategoryId[]=${subCategoryIds}`
+    const subCategoryQuery = subCategorys
+      ? `&subCategory[]=${subCategorys}`
       : "";
 
     const manufacturerQuery = manufacturers
       ? `&manufacturer[]=${manufacturers}`
       : "";
 
-    const productIdQuery = products ? `&productId[]=${products}` : "";
+    const productQuery = products ? `&product[]=${products}` : "";
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
         try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

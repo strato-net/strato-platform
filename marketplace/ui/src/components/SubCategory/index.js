@@ -150,9 +150,9 @@ const SubCategory = () => {
       ...getColumnSearchProps("description")
     },
     {
-      title: "categoryId",
-      dataIndex: "categoryId",
-      ...getColumnSearchProps("categoryId")
+      title: "category",
+      dataIndex: "category",
+      ...getColumnSearchProps("category")
     },
     {
       title: "createdAt",

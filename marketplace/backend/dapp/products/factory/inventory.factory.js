@@ -4,8 +4,8 @@ const factory = {
     getInventoryArgs(uid,userAddress) {
         const args = {
             appChainId: `${uid}`,
-            categoryId: '0000000000000000000000000000000000000000',
-            subCategoryId: '0000000000000000000000000000000000000000',
+            category: '0000000000000000000000000000000000000000',
+            subCategory: '0000000000000000000000000000000000000000',
             quantity: uid,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,

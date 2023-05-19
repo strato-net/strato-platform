@@ -11,7 +11,7 @@ import {
   DatePicker,
   Spin,
   Upload,
-  notification
+  notification,
 } from "antd";
 import { useFormik, getIn } from "formik";
 import * as yup from "yup";
@@ -165,7 +165,7 @@ const CreateEventModal = ({
   };
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
@@ -173,17 +173,16 @@ const CreateEventModal = ({
   }, [subCategoryDispatch]);
 
   useEffect(() => {
-    if(formik.values.subCategory.address){
+    if(formik.values.subCategory){
       productActions.fetchCategoryBasedProduct(
         productDispatch,
-        formik.values.category.address,
-        formik.values.subCategory.address ?? null
+        formik.values.category.name,
+        formik.values.subCategory.name ?? null
       );
     }
   }, [
     productDispatch,
-    // formik.values.category.address,
-    formik.values.subCategory.address,
+    formik.values.subCategory,
   ]);
 
   useEffect(() => {
@@ -283,31 +282,14 @@ const CreateEventModal = ({
                     disabled={false}
                     value={formik.values.category.name}
                     onChange={(value) => {
-                      let selectedCategory = { address: "" };
-                      if (value) {
-                        selectedCategory = categorys.find(
-                          (e) => e.name === value
-                        );
-                      }
                       formik.setFieldValue("category.name", value);
-                      formik.setFieldValue(
-                        "category.address",
-                        selectedCategory.address
-                      );
                       formik.setFieldTouched("category.name", false, false);
+                      
                       if(formik.values.subCategory.name){
                         formik.setFieldValue("subCategory.name", null);
-                        formik.setFieldValue(
-                          "subCategory.address",
-                          ""
-                        );
                       }
-                      if(formik.values.product.name){
-                        formik.setFieldValue("product.name", null);
-                        formik.setFieldValue(
-                          "product.address",
-                          ""
-                        );
+                      if(formik.values.productName.name){
+                        formik.setFieldValue("productName.name", null);
                       }
                     }}
                   >
@@ -339,29 +321,17 @@ const CreateEventModal = ({
                     loading={issubCategorysLoading}
                     value={formik.values.subCategory.name}
                     onChange={(value) => {
-                      let selectedSubCategory = { address: "" };
-                      if (value) {
-                        selectedSubCategory = subCategorys.find(
-                          (e) => e.name === value
-                        );
-                      }
                       formik.setFieldValue("subCategory.name", value);
-                      formik.setFieldValue(
-                        "subCategory.address",
-                        selectedSubCategory.address
-                      );
                       formik.setFieldTouched("subCategory.name", false, false);
                     }}
                   >
-                    {subCategorys.map((e, index) => {
-                      if (e.categoryId === formik.values.category.address) {
-                        return (
-                          <Option value={e.name} key={index}>
-                            {e.name}
-                          </Option>
-                        );
-                      }
-                    })}
+                    {categorys.map((category) =>
+                      category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
+                        <Option value={e.name} key={index}>
+                          {e.name}
+                        </Option>
+                      )) : null
+                    )}
                   </Select>
                   {getIn(formik.touched, "subCategory.name") &&
                     getIn(formik.errors, "subCategory.name") && (
@@ -386,8 +356,8 @@ const CreateEventModal = ({
                     value={formik.values.product.name}
                     loading={isCategoryBasedProductsLoading}
                     disabled={
-                      !formik.values.category.address ||
-                      !formik.values.subCategory.address || isCategoryBasedProductsLoading
+                      !formik.values.category ||
+                      !formik.values.subCategory || isCategoryBasedProductsLoading
                     }
                     onChange={(value) => {
                       let selectedProduct = { address: "" };

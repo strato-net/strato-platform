@@ -14,12 +14,9 @@ const CategoryCard = () => {
   const { categorys } = useCategoryState();
 
   const categoryImages = [
-    Images.category1,
-    Images.category2,
-    Images.category3,
-    Images.category4,
-    Images.category5,
-    Images.category6,
+    Images.art,
+    Images.carbon,
+    Images.realEstate
   ];
 
   return (
@@ -44,15 +41,15 @@ const CategoryCard = () => {
               className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
               onClick={() =>
                 navigate(
-                  `${naviroute.replace(":categoryId", category.address)}`
+                  `${naviroute.replace(":category", category.name)}`
                 )
               }
             >
               <div className="flex flex-col items-center text-center">
                 <Image
-                  src={category.imageUrl}
+                  src={categoryImages[index]}
                   height={108}
-                  width={108}
+                  width={150}
                   preview={false}
                 />
                 <Text type="secondary" className="mt-2 text-sm !text-primaryB">

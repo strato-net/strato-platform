@@ -110,12 +110,12 @@ const actions = {
     }
   },
 
-  fetchSubCategory: async (dispatch, categoryId) => {
+  fetchSubCategory: async (dispatch, category) => {
 
     dispatch({ type: actionDescriptors.fetchSubCategory });
 
     try {
-      const response = await fetch(`${apiUrl}/subcategory?categoryId=${categoryId}`, {
+      const response = await fetch(`${apiUrl}/subcategory?category=${category}`, {
         method: HTTP_METHODS.GET,
       });
 
@@ -136,12 +136,12 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchSubCategoryFailed, error:  "Error while fetching sub-category" });
     }
   },
-  fetchSubCategoryList: async (dispatch, categoryId) => {
+  fetchSubCategoryList: async (dispatch, category) => {
 
     dispatch({ type: actionDescriptors.fetchSubCategory });
 
     try {
-      const response = await fetch(`${apiUrl}/subcategory?categoryId[]=${categoryId}`, {
+      const response = await fetch(`${apiUrl}/subcategory?category[]=${category}`, {
         method: HTTP_METHODS.GET,
       });
 

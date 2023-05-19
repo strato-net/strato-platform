@@ -53,7 +53,7 @@ const Product = () => {
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {

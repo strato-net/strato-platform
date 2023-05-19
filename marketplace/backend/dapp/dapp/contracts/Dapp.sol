@@ -4,9 +4,9 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /** @dev Importing contracts to be later instantiated on chains via codePtr */
 import "/dapp/products/contracts/ProductManager.sol";
-import "/dapp/categories/contracts/Category.sol";
-import "/dapp/categories/contracts/CategoryManager.sol";
-import "/dapp/categories/contracts/SubCategory.sol";
+// import "/dapp/categories/contracts/Category.sol";
+// import "/dapp/categories/contracts/CategoryManager.sol";
+// import "/dapp/categories/contracts/SubCategory.sol";
 import "/dapp/assets/Order/contracts/Order.sol";
 import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
@@ -47,7 +47,7 @@ contract Dapp {
     // UserManager userManager;
     ItemManager itemManager;
     ProductManager public productManager;
-    CategoryManager categoryManager;
+    // CategoryManager categoryManager;
     EventTypeManager_10 eventTypeManager;
     UserMembershipManager userMembershipManager;
     PaymentManager paymentManager;
@@ -69,7 +69,7 @@ contract Dapp {
         bootUserOrganizationalUnit = userCert["organizationalUnit"];
         itemManager = new ItemManager(address(permissionManager));
         productManager = new ProductManager(address(permissionManager));
-        categoryManager = new CategoryManager(address(permissionManager));
+        // categoryManager = new CategoryManager(address(permissionManager));
         eventTypeManager = new EventTypeManager_10(address(permissionManager));
         userMembershipManager = new UserMembershipManager(address(permissionManager));
         paymentManager = new PaymentManager();

@@ -39,7 +39,7 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const CategoryProductList = () => {
-  const [categoryID, setCategoryID] = useState("");
+  const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
@@ -58,7 +58,7 @@ const CategoryProductList = () => {
   const { categorys, iscategorysLoading } = useCategoryState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   const routeMatch = useMatch({
@@ -72,16 +72,16 @@ const CategoryProductList = () => {
   };
 
   useEffect(() => {
-    let param = routeMatch?.params?.categoryId;
+    let param = routeMatch?.params?.category;
     let newCategory = [];
-    if (param !== ":categoryId") newCategory.push(param);
-    setCategoryID(param);
+    if (param !== ":category") newCategory.push(param);
+    setCategory(param);
     setSelectedCategories(newCategory);
   }, []);
 
   const currentCategory = useMemo(
-    () => categorys.find((c) => c.address === categoryID),
-    [categoryID]
+    () => categorys.find((c) => c.name === category),
+    [category]
   );
   //=========================Sub-categories===============================//
 
@@ -89,10 +89,10 @@ const CategoryProductList = () => {
   const { subCategorys } = useSubCategoryState();
 
   useEffect(() => {
-    let categoryIds = null;
+    let categorys = null;
     if (selectedCategories.length) {
-      categoryIds = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categoryIds);
+      categorys = arrayToStr(selectedCategories);
+      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
   }, [subCategoryDispatch, selectedCategories]);
 
@@ -106,15 +106,15 @@ const CategoryProductList = () => {
   const { productsForFilter, isProductsLoading } = useProductState();
 
   useEffect(() => {
-    let categoryIds = null,
-      subCategoryIds = null;
+    let categorys = null,
+      subCategorys = null;
     if (selectedCategories.length || selectedSubCategories.length) {
-      categoryIds = arrayToStr(selectedCategories);
-      subCategoryIds = arrayToStr(selectedSubCategories);
+      categorys = arrayToStr(selectedCategories);
+      subCategorys = arrayToStr(selectedSubCategories);
       productActions.fetchProductsForFilter(
         productDispatch,
-        categoryIds,
-        subCategoryIds
+        categorys,
+        subCategorys
       );
     }
   }, [productDispatch, selectedCategories, selectedSubCategories]);
@@ -143,7 +143,7 @@ const CategoryProductList = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    if (categoryID !== "") {
+    if (category !== "") {
       actions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -166,7 +166,7 @@ const CategoryProductList = () => {
     debouncedMaxQty,
     debouncedMinPrice,
     debouncedMaxPrice,
-    categoryID,
+    category,
   ]);
 
   //=========================Other functions===============================//
@@ -244,7 +244,7 @@ const CategoryProductList = () => {
                     >
                       <div className="flex flex-col gap-3">
                         {categorys.map((category, index) => (
-                          <Checkbox value={category.address} key={index} className="m-0">
+                          <Checkbox value={category.name} key={index} className="m-0">
                             {category.name}
                           </Checkbox>
                         ))}
@@ -319,7 +319,7 @@ const CategoryProductList = () => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {subCategorys.length > 0 && (
+            {currentCategory.subCategorys.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -335,8 +335,8 @@ const CategoryProductList = () => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {subCategorys.map((subcategory, index) => (
-                          <Checkbox value={subcategory.address} key={index} className="m-0" onChange={onChangeSubCategory}>
+                        {currentCategory.subCategorys.map((subcategory, index) => (
+                          <Checkbox value={subcategory.name} key={index} className="m-0" onChange={onChangeSubCategory}>
                             {subcategory.name}
                           </Checkbox>
                         ))}
@@ -425,7 +425,7 @@ const CategoryProductList = () => {
               <div className="mt-4 mb-8 mr-10" id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
-                    (c) => c.address === product.categoryId
+                    (c) => c.name === product.category
                   );
                   return (
                     <CategoryProductCard

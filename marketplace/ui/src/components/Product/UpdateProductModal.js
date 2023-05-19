@@ -71,11 +71,11 @@ const UpdateProductModal = ({
         name: decodeURIComponent(productToUpdate.name),
         category: {
           name: productToUpdate.categoryName,
-          address: productToUpdate.categoryId,
+          address: productToUpdate.category,
         },
         subCategory: {
           name: productToUpdate.subCategoryName,
-          address: productToUpdate.subCategoryId,
+          address: productToUpdate.subCategory,
         },
         manufacturer: decodeURIComponent(productToUpdate.manufacturer),
         unitofmeasurement:{
@@ -233,17 +233,7 @@ const UpdateProductModal = ({
                   name="category.name"
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    let selectedCategory = { address: "" };
-                    if (value) {
-                      selectedCategory = categorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue(
-                      "category.address",
-                      selectedCategory.address
-                    );
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -275,30 +265,15 @@ const UpdateProductModal = ({
                   loading={issubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    let selectedSubCategory = { address: "" };
-                    if (value) {
-                      selectedSubCategory = subCategorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("subCategory.name", value);
-                    formik.setFieldValue(
-                      "subCategory.address",
-                      selectedSubCategory.address
-                    );
                   }}
-                  filterOption={(input, option) =>
-                    (option?.value ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
                 >
-                  {subCategorys.map((e, index) =>
-                    e.categoryId === formik.values.category.address ? (
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
                       <Option value={e.name} key={index}>
                         {e.name}
                       </Option>
-                    ) : null
+                    )) : null
                   )}
                 </Select>
                 {getIn(formik.touched, "subCategory.name") &&

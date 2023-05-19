@@ -73,33 +73,33 @@ const UpdateInventoryModal = ({
   }, [subCategoryDispatch]);
 
   useEffect(() => {
-    if (inventoryToUpdate && subCategorys.length) {
-      let subCategory = subCategorys.find(
-        (s) => s.address === inventoryToUpdate.inventory.subCategoryId
-      );
+    // if (inventoryToUpdate && subCategorys.length) {
+    //   let subCategory = subCategorys.find(
+    //     (s) => s.address === inventoryToUpdate.inventory.subCategoryId
+    //   );
 
-      let nextState = {
-        category: {
-          name: inventoryToUpdate.category.name,
-          address: inventoryToUpdate.category.address,
-        },
-        subCategory: {
-          name: subCategory.name ?? "",
-          address: subCategory.address ?? "",
-        },
-        productName: {
-          name: inventoryToUpdate.inventory.name,
-          address: inventoryToUpdate.inventory.productId,
-        },
-        quantity: inventoryToUpdate.inventory.quantity,
-        pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
-        batchId: inventoryToUpdate.inventory.batchId,
-        serialNumber: null,
-        status: inventoryToUpdate.inventory.status === 1 ? true : false,
-      };
+    //   let nextState = {
+    //     category: {
+    //       name: inventoryToUpdate.category.name,
+    //       address: inventoryToUpdate.category.address,
+    //     },
+    //     subCategory: {
+    //       name: subCategory.name ?? "",
+    //       address: subCategory.address ?? "",
+    //     },
+    //     productName: {
+    //       name: inventoryToUpdate.inventory.name,
+    //       address: inventoryToUpdate.inventory.productId,
+    //     },
+    //     quantity: inventoryToUpdate.inventory.quantity,
+    //     pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
+    //     batchId: inventoryToUpdate.inventory.batchId,
+    //     serialNumber: null,
+    //     status: inventoryToUpdate.inventory.status === 1 ? true : false,
+    //   };
     
-      setFormState(nextState);
-    }
+    //   setFormState(nextState);
+    // }
   }, [inventoryToUpdate, subCategorys]);
 
   const handleUpdateFormSubmit = async (values) => {
@@ -164,18 +164,7 @@ const UpdateInventoryModal = ({
                   disabled={true}
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    let selectedCategory = { address: "" };
-                    if (value) {
-                      selectedCategory = categorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue(
-                      "category.address",
-                      selectedCategory.address
-                    );
-                    formik.setFieldTouched("category.name", false, false);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -203,32 +192,18 @@ const UpdateInventoryModal = ({
                   id="subCategory"
                   name="subCategory.name"
                   disabled={true}
-                  loading={inventoryToUpdate ? false : issubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    let selectedSubCategory = { address: "" };
-                    if (value) {
-                      selectedSubCategory = subCategorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("subCategory.name", value);
-                    formik.setFieldValue(
-                      "subCategory.address",
-                      selectedSubCategory.address
-                    );
-                    formik.setFieldTouched("subCategory.name", false, false);
                   }}
                 >
-                  {subCategorys.map((e, index) => {
-                    if (e.categoryId === formik.values.category.address) {
-                      return (
-                        <Option value={e.name} key={index}>
-                          {e.name}
-                        </Option>
-                      );
-                    }
-                  })}
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
+                      <Option value={e.name} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
+                  )}
                 </Select>
                 {getIn(formik.touched, "subCategory.name") &&
                   getIn(formik.errors, "subCategory.name") && (

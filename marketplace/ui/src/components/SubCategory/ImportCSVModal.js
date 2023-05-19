@@ -62,8 +62,8 @@ const ImportCSVModal = ({
       }
 
       
-      if (!contents.data[0]['categoryId']) {
-        actions.setMessage(dispatch, "Missing required column 'categoryId'");
+      if (!contents.data[0]['category']) {
+        actions.setMessage(dispatch, "Missing required column 'category'");
         return;
       }
 
@@ -82,7 +82,7 @@ const ImportCSVModal = ({
           subCategoryArgs: {
             name: row['name'],
             description: row['description'],
-            categoryId: row['categoryId'],
+            category: row['category'],
             createdAt: row['createdAt'],
           },
           isPublic: false

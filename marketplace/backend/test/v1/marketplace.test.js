@@ -133,7 +133,7 @@ describe('Marketplace End-To-End Tests', function () {
     assert.isDefined(createInventoryResponse.body.data, 'body.data should be defined')
 
     const marketArgs = {
-      ...marketplaceArgs(getProduct.body.data.categoryId, getProduct.body.data.subCategoryId, getProduct.body.data.name, getProduct.body.data.manufacturer),
+      ...marketplaceArgs(getProduct.body.data.category, getProduct.body.data.subCategory, getProduct.body.data.name, getProduct.body.data.manufacturer),
     }
 
     // get
@@ -223,7 +223,7 @@ describe('Marketplace End-To-End Tests', function () {
     assert.isDefined(createInventoryResponse.body.data, 'body.data should be defined')
 
     const marketArgs = {
-      ...marketplaceArgs(getProduct.body.data.categoryId, getProduct.body.data.subCategoryId, getProduct.body.data.name, getProduct.body.data.manufacturer),
+      ...marketplaceArgs(getProduct.body.data.category, getProduct.body.data.subCategory, getProduct.body.data.name, getProduct.body.data.manufacturer),
     }
 
     // get
@@ -237,7 +237,7 @@ describe('Marketplace End-To-End Tests', function () {
     assert.deepInclude(
       // Convert the Marketplace data into strings as the args are in strings
       R.map(v => '' + v, marketplace.body.data[0]),
-      R.map(v => '' + v, { ...marketplaceArgs(getProduct.body.data.categoryId, getProduct.body.data.subCategoryId, getProduct.body.data.name, getProduct.body.data.manufacturer) }));
+      R.map(v => '' + v, { ...marketplaceArgs(getProduct.body.data.category, getProduct.body.data.subCategory, getProduct.body.data.name, getProduct.body.data.manufacturer) }));
 
     assert.equal(marketplace.status, 200, 'should be 200');
     assert.isDefined(marketplace.body, 'body should be defined');

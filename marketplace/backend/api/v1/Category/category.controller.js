@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { getSignedUrlFromS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
+import CategoriesJson from  "../../../category-utility/categories.json"
 
 const options = { config, cacheNonce: true }
 
@@ -11,21 +12,10 @@ class CategoryController {
 
   static async get(req, res, next) {
     try {
-      const { dapp, params } = req
+      const { params } = req
       const { address } = params
 
-      let args
-      let chainOptions = options
-
-      if (address) {
-        args = { address }
-      }
-  
-      chainOptions = { ...options, chainIds: [dapp.chainId] }
-
-      const category = await dapp.getCategory(args, chainOptions)
-      const categoryImageUrl=getSignedUrlFromS3(category.imageKey, req.app.get(constants.s3ParamName))
-      const result={...category,imageUrl:categoryImageUrl}
+      let result;
       rest.response.status200(res, result)
 
       return next()
@@ -36,14 +26,7 @@ class CategoryController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
-      
-      const categories = await dapp.getCategories({ ...query, chainIds: [dapp.chainId] })
-      const categoriesWithImageUrl=categories.map(category=>({
-        ...category,
-        imageUrl:getSignedUrlFromS3(category.imageKey,req.app.get(constants.s3ParamName))
-      }))
-      rest.response.status200(res, categoriesWithImageUrl)
+      rest.response.status200(res, CategoriesJson.categories);
 
       return next()
     } catch (e) {
@@ -53,11 +36,11 @@ class CategoryController {
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { body } = req
 
       CategoryController.validateCreateCategoryArgs(body)
  
-      const result = await dapp.createCategory(body)
+      let result;
       rest.response.status200(res, result)
 
       return next()
@@ -68,32 +51,18 @@ class CategoryController {
 
   static async update(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { body } = req
 
       CategoryController.validateUpdateCategoryArgs(body)
 
-      const result = await dapp.updateCategory(body, options)
-
+      let result;
       rest.response.status200(res, result)
+
       return next()
     } catch (e) {
       return next(e)
     }
   }
-
-  // TODO - remove it post developement
-  // static async audit(req, res, next) {
-  //   try {
-  //     const { dapp, params } = req
-  //     const { address, chainId } = params
-
-  //     const result = await dapp.auditCategory( { address, chainId }, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
-
 
 
 

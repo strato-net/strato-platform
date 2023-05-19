@@ -135,11 +135,4 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
     }
   })
 
-  it('Should populate categories and subCategories', async () => {
-    let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options, chainIds: [dapp.chainId] })
-    const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
-    assert(Array.isArray(result), 'result should be an array')
-    assert.equal(result.length, SeederJson.categories.length)
-  })
-
 })
