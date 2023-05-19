@@ -30,7 +30,7 @@ import { orderLineItemArgs } from "../../test/v1/factories/orderLineItem";
 import { RestError } from "blockapps-rest/dist/util/rest.util";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
-
+import orderManagerJs from '/dapp/orders/orderManager';
 
 const allAssetNames = [
   orderJs.contractName,
@@ -135,10 +135,11 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const userMembershipManager = await userMembershipManagerJs.bindAddress(admin, state.userMembershipManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
+  const orderManager = await orderManagerJs.bindAddress(admin,state.orderManager,options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, appPermissionManager, categoryManager, productManager, eventTypeManager, itemManager, paymentManager, userMembershipManager };
+  return { cirrusOrg, appPermissionManager, categoryManager, productManager, eventTypeManager, itemManager, paymentManager, userMembershipManager,orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions) {

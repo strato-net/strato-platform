@@ -15,7 +15,7 @@ import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/userMemberships/contracts/UserMembershipManager.sol";
 import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
-
+import "/dapp/orders/contracts/OrderManager.sol";
 /**
  * Single entry point to all the project's contracts
  * Deployed by the deploy script
@@ -42,7 +42,8 @@ contract Dapp {
     EventTypeManager_10 eventTypeManager;
     UserMembershipManager userMembershipManager;
     PaymentManager paymentManager;
-
+    OrderManager orderManager;
+    
     account public bootUserAccount;
     string public bootUserCommonName;
     string public bootUserOrganization;
@@ -62,6 +63,8 @@ contract Dapp {
         productManager = new ProductManager(address(permissionManager));
         categoryManager = new CategoryManager(address(permissionManager));
         eventTypeManager = new EventTypeManager_10(address(permissionManager));
+        orderManager = new OrderManager(address(permissionManager));
+        
         userMembershipManager = new UserMembershipManager(
             address(permissionManager)
         );
