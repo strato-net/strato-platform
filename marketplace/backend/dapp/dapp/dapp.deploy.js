@@ -7,8 +7,6 @@ import RestStatus from "http-status-codes"
 import dotenv from 'dotenv'
 
 import dappJs from "./dapp"
-import SeederJs from "/seeder-utility/seeder";
-import SeederJson from "/seeder-utility/seeder.json";
 import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()

@@ -234,6 +234,7 @@ const UpdateProductModal = ({
                   value={formik.values.category.name}
                   onChange={(value) => {
                     formik.setFieldValue("category.name", value);
+                    formik.setFieldValue("subCategory.name", null);
                   }}
                 >
                   {categorys.map((e, index) => (

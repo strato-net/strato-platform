@@ -90,7 +90,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
         returns (uint256) {
 
         for(uint i=0;i<_inventories.length;i++){
-            Inventory inventory = Inventory(_inventories[i]);
+            Inventory_2 inventory = Inventory_2(_inventories[i]);
             
             if(_isReduce){
                 if(_quantities[i] > inventory.availableQuantity()){

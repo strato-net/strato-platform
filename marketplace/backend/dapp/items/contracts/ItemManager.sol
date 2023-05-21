@@ -150,7 +150,7 @@ contract ItemManager is ItemStatus,InventoryStatus{
    function getProductAndInventory(ProductManager _productManager, address[] _itemAddress,address _newOwner) public returns (address, address) {
         Item_3 item = Item_3(_itemAddress[0]);
         Product_4 product;
-        Inventory inventory;
+        Inventory_2 inventory;
 
         Product_4 oldProduct = Product_4(item.productId());
         address productAddress = _productManager.checkForProduct(address(oldProduct), oldProduct.uniqueProductCode(),_newOwner);
@@ -159,7 +159,7 @@ contract ItemManager is ItemStatus,InventoryStatus{
             ? new Product_4(oldProduct.appChainId(), oldProduct.name(), oldProduct.description(), oldProduct.manufacturer(), oldProduct.unitOfMeasurement(), oldProduct.userUniqueProductCode(), oldProduct.uniqueProductCode(), oldProduct.leastSellableUnit(), oldProduct.imageKey(), oldProduct.isActive(), oldProduct.category(), oldProduct.subCategory(), block.timestamp,_newOwner)
             : Product_4(productAddress);
 
-        Inventory oldInventory = Inventory(item.inventoryId());
+        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
 
         (uint status,address inventory) = product.addInventory( _itemAddress.length, oldInventory.pricePerUnit(), oldInventory.batchId(), InventoryStatus.UNPUBLISHED, block.timestamp,_newOwner);
         
