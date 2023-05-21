@@ -68,6 +68,7 @@ pipeline {
           withCredentials([
             usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
             usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
+            usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
@@ -86,6 +87,9 @@ pipeline {
                 STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
+                EXT_STORAGE_S3_ACCESS_KEY_ID='${AWS_IAM_USER_KEY_ID}' \\
+                EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
+                EXT_STORAGE_S3_BUCKET='tcommerce-dev' \\
                 ./strato --single
             """
           }
