@@ -1,0 +1,6 @@
+url: __URL__
+dapp:
+  contract:
+    name: Dapp
+    address: '0000000000000000000000000000000000000100'
+    appChainId: __DAPP_SHARD_ID__
