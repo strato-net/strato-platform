@@ -27,13 +27,13 @@ const actionDescriptors = {
   deleteCartItemFailed: "delete_cart_item_failed",
   addShippingAddress: "add_shipping_address",
   addShippingAddressSuccessful: "add_shipping_address_successful",
-  addShippingAddressFailed : "add_shipping_address_failed",
-  fetchUserAddress:"fetch_user_address",
-  fetchUserAddressSuccessful:"fetch_user_address_successful",
-  fetchUserAddressFailed:"fetch_user_address_failed",
-  fetchUserAddresses:"fetch_user_addresses",
-  fetchUserAddressesSuccessful:"fetch_user_addresses_successful",
-  fetchUserAddressesFailed:"fetch_user_addresses_failed",
+  addShippingAddressFailed: "add_shipping_address_failed",
+  fetchUserAddress: "fetch_user_address",
+  fetchUserAddressSuccessful: "fetch_user_address_successful",
+  fetchUserAddressFailed: "fetch_user_address_failed",
+  fetchUserAddresses: "fetch_user_addresses",
+  fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
+  fetchUserAddressesFailed: "fetch_user_addresses_failed"
 };
 
 const actions = {
@@ -154,7 +154,7 @@ const actions = {
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
-        try {
+    try {
       const response = await fetch(
         `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
         {
@@ -163,14 +163,14 @@ const actions = {
       );
 
       const body = await response.json();
-
+      
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceSuccessful,
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceFailed,
           error: "Error while fetching marketplace products",
@@ -200,7 +200,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
+      const body = await response.json();      
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -244,7 +244,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Shipping address added successfully", true);
         return body.data;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.addShippingAddressFailed,
           error: "Error while adding Shipping address",
@@ -268,7 +268,7 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch,address) => {
+  fetchUserAddress: async (dispatch, address) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
 
     try {
@@ -279,7 +279,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
+      const body = await response.json();   
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -287,7 +287,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchUserAddressFailed,
           error: "Error while getting Shipping address",
@@ -329,7 +329,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchUserAddressesFailed,
           error: "Error while getting Shipping address",

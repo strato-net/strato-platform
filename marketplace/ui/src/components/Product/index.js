@@ -27,6 +27,7 @@ import {
 import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -51,6 +52,8 @@ const Product = () => {
 
   const { categorys, iscategorysLoading } = useCategoryState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
     categoryActions.fetchCategory(categoryDispatch);
@@ -98,7 +101,7 @@ const Product = () => {
   }, [products]);
 
   const showModal = () => {
-    setOpen(true);
+    hasChecked && !isAuthenticated && loginUrl !== undefined ? window.location.href = loginUrl : setOpen(true)
   };
 
   const handleCancel = () => {

@@ -19,6 +19,7 @@ import {
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Title, Text } = Typography;
 
@@ -31,8 +32,8 @@ const TopSellingProductCard = () => {
     Images.topSelling3,
   ];
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { topSellingProducts, isTopSellingProductsLoading, cartList } =
-    useMarketplaceState();
+  const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
@@ -68,6 +69,7 @@ const TopSellingProductCard = () => {
       });
     }
   };
+
 
   const addItemToCart = (product) => {
     let found = false;
@@ -124,7 +126,7 @@ const TopSellingProductCard = () => {
           </div>
         </Space>
       </div>
-      <div className="flex justify-evenly px-2"  id="topSelling">
+      <div className="flex justify-evenly px-2" id="topSelling">
         {isTopSellingProductsLoading ? (
           <div className="h-52 flex justify-center items-center">
             <Spin spinning={isTopSellingProductsLoading} size="large" />
@@ -149,9 +151,9 @@ const TopSellingProductCard = () => {
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                       }
                     />
-                    <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer"  onClick={() =>
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                      }>
+                    <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
+                      navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                    }>
                       {decodeURIComponent(topSellingProduct.name)}
                     </Text>
                     <Text className="mt-3 text-xl !text-primaryC font-semibold">
@@ -169,16 +171,24 @@ const TopSellingProductCard = () => {
                       <Button
                         className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                         onClick={() => {
-                          addItemToCart(topSellingProduct);
-                          navigate("/marketplace/checkout");
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            addItemToCart(topSellingProduct);
+                            navigate("/marketplace/checkout");
+                          }
                         }}
                       >
                         Buy now
                       </Button>
                       <div
                         onClick={() => {
-                          addItemToCart(topSellingProduct);
-                          navigate("/marketplace/checkout");
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            addItemToCart(topSellingProduct);
+                            navigate("/marketplace/checkout");
+                          }
                         }}
                         className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"
                       >
