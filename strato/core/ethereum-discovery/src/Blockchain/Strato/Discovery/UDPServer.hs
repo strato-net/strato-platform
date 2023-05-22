@@ -63,9 +63,9 @@ connectMe (UDPPort port') = do
 
 addPeersIfNeeded :: MonadDiscovery m => Int -> m ()
 addPeersIfNeeded minPeers = do
-  numAvailablePeers <- getNumAvailablePeers
-  $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
-  when (numAvailablePeers < minPeers) $ do
+  numBondedPeers <- getNumBondedPeers
+  $logInfoS "addPeersIfNeeded" . T.pack $ "Number of bonded peers: " ++ show numBondedPeers ++ " / " ++ show minPeers
+  when (numBondedPeers < minPeers) $ do
     eBondedPeers <- getBondedPeersForUDP
     case eBondedPeers of
       Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
