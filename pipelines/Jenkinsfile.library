@@ -1165,7 +1165,7 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
 def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-started', OAuthDiscoveryUrl, clientId, clientSecret, username, password) {
   // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
-  sh "echo ${stratoGSPath} > _stratogs_path_tmp"
+  //sh "echo ${stratoGSPath} > _stratogs_path_tmp"
   sh "echo ${OAuthDiscoveryUrl} > _oauth_discovery_url_tmp"
   sh "echo ${username} > _username_tmp"
   sh "echo ${password} > _password_tmp"
@@ -1174,12 +1174,10 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
   
   sh '''#!/bin/bash -le
       set -x
-      cd $(<_stratogs_path_tmp)
-      token=$(curl -s -X POST '$(<_oauth_discovery_url_tmp)' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic $(<_client_b64string_tmp)' --data-urlencode 'grant_type=password' --data-urlencode 'username=$(<_username_tmp)' --data-urlencode 'password=$(_password_tmp)' | jq -r .access_token)
+      USER_TOKEN=$(curl -s -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
-      docker exec strato_nginx_1 curl -H "Authorization: Bearer $token" -X POST "localhost:80/strato/v2.3/key"
-      userPubKey=$(docker exec strato_nginx_1 curl -s -H "Authorization: Bearer $token" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
-      cd ..
+      docker exec strato_nginx_1 curl -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
+      userPubKey=$(docker exec strato_nginx_1 curl -s -H "Authorization: Bearer $USER_TOKEN" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
       
       sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
