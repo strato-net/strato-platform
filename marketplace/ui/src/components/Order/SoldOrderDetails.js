@@ -40,7 +40,6 @@ function useQuery() {
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
-  const [chainId, setChainId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
   const { Text } = Typography;
@@ -123,17 +122,17 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-    setChainId(query.get("chainId"));
+   
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
+    if (Id !== undefined) {
       getData();
     }
   }, [Id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id, chainId);
+    const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
       getPaymentStatus(data.paymentSessionId);
     }
@@ -224,7 +223,7 @@ const SoldOrderDetails = ({ user, users }) => {
     if (selectedDate == null) {
       body = {
         address: Id,
-        chainId: chainId,
+      
         updates: {
           sellerComments: comment,
           status: parseInt(getStatusByValue(status)),
@@ -234,7 +233,7 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-        chainId: chainId,
+      
         updates: {
           sellerComments: comment,
           status: 3,
@@ -246,7 +245,7 @@ const SoldOrderDetails = ({ user, users }) => {
     let isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
-      await actions.fetchOrderDetails(dispatch, Id, chainId);
+      await actions.fetchOrderDetails(dispatch, Id);
     }
   };
 
@@ -260,7 +259,7 @@ const SoldOrderDetails = ({ user, users }) => {
       }
       body = {
         address: Id,
-        chainId: chainId,
+      
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
           sellerComments: comment,
@@ -270,7 +269,7 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-        chainId: chainId,
+        
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
         },
@@ -280,7 +279,7 @@ const SoldOrderDetails = ({ user, users }) => {
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
-      await actions.fetchOrderDetails(dispatch, Id, chainId);
+      await actions.fetchOrderDetails(dispatch, Id);
     }
   };
 
@@ -619,7 +618,7 @@ const SoldOrderDetails = ({ user, users }) => {
           isUploadSerialNumberModalOpen={isUploadSerialNumberModalOpen}
           toggleUploadSerialNumberModal={setisUploadSerialNumberModalOpen}
           product={selectedProd}
-          chainId={chainId}
+       
           orderId={details.orderId}
           orderAddress={details.address}
           dispatch={dispatch}

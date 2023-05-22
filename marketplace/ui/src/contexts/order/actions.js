@@ -187,7 +187,7 @@ const actions = {
     }
   },
 
-  fetchOrderDetails: async (dispatch, id, chainId) => {
+  fetchOrderDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchOrderDetails });
 
     try {
@@ -219,7 +219,7 @@ const actions = {
     }
   },
 
-  fetchOrderLineItemDetails: async (dispatch, id, chainId) => {
+  fetchOrderLineItemDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchOrderLineItemDetails });
 
     try {

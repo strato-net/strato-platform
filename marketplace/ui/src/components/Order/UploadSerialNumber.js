@@ -22,7 +22,6 @@ const UploadSerialNumberModal = ({
   isUploadSerialNumberModalOpen,
   toggleUploadSerialNumberModal,
   product,
-  chainId,
   Id,
   orderId,
   dispatch,
@@ -87,7 +86,7 @@ const UploadSerialNumberModal = ({
     let isDone = await actions.createOrderLineItem(dispatch, body);
     if (isDone) {
       toggleUploadSerialNumberModal(false);
-      actions.fetchOrderDetails(dispatch, Id, chainId);
+      actions.fetchOrderDetails(dispatch, Id);
     }
   };
 

@@ -1109,12 +1109,13 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
       const { address, chainId, updates } = args;
+      
       const contract = { name: orderJs.contractName, address: address };
 
       const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateBuyerDetails({orderAddress: address, updates});
+          await managers.orderManager.updateBuyerDetails({orderAddress: address, ...updates});
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
         const quantities = quantitiesToUpdate.split(",").slice(0, -1);
@@ -1141,7 +1142,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateSellerDetails({orderAddress: address, updates});
+          await managers.orderManager.updateSellerDetails({orderAddress: address, ...updates});
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
         const quantities = quantitiesToUpdate.split(",").slice(0, -1);
@@ -1151,7 +1152,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       } else if (updates.status == ORDER_STATUS.CLOSED) {
 
 
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({orderAddress: address, updates});
+        const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({orderAddress: address, ...updates});
 
         // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
 
@@ -1192,7 +1193,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const orderLines = managers.orderManager.getOrderLines({orderAddress: address},createOptions);
       
       const response = await Promise.allSettled([order, orderLines]);
-      const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, optionsWithChainId);
+      const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
 
       const productIds = [
@@ -1294,12 +1295,12 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getOrderLine = async function (args = {}, options = optionsNoChainIds) {
     try {
 
-      const { chainId } = args;
+      const { address } = args;
       const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-      const orderLine = await managers.orderManager.getOrderLine(rawAdmin, { chainId, ...args, }, getOptions);
+      const orderLine = await managers.orderManager.getOrderLine( { ...args, }, getOptions);
 
       const inventory = await contract.getInventory({ address: orderLine.inventoryId, });
-      const orderLineItems = await managers.orderManager.getOrderLineItems(rawAdmin, { chainId, orderLineId: orderLine.address, }, getOptions);
+      const orderLineItems = await managers.orderManager.getOrderLineItems( {  orderLineId: orderLine.address, }, getOptions);
 
       return { ...inventory, items: orderLineItems, };
     } catch (error) {

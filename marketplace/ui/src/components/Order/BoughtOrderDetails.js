@@ -36,8 +36,6 @@ function useQuery() {
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
   const [Id, setId] = useState(undefined);
-
-  const [chainId, setChainId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
   const { Text } = Typography;
@@ -87,18 +85,18 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-    setChainId(query.get("chainId"));
+   
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
+    if (Id !== undefined) {
       getData();
       // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
-  }, [Id, dispatch, chainId]);
+  }, [Id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id, chainId);
+    const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
       getPaymentStatus(data.paymentSessionId);
     }
@@ -297,7 +295,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   const handleCancelOrder = async () => {
     const body = {
       address: Id,
-      chainId: chainId,
       updates: {
         buyerComments: encodeURIComponent(comment),
         status: 4,

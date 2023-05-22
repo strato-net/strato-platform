@@ -140,7 +140,7 @@ const OrderItemEventsList = () => {
           <Breadcrumb.Item href="javascript:;">
             {
               state == null ? <div>
-              </div> : <ClickableCell href={state.seller === true ? `${routes.SoldOrderDetails.url.replace(":id", state.orderAddress)}?chainId=${state.orderChainId}` : `${routes.BoughtOrderDetails.url.replace(":id", state.orderAddress)}?chainId=${state.orderChainId}`}>
+              </div> : <ClickableCell href={state.seller === true ? `${routes.SoldOrderDetails.url.replace(":id", state.orderAddress)}` : `${routes.BoughtOrderDetails.url.replace(":id", state.orderAddress)}`}>
                 {state.orderId}
               </ClickableCell>
             }
