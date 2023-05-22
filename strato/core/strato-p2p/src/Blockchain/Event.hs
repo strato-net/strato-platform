@@ -420,10 +420,11 @@ handleEvents peer = awaitForever $ \case
         $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
         peerX509 <- lift $ getPeerX509 peer
         myX509 <- lift getMyX509
-        ChainMemberRSet mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
+        ChainMemberRSet oldMem <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
         let (hasAccess, ChainMemberRSet newMem) = chainMemberParsedSetToChainMemberRSet org
-            mems' = ChainMemberRSet $ (if hasAccess then rSetUnion else rSetIntersection) mems newMem
-        when (checkPeerIsMember myX509 peerX509 mems') $ do
+            newMem' = ChainMemberRSet $ (if hasAccess then rSetUnion else rSetIntersection) oldMem newMem
+        -- only send chain details if they weren't associated w/ chain before
+        when (not (checkPeerIsMember myX509 peerX509 (ChainMemberRSet oldMem)) && checkPeerIsMember myX509 peerX509 newMem') $ do
           $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Peer cleared for chain " ++ formatted
           cInfo <- lift $ select (Proxy @ChainInfo) cId -- This should never be Nothing
           when (isJust cInfo) $ do 
