@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -25,11 +27,16 @@ module Handlers.Transaction
   ) where
 
 import           Control.DeepSeq
+import qualified Control.Exception          as E
+import           Control.Monad              (when)
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import qualified Data.Binary                as Bin
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Lazy       as BL
 import           Data.Conduit
-import           Data.Conduit.Combinators    (yieldMany)
+import           Data.Conduit.Combinators   (yieldMany)
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text                   as T
@@ -50,8 +57,8 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf          (runKafkaConfigured)
-import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
-import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
+import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..), Timestamp)
+import           Blockchain.Sequencer.Kafka  (writeUnseqEventsWithLimits)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.MicroTime  (getCurrentMicrotime)
 
@@ -110,7 +117,7 @@ txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing
 
 server :: (MonadLogger m, HasSQL m) => ServerT API m
-server = getTransaction :<|> postTransaction :<|> postTransactionList
+server = getTransaction :<|> postTransaction Nothing :<|> postTransactionList Nothing
 
 ---------------------------
 
@@ -182,23 +189,26 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
 
     return . Just $ nub txs
 
-postTransactionC :: (MonadIO m, MonadLogger m) => RawTransaction' -> ConduitT a IngestEvent m Keccak256
-postTransactionC (RawTransaction' raw "") = do
+postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a B.ByteString m Keccak256
+postTransactionC limit (RawTransaction' raw "") = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
-  yield . IETx ts $ IngestTx API tx'
+  let encodedTx = BL.toStrict . Bin.encode . IETx ts $ IngestTx API tx'
+  when (isJust limit && (B.length encodedTx) >= (fromJust limit)) $ 
+    throwIO $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show (B.length encodedTx)
+  yield encodedTx
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
-postTransactionC _ =
+postTransactionC _ _ =
   throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 postTransaction :: (MonadIO m, MonadLogger m) =>
-                   RawTransaction' -> m Keccak256
-postTransaction rt      = runConduit $ postTransactionC rt `fuseUpstream` emitKafkaTransactions
+                   Maybe Int -> RawTransaction' -> m Keccak256
+postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitKafkaTransactions
 
-postTransactionListC :: (MonadIO m, MonadLogger m) => [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
-postTransactionListC raws = do
+postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a B.ByteString m [Keccak256]
+postTransactionListC limit raws = do
   handlerStart <- liftIO $ getTime Realtime
 
   parserStart <- liftIO $ getTime Realtime
@@ -213,7 +223,8 @@ postTransactionListC raws = do
   $logDebug $ T.pack $ "Inserted " ++ (show (num - num')) ++ " of the transactions"
   $logDebug $ T.pack $ "Kafkaing txs: \n" ++ (unlines $ format <$> ((transactionHash . snd) <$> txr))
   ts <- liftIO getCurrentMicrotime
-  yieldMany $ IETx ts . IngestTx API . snd <$> txr
+  encodedTxs <- makeEncodedTxs ts txs limit
+  yieldMany encodedTxs
   sendResponseStart <- liftIO $ getTime Realtime
   let times = (map toNanoSecs $
                       [ parserStart - handlerStart
@@ -228,9 +239,17 @@ postTransactionListC raws = do
       case a of String _ -> True
                 _        -> False
 
+makeEncodedTxs :: (MonadIO m) => Timestamp -> [Transaction] -> Maybe Int -> m [B.ByteString]
+makeEncodedTxs ts txs limit = pure $ map (\tx -> 
+          let encodedTx = BL.toStrict $ Bin.encode $ IETx ts $ IngestTx API tx
+          in if (isJust limit && (B.length encodedTx) >= (fromJust limit))
+                then E.throw $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show (B.length encodedTx)
+                else encodedTx
+       ) txs
+
 postTransactionList :: (MonadIO m, MonadLogger m) =>
-                       [RawTransaction'] -> m [Keccak256]
-postTransactionList rts = runConduit $ postTransactionListC rts `fuseUpstream` emitKafkaTransactions
+                       Maybe Int -> [RawTransaction'] -> m [Keccak256]
+postTransactionList limit rts = runConduit $ postTransactionListC limit rts `fuseUpstream` emitKafkaTransactions
 
 
 
@@ -267,7 +286,7 @@ transactionQueryParams = [ "address",
                            "[chainids]",
                            "chainid"]
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT B.ByteString Void m ()
 emitKafkaTransactions = loop id
   where
     -- this is essentially the same as sinkList,
@@ -275,7 +294,7 @@ emitKafkaTransactions = loop id
     loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x:))
     emit txs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
-      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
+      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEventsWithLimits txs
       case rets of
         Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
         Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps

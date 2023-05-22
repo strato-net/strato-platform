@@ -63,6 +63,7 @@ packages:
 - simulator/strato-lite
 
 - tools/blockapps-tools
+- tools/debugger-tools
 - tools/x509-tools
 
 - vault/api
@@ -94,6 +95,16 @@ extra-deps:
 - saltine-0.2.0.1@sha256:8b41875d2dcd2b27bf87e1b8b19fc290d07262d7fa0565663db5709fe5c86f50,5221
 - aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
 - generically-0.1
+- ghc-debug-stub-0.4.0.0
+- ghc-debug-convention-0.4.0.0
+- ghc-debug-client-0.4.0.1
+- ghc-debug-common-0.4.0.0
+- bitwise-1.0.0.1
+- contra-tracer-0.2.0.0
+- dom-lt-0.2.3
+- eventlog2html-0.9.3
+- statistics-linreg-0.3
+- trie-simple-0.4.1.1
 
 
 #- git: https://github.com/blockapps/milena

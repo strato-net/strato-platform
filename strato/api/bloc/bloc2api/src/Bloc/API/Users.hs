@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeOperators              #-}
 
 module Bloc.API.Users (
+    BlocTransactionBodyResult(..),
     BlocTransactionResult(..),
     BlocTransactionStatus(..),
     PostUsersFill,
@@ -29,6 +30,7 @@ module Bloc.API.Users (
     SendTransaction(..),
     MethodCall(..),
     BlocTransactionData(..),
+    UploadContractDetails(..),
     uploadlistcontractChainid,
     uploadlistcontractTxParams,
     sendtransactionChainid,
@@ -64,10 +66,10 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 
 import           Blockchain.Data.TransactionResult
+import           Blockchain.Data.Json              (RawTransaction')
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
@@ -95,9 +97,48 @@ instance ToSchema BlocTransactionStatus where
     & mapped.schema.example ?~ toJSON Success
 
 data BlocTransactionData = Send   Deprecated.PostTransaction
-                         | Upload ContractDetails
+                         | Upload UploadContractDetails
                          | Call   [SolidityValue]
                          deriving (Eq,Show,Generic)
+
+data UploadContractDetails = UploadContractDetails
+  { contractName       :: Text
+  , contractAccount    :: Maybe Account
+  } deriving (Show,Eq,Generic)
+
+instance ToJSON UploadContractDetails where
+  toJSON UploadContractDetails{..} = object $
+    [ "name" .= contractName
+    , "address" .= fmap _accountAddress contractAccount
+    , "chainId" .= fmap _accountChainId contractAccount
+    ]
+
+instance FromJSON UploadContractDetails where
+  parseJSON = withObject "UploadContractDetails" $ \obj ->
+    UploadContractDetails
+      <$> obj .: "name"
+      <*> (do
+        mAddr <- obj .:? "address"
+        case mAddr of
+          Nothing -> pure Nothing
+          Just addr -> Just . Account addr <$> (obj .:? "chainId"))
+
+instance ToSample UploadContractDetails where toSamples _ = noSamples
+
+instance Arbitrary UploadContractDetails where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSchema UploadContractDetails where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "UploadContractDetails"
+    & mapped.schema.description ?~ "Returned data from contract creation."
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: UploadContractDetails
+      ex = UploadContractDetails
+        { contractName = "Example"
+        , contractAccount = Just $ Account (Address 0xdeadbeef) Nothing
+        }
 
 instance Arbitrary BlocTransactionData where
   arbitrary = GR.genericArbitrary GR.uniform
@@ -108,7 +149,7 @@ instance ToJSON BlocTransactionData where
                                  , "contents" .= (transaction::Deprecated.PostTransaction)
                                  ]
     Upload details     -> object [ "tag" .= ("Upload":: Text)
-                                 , "contents" .= (details::ContractDetails)
+                                 , "contents" .= (details::UploadContractDetails)
                                  ]
     Call   solVals     -> object [ "tag" .= ("Call":: Text)
                                  , "contents" .= (solVals::[SolidityValue])
@@ -140,14 +181,9 @@ instance ToSample BlocTransactionData where
       , Deprecated.posttransactionChainId    = Nothing
       , Deprecated.posttransactionMetadata   = Nothing
       }
-    , Upload ContractDetails {
-        contractdetailsBin        = "Contract Bin"
-      , contractdetailsAccount    = Just $ Account (Address 0xdeadbeef) Nothing
-      , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
-      , contractdetailsName       = "Example"
-      , contractdetailsSrc        = namedSource "Example.sol" "contract Example { }"
-      , contractdetailsXabi       = sampleXabi
+    , Upload UploadContractDetails {
+        contractName        = "Example"
+      , contractAccount    = Just $ Account (Address 0xdeadbeef) Nothing
       }
     , Call [] -- probably make a better Call sample
     ]
@@ -160,6 +196,11 @@ instance ToSchema BlocTransactionData where
       where
         ex :: BlocTransactionData
         ex = Call [] -- probably make a better ToSchema example
+
+data BlocTransactionBodyResult = BlocTransactionBodyResult
+  { blocTransactionHash :: Keccak256
+  , blocTransactionRaw  :: Maybe RawTransaction'
+  } deriving (Eq, Show, Generic)
 
 data BlocTransactionResult = BlocTransactionResult
   { blocTransactionStatus   :: BlocTransactionStatus
@@ -177,12 +218,23 @@ instance ToJSON BlocTransactionResult where
 instance FromJSON BlocTransactionResult where
   parseJSON = genericParseJSON (aesonDrop 15 camelCase)
 
+instance ToJSON BlocTransactionBodyResult where
+  toJSON = genericToJSON (aesonDrop 15 camelCase)
+
+instance FromJSON BlocTransactionBodyResult where
+  parseJSON = genericParseJSON (aesonDrop 15 camelCase)
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
     , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
+    }
+
+instance ToSample BlocTransactionBodyResult where
+  toSamples _ = singleSample BlocTransactionBodyResult
+    { blocTransactionHash = hash "foobarbaz"
+    , blocTransactionRaw = Nothing
     }
 
 instance ToSchema BlocTransactionResult where
@@ -197,6 +249,14 @@ instance ToSchema BlocTransactionResult where
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
+
+instance ToSchema BlocTransactionBodyResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Transaction body result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: BlocTransactionBodyResult
+      ex = BlocTransactionBodyResult (hash "foobarbaz") Nothing -- ^ TODO: replace Nothing with Something
 
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256

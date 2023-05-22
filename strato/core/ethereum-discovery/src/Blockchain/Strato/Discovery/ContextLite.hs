@@ -162,6 +162,9 @@ instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT ContextLite m) w
 instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT ContextLite m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
   access = liftIO . Mod.access
 
@@ -192,6 +195,7 @@ type MonadDiscovery m = ( HasVault m
                         , A.Selectable IPAsText ClosestPeers m
                         , A.Selectable String PPeer m
                         , A.Replaceable PPeer PeerUdpDisable m
+                        , A.Replaceable PPeer T.Text m
                         , A.Replaceable T.Text PPeer m
                         , A.Selectable () (B.ByteString, SockAddr) m
                         , A.Replaceable IPAsText PPeer m
