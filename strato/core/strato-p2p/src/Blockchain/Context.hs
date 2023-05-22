@@ -540,6 +540,7 @@ type MonadP2P m = ( MonadIO m
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
+                       , BondedPeers
                        , PublicKey
                        ] m
                   , All '[Mod.Modifiable]
