@@ -343,8 +343,8 @@ const SoldOrderDetails = ({ user, users }) => {
               onClick={() => {
                 navigate(
                   `${routes.SoldOrderItemDetail.url
-                    .replace(":id", text.address)
-                    .replace(":chainId", text.chainId)}`,
+                    .replace(":id", text.address)}`,
+                    // .replace(":chainId", text.chainId)}`
                   { state: { orderId: orderDetails.orderId, address: Id } }
                 );
               }}
@@ -621,6 +621,7 @@ const SoldOrderDetails = ({ user, users }) => {
           product={selectedProd}
           chainId={chainId}
           orderId={details.orderId}
+          orderAddress={details.address}
           dispatch={dispatch}
           actions={actions}
           isLoading={isCreateOrderLineItem}

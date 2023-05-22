@@ -28,6 +28,7 @@ const UploadSerialNumberModal = ({
   dispatch,
   actions,
   isLoading,
+  orderAddress
 }) => {
   const [serialNumbers, setSerialNumbers] = useState([]);
   const [serialNumbersStr, setSerialNumbersStr] = useState("");
@@ -78,7 +79,8 @@ const UploadSerialNumberModal = ({
 
     const body = {
       orderId: orderId,
-      chainId: chainId,
+      // chainId: chainId,
+      orderAddress: orderAddress,
       orderLineId: product.address,
       serialNumber: serialNumbers,
     };

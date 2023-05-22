@@ -236,8 +236,8 @@ const BoughtOrderDetails = ({ user, users }) => {
             onClick={() => {
               navigate(
                 `${routes.BoughtOrderItemDetail.url
-                  .replace(":id", text.address)
-                  .replace(":chainId", text.chainId)}`,
+                  .replace(":id", text.address)}`,
+                  // .replace(":chainId", text.chainId)}`,
                 { state: { orderId: details.orderId, address: Id } }
               );
             }}
