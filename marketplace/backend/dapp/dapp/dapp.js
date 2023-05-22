@@ -909,8 +909,32 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+
       // get user paymentProvider details from cirrus
-      return paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
+      const paymentProvider = paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
+
+      /* TODO check if the provider contract exists on then initiate a update */
+      if (!paymentProvider) {
+        // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
+        return {}
+      }
+      const connectedStripeAccountStatus = { paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
+
+      try {
+        const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
+        connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
+        connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
+        connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
+
+      } catch (error) {
+        if (error.code == 'account_invalid') {
+          connectedStripeAccountStatus.accountDeauthorized = true
+        }
+      }
+
+      await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, chainOptions)
+
+      return connectedStripeAccountStatus
 
     } catch (error) {
       console.error(`${error}`)
@@ -1436,7 +1460,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getAllCertifiers = async function (args = {}, options = optionsNoChainIds) {
-   
+
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
     const membersWithCertifierRole = await managers.userMembershipManager.getAll({ appChainId: contract.chainId, isCertifier: true, ownerOrganization: contract.userOrganization, ...args, }, getOptions);
     const certifierAddresses = Array.from(new Set(membersWithCertifierRole.map(certifier => certifier.userAddress))); // ensure only unique addresses
@@ -1467,7 +1491,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   // -----------------------------User Membership Request starts here -------------------------------
   contract.createUserMembershipRequest = async function (args, options = defaultOptions) {
     const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    const userMembership = await managers.userMembershipManager.getAll({ userAddress: args.userAddress,appChainId:contract.chainId,ownerOrganization: contract.userOrganization }, createOptions);
+    const userMembership = await managers.userMembershipManager.getAll({ userAddress: args.userAddress, appChainId: contract.chainId, ownerOrganization: contract.userOrganization }, createOptions);
     const newArgs = { createdDate: Date.now(), userMembershipAddress: userMembership[0].address, ...args }
 
     // TODO remove usermembership address fetch
