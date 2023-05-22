@@ -155,14 +155,15 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
     function transferOwnership(
         address[] _itemsAddress,
-        address _newOwner
+        address _newOwner,
+        address _dappAddress
     ) public returns (uint, address, address) {
         string itemAddresses = "";
         // if(_itemsAddress.length <= 0){
         //     return (RestStatus.BAD_REQUEST,address(0),address(0));
         // }
         // get Dapp contract from dapp chain
-        Dapp dapp = Dapp(address(0x100));
+        Dapp dapp = Dapp(address(_dappAddress));
         ProductManager productManager = dapp.productManager();
 
         (address productId, address inventoryId) = getProductAndInventory(
