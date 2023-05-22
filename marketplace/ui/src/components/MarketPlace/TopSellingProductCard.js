@@ -70,7 +70,6 @@ const TopSellingProductCard = () => {
     }
   };
 
-
   const addItemToCart = (product) => {
     let found = false;
     for (var i = 0; i < cartList.length; i++) {

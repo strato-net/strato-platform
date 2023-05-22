@@ -46,6 +46,8 @@ import useDebounce from "../UseDebounce";
 import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
+import { useAuthenticateState } from "../../contexts/authentication";
+
 
 const ProductDetails = ({ user, users }) => {
   const { state } = useLocation();
@@ -64,6 +66,8 @@ const ProductDetails = ({ user, users }) => {
   const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
     if (Id !== undefined) {
@@ -578,8 +582,12 @@ const ProductDetails = ({ user, users }) => {
                   type="primary"
                   className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
                   onClick={() => {
-                    addItemToCart();
-                    navigate("/marketplace/checkout");
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                      navigate("/marketplace/checkout");
+                    }
                   }}
                   disabled={isCalledFromInventory}
                   id="buyNow"

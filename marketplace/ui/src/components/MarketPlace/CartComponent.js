@@ -13,6 +13,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import {
     useMarketplaceDispatch,
   } from "../../contexts/marketplace";
+  import { useAuthenticateState } from "../../contexts/authentication";
 
 
 const CartComponent = ({ columns, data }) => {
@@ -22,7 +23,8 @@ const CartComponent = ({ columns, data }) => {
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
 
-   
+    let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
 
     useEffect(() => {
         let t = 0;
@@ -89,9 +91,12 @@ const CartComponent = ({ columns, data }) => {
                             id="submit-order-button"
                             className="w-44 h-9 bg-primary !hover:bg-primaryHover"
                             onClick={() => {
+                                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                    window.location.href = loginUrl;
+                                } else {
                                 actions.addItemToConfirmOrder(marketplaceDispatch, data);
                                 navigate("/marketplace/confirmOrder");
-                            }}
+                            }}}
                             disabled={data.length === 0}
                         >
                             Submit Order
