@@ -29,10 +29,8 @@ const getTokenFromHeader = async (req) => {
 class AuthHandler {
   static authorizeRequest() {
     return async function (req, res, next) {
-      if(process.env.OAUTH_DEV_MODE !== 'true'){
-        next();    // for now, this is a hack to just always authorize, this skips the rest of the code in this function
-        return;
-      };
+      next();    // for now, this is a hack to just always authorize, this skips the rest of the code in this function
+      return;
 
 	
       try {
