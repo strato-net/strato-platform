@@ -13,7 +13,7 @@ cacheNonce: true
 nodes:
   - id: 0
     label: mercata-testnet-node1
-    url: https://strato-node1.tcommerce-dev-td3ar4a.blockapps.net
+    url: https://node1.mercata-testnet.blockapps.net
     port: 30303
     oauth:
       appTokenCookieName: asset_framework_session

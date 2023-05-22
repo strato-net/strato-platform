@@ -6,7 +6,6 @@ import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/ProductManager.sol";
-import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 
 /// @title A representation of ItemManager to manage items
 contract ItemManager is ItemStatus,InventoryStatus{
@@ -15,7 +14,6 @@ contract ItemManager is ItemStatus,InventoryStatus{
     mapping(string => uint) private uniqueSerialNumberByUPC;
     mapping(address => address) private itemProductIdMapping;
     mapping(address => address) private itemInventoryIdMapping;
-    AppPermissionManager appPermissionManager;
 
     struct ItemObject {
         uint itemNumber;
@@ -23,9 +21,6 @@ contract ItemManager is ItemStatus,InventoryStatus{
         string[] rawMaterialProductName;
         string[] rawMaterialSerialNumber;
         string[] rawMaterialProductId;
-    }
-    constructor(address _permissionManager) public {
-         appPermissionManager=AppPermissionManager(_permissionManager);
     }
 
     // TODO to be removed after product transformation implementation
@@ -98,9 +93,7 @@ contract ItemManager is ItemStatus,InventoryStatus{
     function addEvent (address[] _itemsAddress, string _appChainId, address _eventTypeId, string _eventBatchId, 
                        uint _date, string _summary, address _certifier, uint _createdDate) 
         public returns (uint, string) {
-            if(!appPermissionManager.canCreateEvent(tx.origin)){
-                return (RestStatus.UNAUTHORIZED,"0");
-            }
+
         string eventAddresses = "";
 
         for(uint256 i = 0; i < _itemsAddress.length; i++){
@@ -118,9 +111,7 @@ contract ItemManager is ItemStatus,InventoryStatus{
 
     function certifyEvent (address[] _eventAddress, string _certifierComment, uint _certifiedDate, uint _scheme) 
         public returns (uint, string) {
-        if(!appPermissionManager.canCertifyEvent(tx.origin)){
-            return (RestStatus.UNAUTHORIZED,"0");
-        }
+
         for(uint256 i = 0; i < _eventAddress.length; i++){
             Event_1 eventAddr = Event_1(_eventAddress[i]);
             uint status = eventAddr.certify(_certifierComment, _certifiedDate, _scheme);

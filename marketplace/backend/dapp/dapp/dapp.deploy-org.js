@@ -27,7 +27,6 @@ describe("Marketplace Dapp - deploy secondary org", function() {
   let orgAddress
   let orgPubKey // I hate you
 
-  let appPermissionManager
   let organizationManager
   let membershipManager
   let userManager

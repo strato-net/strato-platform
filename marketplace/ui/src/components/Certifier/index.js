@@ -5,7 +5,6 @@ import CertifyEventsList from "./CertifyEventsList";
 import { useEventDispatch, useEventState } from "../../contexts/event";
 import { actions as eventActions } from "../../contexts/event/actions";
 import classNames from "classnames";
-import { USER_ROLES } from "../../helpers/constants";
 
 const { Search } = Input;
 const { Title } = Typography;

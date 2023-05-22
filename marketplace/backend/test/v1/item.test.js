@@ -12,7 +12,6 @@ import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
 import { itemArgs, updateItemArgs } from './factories/item'
 import { Item, Product, Inventory, Organizations } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 const options = { config }
 
 const loadEnv = dotenv.config()
@@ -50,13 +49,6 @@ describe('Item End-To-End Tests', function () {
       orgAdminResponse.message
     )
     orgAdmin = { ...orgAdminResponse.user, ...orgAdminCredentials }
-
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:orgAdmin.address,
-      role:ROLE.ADMIN
-    });
   })
 
   it('Get all Items', async () => {
