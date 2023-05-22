@@ -8,7 +8,6 @@ import "/dapp/payments/contracts/PaymentServices.sol";
 contract PaymentProvider_1 is PaymentServices{
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -25,13 +24,11 @@ contract PaymentProvider_1 is PaymentServices{
 
 
     constructor(
-            string _appChainId
-        ,   PaymentServices _name
+            PaymentServices _name
         ,   string _accountId
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         name = _name;
         accountId = _accountId;

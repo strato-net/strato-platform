@@ -39,7 +39,6 @@ const loadDapp = async (req, res, next) => {
 
   req.user = user
   req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-    chainIds: [deploy.dapp.contract.appChainId],
     ...options
   })
 

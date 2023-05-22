@@ -18,7 +18,7 @@ router.get(
   Category.getAll,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   CategoryController.getAll
 );
 
@@ -26,7 +26,7 @@ router.post(
   Category.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   CategoryController.create
 );
 
@@ -35,7 +35,7 @@ router.put(
   Category.update,
   authHandler.authorizeRequest(),
   loadDapp,
-  attachMembership,
+  // attachMembership,
   CategoryController.update
 )
 

@@ -54,6 +54,9 @@ function bind(admin, _contract, contractOptions) {
     return createUserMembershipAndPermissions(admin, contract, args, options)
   }
 
+  contract.getUserMembershipRequest = async function (args, options = contractOptions) {
+    return userMembershipRequestJs.get(admin, args, options);
+  }
   return contract
 }
 
@@ -196,7 +199,7 @@ const args = {userMembershipRequestAddress:'',userMembershipEvent:1,..._args}
 
   const [restStatus, userMembershipState] = await rest.call(admin, callArgs, options)
 
-  if (parseInt(restStatus, 10) !== RestStatus.OK) {
+  if (parseInt(restStatus, 10) !== RestStatus.CREATED) {
     throw new rest.RestError(restStatus, 0, { callArgs })
   }
 

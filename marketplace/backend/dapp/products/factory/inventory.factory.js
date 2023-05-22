@@ -1,9 +1,8 @@
 /** Factory creation for Inventory arguments. */
 const factory = {
     /** Sample arguments for creating a Inventory contract. Use util.uid() to generate a uid. */
-    getInventoryArgs(uid,userAddress) {
+    getInventoryArgs(uid, userAddress) {
         const args = {
-            appChainId: `${uid}`,
             categoryId: '0000000000000000000000000000000000000000',
             subCategoryId: '0000000000000000000000000000000000000000',
             quantity: uid,
@@ -11,7 +10,7 @@ const factory = {
             batchId: `batchId_${uid}`,
             status: 2,
             createdDate: new Date().getTime(),
-            owner:userAddress
+            owner: userAddress
         }
 
         return args;

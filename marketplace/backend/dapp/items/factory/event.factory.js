@@ -5,7 +5,6 @@ const factory = {
     getEventArgs(uid) {
         const args = {
             itemAddress: '0000000000000000000000000000000000000000',
-            appChainId: `${uid}`,
             eventTypeId: '0000000000000000000000000000000000000000',
             eventBatchId: uid,
             itemSerialNumber: `${uid}`,

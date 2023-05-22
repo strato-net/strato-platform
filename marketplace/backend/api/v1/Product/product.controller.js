@@ -19,7 +19,7 @@ class ProductController {
 
       if (address) {
         args = { address }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const product = await dapp.getProduct(args, chainOptions)

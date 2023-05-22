@@ -51,7 +51,6 @@ async function uploadContract(user, _constructorArgs, options) {
 
 function marshalIn(_args) {
     const defaultArgs = {
-        appChainId: '',
         paymentSessionId: '',
         paymentProvider: '',
         paymentStatus: '',
