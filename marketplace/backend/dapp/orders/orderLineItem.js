@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 
 
 const contractName = 'OrderLineItem';
-const contractFilename = `${util.cwd}/dapp/assets/Order/contracts/OrderLineItem.sol`;
+const contractFilename = `${util.cwd}/dapp/orders/contracts/OrderLineItem.sol`;
 
 /** 
  * Upload a new OrderLineItem 

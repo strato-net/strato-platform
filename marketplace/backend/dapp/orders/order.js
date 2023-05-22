@@ -10,7 +10,7 @@ import {
 import dayjs from "dayjs";
 
 const contractName = "Order";
-const contractFilename = `${util.cwd}/dapp/assets/Order/contracts/Order.sol`;
+const contractFilename = `${util.cwd}/dapp/orders/contracts/Order.sol`;
 
 /**
  * Upload a new Order

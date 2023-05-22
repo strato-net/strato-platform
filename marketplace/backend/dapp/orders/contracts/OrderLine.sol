@@ -72,7 +72,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
       uint orderLineItemCounter = 0;
 
       // getting the order chain's governance contract
-      Order order = Order(address(0x100));
+      Order order = Order(orderAddress);
 
 
       // if(assetOwnerOrganization != ownerOrganization){
@@ -83,7 +83,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
         }
 
-        Item_3 item = Item_3(account(address(_items[i]),"parent"));
+        Item_3 item = Item_3(address(_items[i]));
 
         // check published status of items
         if(item.status() != ItemStatus.PUBLISHED){

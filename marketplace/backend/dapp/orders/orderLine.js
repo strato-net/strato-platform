@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 
 
 const contractName = 'OrderLine_2';
-const contractFilename = `${util.cwd}/dapp/assets/Order/contracts/OrderLine.sol`;
+const contractFilename = `${util.cwd}/dapp/orders/contracts/OrderLine.sol`;
 
 /** 
  * Upload a new OrderLine 
@@ -54,14 +54,14 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        orderChainId: 0,
         productId: 0,
         inventoryId: 0,
         quantity: 0,
         pricePerUnit: 0,
         tax: 0,
         shippingCharges: 0,
-        createdDate: 0
+        createdDate: 0,
+        orderAddress:0
     };
     
     const args = {

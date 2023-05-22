@@ -76,7 +76,7 @@ export const Order = {
   payment: '/payment',
   paymentSession: '/payment/session/:session_id',
   userAddress: '/userAddress',
-  getAllUserAddress: '/userAddresses'
+  getAllUserAddress: '/userAddresses/user',
 }
 
 export const OrderLine = {

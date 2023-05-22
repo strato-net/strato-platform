@@ -12,7 +12,6 @@ import categoryManagerJs from "/dapp/categories/categoryManager";
 import categoryJs from "/dapp/categories/category";
 import subCategoryJs from "/dapp/categories/subCategory";
 import itemJs from "/dapp/items/item";
-import orderChainJs from "/dapp/assets/Order/orderChain";
 import orderJs from "/dapp/orders/order";
 import orderLineItemJs from "/dapp/orders/orderLineItem";
 import orderLineJs from "/dapp/orders/orderLine";
@@ -1190,11 +1189,9 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = await managers.orderManager.getOrder(args, createOptions);
-      const orderLines = await managers.orderManager.getOrderLines({orderAddress: address}, createOptions);
+      const orderLines = await managers.orderManager.getOrderLines({orderAddress: address},createOptions);
       
       const response = await Promise.allSettled([order, orderLines]);
-      console.log(response);
-      process.exit()
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, optionsWithChainId);
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
 
@@ -1233,7 +1230,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getOrders = async function (args = {}, options = optionsNoChainIds) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-      return managers.orderManager.getOrders(rawAdmin, { ...args, }, getOptions);
+      return managers.orderManager.getOrders(rawAdmin, args, getOptions);
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1252,13 +1249,13 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
-      const { orderLineId, serialNumber, chainId } = args;
-      const chainOptions = { ...options, chainIds: [chainId], org: managers.cirrusOrg, app: mainChainContractName, };
+      const { orderLineId, serialNumber } = args;
+      const chainOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
 
-      const orderLine = await managers.orderManager.getOrderLine(rawAdmin, { chainId, address: orderLineId }, chainOptions);
+      const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
       const { productId } = orderLine
 
-      const items = await managers.itemManager.getItems({ serialNumber: [...serialNumber], productId, chainId: contract.chainId }, chainOptions);
+      const items = await managers.itemManager.getItems({ serialNumber: [...serialNumber], productId }, chainOptions);
 
       if (serialNumber.length != items.length) {
         throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different then the actual inventory")
@@ -1276,7 +1273,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       };
 
       // create orderlineitem for orderline
-      const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(rawAdmin, _contract, _args, chainOptions);
+      const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
 
       // update status of all items to sold

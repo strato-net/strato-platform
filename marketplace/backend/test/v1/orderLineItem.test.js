@@ -111,9 +111,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     )
     const [orderResponse]=createOrderResponse.body.data
 
-    const {address:orderAddress} = orderResponse
-    const [orderChainId] = orderResponse.chainIds
-    orderChain=orderChainId
+    const [,orderAddress] = orderResponse
 
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
@@ -121,7 +119,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     // get
     const getOrderResponse = await get(
       Order.prefix,
-      Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
+      Order.get.replace(':address',orderAddress),
       {},
       globalAdmin.token,
     )
@@ -134,7 +132,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderResponse.body, 'body should be defined');
     
     // create order line item
-    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderChainId,orderLineId,serialNumbersArray)
+    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderAddress,orderLineId,serialNumbersArray)
 
     const getCreateOrderLineItemsResponse=await post(
       OrderLineItem.prefix,
@@ -191,9 +189,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     )
     const [orderResponse]=createOrderResponse.body.data
 
-    const {address:orderAddress} = orderResponse
-    const [orderChainId] = orderResponse.chainIds
-    orderChain=orderChainId
+    const [,orderAddress] = orderResponse
 
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
@@ -201,7 +197,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     // get
     const getOrderResponse = await get(
       Order.prefix,
-      Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
+      Order.get.replace(':address',orderAddress),
       {},
       globalAdmin.token,
     )
@@ -214,7 +210,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderResponse.body, 'body should be defined');
     
     // create order line item
-    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderChainId,orderLineId,serialNumbersArray)
+    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderLineId,serialNumbersArray)
 
     const getCreateOrderLineItemsResponse=await post(
       OrderLineItem.prefix,
@@ -229,8 +225,8 @@ describe('OrderLineItem End-To-End Tests', function () {
     // get
     const getMachine = await get(
       OrderLineItem.prefix,
-      OrderLineItem.get.replace(':address', orderAddress).replace(':chainId', orderChainId),
-      {orderChainId},
+      OrderLineItem.get.replace(':address', orderAddress),
+      {},
       seller.token,
     )
 
@@ -243,7 +239,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     const getOrderLineItemResponse = await get(
       OrderLineItem.prefix,
       OrderLineItem.getAll,
-      {chainId:orderChain},
+      {},
       globalAdmin.token,
     )
 
@@ -300,8 +296,6 @@ describe('OrderLineItem End-To-End Tests', function () {
     const [orderResponse]=createOrderResponse.body.data
 
     const {address:orderAddress} = orderResponse
-    const [orderChainId] = orderResponse.chainIds
-    orderChain=orderChainId
     
     console.log(createOrderResponse.body.data)
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
@@ -310,7 +304,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     // get
     const getOrderResponse = await get(
       Order.prefix,
-      Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
+      Order.get.replace(':address',orderAddress),
       {},
       globalAdmin.token,
     )
@@ -323,7 +317,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderResponse.body, 'body should be defined');
     
     // create order line item
-    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderChainId,orderLineId,serialNumbersArray)
+    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderLineId,serialNumbersArray)
 
     const getCreateOrderLineItemsResponse=await post(
       OrderLineItem.prefix,
@@ -337,7 +331,6 @@ describe('OrderLineItem End-To-End Tests', function () {
 
     const orderCloseArgs = {
       address:orderAddress,
-      chainId:orderChain,
       updates:{
         status:3,
         sellerComments:"dfjlksdjf",

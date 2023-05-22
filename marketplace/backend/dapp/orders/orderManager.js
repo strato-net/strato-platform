@@ -112,7 +112,7 @@ function bind(user, _contract, options) {
   contract.getState = async () => getState(user, contract, options);
   contract.getOrder = async (args, _options = defaultOptions) =>
     orderJs.get(user, args, _options);
-  contract.getOrders = async (args, _options = defaultOptions) =>
+  contract.getOrders = async (user,args, _options = defaultOptions) =>
     orderJs.getAll(user, args, _options);
   contract.createOrder = async (args) =>
     createOrder(user, contract, args, options);
@@ -124,16 +124,16 @@ function bind(user, _contract, options) {
     getInventoriesAndAvailableQuantity(user, contract, args, options);
   contract.addOrderLine = async (args) =>
     addOrderLine(user, contract, args, options);
-  contract.getOrderLine = async (args) =>
-    orderLineJs.get(user, contract, args, options);
-  contract.getOrderLines = async (args) =>
-    orderLineJs.getAll(user, contract, args, options);
+  contract.getOrderLine = async (args,options=defaultOptions) =>
+    orderLineJs.get(user, args, options);
+  contract.getOrderLines = async (args,options=defaultOptions) =>
+    orderLineJs.getAll(user, args, options);
   contract.addOrderLineItems = async (args) =>
     addOrderLineItems(user, contract, args, options);
-  contract.getOrderLineItem = async (args) =>
-    orderLineItemJs.get(user, contract, args, options);
-  contract.getOrderLineItems = async (args) =>
-    orderLineItemJs.getAll(user, contract, args, options);
+  contract.getOrderLineItem = async (args,options=defaultOptions) =>
+    orderLineItemJs.get(user, args, options);
+  contract.getOrderLineItems = async (args,options=defaultOptions) =>
+    orderLineItemJs.getAll(user, args, options);
   return contract;
 }
 
