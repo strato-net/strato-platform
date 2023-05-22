@@ -73,8 +73,10 @@ services:
     - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
     - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
     - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} # should only be used for client credentials flow in the app going forward. Use same client id as vault-proxy in strato container (in case if client-credentials flow is not supported by same client as auth code grant in nginx, e.g. for AWS Cognito)
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
     - OAUTH_SERVICE_OAUTH_FLOW=client-credential
     - OAUTH_TOKEN_FIELD=access_token
