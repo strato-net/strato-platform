@@ -1174,7 +1174,7 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
   
   sh '''#!/bin/bash -le
       set -x
-      USER_TOKEN=$(curl -s -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(_password_tmp)" | jq -r .access_token)
+      USER_TOKEN=$(curl -s -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
       docker exec strato_nginx_1 curl -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
       userPubKey=$(docker exec strato_nginx_1 curl -s -H "Authorization: Bearer $USER_TOKEN" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
