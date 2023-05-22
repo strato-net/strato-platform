@@ -135,7 +135,7 @@ const Inventory = ({ user }) => {
   return (
     <>
       {contextHolder}
-      {stripeStatus == null || iscategorysLoading || isInventoriesLoading || isLoadingStripeStatus ? (
+      {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>

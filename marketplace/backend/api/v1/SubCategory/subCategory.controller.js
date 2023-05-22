@@ -25,6 +25,26 @@ class SubCategoryController {
       const { category } = query
       const categories = CategoriesJson.categories;
 
+      if (Array.isArray(category)) {
+        if (category[0].indexOf(",") > -1) {
+          let subCategoryList = [];
+          categories.map((record) => {
+            if (category[0].includes(record.name)) {
+              record.subCategories.map((subCategory) => {
+                subCategoryList.push(subCategory);
+              })
+            }
+          });
+          rest.response.status200(res, subCategoryList)
+        }
+        else {
+          const categoryRecord = categories.find((record) => record.name === category[0]);
+          const subCategories = categoryRecord.subCategories;
+          
+          rest.response.status200(res, subCategories)
+        }
+      }
+
       const categoryRecord = categories.find((record) => record.name === category);
       const subCategories = categoryRecord.subCategories;
       

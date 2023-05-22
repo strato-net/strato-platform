@@ -56,6 +56,7 @@ const CategoryProductList = () => {
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
+  let currentCategory;
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -68,6 +69,7 @@ const CategoryProductList = () => {
 
   const onChangeCategory = (checkedValues) => {
     setSelectedCategories(checkedValues);
+    currentCategory = categorys.find((c) => c.name === checkedValues);
     if (checkedValues.length) clearSelection();
   };
 
@@ -79,10 +81,7 @@ const CategoryProductList = () => {
     setSelectedCategories(newCategory);
   }, []);
 
-  const currentCategory = useMemo(
-    () => categorys.find((c) => c.name === category),
-    [category]
-  );
+  currentCategory = categorys.find((c) => c.name === category);
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
@@ -319,7 +318,7 @@ const CategoryProductList = () => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {currentCategory.subCategorys.length > 0 && (
+            {currentCategory && currentCategory.subCategories.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -335,7 +334,7 @@ const CategoryProductList = () => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {currentCategory.subCategorys.map((subcategory, index) => (
+                        {subCategorys.map((subcategory, index) => (
                           <Checkbox value={subcategory.name} key={index} className="m-0" onChange={onChangeSubCategory}>
                             {subcategory.name}
                           </Checkbox>
@@ -346,7 +345,7 @@ const CategoryProductList = () => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )}
+            )} 
 
             {/* Panel - Product */}
             {productsForFilter.length > 0 && (

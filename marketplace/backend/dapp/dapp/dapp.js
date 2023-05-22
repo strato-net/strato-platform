@@ -644,7 +644,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getProductNames = async function (args, options = defaultOptions) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
     return managers.productManager.getProducts(
-      { appChainId: contract.chainId, ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
+      { appChainId: contract.chainId, ...args, sort: '-createdDate' },
       getOptions
     );
   };
@@ -661,7 +661,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    return marketplaceJs.getAll(rawAdmin, { appChainId: contract.chainId, ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions);
+    return marketplaceJs.getAll(rawAdmin, { appChainId: contract.chainId, ...args }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
