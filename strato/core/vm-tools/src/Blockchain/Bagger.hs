@@ -18,6 +18,10 @@ import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Class          (lift)
+
+import qualified Data.Binary                        as Bin
+import qualified Data.ByteString                    as BS
+import qualified Data.ByteString.Lazy               as BL
 import qualified Data.DList                         as DL
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
@@ -198,6 +202,12 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
     InvalidPragma s q erPragmas OutputTx{otHash=hsh} ->
         (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
+    NonceLimitExceeded s q e l OutputTx{otHash=hsh} ->
+        (p s q ++ "account nonce limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
+    TXSizeLimitExceeded s q e l OutputTx{otHash=hsh} ->
+        (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
+    GasLimitExceeded s q e l OutputTx{otHash=hsh} ->
+        (p s q ++ "transaction gas limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -487,16 +497,20 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
     state <- lift getBaggerState
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-        txgl         = TD.transactionGasLimit bt
         txn          = TD.transactionNonce bt
         txFee        = B.calculateIntrinsicTxFee state t
-    when (intrinsicGas > txgl) .
-       throwE $ GasLimitTooLow Validation Incoming intrinsicGas t
+        txSize       = toInteger $ BS.length $ BL.toStrict $ Bin.encode t 
+    when (intrinsicGas >= flags_gasLimit) .
+       throwE $ GasLimitExceeded Validation Incoming intrinsicGas flags_gasLimit t
     (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
     when (addressNonce > txn) .
        throwE $ NonceTooLow Validation Incoming addressNonce t
+    when (addressNonce >= flags_accountNonceLimit) .
+       throwE $ NonceLimitExceeded Validation Incoming addressNonce flags_accountNonceLimit t
     when (addressBalance < txFee) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
+    when (txSize >= flags_txSizeLimit) .
+       throwE $ TXSizeLimitExceeded Validation Incoming txSize flags_txSizeLimit t 
     return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()

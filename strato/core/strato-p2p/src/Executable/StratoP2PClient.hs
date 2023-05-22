@@ -40,6 +40,7 @@ import           UnliftIO
 import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
+import           Blockchain.Event                      (cleanUpGlobalHeadersCache)
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
@@ -84,7 +85,7 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
     let pStr = pPeerString peer -- display string will show up as dns name
-    attempt :: Maybe SomeException <- withActivePeer peer $
+    attempt :: Maybe SomeException <- withCertifiedPeer peer . withActivePeer peer $
       runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
                           (c ^. peerSource)
                           (c ^. peerSink)
@@ -108,14 +109,16 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
 
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
-
-  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx 
-  fmap (either Just (const Nothing)) . try . runConduit $ eventSource
-                  .| handleMsgClientConduit myPublic peer
-                  .| eventSink
-                  .| pSink
+  mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
+  case mConnectionResult of
+    Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
+    Just (_, (outCtx, inCtx)) -> do
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSink <- mkEthP2PEventConduit peerStr outCtx 
+      fmap (either Just (const Nothing)) . try . runConduit $ eventSource
+                      .| handleMsgClientConduit myPublic peer
+                      .| eventSink
+                      .| pSink
 
 
 runPeerInList :: ( MonadP2P m
@@ -139,7 +142,7 @@ stratoP2PClient runner = runner $ \_ -> do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    ePeers <- getAvailablePeers
+    ePeers <- getBondedPeers
     case ePeers of
       Left err -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
@@ -158,7 +161,7 @@ stratoP2PClient runner = runner $ \_ -> do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> do
+            Just _  -> void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
               result <- try $ liftIO $ Async.withAsync (runLoggingT . runner $ \sSource -> runPeerInList p sSource) $ \res -> Async.waitCatch res
               handleRunPeerResult p result
               liftIO (SSem.signal sem)
@@ -174,21 +177,45 @@ stratoP2PClient runner = runner $ \_ -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    disErr <- storeDisableException thePeer (T.pack "WrongGenesisBlock")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisable thePeer
-                   e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just HeadMacIncorrect  <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "HeadMacIncorrect")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    lengthenPeerDisable thePeer
                    e' | Just NetworkIDMismatch <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    disErr <- storeDisableException thePeer (T.pack "NetworkIDMismatch")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisable thePeer
-                   e' | Just PeerDisconnected <- fromException e' -> lengthenPeerDisable thePeer
-                   e' | Just TimeoutException <- fromException e' -> lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
+                   e' | Just PeerDisconnected <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    cleanUpGlobalHeadersCache -- connection ended, so clean up global cache for other threads
+                    lengthenPeerDisable thePeer
+                   e' | Just TimeoutException <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "TimeoutException")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    cleanUpGlobalHeadersCache -- connection ended, so clean up global cache for other threads
+                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
+                   e' | Just NoPeerCertificate <- fromException e' -> do
+                    disErr <- storeDisableException thePeer (T.pack "NoPeerCertificate")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    udpErr <- disableUDPPeerForSeconds thePeer 86400
+                    whenLeft udpErr $ \theUDPErr -> do
+                      $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                    lengthenPeerDisable thePeer
                    e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do
                         udpErr <- disableUDPPeerForSeconds thePeer 86400
                         whenLeft udpErr $ \theUDPErr -> do
                           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+                        disErr <-storeDisableException thePeer (T.pack "ioErrType: NoSuchThing")
+                        whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                         lengthenPeerDisable thePeer
                       _ -> return $ Right ()
                    _  -> return $ Right ()
