@@ -1,7 +1,6 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/permissions/app/contracts/Role.sol";
 import "/dapp/userMemberships/contracts/UserMembership.sol";
-import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 import "/dapp/userMemberships/contracts/UserMembershipStateEnum.sol";
 import "/dapp/userMemberships/contracts/UserMembershipEventEnum.sol";
 import "/dapp/userMemberships/contracts/UserMembershipRequest.sol";
@@ -15,11 +14,11 @@ contract UserMembershipManager is
 {
 
     UserMembershipFSM public userMembershipFSM;
-    AppPermissionManager public appPermissionManager;
+    // AppPermissionManager public appPermissionManager;
     mapping(address => address) public userMemberships;
 
     constructor(address _permissionManager) public {
-     appPermissionManager = AppPermissionManager(_permissionManager);
+    //  appPermissionManager = AppPermissionManager(_permissionManager);
      userMembershipFSM = new UserMembershipFSM();
     }
 
@@ -42,7 +41,7 @@ contract UserMembershipManager is
         }
         UserMembership_2 userMembership = UserMembership_2(_userMembership);
          // TODO AppPermissionManager implementation
-        var(grantRoleStatus, ) = appPermissionManager.upsertRole('AppChain', userMembership.userAddress(), userMembership.getRoles());
+        // var(grantRoleStatus, ) = appPermissionManager.upsertRole('AppChain', userMembership.userAddress(), userMembership.getRoles());
         
         return (grantRoleStatus);
     }
@@ -121,7 +120,7 @@ contract UserMembershipManager is
         uint status = userMembership.update(_isAdmin, _isTradingEntity, _isCertifier, _scheme);
 
         // TODO AppPermissionManager implementation
-        var(grantRoleStatus, ) = appPermissionManager.upsertRole('AppChain', userMembership.userAddress(), userMembership.getRoles());
+        // var(grantRoleStatus, ) = appPermissionManager.upsertRole('AppChain', userMembership.userAddress(), userMembership.getRoles());
         
         // if(grantRoleStatus != uint(RestStatus.OK)){
         //     return (grantRoleStatus);

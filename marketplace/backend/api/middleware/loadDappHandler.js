@@ -3,12 +3,13 @@ import RestStatus from 'http-status-codes'
 import dappJs from '/dapp/dapp/dapp'
 import constants from '../../helpers/constants'
 import config from '/load.config'
+import oauthHelper from '/helpers/oauthHelper'
 
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
   const { app, username } = req
-  const accessToken = {token: req.headers['x-user-access-token']};
+  const accessToken = { token: req.headers['x-user-access-token'] };
   const userCredentials = {
     username,
     ...accessToken,
@@ -16,6 +17,7 @@ const loadDapp = async (req, res, next) => {
   // console.log('req: \n\n\n\n\n', req)
   console.log('userCredentials: \n\n\n\n\n', userCredentials)
   let address
+
   try {
     address = await rest.getKey(userCredentials, options)
   } catch (e) {

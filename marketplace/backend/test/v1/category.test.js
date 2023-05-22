@@ -9,7 +9,6 @@ import dappJs from '../../dapp/dapp/dapp'
 
 import { categoryArgs, updateCategoryArgs } from './factories/category'
 import { Category } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 
 const options = { config }
 
@@ -39,15 +38,14 @@ describe('Category End-To-End Tests', function () {
 
     const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
     const dapp = await dappJs.loadFromDeployment(globalAdminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
-    
+
     assert.strictEqual(
       globalAdminResponse.status,
       RestStatus.OK,
       globalAdminResponse.message
-      )
-      globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
-      
-   
+    )
+    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
+
   })
 
   it('Create a Category', async () => {

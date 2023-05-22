@@ -10,7 +10,6 @@ import dappJs from '../../dapp/dapp/dapp'
 
 import { eventTypeArgs, updateEventTypeArgs } from './factories/eventType'
 import { EventType, Organizations } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 
 const options = { config }
 
@@ -50,12 +49,6 @@ describe('EventType End-To-End Tests', function () {
     )
     orgAdmin = { ...orgAdminResponse.user, ...orgAdminCredentials }
 
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:orgAdmin.address,
-      role:ROLE.TRADING_ENTITY
-    });
   })
 
   it('Create an EventType', async () => {

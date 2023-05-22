@@ -10,7 +10,6 @@ import dappJs from '../../dapp/dapp/dapp'
 import { categoryArgs, updateCategoryArgs } from './factories/category'
 import { subCategoryArgs, updateSubCategoryArgs } from './factories/subCategory'
 import { Category, SubCategory } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 
 const options = { config }
 
@@ -40,7 +39,7 @@ describe('Category End-To-End Tests', function () {
 
     const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
     const dapp = await dappJs.loadFromDeployment(globalAdminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
-    
+
 
     assert.strictEqual(
       globalAdminResponse.status,
@@ -49,16 +48,9 @@ describe('Category End-To-End Tests', function () {
     )
     globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
 
-
-    // await dapp.managers.userMembershipManager.createUserMembership({
-    //   appChainId:dapp.chainId,
-    //   username:`${process.env.GLOBAL_ADMIN_NAME}`,
-    //   userAddress:globalAdmin.address,
-    //   role:ROLE.ADMIN
-    // });
   })
 
-it('Create a subCategory', async () => {
+  it('Create a subCategory', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }

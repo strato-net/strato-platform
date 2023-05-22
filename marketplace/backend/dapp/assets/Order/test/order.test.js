@@ -8,7 +8,6 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderJs from '../order';
 import orderChainJs from '../orderChain';
 import orderLineJS from '../orderLine'
@@ -32,10 +31,10 @@ describe('Order', function () {
     let newOptions;
 
     let factoryArgs;
-    const updateBuyerFactoryArgs = (user) => ({ ...(factory.getUpdateBuyerOrderArgs(util.uid()))});
-    const updateSellerFactoryArgs = (user) => ({ ...(factory.getUpdateSellerOrderArgs(util.uid()))});
-    const OrderLineFactoryArgs = (user) => ({ ...(factory.getOrderLineArgs(util.uid()))});
-    const OrderLineItemFactoryArgs = (user) => ({ ...(factory.getOrderLineItemArgs(util.uid()))});
+    const updateBuyerFactoryArgs = (user) => ({ ...(factory.getUpdateBuyerOrderArgs(util.uid())) });
+    const updateSellerFactoryArgs = (user) => ({ ...(factory.getUpdateSellerOrderArgs(util.uid())) });
+    const OrderLineFactoryArgs = (user) => ({ ...(factory.getOrderLineArgs(util.uid())) });
+    const OrderLineItemFactoryArgs = (user) => ({ ...(factory.getOrderLineItemArgs(util.uid())) });
 
     before(async () => {
         assert.isDefined(
@@ -79,12 +78,12 @@ describe('Order', function () {
         globalAdmin = { ...adminResponse.user, ...adminCredentials }
 
         dapp = await dappJs.loadFromDeployment({ token: adminUserToken }, `${config.configDirPath}/${config.deployFilename}`, options);
-        newOptions={
+        newOptions = {
             // app:'MyApp',
-            org:dapp.managers.cirrusOrg,
+            org: dapp.managers.cirrusOrg,
             ...options
         }
-        factoryArgs = (user) => ({ ...(factory.getOrderArgs(util.uid(),constants.buyerOrgName,dapp.managers.cirrusOrg))});
+        factoryArgs = (user) => ({ ...(factory.getOrderArgs(util.uid(), constants.buyerOrgName, dapp.managers.cirrusOrg)) });
     });
     // TODO : there should be two different users for Buyer and seller and two different test suites to check their permissions 
     // ! currently User from any other org except deployer is not able to create private chain
@@ -101,7 +100,7 @@ describe('Order', function () {
             R.map(v => '' + v, args));
     });
 
-    describe('Buyer Org',()=>{
+    describe('Buyer Org', () => {
 
         it('createOrder (Private chain)', async () => {
             const args = factoryArgs(globalAdmin);
@@ -114,7 +113,7 @@ describe('Order', function () {
                 R.map(v => '' + v, orderData),
                 R.map(v => '' + v, args));
         });
-    
+
         it('createOrder (Private chain, multiple)', async () => {
             const args1 = factoryArgs(globalAdmin);
             const args2 = factoryArgs(globalAdmin);
@@ -134,12 +133,12 @@ describe('Order', function () {
             assert.deepInclude(R.map(v => '' + v, orderData3), R.map(v => '' + v, args3));
             assert.deepInclude(R.map(v => '' + v, orderData4), R.map(v => '' + v, args4));
         });
-        
+
         it('addOrderLine of order - 403', async () => {
             // create the order
             const args = factoryArgs(globalAdmin);
             const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
-    
+
             // Check if order was created
             const orderData = await order.get();
             // Sorting is needed in order to allow for chainIds to be in any order
@@ -148,51 +147,52 @@ describe('Order', function () {
                 // Convert the Order data into strings as the args are in strings
                 R.map(v => '' + v, orderData),
                 R.map(v => '' + v, args));
-            
+
             // add the orderLine
             const orderLineArgs = OrderLineFactoryArgs(globalAdmin);
-            
-    
-            await assert.restStatus(async ()=>{
+
+
+            await assert.restStatus(async () => {
                 await order.addOrderLine(orderLineArgs);
-            },RestStatus.FORBIDDEN);
+            }, RestStatus.FORBIDDEN);
         })
-    
-    
+
+
         it('update a buyer details - 403', async () => {
             // Create our Order
             const args = factoryArgs(globalAdmin);
             const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
-      
+
             // Check if Order was created
             const orderData = await order.get();
             assert.deepInclude(R.map(v => '' + v, orderData), R.map(v => '' + v, args));
-                    
+
             const buyerDetailsArgs = updateBuyerFactoryArgs(globalAdmin);
-            
-            await assert.restStatus(async ()=>{
+
+            await assert.restStatus(async () => {
                 await order.updateBuyerDetails(buyerDetailsArgs);
-            },RestStatus.FORBIDDEN);
+            }, RestStatus.FORBIDDEN);
         });
-    
+
+        // TODO: Update this test, it is failing
         it('update a seller details - 200', async () => {
             // Create our Order
             const args = factoryArgs(globalAdmin);
             const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
-      
+
             // Check if Order was created
             const orderData = await order.get();
             assert.deepInclude(R.map(v => '' + v, orderData), R.map(v => '' + v, args));
-                    
+
             const sellerDetailsArgs = updateSellerFactoryArgs(globalAdmin);
             const [status,] = await order.updateSellerDetails(sellerDetailsArgs);
-            assert.equal(status,RestStatus.OK);
-            const updatedOrder=await order.get();
-            assert.deepInclude(R.map(v => '' + v, {...orderData,...updatedOrder}), R.map(v => '' + v, sellerDetailsArgs))
+            assert.equal(status, RestStatus.OK);
+            const updatedOrder = await order.get();
+            assert.deepInclude(R.map(v => '' + v, { ...orderData, ...updatedOrder }), R.map(v => '' + v, sellerDetailsArgs))
         });
     });
 
-    describe('Seller org',()=>{
-    //  TODO once the bug is fixed write the test for seller
+    describe('Seller org', () => {
+        //  TODO once the bug is fixed write the test for seller
     });
 });

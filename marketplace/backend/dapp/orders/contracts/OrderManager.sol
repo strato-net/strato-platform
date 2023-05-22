@@ -4,15 +4,9 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/orders/contracts/Order.sol";
 import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
-import "/dapp/permissions/app/contracts/AppPermissionManager.sol";
 
 contract OrderManager is RestStatus,OrderStatus{
-    AppPermissionManager appPermissionManager;
-
-    constructor(address _permissionManager) public {
-     appPermissionManager=AppPermissionManager(_permissionManager);
-    }
-
+  
     function createOrder(    
             string _orderId
         ,   string _buyerOrganization

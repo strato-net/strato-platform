@@ -5,7 +5,7 @@ import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
 import RestStatus from 'http-status-codes';
 import userMembershipManagerJs from '../userMembershipManager';
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
+// import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import factory from '../factory/userMembershipManager.factory';
 import certificateJs from '/dapp/certificates/certificate'
 import { args } from 'commander';
@@ -31,8 +31,8 @@ describe('User Membership Manager', function () {
 
     let factoryArgs
     const updateFactoryArgs = (user) => ({ ...(factory.getUpdateUserMembershipArgs(util.uid())) });
-    const userMembershipRequestArgs = (userAddress,userMembershipAddress) =>({ ...(factory.getUserMembershipRequestArgs(util.uid(),userAddress,userMembershipAddress)) });
-    const updateUserMembershipRequestArgs = (userMembershipRequestAddress) =>({ ...(factory.getUpdateUserMembershipRequestArgs(userMembershipRequestAddress)) });
+    const userMembershipRequestArgs = (userAddress, userMembershipAddress) => ({ ...(factory.getUserMembershipRequestArgs(util.uid(), userAddress, userMembershipAddress)) });
+    const updateUserMembershipRequestArgs = (userMembershipRequestAddress) => ({ ...(factory.getUpdateUserMembershipRequestArgs(userMembershipRequestAddress)) });
 
     before(async () => {
         assert.isDefined(
@@ -88,8 +88,8 @@ describe('User Membership Manager', function () {
         factoryArgs = (user) => ({ ...(factory.getUserMembershipArgs(util.uid(), globalAdmin.address, adminOrganization)) });
 
         // deploy permission manager
-        permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            globalAdmin, { admin: globalAdmin.address, master: globalAdmin.address }, options);
+        // permissionManagerContract = await appPermissionManagerJs.uploadContract(
+        //     globalAdmin, { admin: globalAdmin.address, master: globalAdmin.address }, options);
 
         // await permissionManagerContract.grantAdminRole({ user: globalAdmin })
 
@@ -128,10 +128,10 @@ describe('User Membership Manager', function () {
 
     })
 
-    it('create user Membership Request',async ()=>{
-  
-        const args = userMembershipRequestArgs(globalAdmin.address,userMembershipContract.address);
-       
+    it('create user Membership Request', async () => {
+
+        const args = userMembershipRequestArgs(globalAdmin.address, userMembershipContract.address);
+
         const [status, userMemberships] = await contract.createUserMembershipRequest(args);
         assert.equal(status, RestStatus.CREATED);
 
@@ -148,14 +148,14 @@ describe('User Membership Manager', function () {
             R.map(v => '' + v, args))
     })
 
-    it('update user Membership Request',async ()=>{
+    it('update user Membership Request', async () => {
 
         const args = updateUserMembershipRequestArgs(userMembershipRequestAddress);
         const [status, userMemberships] = await contract.updateUserMembershipRequest(args);
-        
+
         assert.equal(status, RestStatus.CREATED);
 
         const userMembershipRequestContract = await contract.getUserMembershipRequest({ address: userMembershipRequestAddress })
-        assert.equal(args.userMembershipRequestAddress,userMembershipRequestContract.address);
+        assert.equal(args.userMembershipRequestAddress, userMembershipRequestContract.address);
     })
 });

@@ -160,6 +160,7 @@ describe('Event End-To-End Tests', function () {
     // get
     const getEvents = await get(
       Event.prefix,
+      // This endpoint does not exist
       Event.getEventsByCertifier,
       {},
       certifier.token,

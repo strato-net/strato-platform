@@ -7,7 +7,6 @@ import dotenv from 'dotenv';
 import RestStatus from 'http-status-codes';
 import certificateJs from '/dapp/certificates/certificate'
 import productManagerJs from '../productManager';
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import factory from '../factory/productManager.factory';
 import dappJs from '/dapp/dapp/dapp'
 
@@ -27,7 +26,6 @@ describe('Product Manager', function () {
     let newOptions;
     let args = {};
     let tradingEntityOrganization;
-    let permissionManagerContract;
     let certifier;
 
     const getfactoryArgs = () => ({ ...(factory.getProductArgs(util.uid())) });
@@ -99,28 +97,7 @@ describe('Product Manager', function () {
             ...options
         }
 
-        // deploy permission manager
-        permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            tradingEntity,
-            {
-                admin: tradingEntity.address,
-                master: tradingEntity.address,
-            },
-            options
-        );
-
-
-        await permissionManagerContract.grantTradingEntityRole({
-            user: tradingEntity
-        })
-
-        await permissionManagerContract.grantCertifierRole({
-            user: certifier
-        })
-
-        contract = await productManagerJs.uploadContract(tradingEntity, {
-            permissionManager: permissionManagerContract.address
-        }, newOptions);
+        contract = await productManagerJs.uploadContract(tradingEntity, {}, newOptions);
     });
 
     it('Create a product', async () => {
@@ -183,7 +160,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
         // Check if Inventory was created
@@ -212,7 +189,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
         // Check if Inventory was created
@@ -273,10 +250,10 @@ describe('Product Manager', function () {
         const inventoryArgs3 = inventoryFactoryArgs();
         const inventoryArgs4 = inventoryFactoryArgs();
 
-        const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1 });
-        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2 });
-        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3 });
-        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4 });
+        const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1, serialNumbers: ['1', '2', '3'] });
+        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2, serialNumbers: ['1', '2', '3'] });
+        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3, serialNumbers: ['1', '2', '3'] });
+        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4, serialNumbers: ['1', '2', '3'] });
 
         const inventoryData1 = await contract.getInventory({ address: inventory1 }, newOptions);
         const inventoryData2 = await contract.getInventory({ address: inventory2 }, newOptions);
@@ -310,7 +287,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
 

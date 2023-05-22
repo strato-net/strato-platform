@@ -56,7 +56,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
     setEditModalOpen(false);
   };
 
-  const callDetailPage = () =>{
+  const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
   }
 
@@ -83,7 +83,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 Preview
               </Button>
               <Popover
-                placement="bottomLeft"  
+                placement="bottomLeft"
                 open={openPop}
                 className="ml-2"
                 id="sideMenu"
@@ -92,7 +92,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                   <div className="font-medium">
                     <div
                       className="flex items-center cursor-pointer"
-                      onClick={(item) => navigate(routes.EventList.url.replace(":id",inventory.address))}
+                      onClick={(item) => navigate(routes.EventList.url.replace(":id", inventory.address))}
                     >
                       <EyeOutlined />
                       <p className="ml-3">View Event</p>
