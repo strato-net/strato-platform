@@ -229,8 +229,10 @@ instance A.Replaceable PPeer T.Text IO where
 
 instance A.Replaceable T.Text PPeer IO where
   replace _ message peer = withGlobalSQLPool $ \sqldb -> do
+    currentTime <- liftIO getCurrentTime
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
+      SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message
+                                      ,PPeerLastMsgTime SQL.=. currentTime]
 
 pPeerString :: PPeer -> String
 pPeerString PPeer{..} = T.unpack pPeerIp ++ ":" ++ show pPeerTcpPort
@@ -386,6 +388,9 @@ peerToEnode peer = (\pk -> Enode (OrgId $ pointToBytes pk)
 
 getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
+
+getNumBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeersForUDP m) => m Int
+getNumBondedPeers = length . unBondedPeersForUDP <$> Mod.access (Mod.Proxy @BondedPeersForUDP)
 
 -- todo: respect the requester's target. also is this basically getClosePeers?s
 getPeersClosestTo :: (A.Selectable IPAsText ClosestPeers m)
