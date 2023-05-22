@@ -93,6 +93,17 @@ type PostBlocTransaction = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
 
+-- | PostBlocTransactionBody should return a list of signed transaction hashes,
+-- using the caller's JWT, and their respective raw transaction bodies without
+-- posting the transactions to the VM
+--
+-- This was made at the request of Stably for their API integration
+type PostBlocTransactionBody = "transaction"
+  :> "body"                                      -- ^ /transaction/body
+  :> S.Header "X-USER-ACCESS-TOKEN" Text         -- ^ jwt
+  :> QueryParam "chainid" ChainId                -- ^ shard ID (optional)
+  :> ReqBody '[JSON] PostBlocTransactionRequest  -- ^ SolidVM transaction
+  :> Post '[JSON] [BlocTransactionBodyResult]    -- ^ Transaction results
 
 data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
   { postbloctransactionrawrequestAddress    :: Address

@@ -28,6 +28,7 @@ module Bloc.Database.Queries
 
 import           Blockchain.Data.AddressStateDB  (AddressState, unsafeResolveCodePtrSelect)
 import           Control.Arrow
+import           Control.DeepSeq
 import           Control.Monad
 import qualified Control.Monad.Change.Alter      as A
 import           Control.Monad.Logger
@@ -38,9 +39,7 @@ import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
-import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
-import           Data.Foldable                   (for_)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
@@ -51,11 +50,11 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable                (for)
+import qualified Database.Esqueleto.Legacy       as E
 import           Database.PostgreSQL.Simple.FromField hiding (name, format)
 import           Opaleye                         hiding (not, null, index, FromField)
 import qualified Opaleye as O
 import           Opaleye.Internal.PGTypesExternal
-import           System.Clock
 import           Text.Format
 import           UnliftIO
 
@@ -71,6 +70,8 @@ import           Bloc.XabiHelper
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -80,6 +81,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Data.Source.Map
 
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.SQL
 import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -162,53 +164,76 @@ insertContractDetailsQuery sourceList =
 
           A.insert (A.Proxy @SourceMap) srcHash sourceList
 
+getContractDetailsFromDB
+  :: (HasSQL m)
+  => CodePtr
+  -> Text
+  -> m (Maybe ContractDetails)
+getContractDetailsFromDB codePtr ctrName = do
+  res <- fmap (map E.entityVal) . sqlQuery $ E.select $
+    E.from $ \(contractDetailsRef) -> do
+      E.where_ (contractDetailsRef E.^. ContractDetailsRefCodeHash E.==. E.val codePtr)
+      E.where_ (contractDetailsRef E.^. ContractDetailsRefName E.==. E.val ctrName)
+      return contractDetailsRef
+  case listToMaybe res of
+    Nothing -> pure $ Nothing
+    Just a -> pure $ Just $ ContractDetails
+      { contractdetailsBin = ""
+      , contractdetailsAccount = contractDetailsRefAccount a
+      , contractdetailsBinRuntime = ""
+      , contractdetailsCodeHash =  contractDetailsRefCodeHash a
+      , contractdetailsName = contractDetailsRefName a
+      , contractdetailsSrc = SourceMap []
+      , contractdetailsXabi = contractDetailsRefXabi a
+      }
+
+insertContractDetails
+  :: (HasSQL m)
+  => ContractDetails
+  -> Bool
+  -> m ()
+insertContractDetails (ContractDetails _ a _ ch n _ x) shouldInsert = case shouldInsert of
+  True -> sqlQuery $ E.insert_ $ ContractDetailsRef a ch n x
+  False -> pure $ ()
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
-                                , HasBlocEnv m
                                 , MonadLogger m
                                 , HasBlocSQL m
+                                , HasSQL m
                                 )
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
-  srcCache <- fmap globalCodePtrCache getBlocEnv
-  now' <- liftIO $ getTime Monotonic
-  let later = (now' +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True codePtr srcCache now'
-    for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
-    pure r
-  runExceptT $ case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
-      mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
-        ~(shouldCompile, name, ch) <- case codeHash of
-          EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
-            [] -> throwE $ "Could not find EVM contract for code hash " <> Text.pack (format ch)
-            ((name, sh):xs) -> do
-              unless (null xs) $
-                $logWarnS "getContractDetailsByCodeHash" . Text.pack $ concat
-                  [ "Found multiple EVM contracts for code hash "
-                  , format ch
-                  , ". Picking first one from the list."
-                  ]
-              pure (Do Compile, name, sh)
-          SolidVMCode name ch -> pure (Don't Compile, Text.pack name, ch)
-          CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
-        srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
-          Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
-          Just s -> pure s
-        detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
-        case Map.lookup name detailsMap of
-            Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-            Just d -> pure d
-      case mDetails of
-        Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
-        Just details -> do
-          liftIO $ Cache.insert srcCache codePtr details
-          pure details
+  runExceptT $ do
+    mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
+      (shouldCompile, name, ch) <- case codeHash of
+        EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
+          [] -> throwE $ "Could not find EVM contract for code hash " <> Text.pack (format ch)
+          ((name, sh):xs) -> do
+            unless (null xs) $
+              $logWarnS "getContractDetailsByCodeHash" . Text.pack $ concat
+                [ "Found multiple EVM contracts for code hash "
+                , format ch
+                , ". Picking first one from the list."
+                ]
+            pure (Do Compile, name, sh)
+        SolidVMCode name ch -> pure (Don't Compile, Text.pack name, ch)
+        CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
+      cd <- lift $ getContractDetailsFromDB codeHash name
+      case cd of
+        Nothing -> do 
+          srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
+            Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
+            Just s -> pure s
+          detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap True
+          case Map.lookup name detailsMap of
+              Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
+              Just d -> pure $! d
+        Just d -> pure $! d 
+    let !mDetails' = force mDetails
+    case mDetails' of
+      Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
+      Just details -> pure details
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError = Text.concat
@@ -221,29 +246,18 @@ getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  , (Keccak256 `A.Alters` SourceMap) m
                                  , MonadLogger m
                                  , HasBlocSQL m
-                                 , HasBlocEnv m
+                                 , HasSQL m
                                  )
                               => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
 getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-      cacheKey = (theVM, src)
-  srcCache <- fmap globalSourceCache getBlocEnv
-  now' <- liftIO $ getTime Monotonic
-  let later = (now' +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now'
-    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
-    pure r
 
-  idsAndDetails <- case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
-      details <- if hasAnyNonEmptySources src
-                   then sourceToContractDetails shouldCompile src
-                   else return Map.empty
-      pure details
+  idsAndDetails <- do
+    details <- if hasAnyNonEmptySources src
+                 then sourceToContractDetails shouldCompile src True
+                 else return Map.empty
+    pure details
+
   case mContract of
     Nothing ->
       case Map.toList idsAndDetails of
@@ -266,13 +280,14 @@ getContractDetailsForContract theVM src mContract = do
 sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
                            , MonadLogger m
                            , HasBlocSQL m
+                           , HasSQL m
                            )
-                        => Should Compile -> SourceMap -> m (Map Text ContractDetails)
-sourceToContractDetails shouldCompile sourceList =
+                        => Should Compile -> SourceMap -> Bool -> m (Map Text ContractDetails)
+sourceToContractDetails shouldCompile sourceList shouldInsert =
   let createContractDetails =
         case shouldCompile of
           Do Compile    -> compileContract
-          Don't Compile -> createMetadataNoCompile
+          Don't Compile -> createMetadataNoCompile shouldInsert
    in createContractDetails sourceList
 
 compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
@@ -317,12 +332,12 @@ compileContract sourceList = do
   pure $ Map.fromList details
 
 -- SolidVM only
-createMetadataNoCompile :: ( MonadIO m
-                           , MonadLogger m
+createMetadataNoCompile :: ( MonadLogger m
+                           , HasSQL m
                            , (Keccak256 `A.Alters` SourceMap) m
                            )
-                        => SourceMap -> m (Map Text ContractDetails)
-createMetadataNoCompile sourceList = do
+                        => Bool -> SourceMap -> m (Map Text ContractDetails)
+createMetadataNoCompile shouldInsert sourceList = do
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
       oldXabi  =  parseXabi "-" $ Text.unpack source
@@ -332,16 +347,18 @@ createMetadataNoCompile sourceList = do
     Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs
   let contracts = xabis
-      details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
-        ContractDetails
-        { contractdetailsBin = source
-        , contractdetailsAccount = Nothing
-        , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
-        , contractdetailsName = contrName
-        , contractdetailsSrc = sourceList
-        , contractdetailsXabi = xabi
-        }
+  details <- flip Map.traverseWithKey contracts $ \ contrName (xabi) -> do
+        let cd = ContractDetails
+              { contractdetailsBin = source
+              , contractdetailsAccount = Nothing
+              , contractdetailsBinRuntime = contrName `Text.append` source
+              , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
+              , contractdetailsName = contrName
+              , contractdetailsSrc = sourceList
+              , contractdetailsXabi = xabi
+              }
+        insertContractDetails cd shouldInsert
+        pure $ cd
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
