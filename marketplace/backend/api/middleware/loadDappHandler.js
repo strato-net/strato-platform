@@ -9,8 +9,7 @@ import jwtDecode from 'jwt-decode'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  const { app, username } = req
-  const accessToken = {token: req.headers['x-user-access-token']};
+  const { app, username, accessToken } = req
   const userCredentials = {
     username,
     ...accessToken,
