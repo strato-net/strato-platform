@@ -4,7 +4,6 @@ import "/dapp/permissions/app/contracts/Role.sol";
 contract UserMembership_2 is RestStatus, Role{
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -20,14 +19,12 @@ contract UserMembership_2 is RestStatus, Role{
     // string public userOrganization;
     
     constructor(
-        string _appChainId
-        ,   bool _isAdmin
+            bool _isAdmin
         ,   bool _isTradingEntity
         ,   bool _isCertifier
         ,   address _userAddress
         ,   address _owner
     ) public {
-        appChainId = _appChainId;
         owner = _owner;
 
         isAdmin = _isAdmin;

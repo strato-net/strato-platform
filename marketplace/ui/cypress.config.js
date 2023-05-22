@@ -27,7 +27,6 @@ module.exports = defineConfig({
   pageLoadTimeout: 60000,
   e2e: {
     baseUrl: "http://localhost",
-    // baseUrl: "https://node3.tcommerce-dev-td3ar4a.blockapps.net",
     experimentalSessionAndOrigin: true,
   },
   chromeWebSecurity: false,

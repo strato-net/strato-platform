@@ -7,7 +7,6 @@ import "/dapp/userMemberships/contracts/UserMembershipStateEnum.sol";
 contract UserMembershipRequest is Role,UserMembershipStateEnum{
     
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -20,15 +19,13 @@ contract UserMembershipRequest is Role,UserMembershipStateEnum{
 
 
     constructor(
-        string _appChainId
-        ,   address _userAddress
+            address _userAddress
         ,   UserMembershipState _state
         ,   Role _role
         ,   uint _createdDate
         ,   address _userMembershipAddress
         ,   address _owner
     ) public {
-        appChainId = _appChainId;
         userAddress = _userAddress;
         state = _state;
         role = _role;
@@ -46,7 +43,7 @@ contract UserMembershipRequest is Role,UserMembershipStateEnum{
         if (owner != msg.sender) return RestStatus.FORBIDDEN;
 
         state = _state;
-        return RestStatus.OK;
+        return RestStatus.CREATED;
     }
 
     function getUserRole() returns(uint, bool, bool, bool, uint){

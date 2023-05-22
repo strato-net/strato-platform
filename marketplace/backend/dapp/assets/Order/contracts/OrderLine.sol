@@ -12,12 +12,10 @@ import "../../../items/contracts/ItemStatus.sol";
 contract OrderLine_1 is ItemStatus,OrderStatus{
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
-    address public orderChainId; 
     address public productId;
     address public inventoryId;
     uint public quantity;
@@ -29,9 +27,7 @@ contract OrderLine_1 is ItemStatus,OrderStatus{
 
     address[] public itemsAddresses;
     constructor(
-        string _appChainId
-        ,   address _orderChainId
-        ,   address _productId
+            address _productId
         ,   address _inventoryId
         ,   uint _quantity
         ,   uint _pricePerUnit
@@ -40,9 +36,7 @@ contract OrderLine_1 is ItemStatus,OrderStatus{
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
-        orderChainId = _orderChainId;
         productId = _productId;
         inventoryId = _inventoryId;
         quantity = _quantity;
@@ -98,7 +92,7 @@ contract OrderLine_1 is ItemStatus,OrderStatus{
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         } 
 
-        OrderLineItem orderLineItem=new OrderLineItem(appChainId, _orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
+        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(item)) + ",";
         itemsAddresses.push(address(item));

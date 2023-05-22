@@ -5,7 +5,6 @@ const factory = {
     /** Sample arguments for creating a OrderLine contract. Use util.uid() to generate a uid. */
     getOrderLineArgs(uid) {
         const args = {
-            appChainId: `${uid}`,
             orderChainId: constants.zeroAddress,
             productId: constants.zeroAddress,
             inventoryId: constants.zeroAddress,

@@ -50,12 +50,12 @@ describe('Category End-To-End Tests', function () {
     globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
 
 
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:globalAdmin.address,
-      role:ROLE.ADMIN
-    });
+    // await dapp.managers.userMembershipManager.createUserMembership({
+    //   appChainId:dapp.chainId,
+    //   username:`${process.env.GLOBAL_ADMIN_NAME}`,
+    //   userAddress:globalAdmin.address,
+    //   role:ROLE.ADMIN
+    // });
   })
 
 it('Create a subCategory', async () => {

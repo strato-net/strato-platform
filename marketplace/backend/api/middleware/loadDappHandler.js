@@ -7,7 +7,8 @@ import config from '/load.config'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  const { app, accessToken, username } = req
+  const { app, username } = req
+  const accessToken = {token: req.headers['x-user-access-token']};
   const userCredentials = {
     username,
     ...accessToken,
@@ -38,7 +39,6 @@ const loadDapp = async (req, res, next) => {
 
   req.user = user
   req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-    chainIds: [deploy.dapp.contract.appChainId],
     ...options
   })
 

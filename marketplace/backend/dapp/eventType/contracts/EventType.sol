@@ -1,14 +1,9 @@
- 
-
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
-
 /// @title A representation of EventType assets
 contract EventType_10 is RestStatus {
-
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -20,21 +15,14 @@ contract EventType_10 is RestStatus {
     /// @dev Events to add and remove members to this shard.
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
-    event CommonNameAdded(string orgName, string orgUnit, string commonName); 
+    event CommonNameAdded(string orgName, string orgUnit, string commonName);
 
     event OrgRemoved(string orgName);
     event OrgUnitRemoved(string orgName, string orgUnit);
     event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
-
-    constructor(
-        string _appChainId,
-            string _name
-        ,   string _description
-        ,   uint _createdDate
-    ) public {
+    constructor(string _name, string _description, uint _createdDate) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         name = _name;
         description = _description;

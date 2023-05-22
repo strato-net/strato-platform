@@ -11,7 +11,6 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 contract Product_3 is UnitOfMeasurement, InventoryStatus {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -33,8 +32,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
 
 
     constructor(
-            string _appChainId
-        ,   string _name
+            string _name
         ,   string _description
         ,   string _manufacturer
         ,   UnitOfMeasurement _unitOfMeasurement
@@ -49,7 +47,6 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         ,   address _owner
     ) public {
         owner = _owner;
-        appChainId = _appChainId;
 
         name = _name;
         description = _description;
@@ -132,7 +129,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory inventory = new Inventory(appChainId, categoryId, subCategoryId, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
+      Inventory inventory = new Inventory(categoryId, subCategoryId, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
       return (RestStatus.OK, address(inventory));
     }
 

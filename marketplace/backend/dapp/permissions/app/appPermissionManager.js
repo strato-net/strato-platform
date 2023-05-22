@@ -82,19 +82,19 @@ const exists = async (admin, contract, methodArgs, options) => {
 }
 
 
-const canCreateUserMembership = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateUserMembership'},options)
-const canUpdateUserMembership = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canUpdateUserMembership'},options)
-const canCreateProduct = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateProduct'},options)
-const canUpdateProduct = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canUpdateProduct'},options)
-const canDeleteProduct = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canDeleteProduct'},options)
-const canCreateCategory = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateCategory'},options)
-const canCreateInventory = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateInventory'},options)
-const canUpdateInventory = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canUpdateInventory'},options)
-const canCreateOrder = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateOrder'},options)
-const canUpdateOrder = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canUpdateOrder'},options)
-const canCreateEvent = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCreateEvent'},options)
-const canUpdateEvent = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canUpdateEvent'},options)
-const canCertifyEvent = async (admin,contract,args,options) => can(admin,contract,{...args,method:'canCertifyEvent'},options)
+const canCreateUserMembership = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateUserMembership' }, options)
+const canUpdateUserMembership = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateUserMembership' }, options)
+const canCreateProduct = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateProduct' }, options)
+const canUpdateProduct = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateProduct' }, options)
+const canDeleteProduct = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canDeleteProduct' }, options)
+const canCreateCategory = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateCategory' }, options)
+const canCreateInventory = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateInventory' }, options)
+const canUpdateInventory = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateInventory' }, options)
+const canCreateOrder = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateOrder' }, options)
+const canUpdateOrder = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateOrder' }, options)
+const canCreateEvent = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateEvent' }, options)
+const canUpdateEvent = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateEvent' }, options)
+const canCertifyEvent = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCertifyEvent' }, options)
 
 
 
@@ -104,7 +104,7 @@ const bind = (admin, _contract, options) => {
   contract.grantRole = async (args) => grantRole(admin, contract, args, options)
 
   contract.grantAdminRole = async (_args) => {
-    const role = (getAppRoles()).ADMIN
+    const role = [(getAppRoles()).ADMIN]
     const contractArgs = {
       ..._args,
       role,
@@ -112,7 +112,7 @@ const bind = (admin, _contract, options) => {
     await grantRole(admin, contract, contractArgs, options)
   }
   contract.grantTradingEntityRole = async (_args) => {
-    const role = (getAppRoles()).TRADINGENTITY
+    const role = [(getAppRoles()).TRADINGENTITY]
     const contractArgs = {
       ..._args,
       role,
@@ -120,7 +120,7 @@ const bind = (admin, _contract, options) => {
     await grantRole(admin, contract, contractArgs, options)
   }
   contract.grantCertifierRole = async (_args) => {
-    const role = (getAppRoles()).CERTIFIER
+    const role = [(getAppRoles()).CERTIFIER]
     const contractArgs = {
       ..._args,
       role,
@@ -132,19 +132,19 @@ const bind = (admin, _contract, options) => {
   contract.getUserPermissions = async (args) => getUserPermissions(admin, contract, args, options)
   contract.exists = async (args) => exists(admin, contract, args, options)
 
-  contract.canCreateUserMembership =  async (args) => canCreateUserMembership(admin,contract,args,options)
-  contract.canUpdateUserMembership = async (args) => canUpdateUserMembership(admin,contract,args,options)
-  contract.canCreateProduct = async (args) => canCreateProduct(admin,contract,args,options)
-  contract.canUpdateProduct = async (args) => canUpdateProduct(admin,contract,args,options)
-  contract.canDeleteProduct = async (args) => canDeleteProduct(admin,contract,args,options)
-  contract.canCreateCategory = async (args) => canCreateCategory(admin,contract,args,options)
-  contract.canCreateInventory = async (args) => canCreateInventory(admin,contract,args,options)
-  contract.canUpdateInventory = async (args) => canUpdateInventory(admin,contract,args,options)
-  contract.canCreateOrder = async (args) => canCreateOrder(admin,contract,args,options)
-  contract.canUpdateOrder = async (args) => canUpdateOrder(admin,contract,args,options)
-  contract.canCreateEvent = async (args) => canCreateEvent(admin,contract,args,options)
-  contract.canUpdateEvent = async (args) => canUpdateEvent(admin,contract,args,options)
-  contract.canCertifyEvent = async (args) => canCertifyEvent(admin,contract,args,options)
+  contract.canCreateUserMembership = async (args) => canCreateUserMembership(admin, contract, args, options)
+  contract.canUpdateUserMembership = async (args) => canUpdateUserMembership(admin, contract, args, options)
+  contract.canCreateProduct = async (args) => canCreateProduct(admin, contract, args, options)
+  contract.canUpdateProduct = async (args) => canUpdateProduct(admin, contract, args, options)
+  contract.canDeleteProduct = async (args) => canDeleteProduct(admin, contract, args, options)
+  contract.canCreateCategory = async (args) => canCreateCategory(admin, contract, args, options)
+  contract.canCreateInventory = async (args) => canCreateInventory(admin, contract, args, options)
+  contract.canUpdateInventory = async (args) => canUpdateInventory(admin, contract, args, options)
+  contract.canCreateOrder = async (args) => canCreateOrder(admin, contract, args, options)
+  contract.canUpdateOrder = async (args) => canUpdateOrder(admin, contract, args, options)
+  contract.canCreateEvent = async (args) => canCreateEvent(admin, contract, args, options)
+  contract.canUpdateEvent = async (args) => canUpdateEvent(admin, contract, args, options)
+  contract.canCertifyEvent = async (args) => canCertifyEvent(admin, contract, args, options)
 
   return contract
 }
