@@ -1079,7 +1079,9 @@ def removeBeanstalkApp() {
  */
 def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started',nodeData) {
 
-  // (using tmp files to avoid replacing quotes with dobule-quotes which makes escapes even worse)
+  // TODO: refactor to make it clear what is nodeData = null vs nodeData != null. Looks like !=null is only used in the big pre-release testing pipeline (as part of `deployStratoWithApp`) - Remove it entirely?
+  
+  // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
   sh "echo ${stratoGSPath} > _stratogs_path_tmp"
   if(nodeData == null){
@@ -1110,6 +1112,9 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
     '''
   }
   else{
+    // TODO: the following code is broken because it's hardcoded t call multinode101 and should be refactored if used (move to a separate function)
+    echo "Code is broken and can't be used, fix if you need it. See TODO comment in the pipeline!"
+    /*
     sh '''#!/bin/bash -le
       set -x
       cd $(<_stratogs_path_tmp)
@@ -1147,8 +1152,56 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
           --output=/genesis-builder/genesis-block.json
       sudo docker cp strato_strato_1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
     '''
+    */
   }
   sh "rm _*_path_tmp"
+}
+
+/**
+ * Register certificate for test user 
+ * @param TBD
+ * @return
+ */
+def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-started', OAuthDiscoveryUrl, clientId, clientSecret, username, password) {
+  // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
+  sh "echo ${stratoPlatformPath} > _platform_path_tmp"
+  sh "echo ${stratoGSPath} > _stratogs_path_tmp"
+  sh "echo ${OAuthDiscoveryUrl} > _oauth_discovery_url_tmp"
+  sh "echo ${username} > _username_tmp"
+  sh "echo ${password} > _password_tmp"
+  def client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${clientId}:${clientSecret}'))\"").trim()
+  sh "echo ${client_b64string} > _client_b64string_tmp"
+  
+  sh '''#!/bin/bash -le
+      set -x
+      cd $(<_stratogs_path_tmp)
+      token=$(curl -s -X POST '$(<_oauth_discovery_url_tmp)' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic $(<_client_b64string_tmp)' --data-urlencode 'grant_type=password' --data-urlencode 'username=$(<_username_tmp)' --data-urlencode 'password=$(_password_tmp)' | jq -r .access_token)
+      # make sure user is created (now or earlier):
+      docker exec strato_nginx_1 curl -H "Authorization: Bearer $token" -X POST "localhost:80/strato/v2.3/key"
+      userPubKey=$(docker exec strato_nginx_1 curl -s -H "Authorization: Bearer $token" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
+      cd ..
+      
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
+      sudo docker exec -e pubkey="${userPubKey}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 x509-generator \\
+          --issuer=/x509-generator/rootCert.pem \\
+          --subject=/x509-generator/subject.json \\
+          --key=/x509-generator/rootPriv.pem \\
+          --output=/x509-generator/OutputCert.pem
+      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /x509-generator/certs.json""" > reformat-cert.sh
+      sudo docker cp reformat-cert.sh strato_strato_1:/x509-generator/
+      sudo docker exec strato_strato_1 bash /x509-generator/reformat-cert.sh
+      # escaped cert is now saved as /x509-generator/certs.json inside the container
+      CERT_ESCAPED=$(sudo docker exec strato_strato_1 cat /x509-generator/certs.json)
+      ADMIN_TOKEN=$(curl -L -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials')
+      
+      docker exec strato_nginx_1 curl -H "Authorization: Bearer ${ADMIN_TOKEN}" -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
+        -H 'Accept: application/json' \\
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
+        -H 'Content-Type: application/json' \\
+        --data-binary "{\\"txs\\":[{\\"payload\\":{\\"contractName\\":\\"CertificateRegistry\\",\\"contractAddress\\":\\"509\\",\\"method\\":\\"registerCertificate\\",\\"args\\":{\\"newCertificateString\\":\\"${CERT_ESCAPED}\\"},\\"metadata\\":{}},\\"type\\":\\"FUNCTION\\"}]}"
+    '''
 }
 
 return this
