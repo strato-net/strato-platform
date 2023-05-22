@@ -9,13 +9,13 @@ class OrderLineItemController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req;
-      const { address } = params;
+      const { orderLineId } = params;
 
       let args;
       let chainOptions = options;
 
-      if (address) {
-        args = { address };
+      if (orderLineId) {
+        args = { orderLineId };
       }
 
       const result = await dapp.getOrderLineItem(args, chainOptions);

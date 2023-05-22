@@ -71,7 +71,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 {decodeURIComponent(inventory.name)}
               </h3>
               <p className="font-medium text-secondryB text-base ml-2">
-                ({category.name})
+                {/* ({category.name}) */}
+                category
               </p>
             </div>
             <div className="flex items-center">

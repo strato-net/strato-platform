@@ -171,6 +171,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
     orderAddress:_args.orderAddress,
     ..._args
   }
+  
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;
     switch (key) {
@@ -182,6 +183,8 @@ async function createOrder(admin, contract, _args, baseOptions) {
         return agg;
     }
   }, 0);
+
+  
 
   const callArgs = {
     contract,
@@ -216,6 +219,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
  */
  async function updateSellerDetails(admin, contract, _args, baseOptions) {
   const args = marshalInUpdateSeller(_args);
+  // console.log("===========================================",_args);
 
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;

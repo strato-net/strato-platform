@@ -86,7 +86,7 @@ export const OrderLine = {
 
 export const OrderLineItem = {
   prefix: '/orderLineItem',
-  get: '/:address',
+  get: '/:orderLineId',
   getAll: '/',
   create: '/',
   update: '/update',
