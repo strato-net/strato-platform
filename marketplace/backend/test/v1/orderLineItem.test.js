@@ -210,7 +210,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderResponse.body, 'body should be defined');
     
     // create order line item
-    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderLineId,serialNumbersArray)
+    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderAddress,orderLineId,serialNumbersArray)
 
     const getCreateOrderLineItemsResponse=await post(
       OrderLineItem.prefix,
@@ -221,11 +221,12 @@ describe('OrderLineItem End-To-End Tests', function () {
 
     assert.equal(getCreateOrderLineItemsResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(getCreateOrderLineItemsResponse.body, 'body should be defined');
+    const orderLineItemAddress = getCreateOrderLineItemsResponse.body.data[0];
 
     // get
     const getMachine = await get(
       OrderLineItem.prefix,
-      OrderLineItem.get.replace(':address', orderAddress),
+      OrderLineItem.get.replace(':address', orderLineItemAddress),
       {},
       seller.token,
     )
@@ -247,9 +248,6 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderLineItemResponse.body, 'body should be defined');
     assert.isDefined(getOrderLineItemResponse.body.data, 'body should be defined');
   })
-
- 
-  
 
   it('Create an Order till closed status with pay later flow', async () => {
     const createProductArgs = {
@@ -295,7 +293,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     )
     const [orderResponse]=createOrderResponse.body.data
 
-    const {address:orderAddress} = orderResponse
+    const [,orderAddress] = orderResponse
     
     console.log(createOrderResponse.body.data)
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
@@ -317,7 +315,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderResponse.body, 'body should be defined');
     
     // create order line item
-    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderLineId,serialNumbersArray)
+    const createOrderLineItemsArgs=factory.getCreateOrderLineItemsArgs(orderId,orderAddress,orderLineId,serialNumbersArray)
 
     const getCreateOrderLineItemsResponse=await post(
       OrderLineItem.prefix,
