@@ -3,7 +3,6 @@ import { assert } from 'chai'
 import { rest } from 'blockapps-rest'
 import config from "../../load.config"
 import oauthHelper from "../../helpers/oauthHelper"
-import { getCurrentEnode } from '/helpers/enodeHelper/'
 import { getMembershipStates } from '/helpers/enums'
 import { yamlWrite } from '/helpers/config'
 import RestStatus from "http-status-codes"
@@ -15,7 +14,7 @@ import membershipManagerJs from '/dapp/memberships/membershipManager'
 
 const options = { config, logger: console }
 
-describe("tCommerce Dapp - deploy secondary org", function() {
+describe("Marketplace Dapp - deploy secondary org", function() {
   this.timeout(config.timeout)
   
   let MembershipStates

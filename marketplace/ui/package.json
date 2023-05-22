@@ -27,7 +27,8 @@
       "last 1 safari version"
     ]
   },
-  "name": "ui",
+  "name": "marketplace-ui",
+  "homepage": "/marketplace/",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",

@@ -32,3 +32,5 @@ config/*.deploy.json
 
 # temp directories
 temp
+
+config.yaml

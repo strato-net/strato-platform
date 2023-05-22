@@ -13,14 +13,11 @@ const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
 
-describe("tCommerce Dapp - deploy contracts, bootnode organization", function () {
+describe("Marketplace Dapp - deploy contracts, bootnode organization", function () {
   this.timeout(config.timeout)
 
   let adminCredentials
   let adminUser
-
-  let bayerCredentials
-  let bayer
 
   let dapp
 
@@ -28,10 +25,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
 
   let adminUserName
   let adminUserPassword
-
-  let bayerName
-  let bayerPassword
-
 
   before(async () => {
     assert.isDefined(
@@ -54,9 +47,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
     adminUserName = process.env.GLOBAL_ADMIN_NAME
     adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
 
-    bayerName = process.env.BAYER_ADMIN_NAME
-    bayerPassword = process.env.BAYER_ADMIN_PASSWORD
-
     let adminUserToken
     try {
       adminUserToken = await oauthHelper.getUserToken(adminUserName, adminUserPassword)
@@ -74,25 +64,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
       adminResponse.message
     )
     adminUser = { ...adminResponse.user, ...adminCredentials }
-
-    let bayerToken
-    try {
-      bayerToken = await oauthHelper.getUserToken(bayerName, bayerPassword)
-    } catch (e) {
-      console.error("ERROR: Unable to fetch the bayer token, check your username and password in your .env", e)
-      throw e
-    }
-    bayerCredentials = { token: bayerToken }
-    console.log("getting bayer user's address:", bayerName)
-    const bayerResponse = await oauthHelper.getStratoUserFromToken(bayerCredentials.token)
-
-    assert.strictEqual(
-      bayerResponse.status,
-      RestStatus.OK,
-      bayerResponse.message
-    )
-    bayer = { ...bayerResponse.user, ...bayerCredentials }
-
   })
 
 
@@ -127,11 +98,16 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
     appChainID = deployment.dapp.contract.appChainId
   })
 
-  it('Should populate categories and subCategories', async () => {
-    let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options, chainIds: [dapp.chainId] })
-    const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
-    assert(Array.isArray(result), 'result should be an array')
-    assert.equal(result.length, SeederJson.categories.length)
-  })
+  // it('Should create and assign admin role', async () => {
+  //   await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
+  // })
+  
+  // This should not be executed when using existing appchainId
+  // it('Should populate categories and subCategories', async () => {
+  //   let _dapp = await dappJs.bindAddress(adminUser, dapp.address, { ...options, chainIds: [dapp.chainId] })
+  //   const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
+  //   assert(Array.isArray(result), 'result should be an array')
+  //   assert.equal(result.length, SeederJson.categories.length)
+  // })
 
 })
