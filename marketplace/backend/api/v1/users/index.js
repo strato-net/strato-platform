@@ -16,14 +16,14 @@ router.get(
 router.get(
   Users.get,
   authHandler.authorizeRequest(), 
-  loadDapp,
+  loadDapp, 
   UsersController.get
 );
 
 router.get(
   Users.getAll,
   authHandler.authorizeRequest(), 
-  loadDapp,
+  loadDapp, 
   UsersController.getAll
 );
 

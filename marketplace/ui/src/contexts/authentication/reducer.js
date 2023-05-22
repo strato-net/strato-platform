@@ -19,7 +19,7 @@ const reducer = (state, action) => {
     case actionDescriptors.checkSuccessful:
       return {
         ...state,
-        user: updatedUser,
+        user: action.payload,
         isAuthenticated: true,
         isCheckingAuthentication: false,
         hasChecked: true
