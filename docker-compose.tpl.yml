@@ -88,6 +88,7 @@ services:
     - CLIENT_URL=${NODE_HOST} # TODO: remove in favor of SERVER_HOST (pending app change)
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+    - OAUTH_DEV_MODE=${OAUTH_DEV_MODE}
     - ORG_NAME='BlockApps' # TODO: can be removed?
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
