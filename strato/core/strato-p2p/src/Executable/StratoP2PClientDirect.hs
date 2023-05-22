@@ -105,7 +105,7 @@ handleEvents ev sSource runner = do
                   $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
                   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
                     let pStr = pPeerString peer -- display string will show up as dns name
-                    attempt :: Maybe SomeException <- withActivePeer peer $
+                    attempt :: Maybe SomeException <- withCertifiedPeer peer . withActivePeer peer $
                       runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
                                           (c ^. peerSource)
                                           (c ^. peerSink)

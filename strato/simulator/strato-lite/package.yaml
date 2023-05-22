@@ -116,6 +116,7 @@ tests:
       - containers
       - crypto-pubkey-types
       - deepseq
+      - ethereum-encryption
       - monad-alter
       - parsec
       - QuickCheck

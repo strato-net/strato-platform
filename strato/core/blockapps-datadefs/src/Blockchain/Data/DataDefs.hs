@@ -47,7 +47,7 @@ import           Numeric
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
-
+import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
 import           Blockchain.Strato.Model.Class

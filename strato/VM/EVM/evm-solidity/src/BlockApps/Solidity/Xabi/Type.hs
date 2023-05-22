@@ -34,7 +34,7 @@ data Type
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::Text}
-  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic,NFData)
+  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic,NFData, Read)
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}
@@ -48,7 +48,7 @@ instance ToSchema Type where
     & mapped.schema.example ?~ toJSON Address
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
-                 deriving (Eq, Show, Generic,NFData)
+                 deriving (Eq, Show, Generic, NFData, Read)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -90,7 +90,7 @@ data VarType =
   , varTypeConstant       :: Maybe Bool
   , varTypeInitialValue   :: Maybe String
   , varTypeType           :: Type
-  } deriving (Eq, Show, Generic,NFData)
+  } deriving (Eq, Show, Generic,NFData, Read)
 
 instance FromJSON VarType where
   parseJSON =
@@ -131,7 +131,7 @@ instance ToSchema VarType where
 instance Arbitrary VarType where arbitrary = GR.genericArbitrary GR.uniform
 
 data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
-               deriving (Eq, Show, Generic,NFData)
+               deriving (Eq, Show, Generic, NFData, Read)
 
 instance FromJSON FieldType where
   parseJSON =

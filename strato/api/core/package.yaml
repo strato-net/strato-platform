@@ -13,6 +13,7 @@ library:
   - aeson
   - aeson-casing
   - base64-bytestring
+  - binary
   - blockapps-data
   - blockapps-datadefs
   - bytestring
