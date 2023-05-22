@@ -1111,10 +1111,10 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const { address, chainId, updates } = args;
       const contract = { name: orderJs.contractName, address: address };
 
-      const chainOptions = { chainIds: [chainId], ...options };
+      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateBuyerDetails(rawAdmin, contract, updates, chainOptions);
+          await managers.orderManager.updateBuyerDetails({orderAddress: address, updates});
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
         const quantities = quantitiesToUpdate.split(",").slice(0, -1);
@@ -1123,7 +1123,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         return { status };
       }
 
-      return managers.orderManager.updateBuyerDetails(rawAdmin, contract, updates, chainOptions);
+      return managers.orderManager.updateBuyerDetails({orderAddress: address, updates});
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1138,10 +1138,10 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const contract = { name: orderJs.contractName, address: address, };
 
-      const chainOptions = { chainIds: [chainId], ...options };
+      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
+          await managers.orderManager.updateSellerDetails({orderAddress: address, updates});
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
         const quantities = quantitiesToUpdate.split(",").slice(0, -1);
@@ -1151,11 +1151,11 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       } else if (updates.status == ORDER_STATUS.CLOSED) {
 
 
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
+        const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({orderAddress: address, updates});
 
-        const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
+        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
 
-        const orderLines = await managers.orderManager.getOrderLines(rawAdmin, {}, newOptions);
+        const orderLines = await managers.orderManager.getOrderLines({orderAddress: address},createOptions);
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
         let itemAddresses
@@ -1163,15 +1163,15 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         let result = []
 
         for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems(rawAdmin, { orderLineId: orderLineAddress }, newOptions)
+          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner });
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
           result.push({ status, productId, inventoryId });
         }
         return result;
       }
 
-      return managers.orderManager.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
+      return managers.orderManager.updateSellerDetails({orderAddress: address, updates});
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1188,8 +1188,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
-      const order = await managers.orderManager.getOrder(args, createOptions);
-      const orderLines = await managers.orderManager.getOrderLines({orderAddress: address},createOptions);
+      const order = managers.orderManager.getOrder(args, createOptions);
+      const orderLines = managers.orderManager.getOrderLines({orderAddress: address},createOptions);
       
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, optionsWithChainId);
@@ -1312,7 +1312,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getOrderLineItem = async function (args, options = optionsNoChainIds) {
     try {
-      return managers.orderManager.getOrderLineItem(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: mainChainContractName, chainIds: [args.chainId], });
+      return managers.orderManager.getOrderLineItem(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName });
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1325,7 +1325,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getOrderLineItems = async function (args = {}, options = optionsNoChainIds) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-      return managers.orderManager.getOrderLineItems(rawAdmin, { ...args, }, getOptions);
+      return managers.orderManager.getOrderLineItems({ ...args, }, getOptions);
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
