@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import CategoriesJson from  "../../../category-utility/categories.json"
 
 const options = { config, cacheNonce: true }
 
@@ -9,8 +10,6 @@ class SubCategoryController {
 
   static async get(req, res, next) {
     try {
-      const { address } = params
-      
       let result;
       rest.response.status200(res, result)
 
@@ -22,9 +21,14 @@ class SubCategoryController {
 
   static async getAll(req, res, next) {
     try {
+      const { query } = req
+      const { category } = query
+      const categories = CategoriesJson.categories;
+
+      const categoryRecord = categories.find((record) => record.name === category);
+      const subCategories = categoryRecord.subCategories;
       
-      let result;
-      rest.response.status200(res, result)
+      rest.response.status200(res, subCategories)
      
       return next()
     } catch (e) {

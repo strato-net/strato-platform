@@ -220,7 +220,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           open={editModalOpen}
           handleCancel={handleEditModalClose}
           debouncedSearchTerm={debouncedSearchTerm}
-          categorys={[]}
           inventoryToUpdate={{
             inventory: inventory,
             category: category,

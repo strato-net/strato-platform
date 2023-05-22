@@ -10,21 +10,9 @@ const CategorysProvider = ({ children }) => {
     isCreateCategorySubmitting: false,
     categorys: [],
     iscategorysLoading: false,
-    // categoryDetails: null,
-    // iscategoryDetailsLoading: false,
-    // categoryOwnership: null,
-    // isOwnershipcategoryTransferring: false,
-    // categoryUpdateObject: null,
-    // iscategoryUpdating: false,
-    // categorysAudit: [],
-    // iscategorysAuditLoading: false,
     error: undefined,
     success: false,
     message: null,
-    // isAssetImportInProgress: false,
-    // assetsUploaded: 0,
-    // assetsUploadedErrors: [],
-    // isImportAssetsModalOpen: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

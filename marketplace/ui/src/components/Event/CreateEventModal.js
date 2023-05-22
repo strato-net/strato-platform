@@ -87,7 +87,6 @@ const CreateEventModal = ({
 
   //Sub-categories
   const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   //product
   const productDispatch = useProductDispatch();
@@ -167,10 +166,6 @@ const CreateEventModal = ({
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
-
-  useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
 
   useEffect(() => {
     if(formik.values.subCategory){
@@ -283,14 +278,8 @@ const CreateEventModal = ({
                     value={formik.values.category.name}
                     onChange={(value) => {
                       formik.setFieldValue("category.name", value);
-                      formik.setFieldTouched("category.name", false, false);
-                      
-                      if(formik.values.subCategory.name){
-                        formik.setFieldValue("subCategory.name", null);
-                      }
-                      if(formik.values.productName.name){
-                        formik.setFieldValue("productName.name", null);
-                      }
+                      formik.setFieldValue("subCategory.name", null);
+                      formik.setFieldValue("productName.name", null);
                     }}
                   >
                     {categorys.map((e, index) => (
@@ -318,7 +307,7 @@ const CreateEventModal = ({
                     showSearch
                     name="subCategory.name"
                     disabled={false}
-                    loading={issubCategorysLoading}
+                    loading={iscategorysLoading}
                     value={formik.values.subCategory.name}
                     onChange={(value) => {
                       formik.setFieldValue("subCategory.name", value);

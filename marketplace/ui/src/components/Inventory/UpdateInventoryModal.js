@@ -10,10 +10,10 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
+  useCategoryDispatch,
+  useCategoryState,
+} from "../../contexts/category";
+import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 
@@ -22,19 +22,18 @@ const { Option } = Select;
 const UpdateInventoryModal = ({
   open,
   handleCancel,
-  categorys,
   debouncedSearchTerm,
   inventoryToUpdate,
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
   const dispatch = useInventoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
+  const categoryDispatch = useCategoryDispatch();
 
-  //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
+  console.log(open)
 
   const { isCreateInventorySubmitting, isinventoryUpdating } =
     useInventoryState();
@@ -69,38 +68,42 @@ const UpdateInventoryModal = ({
   });
 
   useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
+    categoryActions.fetchCategories(categoryDispatch);
+  }, [categoryDispatch]);
 
   useEffect(() => {
-    // if (inventoryToUpdate && subCategorys.length) {
-    //   let subCategory = subCategorys.find(
-    //     (s) => s.address === inventoryToUpdate.inventory.subCategoryId
-    //   );
-
-    //   let nextState = {
-    //     category: {
-    //       name: inventoryToUpdate.category.name,
-    //       address: inventoryToUpdate.category.address,
-    //     },
-    //     subCategory: {
-    //       name: subCategory.name ?? "",
-    //       address: subCategory.address ?? "",
-    //     },
-    //     productName: {
-    //       name: inventoryToUpdate.inventory.name,
-    //       address: inventoryToUpdate.inventory.productId,
-    //     },
-    //     quantity: inventoryToUpdate.inventory.quantity,
-    //     pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
-    //     batchId: inventoryToUpdate.inventory.batchId,
-    //     serialNumber: null,
-    //     status: inventoryToUpdate.inventory.status === 1 ? true : false,
-    //   };
+    if (inventoryToUpdate) {
+      let subCategory; 
+      categorys.map(
+        (category) => category.subCategories.map(
+          (subCategoryRecord) => {
+            if (subCategoryRecord.name === inventoryToUpdate.inventory.subCategory) {
+              subCategory = subCategoryRecord;
+            } 
+          }
+        )
+      );
+      let nextState = {
+        category: {
+          name: inventoryToUpdate.category.name,
+        },
+        subCategory: {
+          name: subCategory.name ?? "",
+        },
+        productName: {
+          name: inventoryToUpdate.inventory.name,
+          address: inventoryToUpdate.inventory.productId,
+        },
+        quantity: inventoryToUpdate.inventory.quantity,
+        pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
+        batchId: inventoryToUpdate.inventory.batchId,
+        serialNumber: null,
+        status: inventoryToUpdate.inventory.status === 1 ? true : false,
+      };
     
-    //   setFormState(nextState);
-    // }
-  }, [inventoryToUpdate, subCategorys]);
+      setFormState(nextState);
+    }
+  }, [inventoryToUpdate]);
 
   const handleUpdateFormSubmit = async (values) => {
     const body = {
@@ -146,9 +149,9 @@ const UpdateInventoryModal = ({
         Edit Inventory
       </h1>
       <hr className="text-secondryD mt-3" />
-      {inventoryToUpdate && issubCategorysLoading ? (
+      {inventoryToUpdate && iscategorysLoading ? (
         <div className="h-44 flex justify-center items-center">
-          <Spin spinning={issubCategorysLoading} size="large" />
+          <Spin spinning={iscategorysLoading} size="large" />
         </div>
       ) : (
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
