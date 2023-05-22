@@ -15,10 +15,14 @@ import {
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+import { useAuthenticateState } from "../../contexts/authentication";
+
 
 const { Title, Text, Paragraph } = Typography;
 
+
 const CategoryProductCard = ({ product, category }) => {
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
 
@@ -164,13 +168,18 @@ const CategoryProductCard = ({ product, category }) => {
               <div
                 onClick={add}
                 className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                <PlusOutlined  className="text-xs text-secondryC" />
+                <PlusOutlined className="text-xs text-secondryC" />
               </div>
             </div>
             <Button
               className="group w-40 h-9 border border-primary hover:bg-primary"
-              onClick={addItemToCart}
-            >
+              onClick={() => {
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  addItemToCart();
+                }
+              }}            >
               <div className="text-primary group-hover:text-white">Add To Cart</div>
             </Button>
             <Button
@@ -178,8 +187,12 @@ const CategoryProductCard = ({ product, category }) => {
               id="buy-now-button"
               className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
               onClick={() => {
-                addItemToCart();
-                navigate("/marketplace/checkout");
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  addItemToCart();
+                  navigate("/marketplace/checkout");
+                }
               }}
             >
               Buy Now
