@@ -597,7 +597,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const randomNumber = parseInt(util.iuid())
       transformedArray.push({
         "itemNumber": randomNumber,
-        "serialNumber": "",
+        "serialNumber": `${randomNumber}`,
         "rawMaterialProductName": [],
         "rawMaterialSerialNumber": [],
         "rawMaterialProductId": []
