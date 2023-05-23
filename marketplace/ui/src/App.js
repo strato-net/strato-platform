@@ -16,24 +16,12 @@ import { UsersProvider } from "./contexts/users";
 const { Content } = Layout;
 
 const App = () => {
-  // const theme = {
-  //   colors: {
-  //     topBar: {
-  //       background: "#fff",
-  //     },
-  //   },
-  // };
 
   const dispatch = useAuthenticateDispatch();
 
-//  const { isAuthenticated, hasChecked, user, loginUrl, users } =
-//    useAuthenticateState();
+  const { isAuthenticated, hasChecked, user, loginUrl, users } =
+    useAuthenticateState();
 
-    const isAuthenticated = true;            // These are dummy hardcoded values, they need to be set properly
-    const hasChecked = true;
-    const user = {commonName: "fred"}
-    const loginUrl = "abcd"
-    const users = [];
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
