@@ -55,7 +55,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
             chainId: item.chainId,
             key: item.address,
             itemId: item.address,
-            serialNumber: item.itemSerialNumber,
+            serialNumber: item.itemSerialNumber ? item.itemSerialNumber : item.address,
             event: item,
           });
         });

@@ -106,7 +106,7 @@ class OrderLineItemController {
     const createOrderLineItemSchema = Joi.object({
       orderId: Joi.string().required(),
       orderLineId: Joi.string().required(),
-      serialNumber: Joi.array().items().required(),
+      serialNumber: Joi.array().items().optional(),
       chainId: Joi.string().required(),
     });
 

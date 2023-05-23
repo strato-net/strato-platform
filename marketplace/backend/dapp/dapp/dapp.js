@@ -1345,7 +1345,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const items = await managers.itemManager.getItems({ serialNumber: [...serialNumber], productId, chainId: contract.chainId }, chainOptions);
 
-      if (serialNumber.length != items.length) {
+      if (serialNumber.length !== 0 && serialNumber.length != items.length) {
         throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different then the actual inventory")
       }
 
