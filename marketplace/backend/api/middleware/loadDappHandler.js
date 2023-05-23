@@ -8,16 +8,8 @@ import oauthHelper from '/helpers/oauthHelper'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  const { app, username } = req
-  let accessToken
+  const { app, username, accessToken } = req
 
-  if (process.env.OAUTH_DEV_MODE === 'true') {
-    accessToken = req.accessToken;
-  }
-  else {
-    //const { app, username } = req
-    accessToken = { token: req.headers['x-user-access-token'] };
-  }
   const userCredentials = {
     username,
     ...accessToken,
