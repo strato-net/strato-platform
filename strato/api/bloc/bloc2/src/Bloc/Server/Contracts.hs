@@ -111,7 +111,6 @@ getContractsContract :: ( A.Selectable Account AddressState m
                         , MonadLogger m
                         , HasBlocSQL m
                         , HasSQL m
-                        , HasBlocEnv m
                         )
                      => ContractName -> Address -> Maybe ChainId -> m ContractDetails
 getContractsContract name addr chainId = do
@@ -137,11 +136,10 @@ getContractsContract name addr chainId = do
         Left e -> throwIO $ UserError e
         Right details -> pure details{contractdetailsAccount=Just (Account addr (unChainId <$> chainId))}
 
+-- Only for EVM, unimplemented for SolidVM
 translateStorageMap :: [StorageAddress] -> S.Storage
 translateStorageMap storage' =
-  let storageMap = Map.fromList $ map (\StorageAddress{..} -> case kind of
-        EVM -> (hexStorageToWord256 key, hexStorageToWord256 value)
-        SolidVM -> error "translateStorageMap: undefined for SolidVM") storage'
+  let storageMap = Map.fromList $ map (\StorageAddress{..} -> (hexStorageToWord256 key, hexStorageToWord256 value)) storage'
 
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
@@ -255,7 +253,6 @@ getContractsDetails' :: ( A.Selectable Account AddressState m
                         , MonadLogger m
                         , HasSQL m
                         , HasBlocSQL m
-                        , HasBlocEnv m
                         )
                      => Address -> Maybe ChainId -> m ContractDetails
 getContractsDetails' contractAddress chainId = do
@@ -283,7 +280,6 @@ getContractsDetails :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        )
                     => Address -> Maybe ChainId -> m ContractDetails
@@ -294,7 +290,6 @@ getContractXabi :: ( A.Selectable Account AddressState m
                    , (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasSQL m
-                   , HasBlocEnv m
                    , HasBlocSQL m
                    )
                 => Account -> m Xabi
@@ -304,7 +299,6 @@ getContractsFunctions :: ( A.Selectable Account AddressState m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , MonadLogger m
                          , HasSQL m
-                         , HasBlocEnv m
                          , HasBlocSQL m
                          )
                       => ContractName -> Address -> Maybe ChainId -> m [FunctionName]
@@ -316,7 +310,6 @@ getContractsSymbols :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , MonadLogger m
                        , HasSQL m
-                       , HasBlocEnv m
                        , HasBlocSQL m
                        )
                     => ContractName -> Address -> Maybe ChainId -> m [SymbolName]
@@ -328,7 +321,6 @@ getContractsEnum :: ( A.Selectable Account AddressState m
                     , (Keccak256 `A.Alters` SourceMap) m
                     , MonadLogger m
                     , HasSQL m
-                    , HasBlocEnv m
                     , HasBlocSQL m
                     )
                  => ContractName -> Address -> EnumName -> Maybe ChainId -> m [EnumValue]
@@ -386,6 +378,7 @@ getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 postContractsCompile :: ( (Keccak256 `A.Alters` SourceMap) m
                         , MonadLogger m
                         , HasBlocSQL m
+                        , HasSQL m
                         )
                      => [PostCompileRequest] -> m [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
@@ -394,7 +387,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       let shouldCompile = case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
             _ -> Do Compile
-      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource False
       for (toList idsAndDetails) $ \ details -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of

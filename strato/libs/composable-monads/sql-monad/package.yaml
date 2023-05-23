@@ -10,6 +10,7 @@ library:
   - blockapps-data
   - monad-logger
   - mtl
+  - persistent-postgresql
   - strato-conf
   - unliftio-core
   

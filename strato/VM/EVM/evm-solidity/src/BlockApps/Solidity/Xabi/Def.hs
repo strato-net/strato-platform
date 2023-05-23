@@ -24,7 +24,7 @@ defAesonOptions = defaultOptions
 data Def = Enum { names::[Text], bytes::Word }
          | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
          | Contract { bytes::Word }
-         deriving (Eq, Show, Generic,NFData)
+         deriving (Eq, Show, Generic, NFData, Read)
 
 instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON Def where
