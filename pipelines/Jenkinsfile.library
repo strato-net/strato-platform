@@ -1200,7 +1200,7 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
         -H 'Accept: application/json' \\
         -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
         -H 'Content-Type: application/json' \\
-        --data-binary '{\\"txs\\":[{\\"payload\\":{\\"contractName\\":\\"CertificateRegistry\\",\\"contractAddress\\":\\"509\\",\\"method\\":\\"registerCertificate\\",\\"args\\":{\\"newCertificateString\\":\\"${CERT_ESCAPED}\\"},\\"metadata\\":{}},\\"type\\":\\"FUNCTION\\"}]}'
+        --data-binary '{\\"txs\\":[{\\"payload\\":{\\"contractName\\":\\"CertificateRegistry\\",\\"contractAddress\\":\\"509\\",\\"method\\":\\"registerCertificate\\",\\"args\\":{\\"newCertificateString\\":\\"${CERT_ESCAPED}\\"},\\"metadata\\":{},\\"type\\":\\"FUNCTION\\"}]}'
     '''
 }
 
