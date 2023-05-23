@@ -8,14 +8,12 @@ const router = express.Router();
 
 router.get(
   Category.get,
-  // authHandler.authorizeRequest(),
   loadDapp,
   CategoryController.get
 );
 
 router.get(
   Category.getAll,
-  // authHandler.authorizeRequest(),
   loadDapp,
   CategoryController.getAll
 );

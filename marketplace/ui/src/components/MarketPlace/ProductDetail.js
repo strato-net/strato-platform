@@ -565,15 +565,26 @@ const ProductDetails = ({ user, users }) => {
               <Row className="justify-center my-7">
                 {isCalledFromInventory ? <Button
                   className="group w-1/3 h-9 border border-primary"
-                  onClick={addItemToCart}
                   disabled={true}
                   id="addToCart"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                    }
+                  }}
                 >
                   Add To Cart
                 </Button> : <Button
                   className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                  onClick={addItemToCart}
-                >
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                    }
+                  }}                >
                   <div className="text-primary group-hover:text-white">
                     Add To Cart
                   </div>
@@ -666,6 +677,7 @@ const ProductDetails = ({ user, users }) => {
                           showSizeChanger: false,
                           position: ["bottomCenter"],
                         }}
+                        rowKey={(record) => record.serialNumber}
                       />
                     ),
                   },
@@ -683,6 +695,7 @@ const ProductDetails = ({ user, users }) => {
                           showSizeChanger: false,
                           position: ["bottomCenter"],
                         }}
+                        rowKey={(record) => record.serialNumber}
                       />
                     ),
                   },

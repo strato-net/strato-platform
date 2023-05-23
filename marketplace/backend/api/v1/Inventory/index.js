@@ -8,14 +8,12 @@ const router = express.Router();
 
 router.get(
   Inventory.get,
-  // authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.get
 );
 
 router.get(
   Inventory.getAll,
-  // authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.getAll
 );

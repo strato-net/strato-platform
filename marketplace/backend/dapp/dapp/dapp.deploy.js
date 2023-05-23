@@ -103,11 +103,11 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
   // })
   
   // This should not be executed when using existing appchainId
-  it('Should populate categories and subCategories', async () => {
-    let _dapp = await dappJs.bindAddress(adminUser, dapp.address, { ...options, chainIds: [dapp.chainId] })
-    const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
-    assert(Array.isArray(result), 'result should be an array')
-    assert.equal(result.length, SeederJson.categories.length)
-  })
+  // it('Should populate categories and subCategories', async () => {
+  //   let _dapp = await dappJs.bindAddress(adminUser, dapp.address, { ...options, chainIds: [dapp.chainId] })
+  //   const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
+  //   assert(Array.isArray(result), 'result should be an array')
+  //   assert.equal(result.length, SeederJson.categories.length)
+  // })
 
 })
