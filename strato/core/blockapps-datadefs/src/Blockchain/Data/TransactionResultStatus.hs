@@ -30,6 +30,9 @@ data TransactionFailureType = IncorrectChainId
                             | ExecutionFailure String
                             | MissingCode
                             | InvalidPragmaType
+                            | NonceLimitError
+                            | TXSizeLimitError
+                            | GasLimitError
                             deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

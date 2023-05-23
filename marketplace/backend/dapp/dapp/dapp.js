@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, ROLE, SERVICE_PROVIDERS, USERMEBERSHIP_STATUS } from "/helpers/constants";
+import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
@@ -22,9 +22,7 @@ import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
 import eventJs from "/dapp/assets/Event/event";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
-import userMembershipManagerJs from "/dapp/userMemberships/userMembershipManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import userAddressJs from "/dapp/addresses/userAddress.js";
 import { orderLineItemArgs } from "../../test/v1/factories/orderLineItem";
 import { RestError } from "blockapps-rest/dist/util/rest.util";
@@ -205,17 +203,15 @@ async function uploadContract(token, options) {
 
 async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
-  const appPermissionManager = await appPermissionManagerJs.bindAddress(admin, state.permissionManager, options)
   const categoryManager = categoryManagerJs.bindAddress(admin, state.categoryManager, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
-  const userMembershipManager = await userMembershipManagerJs.bindAddress(admin, state.userMembershipManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, appPermissionManager, categoryManager, productManager, eventTypeManager, itemManager, paymentManager, userMembershipManager };
+  return { cirrusOrg, categoryManager, productManager, eventTypeManager, itemManager, paymentManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions) {
@@ -298,20 +294,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
-  };
-
-  // ------------------------------ ROLES --------------------------------
-
-  contract.grantAdminRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantAdmin(args, options);
-  };
-
-  contract.grantTradingEntityRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantTradingEntityRole(args, options);
-  };
-
-  contract.grantCertifierRole = async function (args, options = defaultOptions) {
-    return managers.appPermissionManager.grantCertifierRole(args, options);
   };
 
   // ------------------------------ ITEMS --------------------------------
@@ -1425,92 +1407,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
 
   //-----------------------------Order ends here -------------------------------
-  // -----------------------------User Membership starts here -------------------------------
-  contract.getUserMembership = async function (args, options = optionsNoChainIds) {
-    return managers.userMembershipManager.get(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName, });
-  };
-
-  contract.getUserMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    return managers.userMembershipManager.getAll({ appChainId: contract.chainId, ...args, ownerOrganization: contract.userOrganization }, getOptions);
-  };
-
-  contract.getAllCertifiers = async function (args = {}, options = optionsNoChainIds) {
-   
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    const membersWithCertifierRole = await managers.userMembershipManager.getAll({ appChainId: contract.chainId, isCertifier: true, ownerOrganization: contract.userOrganization, ...args, }, getOptions);
-    const certifierAddresses = Array.from(new Set(membersWithCertifierRole.map(certifier => certifier.userAddress))); // ensure only unique addresses
-
-    let certifierUsers;
-    let users;
-    if (certifierAddresses.length > 0) {
-      users = await certificateJs.getCertificates(admin, { userAddress: certifierAddresses });
-      certifierUsers = users.map(({ commonName, userAddress }) => ({ commonName, userAddress }));
-      return certifierUsers;
-    }
-    return [];
-  };
-
-  contract.createUserMembership = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-
-    return managers.userMembershipManager.createUserMembership({ appChainId: contract.chainId, ...args }, createOptions);
-  };
-
-  contract.updateUserMembership = async function (args, options = defaultOptions) {
-    const { address: userMembership, updates } = args;
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, chainIds: [contract.chainId] };
-
-    return managers.userMembershipManager.updateUserMembership({ userMembership, ...updates, }, createOptions);
-  };
-
-  // -----------------------------User Membership Request starts here -------------------------------
-  contract.createUserMembershipRequest = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    const userMembership = await managers.userMembershipManager.getAll({ userAddress: args.userAddress,appChainId:contract.chainId,ownerOrganization: contract.userOrganization }, createOptions);
-    const newArgs = { createdDate: Date.now(), userMembershipAddress: userMembership[0].address, ...args }
-
-    // TODO remove usermembership address fetch
-    const pendingMembershipRequests = await managers.userMembershipManager.getAllUserMembershipRequest({ appChainId: contract.chainId, state: USERMEBERSHIP_STATUS.NEW, userMembershipAddress: userMembership[0].address, role: args.roles }, createOptions);
-
-    if (pendingMembershipRequests.length > 0) {
-      throw new rest.RestError(RestStatus.CONFLICT, "Your previous request is already under review.");
-    }
-
-    return managers.userMembershipManager.createUserMembershipRequest({ appChainId: contract.chainId, ...newArgs }, createOptions);
-  };
-
-  contract.getUserMembershipRequest = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    return managers.userMembershipManager.getAllUserMembershipRequest({ appChainId: contract.chainId, ...args, }, getOptions);
-  };
-  contract.getAllUserMembershipRequest = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    return managers.userMembershipManager.getAllUserMembershipRequest({ appChainId: contract.chainId, ...args, }, getOptions);
-  };
-  contract.createUserMembershipAndPermissions = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    const userMembership = await managers.userMembershipManager.getAll({ appChainId: contract.chainId, userAddress: args.userAddress }, createOptions);
-    if (userMembership.length > 0) {
-      throw new rest.RestError(RestStatus.CONFLICT, "User is already added.");
-    }
-    return managers.userMembershipManager.createUserMembershipAndPermissions({ appChainId: contract.chainId, ...args }, createOptions);
-  };
-
-  contract.getAllUserMembershipRequest = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
-    if (contract.userOrganization != "BlockApps") { args.ownerOrganization = contract.userOrganization }
-    return managers.userMembershipManager.getAllUserMembershipRequest({ appChainId: contract.chainId, sort: '-createdDate', ...args }, getOptions);
-
-  };
-
-  contract.updateUserMembershipRequest = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, chainIds: [contract.chainId] };
-    return managers.userMembershipManager.updateUserMembershipRequest(args, createOptions);
-  };
-
-  // -----------------------------User Membership Request ends here -------------------------------
-  // -----------------------------User Membership ends here -------------------------------
   contract.createEventType = async function (args, options = defaultOptions) {
     try {
 

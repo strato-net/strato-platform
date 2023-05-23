@@ -6,7 +6,7 @@ import           Control.Concurrent.Async.Lifted.Safe
 import           BlockApps.Logging
 import           Blockchain.Context
 import           Executable.StratoP2PClient
-import           Executable.StratoP2PClientDirect
+-- import           Executable.StratoP2PClientDirect
 import           Executable.StratoP2PServer
 import           Executable.StratoP2PLoopback
 
@@ -16,8 +16,8 @@ stratoP2P :: ( MonadP2P n
              )
           => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
 stratoP2P runner =
-  concurrently_
-  (race_ (stratoP2PLoopback runner)
+  -- concurrently_ (
+  race_ (stratoP2PLoopback runner)
     (race_ (stratoP2PClient runner)
-           (stratoP2PServer runner)))
-  (stratoP2PClientDirect runner)
+           (stratoP2PServer runner))
+  -- )(stratoP2PClientDirect runner)

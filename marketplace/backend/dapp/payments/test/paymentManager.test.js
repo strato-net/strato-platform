@@ -89,7 +89,7 @@ describe('Payment Manager', function() {
         assert.equal(status, RestStatus.CREATED);
         
         let paymentData = await contract.get({address: paymentAddress});
-     
+        
 
 
         assert.deepInclude(

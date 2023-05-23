@@ -6,7 +6,7 @@ const factory = {
             appChainId: `${uid}`,
             categoryId: '0000000000000000000000000000000000000000',
             subCategoryId: '0000000000000000000000000000000000000000',
-            quantity: uid,
+            quantity: 3,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,
             status: 2,

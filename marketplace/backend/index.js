@@ -63,6 +63,7 @@ app.use(
 );
 
 app.oauth = authHandler.initOauth()
+
 app.set(constants.s3ParamName, {
   bucket: {
     Bucket: process.env.EXT_STORAGE_S3_BUCKET

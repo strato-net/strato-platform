@@ -98,6 +98,8 @@ attemptBond = do
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
           if (pPeerLastMsg p == T.pack "Ping") then do
+            disErr <- storeDisableException p (T.pack "attemptBond")
+            whenLeft disErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to store disable exception: " ++ show err
             eErr <- lengthenPeerDisable' p
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
           else do
@@ -176,6 +178,8 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
       if (neighborsExist == True) 
         then do
           $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
+          disErr <- storeDisableException (fromJust thePeer) (T.pack "duplicateNeighbors")
+          whenLeft disErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to store disable exception: " ++ show err
           eErr <- lengthenPeerDisable' $ fromJust thePeer
           whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
       else do
@@ -196,6 +200,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
                            , pPeerBondState = 0
                            , pPeerActiveState = 0
                            , pPeerVersion = T.pack "61" -- fix
+                           , pPeerDisableException = T.pack "None"
                            , pPeerNextDisableWindowSeconds=5
                            , pPeerNextUdpDisableWindowSeconds=5
                            , pPeerDisableExpiration=posixSecondsToUTCTime 0
@@ -221,6 +226,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
                           ,  pPeerBondState = 0
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix
+                          ,  pPeerDisableException = T.pack "None"
                           , pPeerNextDisableWindowSeconds=5
                           , pPeerNextUdpDisableWindowSeconds=5
                           , pPeerDisableExpiration=posixSecondsToUTCTime 0

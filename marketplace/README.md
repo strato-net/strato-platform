@@ -42,9 +42,6 @@ cd tCommerce/backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-BAYER_ADMIN_NAME=<bayerUsername>
-BAYER_ADMIN_PASSWORD=<bayerPassword>
-
 EXT_STORAGE_S3_ACCESS_KEY_ID=<s3Key>
 EXT_STORAGE_S3_SECRET_ACCESS_KEY=<s3AccessKey>
 EXT_STORAGE_S3_BUCKET=<s3Bucket>
@@ -124,9 +121,9 @@ sudo docker-compose build
 1. Fill in the following fields in the run-app.sh script and run it:
     ```
 
-    export IS_BOOTNODE=true
-    export API_DEBUG=true
-    export SERVER_HOST=http://<your external IP address> # can't use 127.0.0.1
+    export MP_IS_BOOTNODE=true
+    export MP_API_DEBUG=true
+    export MP_SERVER_HOST=<your external IP address> # can't use 127.0.0.1
     export SERVER_IP=<your external IP address> # can't use 127.0.0.1
     export OAUTH_OPENID_DISCOVERY_URL=https://<oauth provider url>/.well-known/openid-configuration
     export OAUTH_CLIENT_ID=<oauth provider client id>
@@ -164,9 +161,9 @@ Secondary node is the one that connects to the existing Dapp contract on the blo
     ```
 3. Fill in the following fields in the `run-app-secondary.sh` script and run it:
     ```
-    export IS_BOOTNODE='false'
-    export API_DEBUG='true'
-    export SERVER_HOST='<SERVER_HOST>'                                      # ex: https://localhost
+    export MP_IS_BOOTNODE='false'
+    export MP_API_DEBUG='true'
+    export MP_SERVER_HOST='<MP_SERVER_HOST>'                                # ex: localhost
     export SERVER_IP='<SERVER_IP>'                                          # ex: 123.123.123.123
     export NODE_LABEL='<NODE_LABEL>                                         # ex: tcommerce_secondary                         
     export OAUTH_APP_TOKEN_COOKIE_NAME='<OAUTH_APP_TOKEN_COOKIE_NAME>'      # ex: tCommerce-node1-session
@@ -190,13 +187,13 @@ Secondary node is the one that connects to the existing Dapp contract on the blo
 Some docker-compose vars are optional with default values and some are required for prod or specific OAuth provider setup.
 
 ```
-IS_BOOTNODE                 - (default: 'false') if false - .deploy.yaml is expected in docker volume
-API_DEBUG                   - (default: 'false') show additional logs of STRATO API calls in backend container log
+MP_IS_BOOTNODE              - (default: 'false') if false - .deploy.yaml is expected in docker volume
+MP_API_DEBUG                - (default: 'false') show additional logs of STRATO API calls in backend container log
 CONFIG_DIR_PATH             - (default: '/config') directory inside of container to keep the config and deploy yaml files. Not recommended to change unless you know what you are doing.
-DEPLOY_FILE_NAME            - (default: 'tCommerce.deploy.yaml') filename of the targeted deploy file. Not recommended to change unless you know what you are doing.
+MP_DAPP_SHARD_ID            - (required for MP_IS_BOOTNODE=false) the if of the existing shard with pre-existing Marketplace dapp contract (for MP_IS_BOOTNODE=false mode only)
 ORG_DEPLOY_FILE_NAME        - (default: 'org.deploy.yaml') filename of the targeted org deploy file. Not recommended to change unless you know what you are doing.
 APPLICATION_USER_NAME       - (default: 'APP_USER') the username of service user
-SERVER_HOST                 - (required) protocol and host (protocol://hostname:port, e.g. https://example.com) of the application server
+MP_SERVER_HOST              - (required) App server host (hostname or hostname:port, e.g. example.com) of the application server
 SERVER_IP                   - (required) IP address of the machine (preferably public one or the private that is accessible from other nodes in network)
 NODE_LABEL                  - (required) String representing the node identificator (e.g. tCommerce-node1)
 STRATO_NODE_PROTOCOL        - (default: 'http') Protocol of the STRATO node (http|https)

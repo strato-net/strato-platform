@@ -39,7 +39,6 @@ describe('UserManager tests', function () {
     const user = await contract.createUser(args);
     assert.equal(user.account, args.account, 'account');
     assert.equal(user.username, args.username, 'username');
-    assert.equal(user.role, args.role, 'role');
   });
 
   it('Create User - UNAUTHORIZED', async function () {
