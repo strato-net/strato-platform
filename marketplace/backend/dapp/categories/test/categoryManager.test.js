@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import dappJs from '/dapp/dapp/dapp'
 import RestStatus from 'http-status-codes';
 import categoryManagerJs from '../categoryManager';
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import certificateJs from '/dapp/certificates/certificate'
 import factory from '../factory/categoryManager.factory';
 import { args } from 'commander';
@@ -102,26 +101,7 @@ describe('Category Manager', function() {
             ...options
         }
 
-        // deploy permission manager
-        permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            globalAdmin,
-            {
-                admin: globalAdmin.address,
-                master: globalAdmin.address,
-            },
-            options
-            );
-            
-            await permissionManagerContract.grantAdminRole({
-                user:globalAdmin
-            })
-            await permissionManagerContract.grantCertifierRole({
-                user:tradingEntity
-            })
-
-            contract = await categoryManagerJs.uploadContract(globalAdmin,{
-               permissionManager:permissionManagerContract.address
-            }, newOptions);
+        contract = await categoryManagerJs.uploadContract(globalAdmin, {}, newOptions);
     });
 
 

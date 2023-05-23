@@ -33,10 +33,8 @@ import { EventsProvider } from "./contexts/event";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
-import Admin from "./components/Admin";
 import Certifier from "./components/Certifier";
 import { MarketplaceProvider } from "./contexts/marketplace";
-import { RolesProvider } from "./contexts/roles";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/AddCart";
@@ -45,10 +43,6 @@ import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
-import SelectRole from "./components/Roles/SelectRoles";
-import ManageRole from "./components/Roles/ManageRole";
-import WaitingApproval from "./components/Roles/WaitingApproval";
-import { USER_ROLES } from "./helpers/constants";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -449,74 +443,19 @@ const AuthenticatedRoutes = ({ user, users }) => {
         }
       />
       <Route
-        exact
-        path={routes.Admin.url}
-        element={
-          <UsersProvider>
-            <RolesProvider>
-              <Admin user={user} users={users} />
-            </RolesProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.SelectRole.url}
-        element={
-          <UsersProvider>
-            <RolesProvider>
-              <SelectRole user={user} users={users} />
-            </RolesProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.ManageRole.url}
-        element={
-          <UsersProvider>
-            <RolesProvider>
-              <ManageRole user={user} users={users} />
-            </RolesProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.WaitingApproval.url}
-        element={
-          <UsersProvider>
-            <WaitingApproval user={user} users={users} />
-          </UsersProvider>
-        }
-      />
-      <Route
         path="/"
         element={<Navigate
-          to={navigateUrlUserOnboarding(user)}
+          to={"/marketplace"}
           replace />}
       />
       <Route
         path="*"
         element={<Navigate
-          to={navigateUrlUserOnboarding(user)}
+          to={"/marketplace"}
           replace />}
       />
     </Routes>
   );
 };
-
-const navigateUrlUserOnboarding = (user) => {
-  if (user?.roles.length === 0 && user.pendingMembershipRequests.length !== 0) {
-    return routes.WaitingApproval.url;
-  } else if (user?.roles.length === 0) {
-    return routes.SelectRole.url;
-  } else if (user?.roles.includes(USER_ROLES["3"]) && user?.roles.length === 1) {
-    return routes.Certifier.url;
-  } else {
-    return routes.Marketplace.url;
-  }
-}
-
 
 export default AuthenticatedRoutes;

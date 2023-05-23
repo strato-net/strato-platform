@@ -69,7 +69,6 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 
-import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.CoreAPI
@@ -97,6 +96,7 @@ instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
          , HasBlocSQL m
+         , HasSQL m
          ) => Selectable Account OLD.ContractDetails (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
@@ -208,8 +208,8 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers.
 getEVMDetailsForRow :: ( MonadLogger m
-                       , Accessible BlocEnv m
                        , HasBlocSQL m
+                       , HasSQL m
                        , Selectable Account AddressState m
                        , (Keccak256 `Alters` SourceMap) m
                        )
@@ -220,7 +220,7 @@ getEVMDetailsForRow row = liftM2 (<|>)
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
-    detailsMap <- lift . sourceToContractDetails (Do Compile) $ deserializeSourceMap src
+    detailsMap <- lift $ sourceToContractDetails (Do Compile) (deserializeSourceMap src) False
     lookupT name detailsMap)
 
 -- Commented out but could still be used if we introduce more globals to slipstream
@@ -390,8 +390,8 @@ getCodeCollection f cp ccString = do
 
 getEVMInserts :: (
   MonadLogger m,
-  Accessible BlocEnv m,
   HasBlocSQL m,
+  HasSQL m,
   Selectable Account AddressState m,
   (Keccak256 `Alters` SourceMap) m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
 getEVMInserts g row actions acct = do

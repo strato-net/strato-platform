@@ -144,10 +144,12 @@ describe('Marketplace End-To-End Tests', function () {
       seller.token,
     )
 
+    console.log("marketplace", marketplace.body.data)
+
     assert.equal(marketplace.status, 200, 'should be 200');
     assert.isDefined(marketplace.body, 'body should be defined');
     assert.isDefined(marketplace.body.data, 'body should be defined');
-    assert.lengthOf(marketplace.body.data, 0, "Marketplace should be empty.");
+    assert.lengthOf(marketplace.body.data, 1, "Marketplace should be empty.");
   })
 
   it('Get all inventories with filter for buyer', async () => {

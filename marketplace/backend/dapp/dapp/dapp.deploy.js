@@ -9,7 +9,6 @@ import dotenv from 'dotenv'
 import dappJs from "./dapp"
 import SeederJs from "/seeder-utility/seeder";
 import SeederJson from "/seeder-utility/seeder.json";
-import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
@@ -99,9 +98,9 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     appChainID = deployment.dapp.contract.appChainId
   })
 
-  it('Should create and assign admin role', async () => {
-    await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
-  })
+  // it('Should create and assign admin role', async () => {
+  //   await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
+  // })
   
   // This should not be executed when using existing appchainId
   // it('Should populate categories and subCategories', async () => {

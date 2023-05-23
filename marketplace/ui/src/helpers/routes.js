@@ -58,7 +58,4 @@ export default {
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
-  SelectRole: { label: "Select Role", url: "/register/role" },
-  ManageRole: { label: "Manage Role", url: "/manage/role" },
-  WaitingApproval: { label: "Waiting Approval", url: "/waiting/approval" }
 };

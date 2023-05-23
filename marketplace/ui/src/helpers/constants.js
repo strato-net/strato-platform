@@ -54,29 +54,6 @@ export const CHARGES = {
 export const MAX_RAW_MATERIAL = 8;
 
 
-export const USER_ROLES = {
-  1: "Admin",
-  2: "Trading Entity",
-  3: "Certifier"
-};
-
-
-export const ROLE_OPTIONS = [
-  {
-      label: 'Trading Entity',
-      value: 'Trading Entity',
-  },
-  {
-      label: 'Certifier',
-      value: 'Certifier',
-  },
-  {
-      label: 'Admin',
-      value: 'Admin',
-  },
-];
-
-
 export const STATUS_FILTER = [
   {
     text: "Pending",

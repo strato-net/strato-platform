@@ -8,7 +8,6 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderLineJs from '../orderLine';
 import orderLineItemJs from '../orderLineItem';
 import orderLineFactory from '../factory/orderLine.factory';
@@ -83,6 +82,7 @@ describe('orderLine', function() {
 
     });
 
+    // TODO: Update this test, it is failing
     it('should upload OrderLine smart contract', async () => {
         const args=orderLineFactoryArgs(globalAdmin)
         contract=await orderLineJs.uploadContract(globalAdmin,args,newOptions);
