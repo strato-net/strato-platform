@@ -207,7 +207,7 @@ const ProductDetails = ({ user, users }) => {
     let items = [];
     if (!found) {
       items = [...cartList, { product: details, qty }];
-     
+
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
       openToast("bottom", false, "Item added to cart");
@@ -359,33 +359,33 @@ const ProductDetails = ({ user, users }) => {
       { state: { serialNumbers: serialNumbers, eventTypeName: eventTypeName } });
   }
 
-  const ownershipDetailColumn =  [
-      {
-        title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
-        dataIndex: "seller",
-        key: "seller",
-        align: "center",
-        render: (text) => <p>{text}</p>,
-      },
-     {
-          title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
-          dataIndex: "newOwner",
-          key: "newOwner",
-          align: "center",
-          render: (text) => <p>{text}</p>,
-        },
-      {
-        title: (
-          <Text className="text-primaryC text-[13px]">
-            OWNERSHIP START DATE
-          </Text>
-        ),
-        dataIndex: "ownershipStartDate",
-        key: "ownershipStartDate",
-        align: "center",
-        render: (epoch) => <p>{epochToDate(epoch)}</p>,
-      },
-    ];
+  const ownershipDetailColumn = [
+    {
+      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      dataIndex: "seller",
+      key: "seller",
+      align: "center",
+      render: (text) => <p>{text}</p>,
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      dataIndex: "newOwner",
+      key: "newOwner",
+      align: "center",
+      render: (text) => <p>{text}</p>,
+    },
+    {
+      title: (
+        <Text className="text-primaryC text-[13px]">
+          OWNERSHIP START DATE
+        </Text>
+      ),
+      dataIndex: "ownershipStartDate",
+      key: "ownershipStartDate",
+      align: "center",
+      render: (epoch) => <p>{epochToDate(epoch)}</p>,
+    },
+  ];
 
   const transformationColumn = [
     {
@@ -584,7 +584,8 @@ const ProductDetails = ({ user, users }) => {
                     } else {
                       addItemToCart();
                     }
-                  }}                >
+                  }}
+                >
                   <div className="text-primary group-hover:text-white">
                     Add To Cart
                   </div>
@@ -732,7 +733,7 @@ const ProductDetails = ({ user, users }) => {
                 </Card>
               ) : null}
 
-          {isSerialNumberSelected? (
+          {isSerialNumberSelected ? (
             <Card className="mb-12 mx-16">
               <Text className="font-semibold text-lg">Ownership History</Text>
               <Row className="my-6">
