@@ -9,7 +9,6 @@ import dotenv from 'dotenv'
 import dappJs from "./dapp"
 import SeederJs from "/seeder-utility/seeder";
 import SeederJson from "/seeder-utility/seeder.json";
-import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
@@ -126,13 +125,6 @@ describe("tCommerce Dapp - deploy contracts, bootnode organization", function ()
     assert.equal(deployment.dapp.contract.address, dapp.address)
     assert.isDefined(deployment.dapp.contract.appChainId)
     appChainID = deployment.dapp.contract.appChainId
-  })
-
-  it('Should create and assign admin role', async () => {
-    await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
-    if (adminUser.address !== bayer.address) {
-      await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: bayer.address })
-    }
   })
 
   it('Should populate categories and subCategories', async () => {

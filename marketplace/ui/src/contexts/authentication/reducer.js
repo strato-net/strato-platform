@@ -1,5 +1,4 @@
 import { actionDescriptors } from "./actions";
-import { USER_ROLES } from "../../helpers/constants";
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -18,11 +17,9 @@ const reducer = (state, action) => {
         loginUrl: action.payload,
       };
     case actionDescriptors.checkSuccessful:
-      let roles = action.payload.roles.map(role => USER_ROLES[role]);
-      let updatedUser = {...action.payload, roles: roles}
       return {
         ...state,
-        user: updatedUser,
+        user: action.payload,
         isAuthenticated: true,
         isCheckingAuthentication: false,
         hasChecked: true

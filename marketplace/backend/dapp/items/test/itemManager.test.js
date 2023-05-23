@@ -5,7 +5,6 @@ import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import itemManagerJs from '../itemManager';
 import itemManagerFactory from '/dapp/items/factory/itemManager.factory.js';
 import certificateJs from '/dapp/certificates/certificate'
@@ -100,27 +99,7 @@ describe('Item Manager', function () {
             ...options
         }
 
-         // deploy permission manager
-         permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            globalAdmin,
-            {
-                admin: globalAdmin.address,
-                master: globalAdmin.address,
-            },
-            options
-            );
-
-            await permissionManagerContract.grantTradingEntityRole({
-                user:globalAdmin
-            })
-
-            await permissionManagerContract.grantCertifierRole({
-                user:certifier
-            })
-
-        contract = await itemManagerJs.uploadContract(globalAdmin, {
-            permissionManager:permissionManagerContract.address
-         }, newOptions);
+        contract = await itemManagerJs.uploadContract(globalAdmin, {}, newOptions);
         certifierAddress = certifier.address;
     });
 

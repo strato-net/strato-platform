@@ -35,7 +35,7 @@ const App = () => {
     // const loginUrl = "abcd"
     // const users = [];
 
-    
+
   useEffect(() => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       window.location.href = loginUrl;
@@ -116,5 +116,4 @@ const App = () => {
     </BrowserRouter>
   );
 };
-
 export default App;
