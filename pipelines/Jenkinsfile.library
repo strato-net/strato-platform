@@ -1167,6 +1167,7 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
   //sh "echo ${stratoGSPath} > _stratogs_path_tmp"
   sh "echo ${OAuthDiscoveryUrl} > _oauth_discovery_url_tmp"
+  
   sh "echo ${username} > _username_tmp"
   sh "echo ${password} > _password_tmp"
   def client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${clientId}:${clientSecret}'))\"").trim()
@@ -1174,7 +1175,8 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
   
   sh '''#!/bin/bash -le
       set -x
-      USER_TOKEN=$(curl -s -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
+      OAUTH_TOKEN_ENDPOINT=$(curl -s $(<_oauth_discovery_url_tmp) | jq -r .token_endpoint)
+      USER_TOKEN=$(curl -s -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
       docker exec strato_nginx_1 curl -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
       userPubKey=$(docker exec strato_nginx_1 curl -s -H "Authorization: Bearer $USER_TOKEN" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
@@ -1192,7 +1194,7 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       sudo docker exec strato_strato_1 bash /x509-generator/reformat-cert.sh
       # escaped cert is now saved as /x509-generator/certs.json inside the container
       CERT_ESCAPED=$(sudo docker exec strato_strato_1 cat /x509-generator/certs.json)
-      ADMIN_TOKEN=$(curl -L -X POST "$(<_oauth_discovery_url_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials')
+      ADMIN_TOKEN=$(curl -L -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials')
       
       docker exec strato_nginx_1 curl -H "Authorization: Bearer ${ADMIN_TOKEN}" -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
         -H 'Accept: application/json' \\
