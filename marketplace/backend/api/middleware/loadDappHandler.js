@@ -18,7 +18,6 @@ const loadDapp = async (req, res, next) => {
     //const { app, username } = req
     accessToken = { token: req.headers['x-user-access-token'] };
   }
-
   const userCredentials = {
     username,
     ...accessToken,
