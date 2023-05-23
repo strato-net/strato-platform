@@ -54,7 +54,6 @@ class InventoryController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
-      console.log('Is this the right controller? ========> ')
       InventoryController.validateCreateInventoryArgs(body)
 
       const result = await dapp.createInventory(body)

@@ -57,22 +57,24 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
 
     function addInventory (address _productAddress, int _quantity, int _pricePerUnit, string _batchId, 
         InventoryStatus _status, uint _createdDate, string[] _serialNumbers) returns (uint256, address) {
-        if(!appPermissionManager.canCreateInventory(tx.origin)){
-           return (RestStatus.UNAUTHORIZED,address(0));
-        }
+        if (_serialNumbers.length == 0) {
+            Product_3 product = Product_3(_productAddress);
+            return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
 
-        for (uint256 i = 0; i < _serialNumbers.length; i++) {
-           if(uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[i]]){
-                return (RestStatus.CONFLICT,address(0));
+        } else {
+            for (uint256 i = 0; i < _serialNumbers.length; i++) {
+                if(uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[i]]){
+                    return (RestStatus.CONFLICT,address(0));
+                }
             }
-        }
-    
-        for (uint256 j = 0; j < _serialNumbers.length; j++) {
-            uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[j]] = true;
-        }
+        
+            for (uint256 j = 0; j < _serialNumbers.length; j++) {
+                uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[j]] = true;
+            }
 
-        Product_3 product = Product_3(_productAddress);
-        return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
+            Product_3 product = Product_3(_productAddress);
+            return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
+        }
     }
 
     function updateInventory (address _productAddress, address _inventory, int _pricePerUnit, 

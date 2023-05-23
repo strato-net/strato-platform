@@ -62,6 +62,14 @@ contract ItemManager is ItemStatus,InventoryStatus{
             string itemAddresses= "";
             string repeatedSerialNumbers= "";
 
+        if (_itemObject.length == 0) {
+            Item_3 itemAddr= new Item_3(_appChainId, _productId, _uniqueProductCode, _inventoryId, _itemObject[0].serialNumber, _status, _comment, new string[], new string[], new string[], 0,
+            _createdDate);
+
+            address itemContractAddress= address(itemAddr);
+            itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
+
+        }
         for (uint256 i = 0; i < _itemObject.length; i++) {
            string currentSerialNumber = _itemObject[i].serialNumber;
            uint exisitngUPC = uniqueSerialNumberByUPC[currentSerialNumber];

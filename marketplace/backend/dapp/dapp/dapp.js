@@ -558,19 +558,21 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const repeatedSerialNumber = [];
     const serialNumbers = []
 
-    for (let i = 0; i < serialNumber.length; i += 200) {
-      serialNo.push(serialNumber[i].itemSerialNumber)
-      const serialNumberArr = serialNo.slice(i, i + 200);
-      const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
 
-      items.forEach(obj => {
-        const item = serialNumberArr.find(num => num === obj.serialNumber);
-        if (item) {
-          repeatedSerialNumber.push(item);
-        }
-      });
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      for (let i = 0; i < serialNumber.length; i += 200) {
+        serialNo.push(serialNumber[i].itemSerialNumber)
+        const serialNumberArr = serialNo.slice(i, i + 200);
+        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
+
+        items.forEach(obj => {
+          const item = serialNumberArr.find(num => num === obj.serialNumber);
+          if (item) {
+            repeatedSerialNumber.push(item);
+          }
+        });
+      }
     }
-
     if (repeatedSerialNumber.length != 0) {
       throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
     }
@@ -579,36 +581,48 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
     let transformedArray = [];
 
-    serialNumber.forEach(function (item) {
-      let rawMaterialProductNameArray = [];
-      let rawMaterialSerialNumberArray = [];
-      let rawMaterialProductIdArray = [];
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      serialNumber.forEach(function (item) {
+        let rawMaterialProductNameArray = [];
+        let rawMaterialSerialNumberArray = [];
+        let rawMaterialProductIdArray = [];
 
-      if (item.rawMaterials.length != 0) {
-        item.rawMaterials.forEach(function (rawMaterial) {
-          let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-          let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-          let rawMaterialProductId = rawMaterial.rawMaterialProductId;
+        if (item.rawMaterials.length != 0) {
+          item.rawMaterials.forEach(function (rawMaterial) {
+            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
+            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
+            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
 
-          for (const element of rawMaterialSerialNumbers) {
-            rawMaterialProductNameArray.push(rawMaterialProductName);
-            rawMaterialSerialNumberArray.push(element);
-            rawMaterialProductIdArray.push(rawMaterialProductId);
-          }
+            for (const element of rawMaterialSerialNumbers) {
+              rawMaterialProductNameArray.push(rawMaterialProductName);
+              rawMaterialSerialNumberArray.push(element);
+              rawMaterialProductIdArray.push(rawMaterialProductId);
+            }
+          });
+        }
+
+        transformedArray.push({
+          "itemNumber": parseInt(util.iuid()),
+          "serialNumber": item.itemSerialNumber,
+          "rawMaterialProductName": rawMaterialProductNameArray,
+          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
+          "rawMaterialProductId": rawMaterialProductIdArray
         });
-      }
-
-      transformedArray.push({
-        "itemNumber": parseInt(util.iuid()),
-        "serialNumber": item.itemSerialNumber,
-        "rawMaterialProductName": rawMaterialProductNameArray,
-        "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-        "rawMaterialProductId": rawMaterialProductIdArray
+        serialNumbers.push(item.itemSerialNumber)
       });
-      serialNumbers.push(item.itemSerialNumber)
-    });
-
+    } 
+    if (serialNumber.length == 0 || serialNumber.length == undefined) {
+      const randomNumber = parseInt(util.iuid())
+      transformedArray.push({
+        "itemNumber": randomNumber,
+        "serialNumber": "",
+        "rawMaterialProductName": [],
+        "rawMaterialSerialNumber": [],
+        "rawMaterialProductId": []
+      });
+    }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
+
 
     const itemParams = {
       itemObject: transformedArray,
@@ -628,6 +642,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       itemAddress.slice(0, -1),
       repeatedSerialNumbers.slice(0, -1),
     ];
+
   };
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { inventory: inventoryId } = args;
