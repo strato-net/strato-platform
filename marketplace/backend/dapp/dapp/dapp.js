@@ -816,14 +816,14 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
 
       // get user paymentProvider details from cirrus
-      const paymentProvider = paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
+      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
 
       /* TODO check if the provider contract exists on then initiate a update */
-      if (!paymentProvider) {
+      if (Object.keys(paymentProvider).length == 0) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         return {}
       }
-      const connectedStripeAccountStatus = { paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
+      const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
       try {
         const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
@@ -836,8 +836,10 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           connectedStripeAccountStatus.accountDeauthorized = true
         }
       }
-
-      await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, chainOptions)
+      const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
+      if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+        await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
+      }
 
       return connectedStripeAccountStatus
 
@@ -910,7 +912,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
           accountDeauthorized: false
         },
-        { ...newOptions, chainIds: [contract.chainId] })
+        newOptions)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
