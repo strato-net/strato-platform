@@ -190,7 +190,7 @@ Some docker-compose vars are optional with default values and some are required 
 MP_IS_BOOTNODE              - (default: 'false') if false - .deploy.yaml is expected in docker volume
 MP_API_DEBUG                - (default: 'false') show additional logs of STRATO API calls in backend container log
 CONFIG_DIR_PATH             - (default: '/config') directory inside of container to keep the config and deploy yaml files. Not recommended to change unless you know what you are doing.
-MP_DAPP_SHARD_ID            - (required for MP_IS_BOOTNODE=false) the if of the existing shard with pre-existing Marketplace dapp contract (for MP_IS_BOOTNODE=false mode only)
+MP_DAPP_ADDRESS             - (required for MP_IS_BOOTNODE=false) the if of the existing shard with pre-existing Marketplace dapp contract (for MP_IS_BOOTNODE=false mode only)
 ORG_DEPLOY_FILE_NAME        - (default: 'org.deploy.yaml') filename of the targeted org deploy file. Not recommended to change unless you know what you are doing.
 APPLICATION_USER_NAME       - (default: 'APP_USER') the username of service user
 MP_SERVER_HOST              - (required) App server host (hostname or hostname:port, e.g. example.com) of the application server
