@@ -62,9 +62,7 @@ app.use(
   })
 );
 
-if (process.env.OAUTH_DEV_MODE === "true") {
-  app.oauth = authHandler.initOauth()
-};
+app.oauth = authHandler.initOauth()
 
 app.set(constants.s3ParamName, {
   bucket: {

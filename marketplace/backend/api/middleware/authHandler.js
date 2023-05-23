@@ -20,21 +20,20 @@ const getTokenFromCookie = async (req, res) => {
 }
 
 const getTokenFromHeader = async (req) => {
-  if (!req.headers.authorization) return null
-  const [bearer, token] = req.headers.authorization.split(' ')
-  if (bearer !== 'Bearer') return null
-  return token
+  if(req.headers['x-user-access-token']) 
+    return req.headers['x-user-access-token']
+    
+  if (req.headers['authorization']) {
+    const [bearer, token] = req.headers['authorization'].split(' ')
+    if (bearer !== 'Bearer') return null
+    return token
+  }
+  return null
 }
 
 class AuthHandler {
   static authorizeRequest() {
     return async function (req, res, next) {
-      if(process.env.OAUTH_DEV_MODE !== 'true'){
-        next();    // for now, this is a hack to just always authorize, this skips the rest of the code in this function
-        return;
-      };
-
-	
       try {
         let token = await getTokenFromCookie(req, res)
         let address
