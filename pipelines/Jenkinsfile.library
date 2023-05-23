@@ -1196,7 +1196,7 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       CERT_ESCAPED=$(sudo docker exec strato_strato_1 cat /x509-generator/certs.json)
       ADMIN_TOKEN=$(curl --fail -L -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
       
-      docker exec strato_nginx_1 curl --fail -H "Authorization: Bearer ${ADMIN_TOKEN}" -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
+      docker exec strato_nginx_1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
         -H 'Accept: application/json' \\
         -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
         -H 'Content-Type: application/json' \\
