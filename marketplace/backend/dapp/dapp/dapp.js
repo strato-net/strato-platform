@@ -40,7 +40,6 @@ const allAssetNames = [
 ];
 
 const contractName = "Dapp";
-const mainChainContractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -88,14 +87,14 @@ async function loadFromDeployment(admin, deployFilename, options) {
 async function uploadDappContract(token, options) {
   const source = await importer.combine(contractFileName);
   const contractArgs = {
-    name: mainChainContractName,
+    name: contractName,
     source,
     args: {},
   };
 
   const copyOfOptions = {
     ...options,
-    history: [mainChainContractName, ...allAssetNames],
+    history: [contractName, ...allAssetNames],
   };
 
   const contract = await createContract(token, contractArgs, copyOfOptions);
@@ -143,7 +142,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.userOrganization = userCertificate.organization
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: mainChainContractName, };
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -228,7 +227,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     return managers.itemManager.updateItem(args);
   };
   contract.getItems = async function (args = {}, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.itemManager.getItems({ ...args }, getOptions);
   };
 
@@ -237,7 +236,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     try {
 
       const { productId, serialNumbers } = args;
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const eventBatchId = util.uid();
       const createdDate = Math.floor(Date.now() / 1000);
@@ -272,7 +271,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const getOptions = {
       ...options,
       org: managers.cirrusOrg,
-      app: mainChainContractName,
+      app: contractName,
     };
 
     const { filterByCertifier, ...restArgs } = args
@@ -346,7 +345,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getInventoryEventTypes = async function (args = {}, options = optionsNoChainIds) {
     const { inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
 
@@ -379,7 +378,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getInventoryEventTypeDetails = async function (args = {}, options = optionsNoChainIds) {
     const { inventoryId, eventTypeId } = args;
 
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
 
     const itemsAddress = items.map((item) => item.address);
@@ -455,7 +454,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     return managers.productManager.deleteProduct(args);
   };
   contract.createInventory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     const { serialNumber, ...restArgs } = args;
 
@@ -536,7 +535,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { inventory: inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
     const itemsAddress = items.map((item) => item.address);
     await managers.productManager.updateInventory(args);
@@ -544,30 +543,30 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     return await managers.itemManager.updateItem(itemParams);
   };
   contract.getProduct = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProduct({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
   contract.getProducts = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', ownerOrganization: contract.userOrganization },
       getOptions
     );
   };
   contract.getProductNames = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
       getOptions
     );
   };
   contract.getInventory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventory({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
   contract.getInventories = async function (args, options = defaultOptions) {
     const { userAddress, ...restArgs } = args
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: contract.userOrganization }, getOptions);
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
@@ -575,32 +574,32 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   // ---------------------------------Category Manager ---------------------------
 
   contract.getCategory = async function (args, options = optionsNoChainIds) {
-    return managers.categoryManager.get(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName, });
+    return managers.categoryManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName, });
   };
 
   contract.getCategories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.categoryManager.getAll({ ...args, }, getOptions);
   };
 
   contract.createCategory = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     return managers.categoryManager.createCategory({ ...args, createdDate, }, createOptions);
   };
 
   contract.updateCategory = async function (args, options = defaultOptions) {
     const { address: category, updates } = args;
-    const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, chainIds: [contract.chainId], };
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName, chainIds: [contract.chainId], };
     return managers.categoryManager.updateCategory({ category, ...updates, }, createOptions);
   };
 
   contract.getSubCategory = async function (args, options = optionsNoChainIds) {
-    return managers.categoryManager.getSubCategory(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName, });
+    return managers.categoryManager.getSubCategory(args, { ...options, org: managers.cirrusOrg, app: contractName, });
   };
 
   contract.getSubCategories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.categoryManager.getSubCategories({ ...args, }, getOptions);
   };
 
@@ -620,7 +619,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   //TODO: remove this method if not required
   // contract.auditSubCategory = async function (args, options = defaultOptions) {
   //   const { address, chainId } = args;
-  //   const auditOptions = {...options, org: managers.cirrusOrg, app: mainChainContractName}
+  //   const auditOptions = {...options, org: managers.cirrusOrg, app: contractName}
   //   return subCategoryJs.getHistory(rawAdmin, chainId, address, auditOptions);
   // }
 
@@ -628,7 +627,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   /* TODO: TO be removed in future iterations since product/inventory is managed via product manager */
   // contract.createProduct = async function (args, options = defaultOptions) {
   //   const { productArgs, isPublic } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   //   if (isPublic) {
   //     return productJs.uploadContract(rawAdmin, {
   //       
@@ -643,11 +642,11 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   // }
 
   // contract.getProduct = async function (args, options = optionsNoChainIds) {
-  //   return productJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: mainChainContractName })
+  //   return productJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
   // }
 
   // contract.getProducts = async function (args = {}, options = optionsNoChainIds) {
-  //   const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   //   return productJs.getAll(rawAdmin, {
   //     
   //     ...args
@@ -669,17 +668,17 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   // contract.auditProduct = async function (args, options = defaultOptions) {
   //   const { address, chainId } = args;
-  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   //   return productJs.getHistory(rawAdmin, chainId, address, auditOptions);
   // }
 
   // contract.getInventory = async function (args, options = optionsNoChainIds) {
-  //   return inventoryJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: mainChainContractName })
+  //   return inventoryJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
   // }
 
   // contract.createInventory = async function (args, options = defaultOptions) {
   //   const { inventoryArgs, isPublic } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   //   if (isPublic) {
   //     return inventoryJs.uploadContract(rawAdmin, {
   //       
@@ -708,13 +707,13 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   // contract.auditInventory = async function (args, options = defaultOptions) {
   //   const { address, chainId } = args;
-  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   //   return inventoryJs.getHistory(rawAdmin, chainId, address, auditOptions);
   // }
 
   // contract.createItem = async function (args, options = defaultOptions) {
   //   const { itemArgs } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
   //   return itemChainJs.createItem(rawAdmin, {
   //     
@@ -725,26 +724,26 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   //-----------------------------TO be removed till here-------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
     return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
   }
 
   contract.getItem = async function (args, options = optionsNoChainIds) {
-    return itemJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: mainChainContractName });
+    return itemJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName });
   };
 
   contract.getItems = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return itemJs.getAll(rawAdmin, { ...args, }, getOptions);
   };
 
   contract.getItemOwnershipHistory = function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return itemJs.getAllOwnershipEvents(rawAdmin, { ...args, }, getOptions);
   };
 
@@ -757,7 +756,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.auditItem = async function (args, options = defaultOptions) {
     const { address, chainId } = args;
-    const auditOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return itemJs.getHistory(rawAdmin, chainId, address, auditOptions);
   };
 
@@ -769,7 +768,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getRawMaterials = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.itemManager.getRawMaterials({
 
       ...args,
@@ -781,7 +780,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       let userStripeAccount, generatedAccountLink;
       // get user paymentProvider details from cirrus
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: contract.userOrganization, accountDeauthorized: false }, getOptions)
@@ -813,7 +812,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
       // get user paymentProvider details from cirrus
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
@@ -854,7 +853,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       // get user paymentProvider details from cirrus
       const { accountId, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime } = args
 
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountId }, getOptions);
@@ -884,7 +883,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const { buyerOrganization, orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
       // TODO
 
       const inventoriesAddresses = orderList.map(order => order.inventoryId);
@@ -976,7 +975,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getPayment = async function (args, options = defaultOptions) {
     try {
-      return managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName });
+      return managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName });
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment", { message: "Error while fetching payment" })
     }
@@ -984,7 +983,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
       const { session_id } = args
       const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
       return StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
@@ -1079,11 +1078,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           createdDate, paymentSessionId, shippingAddress
         }
 
-        // console.log(createOptions)
-        // process.exit()
-
-        const order = await managers.orderManager.createOrder(orderArgs);
-        orders.push(order);
+        const [statusCode, orderAddress] = await managers.orderManager.createOrder(orderArgs);
+        orders.push([statusCode, orderAddress]);
 
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
@@ -1092,8 +1088,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
           await managers.orderManager.addOrderLine({
-            // inventoryOwner: inventoryObject.owner,
-            orderAddress: order[1],
+            orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
             quantity: inventoryObject.quantity,
@@ -1120,7 +1115,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const contract = { name: orderJs.contractName, address: address };
 
-      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
           await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
@@ -1147,7 +1142,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const contract = { name: orderJs.contractName, address: address, };
 
-      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
           await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
@@ -1162,7 +1157,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
 
-        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
+        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: contractName }
 
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
@@ -1194,7 +1189,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const { address, ...newArgs } = args;
 
-      const createOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName };
+      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
@@ -1238,7 +1233,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getOrders = async function (args = {}, options = optionsNoChainIds) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       return managers.orderManager.getOrders(rawAdmin, args, getOptions);
     } catch (error) {
       if (error.response) {
@@ -1259,7 +1254,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
       const { orderLineId, serialNumber } = args;
-      const chainOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+      const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
       const { productId } = orderLine
@@ -1304,7 +1299,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     try {
 
       const { address } = args;
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       const orderLine = await managers.orderManager.getOrderLine({ ...args, }, getOptions);
 
       const inventory = await contract.getInventory({ address: orderLine.inventoryId, });
@@ -1321,7 +1316,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getOrderLineItem = async function (args, options = optionsNoChainIds) {
     try {
-      return managers.orderManager.getOrderLineItem(args, { ...options, org: managers.cirrusOrg, app: mainChainContractName });
+      return managers.orderManager.getOrderLineItem(args, { ...options, org: managers.cirrusOrg, app: contractName });
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1333,7 +1328,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getOrderLineItems = async function (args = {}, options = optionsNoChainIds) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       return managers.orderManager.getOrderLineItems({ ...args, }, getOptions);
     } catch (error) {
       if (error.response) {
@@ -1355,7 +1350,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName }
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
     return userAddressJs.getAll(rawAdmin, { ownerOrganization: contract.userOrganization, ...args }, getOptions);
   };
 
@@ -1375,7 +1370,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
 
   contract.getEventTypes = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.eventTypeManager.getAll({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
 
@@ -1390,7 +1385,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.certifyEvent = async function (args, options = defaultOptions) {
     const { eventBatchId, updates } = args;
     const certifiedDate = Math.floor(Date.now() / 1000);
-    const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const eventAddress = [];
     const events = await managers.itemManager.getEvents({ eventBatchId: [...eventBatchId] }, getOptions);
 
@@ -1406,7 +1401,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.auditEvent = async function (args, options = defaultOptions) {
     const { address, chainId } = args;
-    const auditOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
+    const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return eventJs.getHistory(rawAdmin, chainId, address, auditOptions);
   };
 
@@ -1576,6 +1571,6 @@ export default {
   loadFromDeployment,
   uploadContract,
   bindAddress,
-  mainChainContractName,
+  contractName,
   uploadDappContract
 };
