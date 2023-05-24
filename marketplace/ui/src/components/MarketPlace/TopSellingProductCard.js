@@ -37,8 +37,10 @@ const TopSellingProductCard = () => {
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
-    actions.fetchTopSellingProducts(marketplaceDispatch, offset);
-  }, [marketplaceDispatch, offset]);
+    if (hasChecked && !isAuthenticated !== undefined) {
+      actions.fetchTopSellingProducts(marketplaceDispatch, offset);
+    }
+  }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
   const naviroute = routes.MarketplaceProductDetail.url;
 

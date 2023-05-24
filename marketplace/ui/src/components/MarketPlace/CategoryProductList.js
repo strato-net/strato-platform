@@ -34,6 +34,7 @@ import useDebounce from "../UseDebounce";
 import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -56,9 +57,12 @@ const CategoryProductList = () => {
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
+  let { hasChecked, isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
+    if (hasChecked && !isAuthenticated !== undefined) {
     categoryActions.fetchCategory(categoryDispatch);
+    }
   }, [categoryDispatch]);
 
   const routeMatch = useMatch({
