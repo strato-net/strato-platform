@@ -33,7 +33,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const copyOfOptions = {
         ...options,
         history: contractName
-      }
+    }
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
@@ -61,9 +61,9 @@ function marshalIn(_args) {
         tax: 0,
         shippingCharges: 0,
         createdDate: 0,
-        orderAddress:0
+        orderAddress: 0
     };
-    
+
     const args = {
         ...defaultArgs,
         ..._args,
@@ -168,36 +168,35 @@ async function get(user, args, options) {
     }
 
 
-    return marshalOut({ ...orderLine, 
+    return marshalOut({
+        ...orderLine,
     });
 }
 
 async function getAll(admin, args = {}, options) {
     const orderLines = await searchAllWithQueryArgs(contractName, args, options, admin)
-    console.log("orderlines",orderLines)
-    process.exit()
     return orderLines.map((orderLine) => marshalOut(orderLine))
 }
 
 async function addOrderLineItems(admin, contract, _args, baseOptions) {
     const callArgs = {
-      contract,
-      method: 'addOrderLineItems',
-      args: util.usc({
-        ..._args
-      }),
+        contract,
+        method: 'addOrderLineItems',
+        args: util.usc({
+            ..._args
+        }),
     }
     const options = {
-      ...baseOptions,
-      history: [contractName],
+        ...baseOptions,
+        history: [contractName],
     }
-  
+
     const [restStatus, orderLineItemAddress] = await rest.call(admin, callArgs, options)
-  
+
     if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
-  
+
     return [restStatus, orderLineItemAddress];
-  }
+}
 
 /**
  * Get contract state in bloc.
