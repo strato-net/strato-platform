@@ -14,6 +14,7 @@ router.get(
 
 router.get(
   Marketplace.getAllLoggedIn,
+  authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getAllLoggedIn
 );
@@ -26,6 +27,7 @@ router.get(
 
 router.get(
   Marketplace.getTopSellingProductsLoggedIn,
+  authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getTopSellingProductsLoggedIn
 );
