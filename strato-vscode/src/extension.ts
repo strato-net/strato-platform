@@ -23,21 +23,21 @@ export async function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.createProject', async () => {
-		const testInput = await vscode.window.showInputBox({
-			ignoreFocusOut: true, placeHolder: 'E.g. http://test-node.blockapps.net:8080',
-			prompt: 'URL to STRATO Test Node'
-		});
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.importProject', async () => {
+		// Set the node endpoint
+		// todo(moncayo): move this somewhere else
+		// const nodeEndpoint = await vscode.window.showInputBox({
+		// 	ignoreFocusOut: true,
+		// 	placeHolder: 'ex: http://node1-mercata-testnet.blockapps.net/',
+		// 	prompt: 'URL to STRATO node'
+		// })
+		// console.log(`Set node endpoint to ${nodeEndpoint}`)
 
-		const prodInput = await vscode.window.showInputBox({
-			ignoreFocusOut: true,
-			placeHolder: 'E.g. http://production-node.blockapps.net:8080',
-			prompt: 'URL to STRATO Production Node'
-		});
-
+		// Import project directory into workspace
 		const options: vscode.OpenDialogOptions = {
+			title: 'Import project directory',
+			openLabel: 'Import project',
 			canSelectMany: false,
-			openLabel: 'Select',
 			canSelectFiles: false,
 			canSelectFolders: true
 		};
@@ -48,8 +48,32 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 		const projectName = (folderUri || [])[0].fsPath || '';
 		const workspaceFolderUri = vscode.Uri.parse(projectName);
-		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.createProjectCommand') || '';
-		const cmdStr = cmd.replace(/\$1/g, workspaceFolderUri.path);
+
+		const numFolders = (vscode.workspace.workspaceFolders || []).length;
+		vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
+
+		// Show the directory paths in a quickPick dialog
+		let backendDir, frontendDir
+		if (vscode.workspace.workspaceFolders) {
+			let subDirectories = folderUri ? getSubdirectories(folderUri[0].path).map(a => path.basename(a)) : []
+			console.log(subDirectories)
+			await vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the backend directory' })
+			.then(selectedPath => {
+				if (selectedPath) {
+					backendDir = selectedPath
+					console.log(`Backend directory: ${backendDir}`)
+				}
+			})
+			await vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the frontend directory' })
+			.then(selectedPath => {
+				if (selectedPath) {
+					frontendDir = selectedPath
+					console.log(`Frontend directory: ${frontendDir}`)
+				}
+			})
+		} else { return }
+
+		// Open up a terminal if there aren't any and run the build scripts
 		let terminal
 		const terminals = vscode.window.terminals;
 		if (terminals && terminals.length) {
@@ -58,25 +82,17 @@ export async function activate(context: vscode.ExtensionContext) {
 			terminal = vscode.window.createTerminal()
 		}
 		terminal.show()
-		terminal.sendText(cmdStr, true)
-		const numFolders = (vscode.workspace.workspaceFolders || []).length;
-		vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
-		await sleep(500);
-		fs.readFile(path.resolve(path.join(process.cwd(), 'resources', 'testupload.sh')).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), 'utf8', function (err, data) {
-			if (err) {
-				return console.log(err);
-			}
-			let result = data.replace(/\[TEST_NODE\]/g, testInput || '[TEST_NODE]')
-				.replace(/\[PROD_NODE\]/g, prodInput || '[PROD_NODE]');
 
-			// fs.writeFile(process.cwd()+'/resources/testupload.sh', result, 'utf8', function(err){
-			// 	if (err) return console.log(err);
-			// })
-			fs.writeFile(path.resolve(path.join(workspaceFolderUri.path, 'testupload.sh')).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), result, 'utf8', function (err) {
-				if (err) return console.log(err);
-			})
-		})
+		// Install the project dependencies
+		if (backendDir && frontendDir) {
+			terminal.sendText(`cd ${backendDir}; yarn install; cd ..`, true)
+			terminal.sendText(`cd ${frontendDir}; yarn install; cd ..`, true)
+		} else {
+			vscode.window.showErrorMessage("Something went wrong with the directory selection!")
+		}
 	}));
+
+
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
 		const terminals = vscode.window.terminals;
@@ -340,3 +356,19 @@ async function sleep(ms: number) {
 }
 // this method is called when your extension is deactivated
 export function deactivate() { }
+
+function getSubdirectories(rootPath: string): string[] {
+	const files = fs.readdirSync(rootPath);
+	const subdirectories: string[] = [];
+
+	files.forEach(file => {
+		const filePath = path.join(rootPath, file);
+		const stats = fs.statSync(filePath);
+
+		if (stats.isDirectory()) {
+			subdirectories.push(filePath);
+		}
+	});
+
+	return subdirectories;
+}
