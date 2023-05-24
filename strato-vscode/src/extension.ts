@@ -39,13 +39,14 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (folderUri && folderUri[0]) {
 			console.debug(`importProject/Selected folder: ${folderUri[0].fsPath}`)
 
-			const projectName = (folderUri || [])[0].fsPath || '';
+			const projectName = folderUri[0].fsPath
 			const workspaceFolderUri = vscode.Uri.parse(projectName);
 			const numFolders = (vscode.workspace.workspaceFolders || []).length;
 			vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
 
-			context.workspaceState.update('strato-vscode.workspaceDir', folderUri[0].fsPath)
-			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${folderUri[0].fsPath}`)
+			context.workspaceState.update('strato-vscode.workspaceDir', projectName)
+				.then(v => console.debug(`importProject/set strato-vscode.workspaceDir to ${projectName}`))
+			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${projectName}`)
 		}
 	}))
 
@@ -78,7 +79,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			.then(sp => {
 				if (sp) {
 					backendDir = sp
-					console.debug(`buildProject/backendDir: ${backendDir}`)
+					context.workspaceState.update('strato-vscode.backendDir', backendDir)
+						.then(() => console.debug(`buildProject/backendDir: ${backendDir}`))
 					runCommand(`cd ${backendDir}; yarn install; cd ..`)
 				}
 			})
@@ -87,7 +89,8 @@ export async function activate(context: vscode.ExtensionContext) {
 				.then(sp => {
 					if (sp) {
 						frontendDir = sp
-						console.debug(`buildProject/frontendDir: ${frontendDir}`)
+						context.workspaceState.update('strato-vscode.frontendDir', frontendDir)
+							.then(() => console.debug(`buildProject/frontendDir: ${frontendDir}`))
 						runCommand(`cd ${frontendDir}; yarn install; cd ..`)
 					}
 				})
@@ -98,21 +101,30 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Deploys the smart contracts to the targetted node using selected deploy scripts
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
-		// cmd = "pushd server; yarn install; yarn build; touch .env; yarn deploy; popd"
+		// Check if .env exists
+		const folders = vscode.workspace.workspaceFolders || [];
+		const cwd = folders[0].uri.path
+		const backendDir = context.workspaceState.get('strato-vscode.backendDir')
+		const envPath = `${cwd}/${backendDir}/.env`
+
+		if (!fs.existsSync(envPath)) {
+			vscode.window.showWarningMessage('.env file does not exist, creating one for you. Consult your project README for additional help.')
+			runCommand(`touch ${envPath}`)
+			return
+		}
+
+		// Runs CONFIG=mercata yarn deploy using the backend package.json
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
 		runCommand(cmd)
+
+		vscode.window.showInformationMessage("dApp smart contract deployment successful!")
 	}));
 
 
 	// Runs the project backend server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';
-		const terminals = vscode.window.terminals;
-		if (terminals && terminals.length) {
-			const terminal = terminals[0]
-			terminal.show()
-			terminal.sendText(cmd, true)
-		}
+		runCommand(cmd)
 	}));
 
 	// Runs the project backend test server
@@ -388,7 +400,7 @@ function getSubdirectories(rootPath: string): string[] {
 
 // Helper function for running a command in a VS terminal
 function runCommand(cmd: string) {
-	// Open up a terminal if there aren't any and run the build scripts
+	// Open up a terminal if there aren't any and run the cmd string
 	let terminal
 	const terminals = vscode.window.terminals;
 	if (terminals && terminals.length) {
