@@ -1174,7 +1174,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         return result;
       }
 
-      return managers.orderManager.updateSellerDetails({ orderAddress: address, updates });
+      return managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
