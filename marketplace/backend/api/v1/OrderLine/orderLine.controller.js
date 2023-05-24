@@ -10,16 +10,13 @@ class OrderLineController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req
-      const { address, chainId } = params 
+      const { address } = params 
      
       let args
       let chainOptions = options
       
       if (address) {
         args = { address }
-        // if (chainId) {
-        //   chainOptions = { ...options, chainIds: [chainId] }
-        // }
       }
 
       const result = await dapp.getOrderLine(args, chainOptions)
