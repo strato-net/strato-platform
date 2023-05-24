@@ -4,8 +4,8 @@ module Blockchain.VMConstants where
 
 import           Blockchain.Strato.Model.Gas
 
-gTXDATANONZERO = 68 :: Gas
-gTXDATAZERO = 4 :: Gas
+gTXDATANONZERO = 1 :: Gas -- 68 :: Gas
+gTXDATAZERO = 1 :: Gas -- 4 :: Gas
 
 gTX = 21000 :: Gas
 gCREATETX = 53000 :: Gas
