@@ -5,7 +5,6 @@ const factory = {
     getProductArgs(uid, userAddress) {
         const args = {
             productArgs: {
-                appChainId: `${uid}`,
                 name: `name_${uid}`,
                 description: `description_${uid}`,
                 manufacturer: `manufacturer_${uid}`,

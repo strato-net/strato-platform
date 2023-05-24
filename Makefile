@@ -35,9 +35,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex nginx postgrest prometheus smd vault-wrapper vault-nginx
+build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper vault-nginx get_solcs build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx get_solcs build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -58,6 +58,14 @@ prometheus:
 smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+
+marketplace-backend:
+	@echo Now building marketplace-backend...
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-backend:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-backend:${VERSION} make --directory=marketplace/backend/
+
+marketplace-ui:
+	@echo Now building marketplace-ui...
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
 
 get_solcs:
 	@echo checking solcs and pulling them if required...

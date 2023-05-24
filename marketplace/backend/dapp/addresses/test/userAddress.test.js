@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import dappJs from '/dapp/dapp/dapp';
 // import constants from '/helpers/constants';
 import RestStatus from 'http-status-codes';
-// import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import userAddressJs from '../userAddress';
 import factory from '../factory/userAddress.factory.js';
 // import { args } from 'commander';
@@ -77,10 +76,12 @@ describe('UserAddress', function () {
         }
     });
 
+    // TODO: Update this test, the contract.get() is not working. getState() can return the contract state
     it('should upload user address contract', async () => {
         const args = factoryArgs(globalAdmin)
         contract = await userAddressJs.uploadContract(globalAdmin, args, newOptions);
         const state = await contract.get();
+        const state2 = await contract.getState();
 
         assert.notStrictEqual(
             { ...state, constructor: '' },  // Ignore constructor

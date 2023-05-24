@@ -7,7 +7,6 @@ import dappJs from '/dapp/dapp/dapp';
 import RestStatus from 'http-status-codes';
 import eventTypeJs from '../eventType';
 import eventTypeManagerJs from '../eventTypeManager';
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import factory from '../factory/eventTypeManager.factory';
 import { args } from 'commander';
 import certificateJs from '/dapp/certificates/certificate'
@@ -24,7 +23,6 @@ describe('Event Type Manager', function () {
     let contract;
     let dapp;
     let newOptions;
-    let permissionManagerContract;
     let adminOrganization;
 
     const factoryArgs = (user) => ({ ...(factory.getEventTypeArgs(util.uid())) });
@@ -78,24 +76,8 @@ describe('Event Type Manager', function () {
             org: adminOrganization,
             ...options
         }
-
-         // deploy permission manager
-         permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            globalAdmin,
-            {
-                admin: globalAdmin.address,
-                master: globalAdmin.address,
-            },
-            options
-            );
-
-        await permissionManagerContract.grantTradingEntityRole({
-            user:globalAdmin
-        })
        
-        contract = await eventTypeManagerJs.uploadContract(globalAdmin, {
-            permissionManager:permissionManagerContract.address
-         }, newOptions);
+        contract = await eventTypeManagerJs.uploadContract(globalAdmin, {}, newOptions);
     });
 
     it('Create Event Type', async () => {

@@ -8,7 +8,6 @@ import certificateJs from '/dapp/certificates/certificate'
 import RestStatus from 'http-status-codes';
 import inventoryJs from '../inventory';
 import factory from '../factory/inventory.factory';
-import {ROLE} from "../../../helpers/constants";
 
 const options = { config };
 
@@ -26,7 +25,7 @@ describe('Inventory', function () {
     let dapp;
     let newOptions;
     let adminOrganization;
-    const factoryArgs = (userAddress) => ({ ...(factory.getInventoryArgs(util.uid(),userAddress)) });
+    const factoryArgs = (userAddress) => ({ ...(factory.getInventoryArgs(util.uid(), userAddress)) });
 
     before(async () => {
         assert.isDefined(
@@ -69,7 +68,7 @@ describe('Inventory', function () {
             adminResponse.message
         )
         globalAdmin = { ...adminResponse.user, ...adminCredentials }
-        
+
         const adminCert = await certificateJs.getCertificateMe(globalAdmin)
         adminOrganization = adminCert.organization;
 
@@ -78,17 +77,10 @@ describe('Inventory', function () {
             ...options
         }
 
-        await dapp.managers.userMembershipManager.createUserMembership({
-            appChainId:dapp.chainId,
-            username:`${process.env.GLOBAL_ADMIN_NAME}`,
-            userAddress:globalAdmin.address,
-            role:ROLE.TRADING_ENTITY
-          });
-
     });
 
     it('Create Inventory - 201', async () => {
-        
+
         // Create Inventory via upload
         const args = factoryArgs(globalAdmin.address)
         contract = await inventoryJs.uploadContract(globalAdmin, args, newOptions);

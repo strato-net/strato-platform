@@ -10,7 +10,6 @@ import dappJs from '../../dapp/dapp/dapp'
 import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
 import { Product, Inventory } from '../../api/v1/endpoints'
-import {ROLE} from "../../helpers/constants"
 
 const options = { config }
 
@@ -48,13 +47,6 @@ describe('Product End-To-End Tests', function () {
       adminResponse.message
     )
     admin = { ...adminResponse.user, ...adminCredentials }
-
-    await dapp.managers.userMembershipManager.createUserMembership({
-      appChainId:dapp.chainId,
-      username:`${process.env.GLOBAL_ADMIN_NAME}`,
-      userAddress:admin.address,
-      role:ROLE.TRADING_ENTITY
-    });
   })
 
   it('Create a Product', async () => {
@@ -213,7 +205,7 @@ describe('Product End-To-End Tests', function () {
     )
 
     assert.equal(deleteProductResponse.status, 409, 'should be 409');
-    
+
     // get product
     const getProduct = await get(
       Product.prefix,
@@ -233,7 +225,7 @@ describe('Product End-To-End Tests', function () {
     else
       assert.equal(isDeleted, true, 'isDeleted should be true')
 
-    })
+  })
 
   it('Update Product', async () => {
     // create product

@@ -19,7 +19,7 @@ class ProductController {
 
       if (address) {
         args = { address }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const product = await dapp.getProduct(args, chainOptions)
@@ -73,6 +73,8 @@ class ProductController {
 
       const result = await dapp.createProduct(body)
       rest.response.status200(res, result)
+
+      console.log("*Seller added product*");
 
       return next()
     } catch (e) {

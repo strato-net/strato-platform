@@ -3,7 +3,7 @@ members:
     unit: 'Apps'
     commonName: 'AppsNode1'
   
-  - organization: 'Apple'
+  - organization: 'AlphaCompany'
   
-  - organization: 'Microsoft'
+  - organization: 'BetaCompany'
     unit: 'Engineering'

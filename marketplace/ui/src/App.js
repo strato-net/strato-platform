@@ -16,18 +16,12 @@ import { UsersProvider } from "./contexts/users";
 const { Content } = Layout;
 
 const App = () => {
-  // const theme = {
-  //   colors: {
-  //     topBar: {
-  //       background: "#fff",
-  //     },
-  //   },
-  // };
 
   const dispatch = useAuthenticateDispatch();
 
   const { isAuthenticated, hasChecked, user, loginUrl, users } =
     useAuthenticateState();
+
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -109,5 +103,4 @@ const App = () => {
     </BrowserRouter>
   );
 };
-
 export default App;

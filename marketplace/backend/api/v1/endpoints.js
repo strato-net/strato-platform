@@ -67,7 +67,7 @@ export const Item = {
 
 export const Order = {
   prefix: '/order',
-  get: '/:address/:chainId/',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
@@ -76,17 +76,17 @@ export const Order = {
   payment: '/payment',
   paymentSession: '/payment/session/:session_id',
   userAddress: '/userAddress',
-  getAllUserAddress: '/userAddresses'
+  getAllUserAddress: '/userAddresses/user',
 }
 
 export const OrderLine = {
   prefix: '/orderLine',
-  get: '/:address/:chainId/'
+  get: '/:address'
 }
 
 export const OrderLineItem = {
   prefix: '/orderLineItem',
-  get: '/:address/:chainId/',
+  get: '/:orderLineId',
   getAll: '/',
   create: '/',
   update: '/update',
@@ -121,19 +121,6 @@ export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',
   getTopSellingProducts: '/topselling'
-}
-
-export const UserMembership = {
-  prefix: '/membership',
-  get: '/:address/:chainId/',
-  getAll: '/',
-  create: '/',
-  update:'/',
-  getAllRequest:'/requests',
-  createRequest:'/requests',
-  approveRequest:'/requests', // update request
-  getAllRequestOfUser:'/requests/user/all',
-  getAllCertifiers: '/certifiers/users/all'
 }
 
 export const PaymentService = {

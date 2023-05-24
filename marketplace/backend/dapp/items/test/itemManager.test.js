@@ -5,7 +5,6 @@ import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from "/dapp/permissions/app/appPermissionManager";
 import itemManagerJs from '../itemManager';
 import itemManagerFactory from '/dapp/items/factory/itemManager.factory.js';
 import certificateJs from '/dapp/certificates/certificate'
@@ -100,27 +99,7 @@ describe('Item Manager', function () {
             ...options
         }
 
-         // deploy permission manager
-         permissionManagerContract = await appPermissionManagerJs.uploadContract(
-            globalAdmin,
-            {
-                admin: globalAdmin.address,
-                master: globalAdmin.address,
-            },
-            options
-            );
-
-            await permissionManagerContract.grantTradingEntityRole({
-                user:globalAdmin
-            })
-
-            await permissionManagerContract.grantCertifierRole({
-                user:certifier
-            })
-
-        contract = await itemManagerJs.uploadContract(globalAdmin, {
-            permissionManager:permissionManagerContract.address
-         }, newOptions);
+        contract = await itemManagerJs.uploadContract(globalAdmin, {}, newOptions);
         certifierAddress = certifier.address;
     });
 
@@ -152,7 +131,7 @@ describe('Item Manager', function () {
 
         events.forEach(event => {
             assert.deepInclude(R.map(v => '' + v, event),
-                R.map(v => '' + v, { appChainId: eventArgs.appChainId, eventTypeId: eventArgs.eventTypeId, eventBatchId: eventArgs.eventBatchId, date: eventArgs.date, summary: eventArgs.summary, certifier: eventArgs.certifier, createdDate: eventArgs.createdDate }));
+                R.map(v => '' + v, { eventTypeId: eventArgs.eventTypeId, eventBatchId: eventArgs.eventBatchId, date: eventArgs.date, summary: eventArgs.summary, certifier: eventArgs.certifier, createdDate: eventArgs.createdDate }));
         });
     });
 
@@ -244,12 +223,12 @@ describe('Item Manager', function () {
         )
         // Update an Event
         const certifyEventArgs = certifyEventFactoryArgs(eventAddress);
-        
+
         await assert.restStatus(async () => {
-            await  itemManagerJs.certifyEvent(globalAdmin, _contract, certifyEventArgs, newOptions);
+            await itemManagerJs.certifyEvent(globalAdmin, _contract, certifyEventArgs, newOptions);
         }, RestStatus.UNAUTHORIZED);
 
-    
+
     });
 
     it('ItemManager: Create item', async () => {

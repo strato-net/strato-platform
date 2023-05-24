@@ -70,9 +70,9 @@ class CategoryController {
 
   static validateCreateCategoryArgs(args) {
     const createCategorySchema = Joi.object({
-        name: Joi.string().required(),
-        description: Joi.string().required(),
-        imageKey:Joi.string().required()
+      name: Joi.string().required(),
+      description: Joi.string().required(),
+      imageKey: Joi.string().required()
     });
 
     const validation = createCategorySchema.validate(args);
@@ -90,7 +90,7 @@ class CategoryController {
       updates: Joi.object({
         name: Joi.string(),
         description: Joi.string(),
-        imageKey:Joi.string()
+        imageKey: Joi.string()
       }).required(),
     });
 

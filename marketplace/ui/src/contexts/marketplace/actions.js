@@ -315,7 +315,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/userAddresses`,
+        `${apiUrl}/order/userAddresses/user`,
         {
           method: HTTP_METHODS.GET,
         }

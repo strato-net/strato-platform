@@ -14,6 +14,7 @@ module Blockchain.Sequencer.Kafka (
     writeUnseqEvents,
     writeSeqVmEvents,
     writeSeqP2pEvents,
+    writeUnseqEventsWithLimits,
     emitKafkaTransactions,
     emitKafkaBlock,
     emitKafkaChainDetails,
@@ -36,6 +37,7 @@ import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Stream.Raw
 
+import qualified Data.ByteString            as B
 import qualified Data.ByteString.Lazy       as BL
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Producer     as KW
@@ -101,6 +103,11 @@ writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
   KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+
+writeUnseqEventsWithLimits :: K.Kafka k => [B.ByteString] -> k [KP.ProduceResponse]
+writeUnseqEventsWithLimits events = do
+  KW.produceMessagesAsSingletonSets $ 
+      (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
 readFromTopic' topic offset = do
