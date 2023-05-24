@@ -1335,6 +1335,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
       const { orderLineId, serialNumber, chainId } = args;
+      const quantity = args.quantity || 0;
+      console.log("dapp order line item quantity", quantity)
       console.log("dapp order line item args", args)
       const chainOptions = {
         ...options,
@@ -1345,15 +1347,32 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const orderLine = await orderLineJs.get(rawAdmin, { chainId, address: orderLineId }, chainOptions);
       console.log("dapp order line item: orderLine", orderLine)
-      const { productId } = orderLine;
-        
-      const items = await managers.itemManager.getItems(
-        {
-          productId,
-          chainId: contract.chainId,
-        },
-        chainOptions
-      );
+      const { productId, inventoryId } = orderLine;
+      
+      // If ther were no serial numbers at inventory creation the serial numbers are set to N/A
+
+      console.log("dapp order line item: inventoryID", inventoryId)
+      let items;
+      if (quantity > 0) {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            chainId: contract.chainId,
+          },
+          chainOptions
+        );
+      } else {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            chainId: contract.chainId,
+            serialNumber: [...serialNumber]
+          },
+          chainOptions
+        );
+      }
         console.log("dapp order line item: item", items, "address", orderLineId)
 
       if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
@@ -1364,20 +1383,25 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const itemsAddresses = items.map(_item => _item.address);
       console.log("dapp order line item: itemsAddresses", itemsAddresses)
+      const totalItemAddresses = quantity === 0 ? itemsAddresses : itemsAddresses.slice(0, quantity);
       
       const _args = {
         orderLineId,
-        items: itemsAddresses,
+        items: totalItemAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
       console.log("dapp order line item: _args", _args)
-
+      
+      // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
+      // Its possible this line isn't working in orderLine.sol 
+      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
       const [status, orderLineItems, _items] = await orderLineJs.addOrderLineItems(rawAdmin, _contract, _args, chainOptions);
       const result = orderLineItems.split(",");
 
       console.log("dapp order line item: result", result, "status", status, "items", _items)
+      // Still getting an error from here. Update is unsuccessful
       const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: itemsAddresses,
+        itemsAddress: totalItemAddresses,
         status: ITEM_STATUS.SOLD,
         comment: "",
       });

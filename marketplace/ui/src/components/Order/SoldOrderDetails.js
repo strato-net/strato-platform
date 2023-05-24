@@ -222,16 +222,20 @@ const SoldOrderDetails = ({ user, users }) => {
     // }
     let body = {};
     if (serialUploaded === false) {
-      setselectedProd(orderDetails.orderLines[0]);
-      body = {
-        orderId: details.orderId,
-        chainId: chainId,
-        orderLineId: selectedProd.address,
-        serialNumber: [],
-      };
-      let createOrderLine = await actions.createOrderLineItem(dispatch, body);
-      if (createOrderLine) {
-        console.log("createOrderLine", createOrderLine);
+      for (let i = 0; i < orderDetails.orderLines.length; i++) {
+        setselectedProd(orderDetails.orderLines[i]);
+        body = {
+          orderId: details.orderId,
+          chainId: chainId,
+          orderLineId: details.orderLines[i].address,
+          serialNumber: [],
+          quantity: details.orderLines[i].quantity
+        };
+
+        let createOrderLine = await actions.createOrderLineItem(dispatch, body);
+        if (createOrderLine) {
+          console.log("createOrderLine", createOrderLine);
+        }
       }
     }
     if (selectedDate == null) {
