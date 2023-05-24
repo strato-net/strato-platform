@@ -149,12 +149,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}));
 
 
-	// Creates a private chain on the targetted node
-	const contractsProvider = new ContractsProvider();
-	vscode.window.registerTreeDataProvider('contracts', contractsProvider);
-	vscode.commands.registerCommand('contracts.refreshEntry', () =>
-		contractsProvider.refresh()
-	);
+		// Creates a private chain on the targetted node
 	vscode.commands.registerCommand('contracts.createChain', async (element) => {
 		const { nodeId } = element;
 		const user = await getApplicationUser(nodeId);
@@ -330,10 +325,19 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage(`Could not find a function called ${variableName} in ${contractName} at address ${contractAddress} on chain ${chainId} on node ${nodeId}.`);
 		}
 	});
+
+	// Register the contracts provider for the sidebar
+	const contractsProvider = new ContractsProvider();
+	vscode.window.registerTreeDataProvider('contracts', contractsProvider);
+	vscode.commands.registerCommand('contracts.refreshEntry', () =>
+		contractsProvider.refresh()
+	);
 	vscode.window.registerTreeDataProvider(
 		'contracts',
 		contractsProvider
 	)
+
+	// Register the Cirrus provider
 	const cirrusProvider = new CirrusProvider();
 	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider);
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
@@ -348,6 +352,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		'cirrus',
 		cirrusProvider
 	)
+
+	// Register the nodes provider
 	const nodesProvider = new NodesProvider();
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider);
 	vscode.commands.registerCommand('nodes.refreshEntry', () =>
@@ -361,6 +367,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		'project-management',
 		new ProjectActionProvider()
 	)
+
+	// Activate debug mode and diagnostics
 	activateStratoDebug(context);
 	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
 	context.subscriptions.push(solidityDiagnostics);
