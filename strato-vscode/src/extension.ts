@@ -26,15 +26,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Imports the project directory into the VS Code workspace context
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.importProject', async () => {
-		// Set the node endpoint
-		// todo(moncayo): move this somewhere else
-		// const nodeEndpoint = await vscode.window.showInputBox({
-		// 	ignoreFocusOut: true,
-		// 	placeHolder: 'ex: http://node1-mercata-testnet.blockapps.net/',
-		// 	prompt: 'URL to STRATO node'
-		// })
-		// console.log(`Set node endpoint to ${nodeEndpoint}`)
-
 		// Import project directory into workspace
 		const options: vscode.OpenDialogOptions = {
 			title: 'Import project directory',
@@ -56,6 +47,18 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${folderUri[0].fsPath}`)
 		}
 	}))
+
+
+	// Set the node endpoint to send queries to
+	// context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.setNode', () => {
+	// 	const nodeEndpoint = await vscode.window.showInputBox({
+	// 		ignoreFocusOut: true,
+	// 		placeHolder: 'ex: http://node1-mercata-testnet.blockapps.net/',
+	// 		prompt: 'URL to STRATO node'
+	// 	})
+	// 	console.log(`Set node endpoint to ${nodeEndpoint}`)
+	// }))
+
 
 	// Builds and installs project dependencies
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.buildProject', () => {
@@ -94,18 +97,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Deploys the smart contracts to the targetted node using selected deploy scripts
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
-
+		// cmd = "pushd server; yarn install; yarn build; touch .env; yarn deploy; popd"
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
-
-		// Create a terminal if one isn't already open
-		const terminals = vscode.window.terminals;
-		let terminal
-		if (terminals && terminals.length) {
-			terminal = terminals[0]
-		} else { terminal = vscode.window.createTerminal() }
-		terminal.show()
-		terminal.sendText(cmd, true)
+		runCommand(cmd)
 	}));
+
+
+	// Runs the project backend server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';
 		const terminals = vscode.window.terminals;
@@ -115,6 +113,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			terminal.sendText(cmd, true)
 		}
 	}));
+
+	// Runs the project backend test server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
 		const terminals = vscode.window.terminals;
@@ -124,6 +124,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			terminal.sendText(cmd, true)
 		}
 	}));
+
+	// Runs the project UI
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
 		const terminals = vscode.window.terminals;
@@ -133,6 +135,9 @@ export async function activate(context: vscode.ExtensionContext) {
 			terminal.sendText(cmd, true)
 		}
 	}));
+
+
+	// Runs the project test UI
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
 		const terminals = vscode.window.terminals;
@@ -143,6 +148,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
+
+	// Creates a private chain on the targetted node
 	const contractsProvider = new ContractsProvider();
 	vscode.window.registerTreeDataProvider('contracts', contractsProvider);
 	vscode.commands.registerCommand('contracts.refreshEntry', () =>
@@ -218,6 +225,9 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
 		}
 	});
+
+
+	// Uploads a contract to the targetted node
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId } = item;
@@ -281,6 +291,9 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
 		}
 	});
+
+
+	// Calls a function on an existing smart contract
 	vscode.commands.registerCommand('contracts.callFunction', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId, contractName, contractAddress, variableName } = item;
