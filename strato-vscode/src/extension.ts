@@ -23,6 +23,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
+
+	// Imports the project directory into the VS Code workspace context
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.importProject', async () => {
 		// Set the node endpoint
 		// todo(moncayo): move this somewhere else
@@ -44,63 +46,65 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		const folderUri = await vscode.window.showOpenDialog(options);
 		if (folderUri && folderUri[0]) {
-			console.log('Selected folder: ' + folderUri[0].fsPath);
-		}
-		const projectName = (folderUri || [])[0].fsPath || '';
-		const workspaceFolderUri = vscode.Uri.parse(projectName);
+			console.debug(`importProject/Selected folder: ${folderUri[0].fsPath}`)
 
-		const numFolders = (vscode.workspace.workspaceFolders || []).length;
-		vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
+			const projectName = (folderUri || [])[0].fsPath || '';
+			const workspaceFolderUri = vscode.Uri.parse(projectName);
+			const numFolders = (vscode.workspace.workspaceFolders || []).length;
+			vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
+
+			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${folderUri[0].fsPath}`)
+		}
+	}))
+
+	// Builds and installs project dependencies
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.buildProject', () => {
+		vscode.window.showInformationMessage("Building your dApp...")
 
 		// Show the directory paths in a quickPick dialog
-		let backendDir, frontendDir
-		if (vscode.workspace.workspaceFolders) {
-			let subDirectories = folderUri ? getSubdirectories(folderUri[0].path).map(a => path.basename(a)) : []
-			console.log(subDirectories)
-			await vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the backend directory' })
-			.then(selectedPath => {
-				if (selectedPath) {
-					backendDir = selectedPath
-					console.log(`Backend directory: ${backendDir}`)
-				}
-			})
-			await vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the frontend directory' })
-			.then(selectedPath => {
-				if (selectedPath) {
-					frontendDir = selectedPath
-					console.log(`Frontend directory: ${frontendDir}`)
-				}
-			})
-		} else { return }
+		const folderPath: string = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : ""
+		console.debug(`buildProject/folderPath: ${folderPath}`)
+		const subDirectories = getSubdirectories(folderPath).map(a => path.basename(a)).filter(b => !b.startsWith('.'))  // Ignore .git, .vscode, etc
+		console.debug(`buildProject/subDirectories: ${subDirectories}`)
 
-		// Open up a terminal if there aren't any and run the build scripts
-		let terminal
+		// Have the user select the directories where the build scripts
+		// are located then install the project dependencies
+		let backendDir, frontendDir
+		vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the backend directory', ignoreFocusOut: true })
+			.then(sp => {
+				if (sp) {
+					backendDir = sp
+					console.debug(`buildProject/backendDir: ${backendDir}`)
+					runCommand(`cd ${backendDir}; yarn install; cd ..`)
+				}
+			})
+			.then(() => {
+				vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the frontend directory', ignoreFocusOut: true })
+				.then(sp => {
+					if (sp) {
+						frontendDir = sp
+						console.debug(`buildProject/frontendDir: ${frontendDir}`)
+						runCommand(`cd ${frontendDir}; yarn install; cd ..`)
+					}
+				})
+			})
+			.then(() => vscode.window.showInformationMessage("dApp build success!"))
+	}))
+
+
+	// Deploys the smart contracts to the targetted node using selected deploy scripts
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
+
+		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
+
+		// Create a terminal if one isn't already open
 		const terminals = vscode.window.terminals;
+		let terminal
 		if (terminals && terminals.length) {
 			terminal = terminals[0]
-		} else {
-			terminal = vscode.window.createTerminal()
-		}
+		} else { terminal = vscode.window.createTerminal() }
 		terminal.show()
-
-		// Install the project dependencies
-		if (backendDir && frontendDir) {
-			terminal.sendText(`cd ${backendDir}; yarn install; cd ..`, true)
-			terminal.sendText(`cd ${frontendDir}; yarn install; cd ..`, true)
-		} else {
-			vscode.window.showErrorMessage("Something went wrong with the directory selection!")
-		}
-	}));
-
-
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
-		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
-		const terminals = vscode.window.terminals;
-		if (terminals && terminals.length) {
-			const terminal = terminals[0]
-			terminal.show()
-			terminal.sendText(cmd, true)
-		}
+		terminal.sendText(cmd, true)
 	}));
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';
@@ -146,168 +150,168 @@ export async function activate(context: vscode.ExtensionContext) {
 	);
 	vscode.commands.registerCommand('contracts.createChain', async (element) => {
 		const { nodeId } = element;
-    const user = await getApplicationUser(nodeId);
-    const config = getConfig() || {};
+		const user = await getApplicationUser(nodeId);
+		const config = getConfig() || {};
 		const nodeOptions = { config, node: nodeId };
-    const userAddress = await rest.getKey(user, nodeOptions);
+		const userAddress = await rest.getKey(user, nodeOptions);
 		if (vscode.window.activeTextEditor) {
-		  const doc = vscode.window.activeTextEditor.document;
-      if (doc.uri.path.slice(-4) === '.sol') {
-        let src:any = doc.getText();
-  		  let srcMap = {}
-        const folders = vscode.workspace.workspaceFolders || [];
-        if (folders.length > 0) {
-          const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
-          const currentFolder = folders[0]
-  		    const folder = currentFolder.uri.path;
-          // eslint-disable-next-line import/no-mutable-exports
-          const dirPath = `${folder}/${serverPath}`
-          srcMap = await importer.combine(doc.uri.path, true, dirPath);
-          srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
-  		  	src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
-        }
-  			try {
-    		  const chainLabel = await vscode.window.showInputBox({
-    		    placeHolder: '',
-    		    prompt: `Enter a value for the chain label: `
-    		  });
-  				if (!chainLabel) return;
-          const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
-    		  const xabiKeys = Object.keys(xabis);
-    		  const items = xabiKeys.map((x) => ({ label: x }))
-    		  const quickPickOption = await vscode.window.showQuickPick(items, {
-    		    placeHolder: 'Pick a contract to use as the chain\'s governance contract',
-    		  });
-  				if (!quickPickOption) return;
-  				const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
-    		  const govXabi = xabis[contractName] || {};
-    		  let args = {}
-    		  if (govXabi.constr) {
-    		  	const constr = govXabi.constr;
-    		  	const argNames = Object.keys(constr.args || {});
-    		  	for (let i = 0; i < argNames.length; i++) {
-    		      const argInput = await vscode.window.showInputBox({
-    		        placeHolder: '',
-    		        prompt: `Enter a value for ${argNames[i]}: `
-    		      });
-  				    if (!argInput) return;
-    		  		args = { ...args, [argNames[i]]: argInput }
-    		  	}
-    		  }
-          const chainArgs = {
-  		    	label: chainLabel,
-  		    	src: srcMap,
-  		    	args,
-  		    	members: [{"address": userAddress, "enode": "enode://abcd@1.2.3.4:30303"}],
-  		    	balances: [{"address": userAddress, "balance": 100000000000000}],
-  		    }
-  				const contract = { name: contractName }
-  		    const res = await rest.createChain(user, chainArgs, contract, nodeOptions);
-  		    vscode.window.showInformationMessage(`${res}`);
-			  } catch (e) {
-  	  	  vscode.window.showErrorMessage(`${e}`);
+			const doc = vscode.window.activeTextEditor.document;
+			if (doc.uri.path.slice(-4) === '.sol') {
+				let src: any = doc.getText();
+				let srcMap = {}
+				const folders = vscode.workspace.workspaceFolders || [];
+				if (folders.length > 0) {
+					const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+					const currentFolder = folders[0]
+					const folder = currentFolder.uri.path;
+					// eslint-disable-next-line import/no-mutable-exports
+					const dirPath = `${folder}/${serverPath}`
+					srcMap = await importer.combine(doc.uri.path, true, dirPath);
+					srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+					src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
+				}
+				try {
+					const chainLabel = await vscode.window.showInputBox({
+						placeHolder: '',
+						prompt: `Enter a value for the chain label: `
+					});
+					if (!chainLabel) return;
+					const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
+					const xabiKeys = Object.keys(xabis);
+					const items = xabiKeys.map((x) => ({ label: x }))
+					const quickPickOption = await vscode.window.showQuickPick(items, {
+						placeHolder: 'Pick a contract to use as the chain\'s governance contract',
+					});
+					if (!quickPickOption) return;
+					const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
+					const govXabi = xabis[contractName] || {};
+					let args = {}
+					if (govXabi.constr) {
+						const constr = govXabi.constr;
+						const argNames = Object.keys(constr.args || {});
+						for (let i = 0; i < argNames.length; i++) {
+							const argInput = await vscode.window.showInputBox({
+								placeHolder: '',
+								prompt: `Enter a value for ${argNames[i]}: `
+							});
+							if (!argInput) return;
+							args = { ...args, [argNames[i]]: argInput }
+						}
+					}
+					const chainArgs = {
+						label: chainLabel,
+						src: srcMap,
+						args,
+						members: [{ "address": userAddress, "enode": "enode://abcd@1.2.3.4:30303" }],
+						balances: [{ "address": userAddress, "balance": 100000000000000 }],
+					}
+					const contract = { name: contractName }
+					const res = await rest.createChain(user, chainArgs, contract, nodeOptions);
+					vscode.window.showInformationMessage(`${res}`);
+				} catch (e) {
+					vscode.window.showErrorMessage(`${e}`);
 				}
 			} else {
-  		  vscode.window.showErrorMessage(`Please open a Solidity file to begin creating a private chain.`);
+				vscode.window.showErrorMessage(`Please open a Solidity file to begin creating a private chain.`);
 			}
 		} else {
-  		vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
+			vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
 		}
 	});
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId } = item;
-    const user = await getApplicationUser(nodeId);
-    const config = getConfig() || {};
+		const user = await getApplicationUser(nodeId);
+		const config = getConfig() || {};
 		const nodeOptions = { config, node: nodeId };
 		if (vscode.window.activeTextEditor) {
-		  const doc = vscode.window.activeTextEditor.document;
-      if (doc.uri.path.slice(-4) === '.sol') {
-        let src:any = doc.getText();
-		    let srcMap = {}
-        const folders = vscode.workspace.workspaceFolders || [];
-        if (folders.length > 0) {
-          const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
-          const currentFolder = folders[0]
-		      const folder = currentFolder.uri.path;
-          // eslint-disable-next-line import/no-mutable-exports
-          const dirPath = `${folder}/${serverPath}`
-          srcMap = await importer.combine(doc.uri.path, true, dirPath);
-          srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
-		    	src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
-        }
-			  try {
-          const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
-  	  	  const xabiKeys = Object.keys(xabis);
-  	  	  const items = xabiKeys.map((x) => ({ label: x }))
-  	  	  const quickPickOption = await vscode.window.showQuickPick(items, {
-  	  	    placeHolder: 'Pick a contract to upload',
-  	  	  });
-			  	if (!quickPickOption) return;
-			  	const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
-  	  	  const govXabi = xabis[contractName] || {};
-  	  	  let args = {}
-  	  	  if (govXabi.constr) {
-  	  	  	const constr = govXabi.constr;
-  	  	  	const argNames = Object.keys(constr.args || {});
-  	  	  	for (let i = 0; i < argNames.length; i++) {
-  	  	      const argInput = await vscode.window.showInputBox({
-  	  	        placeHolder: '',
-  	  	        prompt: `Enter a value for ${argNames[i]}: `
-  	  	      });
-			  	    if (!argInput) return;
-  	  	  		args = { ...args, [argNames[i]]: argInput }
-  	  	  	}
-  	  	  }
-          const uploadArgs = {
-		      	source: srcMap,
-		      	args,
-			  		name: contractName,
-			  		chainid: chainId,
-		      }
-		      const res = await rest.createContract(user, uploadArgs, nodeOptions);
-		      vscode.window.showInformationMessage(`${res}`);
-			  } catch (e) {
-  	  	  vscode.window.showErrorMessage(`${e}`);
-			  }
+			const doc = vscode.window.activeTextEditor.document;
+			if (doc.uri.path.slice(-4) === '.sol') {
+				let src: any = doc.getText();
+				let srcMap = {}
+				const folders = vscode.workspace.workspaceFolders || [];
+				if (folders.length > 0) {
+					const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+					const currentFolder = folders[0]
+					const folder = currentFolder.uri.path;
+					// eslint-disable-next-line import/no-mutable-exports
+					const dirPath = `${folder}/${serverPath}`
+					srcMap = await importer.combine(doc.uri.path, true, dirPath);
+					srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+					src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
+				}
+				try {
+					const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
+					const xabiKeys = Object.keys(xabis);
+					const items = xabiKeys.map((x) => ({ label: x }))
+					const quickPickOption = await vscode.window.showQuickPick(items, {
+						placeHolder: 'Pick a contract to upload',
+					});
+					if (!quickPickOption) return;
+					const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
+					const govXabi = xabis[contractName] || {};
+					let args = {}
+					if (govXabi.constr) {
+						const constr = govXabi.constr;
+						const argNames = Object.keys(constr.args || {});
+						for (let i = 0; i < argNames.length; i++) {
+							const argInput = await vscode.window.showInputBox({
+								placeHolder: '',
+								prompt: `Enter a value for ${argNames[i]}: `
+							});
+							if (!argInput) return;
+							args = { ...args, [argNames[i]]: argInput }
+						}
+					}
+					const uploadArgs = {
+						source: srcMap,
+						args,
+						name: contractName,
+						chainid: chainId,
+					}
+					const res = await rest.createContract(user, uploadArgs, nodeOptions);
+					vscode.window.showInformationMessage(`${res}`);
+				} catch (e) {
+					vscode.window.showErrorMessage(`${e}`);
+				}
 			} else {
-  		  vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
+				vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
 			}
 		} else {
-  		vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
+			vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
 		}
 	});
 	vscode.commands.registerCommand('contracts.callFunction', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId, contractName, contractAddress, variableName } = item;
-    const user = await getApplicationUser(nodeId);
-    const config = getConfig() || {}
+		const user = await getApplicationUser(nodeId);
+		const config = getConfig() || {}
 		const nodeOptions = { config, node: nodeId };
-    const { xabi } = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
+		const { xabi } = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((xabi || {}).funcs || {})[variableName]
 		if (variableName && variableName !== 'constructor' && func) {
 			const argNames = Object.keys(func.args || {});
 			let args = {}
 			for (let i = 0; i < argNames.length; i++) {
-		    const argInput = await vscode.window.showInputBox({
-		      placeHolder: '',
-		      prompt: `Enter a value for ${argNames[i]}: `
-		    });
+				const argInput = await vscode.window.showInputBox({
+					placeHolder: '',
+					prompt: `Enter a value for ${argNames[i]}: `
+				});
 				if (!argInput) return;
 				args = { ...args, [argNames[i]]: argInput }
 			}
 			try {
-			const contract = { name: contractName, address: contractAddress }
-      const callArgs = {
-				contract,
-				args,
-				method: variableName,
-				chainid: chainId
-			}
-			const res = await rest.call( user, callArgs, nodeOptions);
-			vscode.window.showInformationMessage(`${res}`);
+				const contract = { name: contractName, address: contractAddress }
+				const callArgs = {
+					contract,
+					args,
+					method: variableName,
+					chainid: chainId
+				}
+				const res = await rest.call(user, callArgs, nodeOptions);
+				vscode.window.showInformationMessage(`${res}`);
 			} catch (e) {
-			  vscode.window.showErrorMessage(`${e}`);
+				vscode.window.showErrorMessage(`${e}`);
 			}
 		} else {
 			vscode.window.showErrorMessage(`Could not find a function called ${variableName} in ${contractName} at address ${contractAddress} on chain ${chainId} on node ${nodeId}.`);
@@ -321,8 +325,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider);
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
-		  placeHolder: '',
-		  prompt: `Enter cirrus query`
+			placeHolder: '',
+			prompt: `Enter cirrus query`
 		});
 		if (!argInput) return;
 		cirrusProvider.query(argInput);
@@ -357,6 +361,7 @@ async function sleep(ms: number) {
 // this method is called when your extension is deactivated
 export function deactivate() { }
 
+// Helper function for listing subdirectories of a folder
 function getSubdirectories(rootPath: string): string[] {
 	const files = fs.readdirSync(rootPath);
 	const subdirectories: string[] = [];
@@ -371,4 +376,19 @@ function getSubdirectories(rootPath: string): string[] {
 	});
 
 	return subdirectories;
+}
+
+
+// Helper function for running a command in a VS terminal
+function runCommand(cmd: string) {
+	// Open up a terminal if there aren't any and run the build scripts
+	let terminal
+	const terminals = vscode.window.terminals;
+	if (terminals && terminals.length) {
+		terminal = terminals[0]
+	} else {
+		terminal = vscode.window.createTerminal()
+	}
+	terminal.show()
+	terminal.sendText(cmd, true)
 }
