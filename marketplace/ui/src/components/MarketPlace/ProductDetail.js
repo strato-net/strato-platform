@@ -143,7 +143,7 @@ const ProductDetails = ({ user, users }) => {
       const prodCategory = categorys.find(
         (c) => c.address === details.categoryId
       );
-      setCategoryName(prodCategory.name);
+      setCategoryName(prodCategory?.name);
     }
   }, [categorys, details]);
 

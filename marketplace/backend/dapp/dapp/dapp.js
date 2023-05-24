@@ -541,31 +541,29 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
     return await managers.itemManager.updateItem(itemParams);
   };
-  contract.getProduct = async function (args, options = defaultOptions) {
+  contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    getOptions.chainIds = contract.chainId
     return managers.productManager.getProduct({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
-  contract.getProducts = async function (args, options = defaultOptions) {
+  contract.getProducts = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    getOptions.chainIds = contract.chainId
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', ownerOrganization: contract.userOrganization },
       getOptions
     );
   };
-  contract.getProductNames = async function (args, options = defaultOptions) {
+  contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
       getOptions
     );
   };
-  contract.getInventory = async function (args, options = defaultOptions) {
+  contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventory({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
-  contract.getInventories = async function (args, options = defaultOptions) {
+  contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: contract.userOrganization }, getOptions);
