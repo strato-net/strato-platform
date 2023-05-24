@@ -84,6 +84,14 @@ class StripeService {
         }
     }
 
+    static getStripeConnectAccountDetail(accountId) {
+        try {
+            return stripe.accounts.retrieve(accountId)
+        } catch (error) {
+            console.error(`Stripe error: ${e}`)
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+        }
+    }
 }
 
 export default StripeService

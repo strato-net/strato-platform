@@ -19,33 +19,32 @@ const loadDapp = async (req, res, next) => {
   let address
 
   try {
-      address = await rest.getKey(userCredentials, options)
-    } catch (e) {
-      // user isn't created in STRATO
-      if (e.response.status === RestStatus.BAD_REQUEST) {
-        rest.response.status(RestStatus.FORBIDDEN, res)
-        return next()
-      }
-
-      // unexpected error
-      return next(e)
+    address = await rest.getKey(userCredentials, options)
+  } catch (e) {
+    // user isn't created in STRATO
+    if (e.response.status === RestStatus.BAD_REQUEST) {
+      rest.response.status(RestStatus.FORBIDDEN, res)
+      return next()
     }
 
-    const user = {
-      ...userCredentials,
-      node: config.nodes[0],
-      address,
-    }
+    // unexpected error
+    return next(e)
+  }
 
-    const deploy = app.get(constants.deployParamName)
+  const user = {
+    ...userCredentials,
+    node: config.nodes[0],
+    address,
+  }
 
-    req.user = user
-    req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
-      chainIds: [deploy.dapp.contract.appChainId],
-      ...options
-    })
+  const deploy = app.get(constants.deployParamName)
 
-    return next()
+  req.user = user
+  req.dapp = await dappJs.bind(user, deploy.dapp.contract, {
+    ...options
+  })
+
+  return next()
 }
 
 export default loadDapp

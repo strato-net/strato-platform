@@ -131,7 +131,7 @@ describe('Item Manager', function () {
 
         events.forEach(event => {
             assert.deepInclude(R.map(v => '' + v, event),
-                R.map(v => '' + v, { appChainId: eventArgs.appChainId, eventTypeId: eventArgs.eventTypeId, eventBatchId: eventArgs.eventBatchId, date: eventArgs.date, summary: eventArgs.summary, certifier: eventArgs.certifier, createdDate: eventArgs.createdDate }));
+                R.map(v => '' + v, { eventTypeId: eventArgs.eventTypeId, eventBatchId: eventArgs.eventBatchId, date: eventArgs.date, summary: eventArgs.summary, certifier: eventArgs.certifier, createdDate: eventArgs.createdDate }));
         });
     });
 
@@ -223,12 +223,12 @@ describe('Item Manager', function () {
         )
         // Update an Event
         const certifyEventArgs = certifyEventFactoryArgs(eventAddress);
-        
+
         await assert.restStatus(async () => {
-            await  itemManagerJs.certifyEvent(globalAdmin, _contract, certifyEventArgs, newOptions);
+            await itemManagerJs.certifyEvent(globalAdmin, _contract, certifyEventArgs, newOptions);
         }, RestStatus.UNAUTHORIZED);
 
-    
+
     });
 
     it('ItemManager: Create item', async () => {

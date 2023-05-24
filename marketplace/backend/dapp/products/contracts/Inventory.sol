@@ -8,7 +8,6 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 contract Inventory is InventoryStatus{
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -25,8 +24,7 @@ contract Inventory is InventoryStatus{
 
 
     constructor(
-            string _appChainId
-        ,   address _categoryId
+            address _categoryId
         ,   address _subCategoryId
         ,   int _quantity
         ,   int _pricePerUnit
@@ -36,7 +34,6 @@ contract Inventory is InventoryStatus{
         ,   address _owner
     ) public {
         owner = _owner;
-        appChainId = _appChainId;
 
         productId = msg.sender;
         categoryId = _categoryId;

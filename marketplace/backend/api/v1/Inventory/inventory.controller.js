@@ -19,7 +19,7 @@ class InventoryController {
 
       if (address) {
         args = { address }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const inventory = await dapp.getInventory(args, chainOptions)

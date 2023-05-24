@@ -5,7 +5,6 @@ const factory = {
     /** Sample arguments for creating a Order contract. Use util.uid() to generate a uid. */
     getOrderArgs(uid, buyerOrganization = "", sellerOrganization = "") {
         const args = {
-            appChainId: `${uid}`,
             orderId: `${uid}`,
             buyerOrganization,
             sellerOrganization,

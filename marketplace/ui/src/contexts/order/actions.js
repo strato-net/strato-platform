@@ -187,11 +187,11 @@ const actions = {
     }
   },
 
-  fetchOrderDetails: async (dispatch, id, chainId) => {
+  fetchOrderDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchOrderDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/order/${id}/${chainId}`, {
+      const response = await fetch(`${apiUrl}/order/${id}`, {
         method: HTTP_METHODS.GET,
       });
 
@@ -219,11 +219,11 @@ const actions = {
     }
   },
 
-  fetchOrderLineItemDetails: async (dispatch, id, chainId) => {
+  fetchOrderLineItemDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchOrderLineItemDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/orderLine/${id}/${chainId}`, {
+      const response = await fetch(`${apiUrl}/orderLine/${id}`, {
         method: HTTP_METHODS.GET,
       });
 

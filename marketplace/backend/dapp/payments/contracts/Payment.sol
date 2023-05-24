@@ -7,7 +7,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract Payment_3 {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -23,8 +22,7 @@ contract Payment_3 {
     string public sellerAccountId;
 
     constructor(
-            string _appChainId
-        ,   string _paymentSessionId
+            string _paymentSessionId
         ,   string _paymentProvider
         ,   string _paymentStatus
         ,   string _sessionStatus
@@ -34,7 +32,6 @@ contract Payment_3 {
         ,   string _sellerAccountId
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         paymentSessionId = _paymentSessionId;
         paymentProvider = _paymentProvider;

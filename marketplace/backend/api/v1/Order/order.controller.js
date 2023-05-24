@@ -11,16 +11,13 @@ class OrderController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req
-      const { address, chainId } = params
+      const { address } = params
 
       let args
       let chainOptions = options
 
       if (address) {
         args = { address }
-        if (chainId) {
-          chainOptions = { ...options, chainIds: [chainId] }
-        }
       }
 
       const order = await dapp.getOrder(args, chainOptions)
@@ -216,7 +213,6 @@ class OrderController {
   static validateUpdateBuyerArgs(args) {
     const updateBuyerSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().required(),
         buyerComments: Joi.string().required(),
@@ -235,7 +231,6 @@ class OrderController {
   static validateUpdateSellerArgs(args) {
     const updateSellerSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().required(),
         sellerComments: Joi.string().allow(''),

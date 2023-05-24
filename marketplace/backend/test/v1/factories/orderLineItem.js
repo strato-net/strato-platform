@@ -13,10 +13,10 @@ const factory={
     return args
   },
 
-  getCreateOrderLineItemsArgs(orderId,chainId='',orderLineId="",serialNumber=[]){
+  getCreateOrderLineItemsArgs(orderId,orderAddress,orderLineId="",serialNumber=[]){
     const args={
       orderId,
-      chainId,
+      orderAddress,
       orderLineId,
       serialNumber
     }

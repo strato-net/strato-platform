@@ -8,7 +8,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract OrderLineItem {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -29,14 +28,12 @@ contract OrderLineItem {
 
 
     constructor(
-        string _appChainId,
             address _orderLineId
         ,   string _itemId
         ,   string _itemSerialNumber
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         orderLineId = _orderLineId;
         itemId = _itemId;
