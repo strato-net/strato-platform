@@ -18,7 +18,6 @@ import orderLineJs from "/dapp/orders/orderLine";
 
 import eventTypeJs from "/dapp/eventType/eventType";
 import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
-import eventJs from "/dapp/assets/Event/event";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
