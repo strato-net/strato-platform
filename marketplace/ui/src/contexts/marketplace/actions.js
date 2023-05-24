@@ -5,9 +5,15 @@ const actionDescriptors = {
   fetchMarketplace: "fetch_marketplace",
   fetchMarketplaceSuccessful: "fetch_marketplace_successful",
   fetchMarketplaceFailed: "fetch_marketplace_failed",
+  fetchMarketplaceLoggedIn: "fetch_marketplace_logged_in",
+  fetchMarketplaceLoggedInSuccessful: "fetch_marketplace_logged_in_successful",
+  fetchMarketplaceLoggedInFailed: "fetch_marketplace_logged_in_failed",
   fetchTopSellingProducts: "fetch_top_selling_products",
   fetchTopSellingProductsSuccessful: "fetch_top_selling_products_successful",
   fetchTopSellingProductsFailed: "fetch_top_selling_products_failed",
+  fetchTopSellingProductsLoggedIn: "fetch_top_selling_products_logged_in",
+  fetchTopSellingProductsLoggedInSuccessful: "fetch_top_selling_products_logged_in_successful",
+  fetchTopSellingProductsLoggedInFailed: "fetch_top_selling_products_logged_in_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   addItemToCart: "add_item_to_cart",
@@ -27,13 +33,13 @@ const actionDescriptors = {
   deleteCartItemFailed: "delete_cart_item_failed",
   addShippingAddress: "add_shipping_address",
   addShippingAddressSuccessful: "add_shipping_address_successful",
-  addShippingAddressFailed : "add_shipping_address_failed",
-  fetchUserAddress:"fetch_user_address",
-  fetchUserAddressSuccessful:"fetch_user_address_successful",
-  fetchUserAddressFailed:"fetch_user_address_failed",
-  fetchUserAddresses:"fetch_user_addresses",
-  fetchUserAddressesSuccessful:"fetch_user_addresses_successful",
-  fetchUserAddressesFailed:"fetch_user_addresses_failed",
+  addShippingAddressFailed: "add_shipping_address_failed",
+  fetchUserAddress: "fetch_user_address",
+  fetchUserAddressSuccessful: "fetch_user_address_successful",
+  fetchUserAddressFailed: "fetch_user_address_failed",
+  fetchUserAddresses: "fetch_user_addresses",
+  fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
+  fetchUserAddressesFailed: "fetch_user_addresses_failed"
 };
 
 const actions = {
@@ -154,7 +160,7 @@ const actions = {
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
-        try {
+    try {
       const response = await fetch(
         `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
         {
@@ -163,14 +169,14 @@ const actions = {
       );
 
       const body = await response.json();
-
+      
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceSuccessful,
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceFailed,
           error: "Error while fetching marketplace products",
@@ -189,6 +195,69 @@ const actions = {
     }
   },
 
+  fetchMarketplaceLoggedIn: async (
+    dispatch,
+    categoryIds,
+    subCategoryIds,
+    products,
+    manufacturers,
+    minQty,
+    maxQty,
+    minPrice,
+    maxPrice
+  ) => {
+    dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
+
+    const categoryQuery = categoryIds ? `&categoryId[]=${categoryIds}` : "";
+
+    const subCategoryQuery = subCategoryIds
+      ? `&subCategoryId[]=${subCategoryIds}`
+      : "";
+
+    const manufacturerQuery = manufacturers
+      ? `&manufacturer[]=${manufacturers}`
+      : "";
+
+    const productIdQuery = products ? `&productId[]=${products}` : "";
+    const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
+    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/marketplace/all?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+      
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceLoggedInSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+          error: "Error while fetching marketplace products",
+        });
+      }
+      
+
+      dispatch({
+        type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+        error: "Error while fetching marketplace products",
+      });
+    }
+  },
+
   fetchTopSellingProducts: async (dispatch, offset) => {
     dispatch({ type: actionDescriptors.fetchTopSellingProducts });
 
@@ -200,7 +269,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
+      const body = await response.json();      
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -221,6 +290,37 @@ const actions = {
     }
   },
 
+  fetchTopSellingProductsLoggedIn: async (dispatch, offset) => {
+    dispatch({ type: actionDescriptors.fetchTopSellingProductsLoggedIn });
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();      
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchTopSellingProductsLoggedInSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({
+        type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
+        error: undefined,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
+        error: undefined,
+      });
+    }
+  },
 
   addShippingAddress: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.addShippingAddress });
@@ -244,7 +344,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Shipping address added successfully", true);
         return body.data;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.addShippingAddressFailed,
           error: "Error while adding Shipping address",
@@ -268,7 +368,7 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch,address) => {
+  fetchUserAddress: async (dispatch, address) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
 
     try {
@@ -279,7 +379,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();
+      const body = await response.json();   
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -287,7 +387,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchUserAddressFailed,
           error: "Error while getting Shipping address",
@@ -329,7 +429,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchUserAddressesFailed,
           error: "Error while getting Shipping address",

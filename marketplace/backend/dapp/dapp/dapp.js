@@ -141,7 +141,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.userOrganization = userCertificate.organization
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, };
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [],};
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -541,29 +541,29 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
     return await managers.itemManager.updateItem(itemParams);
   };
-  contract.getProduct = async function (args, options = defaultOptions) {
+  contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProduct({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
-  contract.getProducts = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+  contract.getProducts = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', ownerOrganization: contract.userOrganization },
       getOptions
     );
   };
-  contract.getProductNames = async function (args, options = defaultOptions) {
+  contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
       { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
       getOptions
     );
   };
-  contract.getInventory = async function (args, options = defaultOptions) {
+  contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventory({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
   };
-  contract.getInventories = async function (args, options = defaultOptions) {
+  contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: contract.userOrganization }, getOptions);
@@ -723,11 +723,22 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   //-----------------------------TO be removed till here-------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
+  };
+
+  contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+    // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+  }
+
+  contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
     return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
   }

@@ -27,6 +27,7 @@ import { useEventDispatch, useEventState } from "../../contexts/event";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Search } = Input;
 
@@ -42,6 +43,8 @@ const Inventory = ({ user }) => {
   const [total, setTotal] = useState(10);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
@@ -152,16 +155,28 @@ const Inventory = ({ user }) => {
                 <Button
                   type="primary"
                   className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
-                  onClick={onboardSeller}
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      onboardSeller()
+                    }
+                  }}
                   disabled={stripeStatus.detailsSubmitted}
-                >
+                  >
                   {"Connect Stripe"}
                 </Button>
                 <Button
                   id="add-inventory-button"
                   type="primary"
                   className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                  onClick={showModal}
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      showModal()
+                    }
+                  }}
                 >
                   Add Inventory
                 </Button>
@@ -184,10 +199,26 @@ const Inventory = ({ user }) => {
                 </Breadcrumb>
                 <div className="flex">
                   <Search placeholder="Search" className="w-80 mr-3" />
-                  <Button type="primary" className="w-48 mr-3" onClick={onboardSeller} disabled={stripeStatus.detailsSubmitted}>
+                  <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        onboardSeller()
+                      }
+                    }}
+                  >
                     {"Connect Stripe"}
                   </Button>
-                  <Button id="add-inventory-button" type="primary" className="w-48" onClick={showModal}>
+                  <Button id="add-inventory-button" type="primary" className="w-48"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        showModal()
+                      }
+                    }}
+                  >
                     Add Inventory
                   </Button>
                 </div>
