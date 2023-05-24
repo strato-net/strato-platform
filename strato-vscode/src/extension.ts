@@ -44,6 +44,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			const numFolders = (vscode.workspace.workspaceFolders || []).length;
 			vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
 
+			context.workspaceState.update('strato-vscode.workspaceDir', folderUri[0].fsPath)
 			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${folderUri[0].fsPath}`)
 		}
 	}))
@@ -117,39 +118,24 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Runs the project backend test server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
-		const terminals = vscode.window.terminals;
-		if (terminals && terminals.length) {
-			const terminal = terminals[0]
-			terminal.show()
-			terminal.sendText(cmd, true)
-		}
+		runCommand(cmd)
 	}));
 
 	// Runs the project UI
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
-		const terminals = vscode.window.terminals;
-		if (terminals && terminals.length) {
-			const terminal = terminals[0]
-			terminal.show()
-			terminal.sendText(cmd, true)
-		}
+		runCommand(cmd)
 	}));
 
 
 	// Runs the project test UI
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', () => {
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
-		const terminals = vscode.window.terminals;
-		if (terminals && terminals.length) {
-			const terminal = terminals[0]
-			terminal.show()
-			terminal.sendText(cmd, true)
-		}
+		runCommand(cmd)
 	}));
 
 
-		// Creates a private chain on the targetted node
+	// Creates a private chain on the targetted node
 	vscode.commands.registerCommand('contracts.createChain', async (element) => {
 		const { nodeId } = element;
 		const user = await getApplicationUser(nodeId);
