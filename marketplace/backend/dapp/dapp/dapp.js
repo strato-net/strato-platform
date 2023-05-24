@@ -305,6 +305,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     return managers.itemManager.updateItem(args);
   };
   contract.getItems = async function (args = {}, options = defaultOptions) {
+    console.log("dapp.getAllItems args:", args);
     const getOptions = { ...options, org: managers.cirrusOrg, app: mainChainContractName, };
     return managers.itemManager.getItems({ appChainId: contract.chainId, ...args }, getOptions);
   };
@@ -592,7 +593,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    } 
+    }
     if (serialNumber.length == 0 || serialNumber.length == undefined) {
       const randomNumber = parseInt(util.iuid())
       transformedArray.push({
@@ -602,6 +603,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         "rawMaterialSerialNumber": [],
         "rawMaterialProductId": []
       });
+      serialNumbers.push(`${randomNumber}`)
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
@@ -1153,7 +1155,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
-          await order.addOrderLine({
+          const [status, orderAddress] = await order.addOrderLine({
             orderChainId: order.chainIds[0],
             inventoryOwner: inventoryObject.owner,
             productId: inventoryObject.productId,
@@ -1164,6 +1166,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
             tax,
             createdDate
           });
+
+          console.log("status, order.addOrderline", status, "address ======", orderAddress)
         };
       }
       await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantitiesToReduce, isReduce: true })
@@ -1206,6 +1210,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     try {
       const { address, chainId, updates } = args;
 
+      console.log("dapp seller order args", args)
       const contract = { name: orderJs.contractName, address: address, };
 
       const chainOptions = { chainIds: [chainId], ...options };
@@ -1220,12 +1225,14 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         return { status };
       } else if (updates.status == ORDER_STATUS.CLOSED) {
 
-
+        console.log("am I here? ")
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await orderJs.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
-
+        console.log("Update Seller status response", statusResponse, "2", inventoryAddresses, "3", quantitiesToUpdate)
         const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
 
         const orderLines = await orderLineJs.getAll(rawAdmin, {}, newOptions);
+
+        console.log("dapp seller order lines", orderLines, "New Options ========> ", newOptions)
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
         let itemAddresses
@@ -1234,13 +1241,17 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
         for (let orderLineAddress of orderLinesAddresses) {
           const orderLineItems = await orderLineItemJs.getAll(rawAdmin, { orderLineId: orderLineAddress }, newOptions)
+          console.log("dapp seller order line items", orderLineItems, "address", orderLineAddress)
+
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+
+          console.log("dapp seller order line itemsAddresses", itemAddresses, "new Owner", newOwner)
           const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner });
           result.push({ status, productId, inventoryId });
         }
         return result;
       }
-
+      console.log("dapp seller order updates", updates)
       return orderJs.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
     } catch (error) {
       if (error.response) {
@@ -1320,44 +1331,62 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
       const { orderLineId, serialNumber, chainId } = args;
-      const chainOptions = { ...options, chainIds: [chainId], org: managers.cirrusOrg, app: mainChainContractName, };
+      console.log("dapp order line item args", args)
+      const chainOptions = {
+        ...options,
+        chainIds: [chainId],
+        org: managers.cirrusOrg,
+        app: mainChainContractName,
+      };
 
       const orderLine = await orderLineJs.get(rawAdmin, { chainId, address: orderLineId }, chainOptions);
-      const { productId } = orderLine
+      console.log("dapp order line item: orderLine", orderLine)
+      const { productId } = orderLine;
+        
+      const items = await managers.itemManager.getItems(
+        {
+          productId,
+          chainId: contract.chainId,
+        },
+        chainOptions
+      );
+        console.log("dapp order line item: item", items, "address", orderLineId)
 
-      const items = await managers.itemManager.getItems({ serialNumber: [...serialNumber], productId, chainId: contract.chainId }, chainOptions);
-
-      if (serialNumber.length !== 0 && serialNumber.length != items.length) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different then the actual inventory")
+      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
       }
 
-      const _contract = { name: orderLineJs.contractName, address: orderLineId, };
+      const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
-      // array of item Addresses
-      const itemsAddresses = items.map((_item) => _item.address);
+      const itemsAddresses = items.map(_item => _item.address);
 
       const _args = {
         orderLineId,
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
+      console.log("dapp order line item: _args", _args)
 
-      // create orderlineitem for orderline
       const [status, orderLineItems, _items] = await orderLineJs.addOrderLineItems(rawAdmin, _contract, _args, chainOptions);
       const result = orderLineItems.split(",");
 
-      // update status of all items to sold
-      const [soldStatus] = await managers.itemManager.updateItem({ itemsAddress: itemsAddresses, status: ITEM_STATUS.SOLD, comment: "", });
-
-      if (soldStatus != 200) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "sold status is not updated");
+      console.log("dapp order line item: result", result, "status", status, "items", _items)
+      const [soldStatus] = await managers.itemManager.updateItem({
+        itemsAddress: itemsAddresses,
+        status: ITEM_STATUS.SOLD,
+        comment: "",
+      });
+      console.log("dapp order line item: soldStatus", soldStatus)
+      if (soldStatus !== 200) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
       }
+
       return result;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Creating  the Order Line Item");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the Order Line Item");
     }
   };
 
