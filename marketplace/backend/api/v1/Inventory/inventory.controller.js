@@ -19,7 +19,7 @@ class InventoryController {
 
       if (address) {
         args = { address }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const inventory = await dapp.getInventory(args, chainOptions)
@@ -59,6 +59,8 @@ class InventoryController {
 
       const result = await dapp.createInventory(body)
       rest.response.status200(res, result)
+
+      console.log("*Seller listed item*");
 
       return next()
     } catch (e) {

@@ -1,6 +1,5 @@
-url: https://node1.mercata-testnet.blockapps.net
+url: https://strato-node1.tcommerce-dev-td3ar4a.blockapps.net
 dapp:
   contract:
     name: Dapp
-    address: '0000000000000000000000000000000000000100'
-    appChainId: e5d181ed85837e74ae2dfc3223556565d46598af1e84dd155f90862abd51446f
+    address: f57b5131dcde05b00ab67a6e1b0f527a573579de

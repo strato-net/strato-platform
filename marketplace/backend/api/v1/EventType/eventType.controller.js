@@ -29,6 +29,8 @@ class EventTypeController {
       const result = await dapp.createEventType(body)
       rest.response.status200(res, result)
 
+      console.log("*Event Type created*");
+
       return next()
     } catch (e) {
       return next(e)

@@ -205,7 +205,7 @@ describe('Product End-To-End Tests', function () {
     )
 
     assert.equal(deleteProductResponse.status, 409, 'should be 409');
-    
+
     // get product
     const getProduct = await get(
       Product.prefix,
@@ -225,7 +225,7 @@ describe('Product End-To-End Tests', function () {
     else
       assert.equal(isDeleted, true, 'isDeleted should be true')
 
-    })
+  })
 
   it('Update Product', async () => {
     // create product

@@ -16,7 +16,6 @@ function useQuery() {
 
 const Invoice = () => {
   const [Id, setId] = useState(undefined);
-  const [chainId, setChainId] = useState(undefined);
 
   const dispatch = useOrderDispatch();
   const {
@@ -34,12 +33,11 @@ const Invoice = () => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-    setChainId(query.get("chainId"));
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
-      actions.fetchOrderDetails(dispatch, Id, chainId);
+    if (Id !== undefined ) {
+      actions.fetchOrderDetails(dispatch, Id);
       // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
   }, [Id, dispatch]);

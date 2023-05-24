@@ -4,13 +4,12 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "../../../products/contracts/Inventory.sol";
 import "./OrderStatus.sol";
-import "./OrderLine.sol";
+import "/dapp/orders/contracts/OrderLine.sol";
 
 /// @title A representation of Order assets
 contract Order is OrderStatus {
 
     address public owner; 
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -43,7 +42,6 @@ contract Order is OrderStatus {
 
 
     constructor(
-        string _appChainId,
             string _orderId
         ,   string _buyerOrganization
         ,   string _sellerOrganization
@@ -59,7 +57,6 @@ contract Order is OrderStatus {
         ,   address _shippingAddress
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         orderId = _orderId;
         buyerOrganization = _buyerOrganization;
@@ -80,8 +77,6 @@ contract Order is OrderStatus {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
         
-        // add seller org as a member of order chain
-        addMember(_sellerOrganization,"","");
 
     }
 
@@ -133,7 +128,7 @@ contract Order is OrderStatus {
     // check for open status to closed status
      if(_status == OrderStatus.CLOSED){
        for(uint i=0;i<orderLines.length;i++){
-        OrderLine_1 orderLine = OrderLine_1(orderLines[i]);
+        OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
         if(!orderLine.isSerialUploaded()){
           return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
         }
@@ -166,8 +161,8 @@ contract Order is OrderStatus {
     }
 
     // Add the orderLine of a order
-    function addOrderLine( address _orderChainId, address _productId, address _inventoryId, uint _quantity, uint _pricePerUnit, uint _shippingCharges
-    , uint _tax, uint _createdDate ) public  returns(uint256, address){
+    function addOrderLine(address _orderAddress, address _productId, address _inventoryId, uint _quantity, uint _pricePerUnit, uint _shippingCharges
+, uint _tax, uint _createdDate ) public  returns(uint256, address){
 
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
@@ -175,7 +170,7 @@ contract Order is OrderStatus {
         return (RestStatus.FORBIDDEN,address(0));
       } 
 
-      OrderLine_1 orderLine=new OrderLine_1(appChainId, _orderChainId,  _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges
+      OrderLine_2 orderLine=new OrderLine_2(_orderAddress, _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges
       , _tax, _createdDate);
       orderLines.push(address(orderLine));
       return (RestStatus.OK,address(orderLine));
@@ -210,8 +205,8 @@ contract Order is OrderStatus {
       string inventories = "";
       string orderLineQuantities = "";
       for(uint i=0;i<orderLines.length;i++){
-        OrderLine_1 orderLine = OrderLine_1(address(orderLines[i]));
-        Inventory inventory = Inventory(account(address(orderLine.inventoryId()),"parent"));
+        OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
+        Inventory inventory = Inventory(address(orderLine.inventoryId()));
         inventories += string(address(orderLine.inventoryId())) + ",";
         orderLineQuantities += string(orderLine.quantity()) + ",";
       }
