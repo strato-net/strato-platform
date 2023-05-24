@@ -145,7 +145,7 @@ const CategoryProductList = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    if(hasChecked && isAuthenticated){
+    if (hasChecked && isAuthenticated !== undefined) {
     if (categoryID !== "") {
       actions.fetchMarketplace(
         marketplaceDispatch,
