@@ -120,7 +120,9 @@ export const Image = {
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',
-  getTopSellingProducts: '/topselling'
+  getAllLoggedIn: '/all',
+  getTopSellingProducts: '/topselling',
+  getTopSellingProductsLoggedIn: '/user/topselling'
 }
 
 export const PaymentService = {

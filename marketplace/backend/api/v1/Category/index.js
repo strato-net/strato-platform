@@ -25,7 +25,6 @@ router.post(
   CategoryController.create
 );
 
-
 router.put(
   Category.update,
   authHandler.authorizeRequest(),

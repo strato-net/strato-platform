@@ -39,6 +39,8 @@ const TopSellingProductCard = () => {
   useEffect(() => {
     if (hasChecked && !isAuthenticated !== undefined) {
       actions.fetchTopSellingProducts(marketplaceDispatch, offset);
+    } else {
+      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 

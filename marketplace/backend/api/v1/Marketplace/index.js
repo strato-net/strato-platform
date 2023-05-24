@@ -13,9 +13,21 @@ router.get(
 );
 
 router.get(
+  Marketplace.getAllLoggedIn,
+  loadDapp,
+  MarketplaceController.getAllLoggedIn
+);
+
+router.get(
   Marketplace.getTopSellingProducts,
   loadDapp,
   MarketplaceController.getTopSellingProducts
+);
+
+router.get(
+  Marketplace.getTopSellingProductsLoggedIn,
+  loadDapp,
+  MarketplaceController.getTopSellingProductsLoggedIn
 );
 
 export default router;
