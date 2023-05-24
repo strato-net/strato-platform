@@ -595,15 +595,19 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       });
     }
     if (serialNumber.length == 0 || serialNumber.length == undefined) {
-      const randomNumber = parseInt(util.iuid())
-      transformedArray.push({
-        "itemNumber": randomNumber,
-        "serialNumber": `${randomNumber}`,
-        "rawMaterialProductName": [],
-        "rawMaterialSerialNumber": [],
-        "rawMaterialProductId": []
-      });
-      serialNumbers.push(`${randomNumber}`)
+      const quantity = args.quantity;
+      for (let i = 0; i < quantity; i++) {
+        const randomNumber = parseInt(util.iuid())
+        transformedArray.push({
+          "itemNumber": randomNumber,
+          "serialNumber": "N/A",
+          "rawMaterialProductName": [],
+          "rawMaterialSerialNumber": [],
+          "rawMaterialProductId": []
+        });
+      }
+
+      console.log("create inventory trasformed array: ", transformedArray, console.log(serialNumbers.length, "sssssssssss"))
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
@@ -1359,7 +1363,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
       const itemsAddresses = items.map(_item => _item.address);
-
+      console.log("dapp order line item: itemsAddresses", itemsAddresses)
+      
       const _args = {
         orderLineId,
         items: itemsAddresses,

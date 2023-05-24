@@ -57,12 +57,21 @@ contract ItemManager is ItemStatus,InventoryStatus{
             string itemAddresses= "";
             string repeatedSerialNumbers= "";
 
-        if (_itemObject.length == 0) {
-            Item_3 itemAddr= new Item_3(_appChainId, _productId, _uniqueProductCode, _inventoryId, _itemObject[0].serialNumber, _status, _comment, new string[], new string[], new string[], 0,
-            _createdDate);
+        if (_itemObject[0].serialNumber == "N/A") {
 
-            address itemContractAddress= address(itemAddr);
-            itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
+            for (uint256 i = 0; i < _itemObject.length; i++) {
+                Item_3 itemAddr= new Item_3(_appChainId, _productId, _uniqueProductCode, _inventoryId, "N/A", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
+                _createdDate);
+
+                address itemContractAddress= address(itemAddr);
+                itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
+
+                uniqueSerialNumberByUPC[_itemObject[0].serialNumber] = _uniqueProductCode;
+                itemProductIdMapping[itemContractAddress] = _productId;
+                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                itemAddresses += string(address(itemAddr)) + ",";
+            }
+                return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
 
         }
         for (uint256 i = 0; i < _itemObject.length; i++) {
