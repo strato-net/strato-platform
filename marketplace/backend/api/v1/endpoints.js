@@ -123,19 +123,6 @@ export const Marketplace = {
   getTopSellingProducts: '/topselling'
 }
 
-export const UserMembership = {
-  prefix: '/membership',
-  get: '/:address/:chainId/',
-  getAll: '/',
-  create: '/',
-  update:'/',
-  getAllRequest:'/requests',
-  createRequest:'/requests',
-  approveRequest:'/requests', // update request
-  getAllRequestOfUser:'/requests/user/all',
-  getAllCertifiers: '/certifiers/users/all'
-}
-
 export const PaymentService = {
   prefix: '/payment',
   stripeOnboarding: '/stripe/account',

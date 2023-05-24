@@ -174,6 +174,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const orderLines = await searchAllWithQueryArgs(contractName, args, options, admin)
+    console.log("orderlines",orderLines)
+    process.exit()
     return orderLines.map((orderLine) => marshalOut(orderLine))
 }
 
