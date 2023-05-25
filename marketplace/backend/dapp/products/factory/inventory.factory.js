@@ -3,8 +3,8 @@ const factory = {
     /** Sample arguments for creating a Inventory contract. Use util.uid() to generate a uid. */
     getInventoryArgs(uid, userAddress) {
         const args = {
-            category: '0000000000000000000000000000000000000000',
-            subCategory: '0000000000000000000000000000000000000000',
+            category: 'Carbon',
+            subCategory: 'Carbon Credit',
             quantity: 3,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,

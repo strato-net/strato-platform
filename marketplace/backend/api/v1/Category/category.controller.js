@@ -34,37 +34,6 @@ class CategoryController {
     }
   }
 
-  static async create(req, res, next) {
-    try {
-      const { body } = req
-
-      CategoryController.validateCreateCategoryArgs(body)
- 
-      let result;
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-  static async update(req, res, next) {
-    try {
-      const { body } = req
-
-      CategoryController.validateUpdateCategoryArgs(body)
-
-      let result;
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-
 
   // ----------------------- ARG VALIDATION ------------------------
 

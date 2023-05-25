@@ -9,8 +9,8 @@ export const productArgs = (uid) => {
       leastSellableUnit: uid,
       imageKey: `1673855860544_seeds.jpg`,
       isActive: true,
-      category: '0000000000000000000000000000000000000000',
-      subCategory: '0000000000000000000000000000000000000000'
+      category: 'Carbon',
+      subCategory: 'Carbon Credit'
     }
   }
 
