@@ -11,7 +11,6 @@ import {
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
-import { Wallet } from "../../images/SVGComponents";
 import "./header.css";
 import { Link, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -41,6 +40,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState()
+  const [pathName, setPathName] = useState("/");
 
 
   const navItems = [
@@ -76,7 +76,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
   };
 
   useEffect(() => {
-    let pathName = window.location.pathname;
+    setPathName(window.location.pathname);
+  },[]);
+
+  useEffect(() => {
     if (pathName.includes("/marketplace")) {
       setSelectedTab("0");
     } else if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
@@ -88,7 +91,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
     }
-  }, [window.location.pathname]);
+  }, [pathName]);
 
   const items = user ? [
     {

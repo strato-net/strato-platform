@@ -7,7 +7,6 @@ import {
   Checkbox,
   Spin,
 } from "antd";
-import { Images } from "../../images";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -56,7 +55,7 @@ const CategoryProductList = () => {
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
@@ -83,7 +82,7 @@ const CategoryProductList = () => {
 
   const currentCategory = useMemo(
     () => categorys.find((c) => c.address === categoryID),
-    [categoryID]
+    [categoryID, categorys]
   );
   //=========================Sub-categories===============================//
 
@@ -105,7 +104,7 @@ const CategoryProductList = () => {
   //============================Products===================================//
   // Filter - Products
   const productDispatch = useProductDispatch();
-  const { productsForFilter, isProductsLoading } = useProductState();
+  const { productsForFilter } = useProductState();
 
   useEffect(() => {
     let categoryIds = null,
@@ -131,7 +130,7 @@ const CategoryProductList = () => {
       var uniqueBrands = productsForFilter
         .map((p) => p.manufacturer)
         .filter(
-          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
+          (manufacturer, index, arr) => arr.indexOf(manufacturer) === index
         );
       setBrands(uniqueBrands);
     }
@@ -146,7 +145,6 @@ const CategoryProductList = () => {
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
-      console.log(hasChecked, !isAuthenticated);
     if (categoryID !== "") {
       actions.fetchMarketplace(
         marketplaceDispatch,
@@ -185,7 +183,7 @@ const CategoryProductList = () => {
     debouncedMaxQty,
     debouncedMinPrice,
     debouncedMaxPrice,
-    categoryID,
+    categoryID
   ]);
 
   //=========================Other functions===============================//
@@ -224,7 +222,7 @@ const CategoryProductList = () => {
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
-        <Breadcrumb.Item href="javascript:;">
+      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
             <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
               Home

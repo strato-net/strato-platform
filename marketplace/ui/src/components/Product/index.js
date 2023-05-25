@@ -37,7 +37,7 @@ const Product = () => {
   const dispatch = useProductDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [queryValue, setQueryValue] = useState("");
-  const [limit, setLimit] = useState(10);
+  const limit = 10;
   const [offset, setOffset] = useState(0);
   const [isSearch, setIsSearch] = useState(false);
   const [page, setPage] = useState(1);
@@ -154,12 +154,12 @@ const Product = () => {
             <>
               <div className="flex justify-between">
                 <Breadcrumb>
-                  <Breadcrumb.Item href="javascript:;">
+                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <ClickableCell href={routes.Marketplace.url}>
                       Home
                     </ClickableCell>
                   </Breadcrumb.Item>
-                  <Breadcrumb.Item href="javascript:;">
+                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <p className="text-primary">
                       Products
                     </p>

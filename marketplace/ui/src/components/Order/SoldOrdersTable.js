@@ -16,9 +16,8 @@ import { Pagination } from "antd";
 
 const SoldOrdersTable = ({ user }) => {
   const dispatch = useOrderDispatch();
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const [limit, setLimit] = useState(10);
+  const debouncedSearchTerm = useDebounce("", 1000);
+  const limit = 10;
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);

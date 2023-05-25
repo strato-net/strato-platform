@@ -1,8 +1,6 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 import { Form, Modal, Input, Select, Radio, Button, Spin } from "antd";
-import TextArea from "antd/es/input/TextArea";
 import getSchema from "./UpdateInventorySchema";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -36,7 +34,7 @@ const UpdateInventoryModal = ({
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
 
-  const { isCreateInventorySubmitting, isinventoryUpdating } =
+  const { isinventoryUpdating } =
     useInventoryState();
 
   const initialValues = {
@@ -228,6 +226,7 @@ const UpdateInventoryModal = ({
                         </Option>
                       );
                     }
+                    return <></>;
                   })}
                 </Select>
                 {getIn(formik.touched, "subCategory.name") &&

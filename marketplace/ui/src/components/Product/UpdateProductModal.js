@@ -167,7 +167,7 @@ const UpdateProductModal = ({
                 {selectedImage ? (
                   <div className="h-20">
                     <img
-                      alt="Product Image"
+                      alt="Product"
                       src={selectedImage}
                       style={{ width: "100%", height: "100%" }}
                     />

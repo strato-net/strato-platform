@@ -7,8 +7,7 @@ import routes from "../../helpers/routes";
 import { useEffect, useState } from "react";
 import { SearchOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
-import { useNavigate, useMatch, useLocation } from "react-router-dom";
-import { EyeOutlined } from "@ant-design/icons";
+import { useMatch, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/event/actions";
 import { useEventDispatch, useEventState } from "../../contexts/event";
 import useDebounce from "../UseDebounce";
@@ -20,12 +19,9 @@ const OrderItemEventsList = () => {
   const [Id, setId] = useState(undefined);
   const [data, setData] = useState([]);
   const { Text } = Typography;
-  const navigate = useNavigate();
   const dispatch = useEventDispatch();
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
+  const limit = 10, offset = 0;
+  const debouncedSearchTerm = useDebounce("", 1000);
   const {
     isItemEventsLoading,
     itemEvents
@@ -127,17 +123,17 @@ const OrderItemEventsList = () => {
     <div className="h-screen mx-14">
       <div className="flex justify-between items-center mt-14">
         <Breadcrumb className="text-xs mb-6">
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
               Home
             </ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={routes.Orders.url}>
               Orders
             </ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             {
               state == null ? <div>
               </div> : <ClickableCell href={state.seller === true ? `${routes.SoldOrderDetails.url.replace(":id", state.orderAddress)}` : `${routes.BoughtOrderDetails.url.replace(":id", state.orderAddress)}`}>

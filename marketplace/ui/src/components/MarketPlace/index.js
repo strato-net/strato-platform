@@ -2,7 +2,7 @@ import { Button, Image, Typography, Spin } from "antd";
 import CategoryCard from "./CategoryCard";
 import TopSellingProductCard from "./TopSellingProductCard";
 import { Images } from "../../images";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { actions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
@@ -10,12 +10,10 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 
 const MarketPlace = () => {
-  const [queryValue, setQueryValue] = useState("");
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
+  const limit = 10, offset = 0;
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
+  const debouncedSearchTerm = useDebounce("", 1000);
   const { iscategorysLoading } = useCategoryState();
 
   useEffect(() => {

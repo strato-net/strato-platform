@@ -58,7 +58,7 @@ const ProductCard = ({
       };
       setState(newProduct);
     }
-  }, [product]);
+  }, [product, categorys, subCategorys]);
 
 
   return (

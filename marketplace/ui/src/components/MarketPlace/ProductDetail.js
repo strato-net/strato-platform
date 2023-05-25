@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  InputNumber,
   Row,
   Card,
   Breadcrumb,
@@ -58,11 +57,8 @@ const ProductDetails = ({ user, users }) => {
   const [isEventSelected, setIsEventSelected] = useState(false);
   const [isSerialNumberSelected, setIsSerialNumberSelected] = useState(false);
   const [serialNumber, setSerialNumber] = useState(false);
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const [ownershipData, setOwnershipData] = useState(false);
+  const limit = 10, offset = 0;
+  const debouncedSearchTerm = useDebounce("", 1000);
   const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
@@ -531,7 +527,7 @@ const ProductDetails = ({ user, users }) => {
         <div>
           <Row>
             <Breadcrumb className="text-xs mt-14 mb-8 ml-16">
-              <Breadcrumb.Item href="javascript:;">
+              <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                 <ClickableCell href={routes.Marketplace.url}>
                   <p
                     className="text-primaryB hover:bg-transparent"
@@ -541,7 +537,8 @@ const ProductDetails = ({ user, users }) => {
                 </ClickableCell>
               </Breadcrumb.Item>
               {
-                isCalledFromInventory ? <Breadcrumb.Item href="javascript:;">
+                isCalledFromInventory ? 
+                <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                   <ClickableCell href={routes.Inventories.url}>
                     <p
                       className="text-primaryB hover:bg-transparent"

@@ -4,7 +4,6 @@ import { Breadcrumb, Spin, Input, notification, Pagination } from "antd";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useLocation } from "react-router-dom";
-import useDebounce from "../UseDebounce";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 
@@ -17,14 +16,10 @@ function useQuery() {
 const Item = () => {
   const { Search } = Input;
   const [inventoryId, setinventoryId] = useState(undefined);
-  const [queryValue, setQueryValue] = useState("");
-  const [limit, setLimit] = useState(10);
+  const limit = 10;
   const [offset, setOffset] = useState(0);
-  const [selectedObj, setSelectedObj] = useState([]);
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
-  const { state } = useLocation();
-  const { productName } = state;
 
   const [api, contextHolder] = notification.useNotification();
 
@@ -47,7 +42,6 @@ const Item = () => {
   };
 
   const dispatch = useItemDispatch();
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
 
   const { items, isItemsLoading, message, success } = useItemState();
   const query = useQuery();
@@ -97,12 +91,12 @@ const Item = () => {
       <div className="mx-16 mt-14">
         <div className="flex justify-between">
           <Breadcrumb>
-            <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
               Home
             </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Inventories.url}>
                 Inventory
               </ClickableCell>

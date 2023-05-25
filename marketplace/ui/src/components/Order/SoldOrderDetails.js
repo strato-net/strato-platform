@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Row,
@@ -14,7 +14,7 @@ import {
   notification,
   Image,
 } from "antd";
-import { useMatch, useLocation } from "react-router-dom";
+import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
@@ -31,12 +31,6 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
-
-function useQuery() {
-  const { search } = useLocation();
-
-  return useMemo(() => new URLSearchParams(search), [search]);
-}
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -86,8 +80,6 @@ const SoldOrderDetails = ({ user, users }) => {
     path: routes.SoldOrderDetails.url,
     strict: true,
   });
-
-  const query = useQuery();
 
   useEffect(() => {
     if (orderDetails) {
@@ -171,7 +163,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const details = orderDetails;
   const audits = ordersAudit;
   if (audits && audits.length) {
-    audits.map((val) => {
+    audits.forEach((val) => {
       if (users && users.length) {
         const sender = users.find(
           (data) => val["transaction_sender"] === data.userAdress
@@ -182,7 +174,7 @@ const SoldOrderDetails = ({ user, users }) => {
   }
 
   if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details["ownerOrganizationalUnit"] == "") {
+    if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }
   }
@@ -435,12 +427,12 @@ const SoldOrderDetails = ({ user, users }) => {
       ) : (
         <div>
           <Breadcrumb className="text-xs ml-14 mt-14 mb-8">
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
                 Orders (Sold)
               </div>

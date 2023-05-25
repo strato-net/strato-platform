@@ -1,6 +1,5 @@
 import React from "react";
 import { Card, Typography, Image, Space } from "antd";
-import { Images } from "../../images";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -12,15 +11,6 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
-
-  const categoryImages = [
-    Images.category1,
-    Images.category2,
-    Images.category3,
-    Images.category4,
-    Images.category5,
-    Images.category6,
-  ];
 
   return (
     <Card className="w-full">

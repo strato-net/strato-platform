@@ -4,20 +4,9 @@ import {
   TextField,
   FormLayout,
   Card,
-  Layout,
-  Popover,
-  Button,
-  OptionList,
-  Stack,
-  Label
+  Layout
 } from "@shopify/polaris";
-import CommonDatePicker from "../CommonDatePicker";
-import dayjs from "dayjs";
-import styled from "styled-components";
 
-const LabelWrapper = styled.div`
-  margin-bottom: 1px;
-`;
 
 const UpdateModal = ({
   isUpdateModalOpen,

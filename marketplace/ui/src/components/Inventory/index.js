@@ -35,9 +35,8 @@ const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const [limit, setLimit] = useState(10);
+  const debouncedSearchTerm = useDebounce("", 1000);
+  const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(10);
@@ -186,7 +185,7 @@ const Inventory = ({ user }) => {
             <>
               <div className="flex justify-between">
                 <Breadcrumb>
-                  <Breadcrumb.Item href="javascript:;">
+                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <ClickableCell href={routes.Marketplace.url}>
                       Home
                     </ClickableCell>
