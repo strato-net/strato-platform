@@ -63,7 +63,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Builds and installs project dependencies
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.buildProject', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.buildProject', async () => {
 		vscode.window.showInformationMessage("Building your dApp...")
 
 		// Show the directory paths in a quickPick dialog
@@ -100,7 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Deploys the smart contracts to the targetted node using selected deploy scripts
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', async () => {
 		// Check if .env exists
 		const folders = vscode.workspace.workspaceFolders || [];
 		const cwd = folders[0].uri.path
@@ -125,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Runs the project backend server
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', async () => {
 		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';
 		runCommand(`cd ${backendDir}`)
@@ -135,31 +135,31 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Runs the project UI
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', async () => {
 		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
 		runCommand(`cd ${frontendDir}`)
-		runCommand(cmd)
+		await runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
 
 	// Runs the project tests against the server
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', async () => {
 		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
 		runCommand(`cd ${backendDir}`)
-		runCommand(cmd)
+		await runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
 
 	// Runs the project tests against the UI
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', () => {
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', async () => {
 		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
 		runCommand(`cd ${frontendDir}`)
-		runCommand(cmd)
+		await runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
@@ -346,7 +346,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Register the contracts provider for the sidebar
 	const contractsProvider = new ContractsProvider();
-	vscode.commands.registerCommand('contracts.refreshEntry', () => contractsProvider.refresh());
+	vscode.commands.registerCommand('contracts.refreshEntry', async () => contractsProvider.refresh());
 	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 
 	// Register the Cirrus provider
@@ -362,8 +362,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider)
 
 	// Register the nodes provider
-	const nodesProvider = new NodesProvider();
-	vscode.commands.registerCommand('nodes.refreshEntry', () => nodesProvider.refresh());
+	const nodesProvider = new NodesProvider();  // todo(moncayo): pass config file into provider?
+	vscode.commands.registerCommand('nodes.refreshEntry', async () => nodesProvider.refresh());
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Activate debug mode and diagnostics
