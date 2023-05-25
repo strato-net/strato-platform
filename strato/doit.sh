@@ -230,7 +230,7 @@ function newnode {
   if [ -n "${txSizeLimit}" ]; then
       txsFlag="--txSizeLimit=${txSizeLimit}"
   fi
-  if [ -n "${gasLimit}"]; then
+  if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
   echo "Starting vm-runner"
