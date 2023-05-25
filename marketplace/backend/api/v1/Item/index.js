@@ -16,6 +16,7 @@ router.get(
 
 router.get(
   Item.ownershipHistory,
+  authHandler.authorizeRequest(true),
   loadDapp,
   ItemController.getOwnershipHistory
 );

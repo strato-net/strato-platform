@@ -40,7 +40,7 @@ class AuthHandler {
         if (!token) {
           token = await getTokenFromHeader(req)
         }
-        const isServiceUser = false
+        let isServiceUser = false
         if (!token && allowAnonAccess === true) {
           token = await oauthHelper.getServiceToken()
           isServiceUser = true
