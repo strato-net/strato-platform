@@ -8,7 +8,7 @@ export default function getConfig(): any {
     console.debug(`getConfig/cfgPath: ${cfgPath}`)
 
     const filename: string = vscode.workspace.getConfiguration().get('strato-vscode.configFile') || 'config.yaml';
-    console.debug(`getConfig/cfgPath: ${filename}`)
+    console.debug(`getConfig/filename: ${filename}`)
 
     const folders = vscode.workspace.workspaceFolders || []
     if (folders.length === 0) {

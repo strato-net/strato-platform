@@ -330,6 +330,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+
 	// Open the STRATO settings page
 	vscode.commands.registerCommand('project-management.settings', async () => {
 		// Open the user settings file
