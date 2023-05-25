@@ -50,16 +50,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	}))
 
-	// Set the node endpoint to send queries to
-	// context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.setNode', () => {
-	// 	const nodeEndpoint = await vscode.window.showInputBox({
-	// 		ignoreFocusOut: true,
-	// 		placeHolder: 'ex: http://node1-mercata-testnet.blockapps.net/',
-	// 		prompt: 'URL to STRATO node'
-	// 	})
-	// 	console.log(`Set node endpoint to ${nodeEndpoint}`)
-	// }))
-
 
 	// Builds and installs project dependencies
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.buildProject', async () => {
@@ -133,21 +123,21 @@ export async function activate(context: vscode.ExtensionContext) {
 	}));
 
 
-	// Runs the project UI
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', async () => {
-		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
-		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
-		runCommand(`cd ${frontendDir}`)
-		runCommand(cmd)
-		runCommand('cd ..')
-	}));
-
-
 	// Runs the project tests against the server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', async () => {
 		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
 		runCommand(`cd ${backendDir}`)
+		runCommand(cmd)
+		runCommand('cd ..')
+	}));
+
+
+	// Runs the project UI
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', async () => {
+		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
+		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
+		runCommand(`cd ${frontendDir}`)
 		runCommand(cmd)
 		runCommand('cd ..')
 	}));
@@ -340,6 +330,13 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Open the STRATO settings page
+	vscode.commands.registerCommand('project-management.settings', async () => {
+		// Open the user settings file
+		vscode.commands.executeCommand('workbench.action.openSettings', 'strato-vscode');
+	});
+
+
 	// Register the quick tools provider
 	vscode.window.registerTreeDataProvider('project-management', new ProjectActionProvider())
 
@@ -430,3 +427,5 @@ function runCommand(cmd: string) {
 	terminal.show()
 	terminal.sendText(cmd, true)
 }
+
+// todo(moncayo): accepts a vscode terminal and sets it to the root workspace dir
