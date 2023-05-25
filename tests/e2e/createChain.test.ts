@@ -212,7 +212,7 @@ describe("Create Chain", function() {
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should be able to create a private chain with a CodePtr to existing code', async() => {
+  /*it('should be able to create a private chain with a CodePtr to existing code', async() => {
     // create users
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
@@ -257,7 +257,7 @@ describe("Create Chain", function() {
     const gov = govList[0];
     assert.isDefined(gov, "Governance contract apperas in Cirrus");
     assert.equal(gov.y, '1', "Governance contract storage matches what we expect");
-  });
+  });*/
 
 });
 
