@@ -35,7 +35,9 @@ import qualified Control.Monad.Change.Modify             as Mod
 import qualified Control.Monad.Trans.State.Strict        as State
 import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
+import qualified Data.Binary                             as Bin
 import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Lazy                    as BL
 import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.Foldable                           (traverse_)
@@ -361,6 +363,10 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
     unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
+    when (acctNonce >= flags_accountNonceLimit) $ throwE $ TFNonceLimitExceeded flags_accountNonceLimit acctNonce t
+    let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t 
+    when (txSize >= flags_txSizeLimit) .
+       throwE $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t 
 
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 

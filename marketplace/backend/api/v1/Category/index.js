@@ -20,19 +20,5 @@ router.get(
   CategoryController.getAll
 );
 
-router.post(
-  Category.create,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  CategoryController.create
-);
-
-router.put(
-  Category.update,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  CategoryController.update
-)
-
 
 export default router;

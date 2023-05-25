@@ -187,8 +187,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 oldProduct.leastSellableUnit(),
                 oldProduct.imageKey(),
                 oldProduct.isActive(),
-                oldProduct.categoryId(),
-                oldProduct.subCategoryId(),
+                oldProduct.category(),
+                oldProduct.subCategory(),
                 block.timestamp,
                 _newOwner
             )
