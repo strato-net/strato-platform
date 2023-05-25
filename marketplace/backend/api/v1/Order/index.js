@@ -27,19 +27,11 @@ router.post(
   OrderController.create
 );
 
-
 router.put(
-  Order.updateBuyerDetails,
+  Order.updateOrderDetails,
   authHandler.authorizeRequest(),
   loadDapp,
-  OrderController.updateBuyerDetails
-)
-
-router.put(
-  Order.updateSellerDetails,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.updateSellerDetails
+  OrderController.updateOrderDetails
 )
 
 router.post(

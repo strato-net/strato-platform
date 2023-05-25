@@ -76,57 +76,24 @@ contract Order is OrderStatus {
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
-        
-
     }
 
-    function updateBuyerDetails(
-        OrderStatus _status
-        ,   string _buyerComments
-    ,uint _scheme
-    ) public returns (uint,string,string) {
-
-      mapping(string => string) ownerCert = getUserCert(tx.origin);
-      string assetOwnerOrganization = ownerCert["organization"];
-      if(assetOwnerOrganization != buyerOrganization){
-        return (RestStatus.FORBIDDEN,"","");
-      }
-
-       // check for open status to closed status
-     if(_status == OrderStatus.CANCELED){
-       return getInventoriesAndAvailableQuantity(_status,_buyerComments,orderLines,true);
-     }
-
-      if (_scheme == 0) {
-        return (RestStatus.OK,"","");
-      }
-
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        changeStatus(_status);
-      }
-
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        buyerComments = _buyerComments;
-      }
-
-      return (RestStatus.OK,string(address(0)),string(address(0)));
-    }
-
-    function updateSellerDetails(
-        OrderStatus _status
-        ,   uint _fullfilmentDate
-        ,   string _sellerComments
-    ,uint _scheme
+     function updateDetails(
+          string _type
+        , OrderStatus _status
+        , uint _fullfilmentDate
+        , string _comments
+        , uint _scheme
     ) public  returns (uint,string,string) {
 
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
-      if(assetOwnerOrganization != sellerOrganization){
-        return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
-      } 
+      // if(assetOwnerOrganization != sellerOrganization){
+      //   return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
+      // } 
 
     // check for open status to closed status
-     if(_status == OrderStatus.CLOSED){
+     if(_status == OrderStatus.CLOSED && _type == 'seller'){
        for(uint i=0;i<orderLines.length;i++){
         OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
         if(!orderLine.isSerialUploaded()){
@@ -134,14 +101,21 @@ contract Order is OrderStatus {
         }
       }
       fullfilmentDate = _fullfilmentDate;
-      return getInventoriesAndAvailableQuantity(_status,_sellerComments,orderLines,false);
+      (uint statusResponse, address[] inventoryIdArray, int[] inventoryQuantityArray) = getInventoriesAndAvailableQuantity(_status,_comments,orderLines,false);
+      return (RestStatus.OK,string(address(0)),string(address(0)));
      }
+
+     bool val;
+     if (_type == 'buyer') val = true;
+     else if (_type == 'seller') val = false;
 
       // check for open status to closed status
      if(_status == OrderStatus.CANCELED){
-       return getInventoriesAndAvailableQuantity(_status,_sellerComments,orderLines,false);
-     }
+       (uint statusResponse, address[] inventoryIdArray, int[] inventoryQuantityArray) = getInventoriesAndAvailableQuantity(_status,_comments,orderLines,val);
 
+        ProductManager.updateInventoriesQuantities(inventoryIdArray, inventoryQuantityArray, false);
+        return (RestStatus.OK,"","");
+     }
 
       if (_scheme == 0) {
         return (RestStatus.OK,"","");
@@ -150,15 +124,104 @@ contract Order is OrderStatus {
       if ((_scheme & (1 << 0)) == (1 << 0)) {
         changeStatus(_status);
       }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        fullfilmentDate = _fullfilmentDate;
+
+      if (_type == 'buyer') {
+        if ((_scheme & (1 << 1)) == (1 << 1)) {
+          buyerComments = _comments;
+        }
       }
-      if ((_scheme & (1 << 2)) == (1 << 2)) {
-        sellerComments = _sellerComments;
+      else if (_type == 'seller') {
+        if ((_scheme & (1 << 1)) == (1 << 1)) {
+          fullfilmentDate = _fullfilmentDate;
+        }
+        if ((_scheme & (1 << 2)) == (1 << 2)) {
+          sellerComments = _comments;
+        }
       }
 
-      return (RestStatus.OK,"","");
+      return (RestStatus.OK,string(address(0)),string(address(0)));
     }
+
+
+    // function updateBuyerDetails(
+    //     OrderStatus _status
+    //     ,   string _buyerComments
+    // ,uint _scheme
+    // ) public returns (uint,string,string) {
+
+    //   mapping(string => string) ownerCert = getUserCert(tx.origin);
+    //   string assetOwnerOrganization = ownerCert["organization"];
+    //   if(assetOwnerOrganization != buyerOrganization){
+    //     return (RestStatus.FORBIDDEN,"","");
+    //   }
+
+    //    // check for open status to closed status
+    //  if(_status == OrderStatus.CANCELED){
+    //    return getInventoriesAndAvailableQuantity(_status,_buyerComments,orderLines,true);
+    //  }
+
+    //   if (_scheme == 0) {
+    //     return (RestStatus.OK,"","");
+    //   }
+
+    //   if ((_scheme & (1 << 0)) == (1 << 0)) {
+    //     changeStatus(_status);
+    //   }
+
+    //   if ((_scheme & (1 << 1)) == (1 << 1)) {
+    //     buyerComments = _buyerComments;
+    //   }
+
+    //   return (RestStatus.OK,string(address(0)),string(address(0)));
+    // }
+
+    // function updateSellerDetails(
+    //     OrderStatus _status
+    //     ,   uint _fullfilmentDate
+    //     ,   string _sellerComments
+    // ,uint _scheme
+    // ) public  returns (uint,string,string) {
+
+    //   mapping(string => string) ownerCert = getUserCert(tx.origin);
+    //   string assetOwnerOrganization = ownerCert["organization"];
+    //   if(assetOwnerOrganization != sellerOrganization){
+    //     return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
+    //   } 
+
+    // // check for open status to closed status
+    //  if(_status == OrderStatus.CLOSED){
+    //    for(uint i=0;i<orderLines.length;i++){
+    //     OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
+    //     if(!orderLine.isSerialUploaded()){
+    //       return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
+    //     }
+    //   }
+    //   fullfilmentDate = _fullfilmentDate;
+    //   return getInventoriesAndAvailableQuantity(_status,_sellerComments,orderLines,false);
+    //  }
+
+    //   // check for open status to closed status
+    //  if(_status == OrderStatus.CANCELED){
+    //    return getInventoriesAndAvailableQuantity(_status,_sellerComments,orderLines,false);
+    //  }
+
+
+    //   if (_scheme == 0) {
+    //     return (RestStatus.OK,"","");
+    //   }
+
+    //   if ((_scheme & (1 << 0)) == (1 << 0)) {
+    //     changeStatus(_status);
+    //   }
+    //   if ((_scheme & (1 << 1)) == (1 << 1)) {
+    //     fullfilmentDate = _fullfilmentDate;
+    //   }
+    //   if ((_scheme & (1 << 2)) == (1 << 2)) {
+    //     sellerComments = _sellerComments;
+    //   }
+
+    //   return (RestStatus.OK,"","");
+    // }
 
     // Add the orderLine of a order
     function addOrderLine(address _orderAddress, address _productId, address _inventoryId, uint _quantity, uint _pricePerUnit, uint _shippingCharges
@@ -194,7 +257,10 @@ contract Order is OrderStatus {
       status = _status;
     }
 
-    function getInventoriesAndAvailableQuantity(OrderStatus _status,string _comments,address[] _orderLines,bool _isBuyer) public returns(uint,string,string){
+    function getInventoriesAndAvailableQuantity(OrderStatus _status,string _comments,address[] _orderLines,bool _isBuyer) public returns(uint,address[],int[]){
+
+      address[] inventories;
+      int[] orderLineQuantities;
 
       changeStatus(_status);
       if(_isBuyer){
@@ -202,16 +268,15 @@ contract Order is OrderStatus {
       }else{
         sellerComments = _comments;
       }
-      string inventories = "";
-      string orderLineQuantities = "";
-      for(uint i=0;i<orderLines.length;i++){
+
+      for (uint i = 0; i < orderLines.length; i++) {
         OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
         Inventory inventory = Inventory(address(orderLine.inventoryId()));
-        inventories += string(address(orderLine.inventoryId())) + ",";
-        orderLineQuantities += string(orderLine.quantity()) + ",";
+        inventories[i] = address(orderLine.inventoryId());
+        orderLineQuantities[i] = int(orderLine.quantity());
       }
+
       return (RestStatus.OK,inventories,orderLineQuantities);
-  
     }
 
    

@@ -66,11 +66,11 @@ function marshalOut(_args) {
   return args;
 }
 
-function marshalInUpdateSeller(_args){
+function marshalInUpdateOrder(_args) {
   const defaultArgs = {
-    status:1,
-    fullfilmentDate:0,
-    sellerComments:''
+    status: 1,
+    fullfilmentDate: 0,
+    comments: ''
   }
   const args = {
     ...defaultArgs,
@@ -112,27 +112,25 @@ function bind(user, _contract, options) {
   contract.getState = async () => getState(user, contract, options);
   contract.getOrder = async (args, _options = defaultOptions) =>
     orderJs.get(user, args, _options);
-  contract.getOrders = async (user,args, _options = defaultOptions) =>
+  contract.getOrders = async (user, args, _options = defaultOptions) =>
     orderJs.getAll(user, args, _options);
   contract.createOrder = async (args) =>
     createOrder(user, contract, args, options);
-  contract.updateBuyerDetails = async (args) =>
-    updateBuyerDetails(user, contract, args, options);
-  contract.updateSellerDetails = async (args) =>
-    updateSellerDetails(user, contract, args, options);
+  contract.updateOrderDetails = async (args) =>
+    updateOrderDetails(user, contract, args, options);
   contract.getInventoriesAndAvailableQuantity = async (args) =>
     getInventoriesAndAvailableQuantity(user, contract, args, options);
   contract.addOrderLine = async (args) =>
     addOrderLine(user, contract, args, options);
-  contract.getOrderLine = async (args,options=defaultOptions) =>
+  contract.getOrderLine = async (args, options = defaultOptions) =>
     orderLineJs.get(user, args, options);
-  contract.getOrderLines = async (args,options=defaultOptions) =>
+  contract.getOrderLines = async (args, options = defaultOptions) =>
     orderLineJs.getAll(user, args, options);
   contract.addOrderLineItems = async (args) =>
     addOrderLineItems(user, contract, args, options);
-  contract.getOrderLineItem = async (args,options=defaultOptions) =>
+  contract.getOrderLineItem = async (args, options = defaultOptions) =>
     orderLineItemJs.get(user, args, options);
-  contract.getOrderLineItems = async (args,options=defaultOptions) =>
+  contract.getOrderLineItems = async (args, options = defaultOptions) =>
     orderLineItemJs.getAll(user, args, options);
   return contract;
 }
@@ -166,29 +164,135 @@ async function createOrder(admin, contract, _args, baseOptions) {
 /**
  * Update buyer order details
  */
- async function updateBuyerDetails(admin, contract, _args, baseOptions) {
-  _args = {
-    orderAddress:_args.orderAddress,
-    ..._args
-  }
-  
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1;
-    switch (key) {
-      case "status":
-        return agg | (base << 0);
-      case "buyerComments":
-        return agg | (base << 1);
-      default:
-        return agg;
-    }
-  }, 0);
+// async function updateBuyerDetails(admin, contract, _args, baseOptions) {
+//   _args = {
+//     orderAddress: _args.orderAddress,
+//     ..._args
+//   }
 
-  
+//   const scheme = Object.keys(_args).reduce((agg, key) => {
+//     const base = 1;
+//     switch (key) {
+//       case "status":
+//         return agg | (base << 0);
+//       case "buyerComments":
+//         return agg | (base << 1);
+//       default:
+//         return agg;
+//     }
+//   }, 0);
+
+//   const callArgs = {
+//     contract,
+//     method: "updateOrderDetails",
+//     args: util.usc({
+//       scheme,
+//       ..._args,
+//     }),
+//   };
+
+//   const options = {
+//     ...baseOptions,
+//     history: [contractName],
+//   };
+
+//   const [restStatus, OrderAddress, quantities] = await rest.call(
+//     admin,
+//     callArgs,
+//     options
+//   );
+
+//   if (parseInt(restStatus, 10) !== RestStatus.OK)
+//     throw new rest.RestError(restStatus, 0, { callArgs });
+
+//   return [restStatus, OrderAddress, quantities];
+// }
+
+/**
+ * Update seller order details
+ */
+// async function updateSellerDetails(admin, contract, _args, baseOptions) {
+//   console.log("args 2 ", _args)
+//   const args = marshalInUpdateSeller(_args);
+//   console.log("args 3 ", args)
+//   // process.exit()
+
+//   // console.log("===========================================",_args);
+
+//   const scheme = Object.keys(_args).reduce((agg, key) => {
+//     const base = 1;
+//     switch (key) {
+//       case "status":
+//         return agg | (base << 0);
+//       case "fullfilmentDate":
+//         return agg | (base << 1);
+//       case "sellerComments":
+//         return agg | (base << 2);
+//       default:
+//         return agg;
+//     }
+//   }, 0);
+
+//   const callArgs = {
+//     contract,
+//     method: "updateOrderDetails",
+//     args: util.usc({
+//       scheme,
+//       ...args,
+//     }),
+//   };
+
+//   const options = {
+//     ...baseOptions,
+//     history: [contractName],
+//   };
+
+//   const [restStatus, OrderAddress, quantities] = await rest.call(
+//     admin,
+//     callArgs,
+//     options
+//   );
+
+//   if (parseInt(restStatus, 10) !== RestStatus.OK)
+//     throw new rest.RestError(restStatus, 0, { callArgs });
+
+//   return [restStatus, OrderAddress, quantities];
+// }
+
+async function updateOrderDetails(admin, contract, _args, baseOptions) {
+  // const args = marshalInUpdateOrder(_args);
+  if (_args.type == 'buyer') {
+    var scheme = Object.keys(_args).reduce((agg, key) => {
+      const base = 1;
+      switch (key) {
+        case "status":
+          return agg | (base << 0);
+        case "buyerComments":
+          return agg | (base << 1);
+        default:
+          return agg;
+      }
+    }, 0);
+  }
+  else if (_args.type == 'seller') {
+    var scheme = Object.keys(_args).reduce((agg, key) => {
+      const base = 1;
+      switch (key) {
+        case "status":
+          return agg | (base << 0);
+        case "fullfilmentDate":
+          return agg | (base << 1);
+        case "sellerComments":
+          return agg | (base << 2);
+        default:
+          return agg;
+      }
+    }, 0);
+  }
 
   const callArgs = {
     contract,
-    method: "updateBuyerDetails",
+    method: "updateOrderDetails",
     args: util.usc({
       scheme,
       ..._args,
@@ -212,60 +316,10 @@ async function createOrder(admin, contract, _args, baseOptions) {
   return [restStatus, OrderAddress, quantities];
 }
 
-
-
-/**
- * Update seller order details
- */
- async function updateSellerDetails(admin, contract, _args, baseOptions) {
-  const args = marshalInUpdateSeller(_args);
-  // console.log("===========================================",_args);
-
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1;
-    switch (key) {
-      case "status":
-        return agg | (base << 0);
-      case "fullfilmentDate":
-        return agg | (base << 1);
-      case "sellerComments":
-        return agg | (base << 2);
-      default:
-        return agg;
-    }
-  }, 0);
-
-  const callArgs = {
-    contract,
-    method: "updateSellerDetails",
-    args: util.usc({
-      scheme,
-      ...args,
-    }),
-  };
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, OrderAddress, quantities] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, OrderAddress, quantities];
-}
-
-
 /**
  * Add the oderLine for a order
  */
- async function addOrderLine(admin, contract, _args, baseOptions) {
+async function addOrderLine(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
     method: "addOrderLine",
@@ -293,7 +347,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
 /**
  * Add the oderLineItems for a order
  */
- async function addOrderLineItems(admin, contract, _args, baseOptions) {
+async function addOrderLineItems(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
     method: "addOrderLineItems",
@@ -322,7 +376,7 @@ async function createOrder(admin, contract, _args, baseOptions) {
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
  */
- async function getState(user, contract, options) {
+async function getState(user, contract, options) {
   const state = await rest.getState(user, contract, options);
   return marshalOut(state);
 }
