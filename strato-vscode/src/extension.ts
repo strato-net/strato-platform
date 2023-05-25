@@ -50,7 +50,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	}))
 
-
 	// Set the node endpoint to send queries to
 	// context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.setNode', () => {
 	// 	const nodeEndpoint = await vscode.window.showInputBox({
@@ -139,7 +138,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
 		runCommand(`cd ${frontendDir}`)
-		await runCommand(cmd)
+		runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
@@ -149,7 +148,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
 		runCommand(`cd ${backendDir}`)
-		await runCommand(cmd)
+		runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
@@ -159,7 +158,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
 		runCommand(`cd ${frontendDir}`)
-		await runCommand(cmd)
+		runCommand(cmd)
 		runCommand('cd ..')
 	}));
 
@@ -362,8 +361,28 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider)
 
 	// Register the nodes provider
-	const nodesProvider = new NodesProvider();  // todo(moncayo): pass config file into provider?
-	vscode.commands.registerCommand('nodes.refreshEntry', async () => nodesProvider.refresh());
+	const nodesProvider = new NodesProvider();
+	vscode.commands.registerCommand('nodes.refreshEntry', async () => {
+		let fp = context.workspaceState.get('strato-vscode.configPath')
+		console.debug(`refreshEntry/fp init: ${fp}`)
+		if (!fp) {
+			const options: vscode.OpenDialogOptions = {
+				title: 'Import configuration',
+				openLabel: 'Import configuration',
+				canSelectMany: false,
+				canSelectFiles: true,
+				canSelectFolders: false
+			};
+			const userSelect = await vscode.window.showOpenDialog(options) || '';
+			console.debug(`refreshEntry/userSelect: ${userSelect}`)
+
+			fp = userSelect && userSelect[0] ? vscode.Uri.parse(userSelect[0].fsPath) : null
+			console.debug(`refreshEntry/fp: ${fp}`)
+			context.workspaceState.update('strato-vscode.configPath', fp)
+			console.debug(`refreshEntry/workspaceState: ${context.workspaceState.get('strato-vscode.configPath')} `)
+		}
+		nodesProvider.refresh()
+	})
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Activate debug mode and diagnostics
