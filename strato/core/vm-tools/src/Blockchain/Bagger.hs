@@ -111,6 +111,8 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
         Just f@TFInvalidPragma{} -> recoverable f
+        Just f@TFNonceLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
+        Just f@TFTXSizeLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
 
 -- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do
@@ -499,7 +501,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
         txn          = TD.transactionNonce bt
         txFee        = B.calculateIntrinsicTxFee state t
-        txSize       = toInteger $ BS.length $ BL.toStrict $ Bin.encode t 
+        txSize       = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt 
     when (intrinsicGas >= flags_gasLimit) .
        throwE $ GasLimitExceeded Validation Incoming intrinsicGas flags_gasLimit t
     (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
