@@ -17,7 +17,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
         string _subCategory, uint _createdDate) 
         returns (uint256, address) {
         
-        Product_4 product = new Product_4(_name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
+        Product_3 product = new Product_3(_name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
         _uniqueProductCode, _leastSellableUnit, _imageKey, _isActive, _category, 
         _subCategory, _createdDate, tx.origin);
 
@@ -31,13 +31,13 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
     function updateProduct (address _productAddress, string _description, string _imageKey, bool _isActive, string _userUniqueProductCode, uint _scheme) 
         returns (uint256) {
 
-        Product_4 product = Product_4(_productAddress);
+        Product_3 product = Product_3(_productAddress);
         return product.update(_description, _imageKey, _isActive, _userUniqueProductCode, _scheme);
     }
 
     function deleteProduct (address _productAddress) returns (uint256, string) {
 
-        Product_4 product = Product_4(_productAddress);
+        Product_3 product = Product_3(_productAddress);
         return product.deleteProduct();
     }
 
@@ -54,7 +54,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
             uniqueSerialNumberByProductAddress[_productAddress][_serialNumbers[j]] = true;
         }
 
-        Product_4 product = Product_4(_productAddress);
+        Product_3 product = Product_3(_productAddress);
         return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
     }
 
@@ -62,7 +62,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
         InventoryStatus _status, uint _scheme) 
         returns (uint256) {
 
-        Product_4 product = Product_4(_productAddress);
+        Product_3 product = Product_3(_productAddress);
         return product.updateInventory(_inventory, _pricePerUnit, _status, _scheme);
     }
 
@@ -70,7 +70,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
         returns (uint256) {
 
         for(uint i=0;i<_inventories.length;i++){
-            Inventory_2 inventory = Inventory_2(_inventories[i]);
+            Inventory inventory = Inventory(_inventories[i]);
             
             if(_isReduce){
                 if(_quantities[i] > inventory.availableQuantity()){

@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Inventory_2';
+const contractName = 'Inventory';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 

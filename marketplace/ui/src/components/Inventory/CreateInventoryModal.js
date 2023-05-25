@@ -107,10 +107,6 @@ const CreateInventoryModal = ({
     formik.values.subCategory,
   ]);
 
-  useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
-
   const handleCreateFormSubmit = async (values) => {
     const body = {
       productAddress: values.productName.address,

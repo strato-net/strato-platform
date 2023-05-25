@@ -70,12 +70,10 @@ const UpdateProductModal = ({
       let nextState = {
         name: decodeURIComponent(productToUpdate.name),
         category: {
-          name: productToUpdate.categoryName,
-          address: productToUpdate.category,
+          name: productToUpdate.category,
         },
         subCategory: {
-          name: productToUpdate.subCategoryName,
-          address: productToUpdate.subCategory,
+          name: productToUpdate.subCategory,
         },
         manufacturer: decodeURIComponent(productToUpdate.manufacturer),
         unitofmeasurement:{

@@ -8,7 +8,7 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 
 
 /// @title A representation of Product assets
-contract Product_4 is UnitOfMeasurement, InventoryStatus {
+contract Product_3 is UnitOfMeasurement, InventoryStatus {
 
     address public owner;
     string public ownerOrganization;
@@ -129,7 +129,7 @@ contract Product_4 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory_2 inventory = new Inventory_2(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
+      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
       return (RestStatus.OK, address(inventory));
     }
 
@@ -141,7 +141,7 @@ contract Product_4 is UnitOfMeasurement, InventoryStatus {
         return RestStatus.FORBIDDEN;
       }
     
-      Inventory_2 inventory = Inventory_2(_inventory);
+      Inventory inventory = Inventory(_inventory);
       inventory.update(_pricePerUnit, _status, _scheme);
       return (RestStatus.OK);
     }
@@ -155,7 +155,7 @@ contract Product_4 is UnitOfMeasurement, InventoryStatus {
       //   return RestStatus.FORBIDDEN;
       // }
     
-      Inventory_2 inventory = Inventory_2(_inventory);
+      Inventory inventory = Inventory(_inventory);
       inventory.updateQuantity(_quantity);
       return (RestStatus.OK);
     }

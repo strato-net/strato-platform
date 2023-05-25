@@ -166,10 +166,10 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner
     ) public returns (address, address) {
         Item_3 item = Item_3(_itemAddress[0]);
-        Product_4 product;
-        Inventory_2 inventory;
+        Product_3 product;
+        Inventory inventory;
 
-        Product_4 oldProduct = Product_4(item.productId());
+        Product_3 oldProduct = Product_3(item.productId());
         address productAddress = _productManager.checkForProduct(
             address(oldProduct),
             oldProduct.uniqueProductCode(),
@@ -177,7 +177,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         );
 
         product = (productAddress == address(0))
-            ? new Product_4(
+            ? new Product_3(
                 oldProduct.name(),
                 oldProduct.description(),
                 oldProduct.manufacturer(),
@@ -192,9 +192,9 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             )
-            : Product_4(productAddress);
+            : Product_3(productAddress);
 
-        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
+        Inventory oldInventory = Inventory(item.inventoryId());
 
         (uint status, address inventory) = product.addInventory(
             _itemAddress.length,

@@ -56,10 +56,6 @@ const Product = () => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
-  useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
-
   const openToast = (placement) => {
     if (success) {
       api.success({
