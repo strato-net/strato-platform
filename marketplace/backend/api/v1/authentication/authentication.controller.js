@@ -129,8 +129,12 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
-    const oauthSignOutUrl = oauth.getLogOutUrl()
-
+    let oauthSignOutUrl
+    if (process.env.DEV_MODE === 'true') {
+      oauthSignOutUrl = oauth.getLogOutUrl()
+    } else {
+      oauthSignOutUrl = '/auth/logout'
+    }
     res.clearCookie(oauth.getCookieNameAccessToken())
     res.clearCookie(oauth.getCookieNameAccessTokenExpiry())
     res.clearCookie(oauth.getCookieNameRefreshToken())
