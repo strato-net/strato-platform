@@ -114,20 +114,20 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
-
-      // TODO: If serial numbers are optional, does a user have to enter all of them or can they enter some?
-      // This will no longer validate if all serial numbers are entered. It will check the max amount based on the quantity entered.
-      // Can possibly use alternatives.conditional(condition, options) to if exact quantity needs to be entered.
-      serialNumber: Joi.array().max(Joi.ref('quantity')).items(Joi.object({
-        itemSerialNumber: Joi.string().required(),
-        rawMaterials: Joi.array().items(Joi.object({
-          rawMaterialProductName: Joi.string().required(),
-          rawMaterialProductId: Joi.string().required(),
-          rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
+      serialNumber: Joi.array().when(Joi.array().length(0), {
+        then: Joi.array().length(0).required(),
+        otherwise: Joi.array().length(Joi.ref('quantity')).items(Joi.object({
+          itemSerialNumber: Joi.string().required(),
+          rawMaterials: Joi.array().items(Joi.object({
+            rawMaterialProductName: Joi.string().required(),
+            rawMaterialProductId: Joi.string().required(),
+            rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
+          })).required()
         })).required()
-      })).optional()
+      }).required(),
     });
 
+    
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
