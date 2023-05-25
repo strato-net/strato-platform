@@ -593,8 +593,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    }
-    if (serialNumber.length == 0 || serialNumber.length == undefined) {
+    } else {
       const quantity = args.quantity;
       for (let i = 0; i < quantity; i++) {
         const randomNumber = parseInt(util.iuid())
@@ -606,7 +605,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           "rawMaterialProductId": []
         });
       }
-
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
