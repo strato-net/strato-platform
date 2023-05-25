@@ -26,13 +26,15 @@ const SoldOrdersTable = ({ user }) => {
   const { ordersSold, isordersSoldLoading } = useOrderState();
 
   useEffect(() => {
-    actions.fetchOrderSold(
-      dispatch,
-      limit,
-      offset,
-      debouncedSearchTerm,
-      user.organization
-    );
+       actions.fetchOrderSold(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        user?.organization
+      );
+    
+   
   }, [dispatch, limit, offset, debouncedSearchTerm, user]);
 
   const navigate = useNavigate();
