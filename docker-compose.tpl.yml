@@ -73,6 +73,7 @@ services:
     - postgres
     - redis
     environment:
+    - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
     - appFetchLimit=${appFetchLimit}
     - averageTxsPerBlock=${averageTxsPerBlock}
@@ -92,6 +93,7 @@ services:
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - faucetEnabled=${faucetEnabled}
+    - gasLimit=${gasLimit}
     - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
@@ -137,6 +139,7 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - txSizeLimit=${txSizeLimit}
     - useSyncMode=${useSyncMode}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
