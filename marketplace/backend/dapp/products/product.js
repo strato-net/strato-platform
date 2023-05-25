@@ -59,8 +59,8 @@ function marshalIn(_args) {
         leastSellableUnit: 0,
         imageKey: '',
         isActive: false,
-        categoryId: '',
-        subCategoryId: '',
+        category: '',
+        subCategory: '',
         createdDate: 0
     };
 

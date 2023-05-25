@@ -48,10 +48,10 @@ const Inventory = ({ user }) => {
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-
+  
   const { categorys, iscategorysLoading } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
-    useInventoryState();
+  useInventoryState();
 
   //events
   const eventsDispatch = useEventDispatch();
@@ -61,7 +61,7 @@ const Inventory = ({ user }) => {
   } = useEventState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
@@ -138,7 +138,7 @@ const Inventory = ({ user }) => {
   return (
     <>
       {contextHolder}
-      {stripeStatus == null || iscategorysLoading || isInventoriesLoading || isLoadingStripeStatus ? (
+      {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>
@@ -228,7 +228,7 @@ const Inventory = ({ user }) => {
                   <div className="my-4" id="inventory-list">
                     {inventories.map((inventory, index) => {
                       let category = categorys.find(
-                        (c) => c.address === inventory.categoryId
+                        (c) => c.name === inventory.category
                       );
                       return (
                         <InventoryCard

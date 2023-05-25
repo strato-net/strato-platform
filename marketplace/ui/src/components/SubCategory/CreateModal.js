@@ -23,7 +23,7 @@ const CreateModal = ({
 
   const [name, setname] = useState();
   const [description, setdescription] = useState();
-  const [categoryId, setcategoryId] = useState();
+  const [category, setcategory] = useState();
   const [createdAt, setcreatedAt] = useState();
 
   const handleFormSubmit = async () => {
@@ -31,7 +31,7 @@ const CreateModal = ({
       subCategoryArgs: {
             name,
             description,
-            categoryId,
+            category,
             createdAt,
       },
       isPublic: false
@@ -45,7 +45,7 @@ const CreateModal = ({
     }
   }
 
-  const isDisabled = (   !name ||   !description ||   !categoryId ||   !createdAt );
+  const isDisabled = (   !name ||   !description ||   !category ||   !createdAt );
 
   const primaryAction = {
     content: "Create SubCategory",
@@ -87,13 +87,13 @@ const CreateModal = ({
           />
         </Form.Item>
         <Form.Item 
-          label="categoryId"
-          name="categoryId"
-          rules={[{ required: true, message: 'Please input categoryId.' }]}
+          label="category"
+          name="category"
+          rules={[{ required: true, message: 'Please input category.' }]}
         >
           <Input
-            label="categoryId"
-            onChange={ (e) => setcategoryId(e.target.value) }
+            label="category"
+            onChange={ (e) => setcategory(e.target.value) }
           />
         </Form.Item>
         <Form.Item 

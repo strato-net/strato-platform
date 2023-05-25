@@ -58,7 +58,7 @@ const UpdateModal = ({
     let isDone = await actions.updateCategory(dispatch, body); 
 
     if (isDone) {
-      actions.fetchCategory(dispatch, 10, 0, debouncedSearchTerm);
+      actions.fetchCategories(dispatch, 10, 0, debouncedSearchTerm);
       toggleUpdateModal(false);
     }
   }

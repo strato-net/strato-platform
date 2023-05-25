@@ -10,21 +10,9 @@ const SubCategorysProvider = ({ children }) => {
     isCreateSubCategorySubmitting: false,
     subCategorys: [],
     issubCategorysLoading: false,
-    subCategoryDetails: null,
-    issubCategoryDetailsLoading: false,
-    subCategoryOwnership: null,
-    isOwnershipsubCategoryTransferring: false,
-    subCategoryUpdateObject: null,
-    issubCategoryUpdating: false,
-    subCategorysAudit: [],
-    issubCategorysAuditLoading: false,
     error: undefined,
     success: false,
     message: null,
-    isAssetImportInProgress: false,
-    assetsUploaded: 0,
-    assetsUploadedErrors: [],
-    isImportAssetsModalOpen: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

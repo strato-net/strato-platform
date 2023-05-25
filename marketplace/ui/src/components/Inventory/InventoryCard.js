@@ -70,10 +70,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               <h3 className="font-semibold text-primaryB text-xl">
                 {decodeURIComponent(inventory.name)}
               </h3>
-              <p className="font-medium text-secondryB text-base ml-2">
-                {/* ({category.name}) */}
-                category
-              </p>
+              {category &&
+                <p className="font-medium text-secondryB text-base ml-2">
+                  ({category.name})
+                </p>
+              }
             </div>
             <div className="flex items-center">
               <Button type="text"
@@ -221,7 +222,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           open={editModalOpen}
           handleCancel={handleEditModalClose}
           debouncedSearchTerm={debouncedSearchTerm}
-          categorys={[]}
           inventoryToUpdate={{
             inventory: inventory,
             category: category,
