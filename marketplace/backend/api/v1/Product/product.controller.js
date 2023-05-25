@@ -19,7 +19,7 @@ class ProductController {
 
       if (address) {
         args = { address }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const product = await dapp.getProduct(args, chainOptions)
@@ -43,6 +43,7 @@ class ProductController {
         imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
         )
       }))
+
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -72,6 +73,8 @@ class ProductController {
 
       const result = await dapp.createProduct(body)
       rest.response.status200(res, result)
+
+      console.log("*Seller added product*");
 
       return next()
     } catch (e) {
@@ -147,8 +150,8 @@ class ProductController {
         leastSellableUnit: Joi.number().required(),
         imageKey: Joi.string().required(),
         isActive: Joi.boolean().required(),
-        categoryId: Joi.string().required(),
-        subCategoryId: Joi.string().required()
+        category: Joi.string().required(),
+        subCategory: Joi.string().required()
       })
     });
 

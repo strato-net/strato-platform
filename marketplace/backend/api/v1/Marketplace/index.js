@@ -8,16 +8,28 @@ const router = express.Router();
 
 router.get(
   Marketplace.getAll,
-  authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getAll
 );
 
 router.get(
-  Marketplace.getTopSellingProducts,
+  Marketplace.getAllLoggedIn,
   authHandler.authorizeRequest(),
   loadDapp,
+  MarketplaceController.getAllLoggedIn
+);
+
+router.get(
+  Marketplace.getTopSellingProducts,
+  loadDapp,
   MarketplaceController.getTopSellingProducts
+);
+
+router.get(
+  Marketplace.getTopSellingProductsLoggedIn,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getTopSellingProductsLoggedIn
 );
 
 export default router;

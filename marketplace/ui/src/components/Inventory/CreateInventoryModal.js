@@ -10,7 +10,7 @@ import {
   Button,
   Spin,
   Upload,
-  notification,
+  notification
 } from "antd";
 import { Link } from "react-router-dom" ;
 import TextArea from "antd/es/input/TextArea";
@@ -51,9 +51,7 @@ const CreateInventoryModal = ({
 
   //Sub-categories
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
-  const { categoryBasedProducts, isCategoryBasedProductsLoading } =
-    useProductState();
-
+  const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
 
   const initialValues = {
@@ -99,22 +97,17 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
-    if(formik.values.subCategory.address){
+    if(formik.values.subCategory){
       productActions.fetchCategoryBasedProduct(
         productDispatch,
-        formik.values.category.address,
-        formik.values.subCategory.address ?? null
+        formik.values.category.name,
+        formik.values.subCategory.name ?? null
       );
     }
   }, [
     productDispatch,
-    // formik.values.category.address,
-    formik.values.subCategory.address,
+    formik.values.subCategory,
   ]);
-
-  useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
 
   const handleCreateFormSubmit = async (values) => {
     const body = {
@@ -289,32 +282,14 @@ const CreateInventoryModal = ({
                     disabled={false}
                     value={formik.values.category.name}
                     onChange={(value) => {
-                      let selectedCategory = { address: "" };
-                      if (value) {
-                        selectedCategory = categorys.find(
-                          (e) => e.name === value
-                        );
-                      }
                       formik.setFieldValue("category.name", value);
-                      formik.setFieldValue(
-                        "category.address",
-                        selectedCategory.address
-                      );
                       formik.setFieldTouched("category.name", false, false);
                       
                       if(formik.values.subCategory.name){
                         formik.setFieldValue("subCategory.name", null);
-                        formik.setFieldValue(
-                          "subCategory.address",
-                          ""
-                        );
                       }
                       if(formik.values.productName.name){
                         formik.setFieldValue("productName.name", null);
-                        formik.setFieldValue(
-                          "productName.address",
-                          ""
-                        );
                       }
                     }}
                   >
@@ -346,29 +321,17 @@ const CreateInventoryModal = ({
                     loading={issubCategorysLoading}
                     value={formik.values.subCategory.name}
                     onChange={(value) => {
-                      let selectedSubCategory = { address: "" };
-                      if (value) {
-                        selectedSubCategory = subCategorys.find(
-                          (e) => e.name === value
-                        );
-                      }
                       formik.setFieldValue("subCategory.name", value);
-                      formik.setFieldValue(
-                        "subCategory.address",
-                        selectedSubCategory.address
-                      );
                       formik.setFieldTouched("subCategory.name", false, false);
                     }}
                   >
-                    {subCategorys.map((e, index) => {
-                      if (e.categoryId === formik.values.category.address) {
-                        return (
-                          <Option value={e.name} key={index}>
-                            {e.name}
-                          </Option>
-                        );
-                      }
-                    })}
+                    {categorys.map((category) =>
+                      category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
+                        <Option value={e.name} key={index}>
+                          {e.name}
+                        </Option>
+                      )) : null
+                    )}
                   </Select>
                   {getIn(formik.touched, "subCategory.name") &&
                     getIn(formik.errors, "subCategory.name") && (
@@ -393,8 +356,8 @@ const CreateInventoryModal = ({
                     name="productName.name"
                     loading={isCategoryBasedProductsLoading}
                     disabled={
-                      !formik.values.category.address ||
-                      !formik.values.subCategory.address || isCategoryBasedProductsLoading
+                      !formik.values.category.name ||
+                      !formik.values.subCategory.name || isCategoryBasedProductsLoading
                     }
                     onChange={(value) => {
                       let selectedProduct = { address: "" };

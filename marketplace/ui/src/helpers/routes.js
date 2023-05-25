@@ -6,7 +6,7 @@ export default {
   Marketplace: { label: "Marketplace", url: "/marketplace" },
   MarketplaceProductList: {
     label: "Marketplace Product List",
-    url: "/marketplace/category/:categoryId",
+    url: "/marketplace/category/:category",
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
@@ -29,11 +29,11 @@ export default {
   },
   SoldOrderItemDetail: {
     label: "Order Item Detail",
-    url: "/sold-orders/:id/:chainId",
+    url: "/sold-orders-details/:id",
   },
   BoughtOrderItemDetail: {
     label: "Order Item Detail",
-    url: "/bought-orders/:id/:chainId",
+    url: "/bought-orders-details/:id",
   },
   OrderItemEventsList: {
     label: "Order Item Event List",

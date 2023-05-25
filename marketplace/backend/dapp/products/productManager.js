@@ -354,7 +354,7 @@ async function getInventories(admin, contract, args = {}, options) {
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
-        const { categoryId, subCategoryId, ...newInventory } = inventory;
+        const { category, subCategory, ...newInventory } = inventory;
         return {
           ...products.find((product) => product.address == inventory.productId),
           ...newInventory,

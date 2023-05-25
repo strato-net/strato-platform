@@ -11,7 +11,6 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 contract Product_3 is UnitOfMeasurement, InventoryStatus {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -25,16 +24,15 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
     int public leastSellableUnit;
     string public imageKey;
     bool public isActive;
-    address public categoryId;
-    address public subCategoryId;
+    string public category;
+    string public subCategory;
     uint public createdDate;
     bool public isDeleted; 
     bool public isInventoryAvailable;  
 
 
     constructor(
-            string _appChainId
-        ,   string _name
+            string _name
         ,   string _description
         ,   string _manufacturer
         ,   UnitOfMeasurement _unitOfMeasurement
@@ -43,13 +41,12 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         ,   int _leastSellableUnit
         ,   string _imageKey
         ,   bool _isActive
-        ,   address _categoryId
-        ,   address _subCategoryId
+        ,   string _category
+        ,   string _subCategory
         ,   uint _createdDate
         ,   address _owner
     ) public {
         owner = _owner;
-        appChainId = _appChainId;
 
         name = _name;
         description = _description;
@@ -60,8 +57,8 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         leastSellableUnit = _leastSellableUnit;
         imageKey = _imageKey;
         isActive = _isActive;
-        categoryId = _categoryId;
-        subCategoryId = _subCategoryId;
+        category = _category;
+        subCategory = _subCategory;
         createdDate = _createdDate;
         isDeleted = false;
         isInventoryAvailable = false;
@@ -132,7 +129,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory inventory = new Inventory(appChainId, categoryId, subCategoryId, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
+      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
       return (RestStatus.OK, address(inventory));
     }
 

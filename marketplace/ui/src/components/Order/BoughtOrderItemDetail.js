@@ -26,7 +26,7 @@ function useQuery() {
 
 const BoughtOrderItemDetail = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
-  const [chainId, setChainId] = useState(undefined);
+ 
   const [data, setdata] = useState([]);
   const { state } = useLocation();
 
@@ -67,12 +67,12 @@ const BoughtOrderItemDetail = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-    setChainId(routeMatch.params.chainId);
+  
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
-      actions.fetchOrderLineItemDetails(dispatch, Id, chainId);
+    if (Id !== undefined) {
+      actions.fetchOrderLineItemDetails(dispatch, Id);
     
       // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
@@ -131,7 +131,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
       dataIndex: "event",
       key: "event",
       render: (text) => (
-        <div className="flex items-center justify-start" onClick={()=>navigate(`${routes.OrderItemEventsList.url.replace(":itemId", text.itemId)}`,{state:{name:details.name,orderId:state.orderId,orderAddress:state.address,orderChainId:chainId,seller:false}})}>
+        <div className="flex items-center justify-start" onClick={()=>navigate(`${routes.OrderItemEventsList.url.replace(":itemId", text.itemId)}`,{state:{name:details.name,orderId:state.orderId,orderAddress:state.address,seller:false}})}>
           <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
           <p  
             className="hover:text-primaryHover cursor-pointer"
@@ -162,7 +162,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
             </div>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="javascript:;">
-            <ClickableCell href={`${routes.BoughtOrderDetails.url.replace(":id", state.address)}?chainId=${chainId}`}>
+            <ClickableCell href={`${routes.BoughtOrderDetails.url.replace(":id", state.address)}`}>
               {state.orderId}
             </ClickableCell>
           </Breadcrumb.Item>

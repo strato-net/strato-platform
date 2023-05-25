@@ -848,6 +848,19 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                 popCallInfo)
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
 
+runStatementBlock :: MonadSM m => [CC.Statement] -> m (Maybe Value)
+runStatementBlock stmts = do
+  pushLocalVars
+  ret <- runStatements stmts
+  popLocalVars
+  return ret
+
+runStatementBlock' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
+runStatementBlock' stmts = do
+  pushLocalVars
+  ret <- runStatements' stmts
+  popLocalVars
+  return ret
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements' [] = return Nothing
@@ -870,7 +883,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
-  decrementGas 50000
+  decrementGas 1
   ret <- runStatement s
 
   case ret of
@@ -1105,7 +1118,7 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
     Right aRealVal -> do
       case returnsDecl of
         Nothing -> do
-          sfsRes <- runStatements statementsForSuccess
+          sfsRes <- runStatementBlock statementsForSuccess
           return $ sfsRes
         Just xs -> do
           case aRealVal of
@@ -1117,14 +1130,14 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
                   forM_ (zip vars xs) $ \(var, (name, ty)) -> do
                     val <- getVar var
                     addLocalVariable ty name val
-                  sfsRes' <- runStatements statementsForSuccess
+                  sfsRes' <- runStatementBlock statementsForSuccess
                   return sfsRes'
             _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
 
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do
   solidVMBreakpoint pos
   mRes <- EUnsafe.try $ do
-    val <- runStatements tryBlock
+    val <- runStatementBlock tryBlock
     pure $ val
   case mRes of
     Left ex -> do
@@ -1142,9 +1155,9 @@ runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
       else withSrcPos pos $ "       if condition failed, skipping internal code"
 
   if conditionResult
-    then runStatements code'
+    then runStatementBlock code'
     else case maybeElseCode of
-      Just elseCode -> runStatements elseCode
+      Just elseCode -> runStatementBlock elseCode
       Nothing -> return Nothing
 
 runStatement (CC.WhileStatement condition code pos) = do
@@ -1152,7 +1165,7 @@ runStatement (CC.WhileStatement condition code pos) = do
 
   while (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
-      result <- runStatements code
+      result <- runStatementBlock code
       return result
 
       -- TODO: this can loop infinitely
@@ -1161,7 +1174,7 @@ runStatement (CC.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
   doWhile (getBool =<< expToVar condition) $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
-      result <- runStatements code
+      result <- runStatementBlock code
       return result
 
       -- TODO: this can loop infinitely
@@ -1188,7 +1201,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
   while condition $! do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
-      result <- runStatements code
+      result <- runStatementBlock code
       _ <- getVar =<< expToVar loopExp
       return result
 
@@ -1279,7 +1292,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do -- emit MemberAdde
 
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
-  withUncheckedCallInfo $ runStatements code
+  withUncheckedCallInfo $ runStatementBlock code
 
 --runs the "_;" operator in a modifier statement
 runStatement (CC.ModifierExecutor _) = do
@@ -1291,7 +1304,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-  decrementGas 50000
+  decrementGas 1
   if c
     then do
       result <- code
@@ -1305,7 +1318,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
-  decrementGas 50000
+  decrementGas 1
   case result of
     Nothing -> do
       c <- condition
@@ -1395,7 +1408,7 @@ expToPath x = todo "expToPath/unhandled" x
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
-  decrementGas 50000
+  decrementGas 1
   return v
 
 decrementGas :: MonadSM m => Gas -> m ()
@@ -2801,9 +2814,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
             _ -> True
       let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
       logVals lhs rhs
-      _ <- runStatements' lhs
-      _ <- pushSender from $ runStatements commands
-      _ <- runStatements' rhs
+      _ <- runStatementBlock' lhs
+      _ <- pushSender from $ runStatementBlock commands
+      _ <- runStatementBlock' rhs
       pure ()
     Nothing -> return ()
 
@@ -2827,7 +2840,6 @@ addLocalVariable theType name value = do
               localVariables currentSlice
           }
         : rest
-
 
 runTheCall :: MonadSM m
            => Account
@@ -2924,9 +2936,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
               _ -> True
   let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
   logVals lhs rhs
-  _ <- runStatements' lhs
-  val   <- runStatements commands
-  _ <- runStatements' rhs
+  _ <- runStatementBlock' lhs
+  val   <- runStatementBlock commands
+  _ <- runStatementBlock' rhs
 
   let findNamedReturns = do
         case returns of
@@ -3027,16 +3039,16 @@ solidityExceptionHandler catchBlockMap ex = do
             case M.lookup "Nill" cbm of
               Nothing -> errFunc s1 s2
               Just (_, stmts) -> do
-                res' <-  runStatements stmts
+                res' <-  runStatementBlock stmts
                 return res'
           Just (mVar, block) -> do
             case mVar of
               Nothing -> do
-                res' <-  runStatements block
+                res' <-  runStatementBlock block
                 return res'
               Just (varName, varType) -> do
                 addLocalVariable varType varName (SInteger errCode)
-                res <- runStatements block
+                res <- runStatementBlock block
                 return res
 
   case ex of
@@ -3070,16 +3082,16 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> arityMismatch s1 i1 i2
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              res' <-  runStatements block
+              res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
               addLocalVariable varType varName (SInteger 9)
-              res <- runStatements block
+              res <- runStatementBlock block
               return res
     (UnknownFunction s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 10 unknownFunction
@@ -3093,16 +3105,16 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> divideByZero s1
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              res' <-  runStatements block
+              res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
               addLocalVariable varType varName (SInteger 12)
-              res <- runStatements block
+              res <- runStatementBlock block
               return res
     (Require s1) -> do
       case M.lookup "Error" catchBlockMap of
@@ -3112,16 +3124,16 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- require False s1
               return Nothing
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              res' <-  runStatements block
+              res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
               addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
-              res <- runStatements block
+              res <- runStatementBlock block
               return res
     (Assert) -> do
       case M.lookup "Error" catchBlockMap of
@@ -3131,16 +3143,16 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- assert False
               return Nothing
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              res' <-  runStatements block
+              res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
               addLocalVariable varType varName (SString "Assertion Error")
-              res <- runStatements block
+              res <- runStatementBlock block
               return res
     (MissingCodeCollection s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 13 missingCodeCollection
@@ -3209,7 +3221,7 @@ solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.State
 solidVMExceptionHelper x y = case M.lookup "" x of
   Nothing -> y
   Just (_, block) -> do
-    res <- runStatements block
+    res <- runStatementBlock block
     return res
 
 
@@ -3220,25 +3232,25 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
       case M.lookup "InternalError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ internalError s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (InvalidArguments s1 s2) ->
       case M.lookup "InvalidArguments" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidArguments s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (IndexOutOfBounds s1 s2) ->
       case M.lookup "IndexOutOfBounds" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ indexOutOfBounds s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (ParseError s1 s2) ->
       case M.lookup "ParseError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ parseError s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (Require s1) ->
       case M.lookup "Require" catchBlockMap of
@@ -3248,10 +3260,10 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
               _ <- require False s1
               return Nothing
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (Assert) ->
       case M.lookup "Assert" catchBlockMap of
@@ -3261,106 +3273,106 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
               _ <- assert False
               return Nothing
             Just (_, stmts) -> do
-              res' <-  runStatements stmts
+              res' <-  runStatementBlock stmts
               return res'
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (UnknownFunction s1 s2) ->
       case M.lookup "UnknownFunction" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownFunction s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (UnknownConstant s1 s2) ->
       case M.lookup "UnknownConstant" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownConstant s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (UnknownVariable s1 s2) ->
       case M.lookup "UnknownVariable" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownVariable s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (UnknownStatement s1 s2) ->
       case M.lookup "UnknownStatement" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ unknownStatement s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (DivideByZero s1) ->
       case M.lookup "DivideByZero" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ divideByZero s1
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (MissingCodeCollection s1 s2) ->
       case M.lookup "MissingCodeCollection" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ missingCodeCollection s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (InaccessibleChain s1 s2) ->
       case M.lookup "InaccessibleChain" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ inaccessibleChain s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (InvalidWrite s1 s2) ->
       case M.lookup "InvalidWrite" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidWrite s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (InvalidCertificate s1 s2) ->
       case M.lookup "InvalidCertificate" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidCertificate s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (MalformedData s1 s2) ->
       case M.lookup "MalformedData" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ malformedData s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (TooMuchGas s1 s2) ->
       case M.lookup "TooMuchGas" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ tooMuchGas s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (PaymentError s1 s2) ->
       case M.lookup "PaymentError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ paymentError s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (TooManyResultsError s1 s2) ->
       case M.lookup "TooManyResultsError" catchBlockMap of
         Nothing -> tooManyResultsError s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (TooManyCooks s1 s2) ->
       case M.lookup "TooManyCooks" catchBlockMap of
         Nothing -> tooManyCooks s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (GeneralMetaProgrammingError s1 s2) ->
       case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
         Nothing -> generalMetaProgrammingError s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (InvalidChain s1 s2) ->
       case M.lookup "InvalidChain" catchBlockMap of
         Nothing -> invalidChain s1 s2
         Just (_, block) -> do
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
@@ -3381,7 +3393,7 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
           _ <- if length args > 0
                 then mapM (\(x, ((_, (CC.IndexedType _ y), _), z)) -> addLocalVariable y x z) $ zip argsToSolidString zipped
                 else pure $ [()]
-          res <- runStatements block
+          res <- runStatementBlock block
           return res
 
     _ -> error "unhandled solid exception" (show ex)

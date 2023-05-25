@@ -110,7 +110,7 @@ describe("Renders Marketplace Page", () => {
 
         cy.request({
           method: "GET",
-          url: `api/v1/product/filter/names?isDeleted=false&&categoryId[]=${category.address}`,
+          url: `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           if (body.data.length !== 0) {
@@ -121,7 +121,7 @@ describe("Renders Marketplace Page", () => {
 
         cy.request({
           method: "GET",
-          url: `/api/v1/marketplace?&categoryId[]=${category.address}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+          url: `/api/v1/marketplace?&category[]=${category.address}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           cy.contains(`${body.data.length} Products found`).should("be.visible");
@@ -152,15 +152,15 @@ describe("Renders Marketplace Page", () => {
 
         cy.request({
           method: "GET",
-          url: `api/v1/subcategory?categoryId[]=${category.address}`,
+          url: `api/v1/subcategory?category[]=${category.address}`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);    
           if (body.data.length !== 0) {
             subCategory = body.data[0];
             cy.contains("Sub-Category").should("exist")
             cy.get('[type="checkbox"]').check(subCategory.address);
-            let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&categoryId[]=${category.address}&subCategoryId[]=${subCategory.address}` 
-            : `api/v1/product/filter/names?isDeleted=false&&categoryId[]=${category.address}`
+            let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}&subCategory[]=${subCategory.address}` 
+            : `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`
             cy.wait(15000)
 
             cy.request({
@@ -178,7 +178,7 @@ describe("Renders Marketplace Page", () => {
 
                 cy.request({
                   method: "GET",
-                  url: `/api/v1/marketplace?&categoryId[]=${category.address}&subCategoryId[]=${subCategory.address}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+                  url: `/api/v1/marketplace?&category[]=${category.address}&subCategory[]=${subCategory.address}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
                 }).then(({ status, body }) => {
                   expect(status).to.eq(200);    
                   cy.contains(`${body.data.length} Products found`).should("be.visible");

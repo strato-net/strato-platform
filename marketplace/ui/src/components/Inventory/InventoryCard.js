@@ -56,7 +56,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
     setEditModalOpen(false);
   };
 
-  const callDetailPage = () =>{
+  const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
   }
 
@@ -70,9 +70,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               <h3 className="font-semibold text-primaryB text-xl">
                 {decodeURIComponent(inventory.name)}
               </h3>
-              <p className="font-medium text-secondryB text-base ml-2">
-                ({category?.name})
-              </p>
+              {category &&
+                <p className="font-medium text-secondryB text-base ml-2">
+                  ({category.name})
+                </p>
+              }
             </div>
             <div className="flex items-center">
               <Button type="text"
@@ -82,7 +84,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 Preview
               </Button>
               <Popover
-                placement="bottomLeft"  
+                placement="bottomLeft"
                 open={openPop}
                 className="ml-2"
                 id="sideMenu"
@@ -91,7 +93,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                   <div className="font-medium">
                     <div
                       className="flex items-center cursor-pointer"
-                      onClick={(item) => navigate(routes.EventList.url.replace(":id",inventory.address))}
+                      onClick={(item) => navigate(routes.EventList.url.replace(":id", inventory.address))}
                     >
                       <EyeOutlined />
                       <p className="ml-3">View Event</p>
@@ -220,7 +222,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           open={editModalOpen}
           handleCancel={handleEditModalClose}
           debouncedSearchTerm={debouncedSearchTerm}
-          categorys={[]}
           inventoryToUpdate={{
             inventory: inventory,
             category: category,

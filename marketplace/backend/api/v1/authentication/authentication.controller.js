@@ -90,8 +90,7 @@ class AuthenticationController {
     // bind to dapp as service user (to have permissions to create user if needed)
     const deploy = app.get(constants.deployParamName)
     const copyOfOptions = {
-      ...options,
-      chainIds: [deploy.dapp.contract.appChainId]
+      ...options
     }
 
     let adminUserToken

@@ -22,12 +22,12 @@ const UploadSerialNumberModal = ({
   isUploadSerialNumberModalOpen,
   toggleUploadSerialNumberModal,
   product,
-  chainId,
   Id,
   orderId,
   dispatch,
   actions,
   isLoading,
+  orderAddress
 }) => {
   const [serialNumbers, setSerialNumbers] = useState([]);
   const [serialNumbersStr, setSerialNumbersStr] = useState("");
@@ -78,14 +78,15 @@ const UploadSerialNumberModal = ({
 
     const body = {
       orderId: orderId,
-      chainId: chainId,
+      // chainId: chainId,
+      orderAddress: orderAddress,
       orderLineId: product.address,
       serialNumber: serialNumbers,
     };
     let isDone = await actions.createOrderLineItem(dispatch, body);
     if (isDone) {
       toggleUploadSerialNumberModal(false);
-      actions.fetchOrderDetails(dispatch, Id, chainId);
+      actions.fetchOrderDetails(dispatch, Id);
     }
   };
 

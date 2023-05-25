@@ -143,9 +143,9 @@ definitions:
             type: string
           isActive:
             type: boolean
-          categoryId:
+          category:
             type: string
-          subCategoryId:
+          subCategory:
             type: string
           createdAt:
             type: string
@@ -177,9 +177,9 @@ definitions:
             type: string
           isActive:
             type: boolean
-          categoryId:
+          category:
             type: string
-          subCategoryId:
+          subCategory:
             type: string
           createdAt:
             type: string

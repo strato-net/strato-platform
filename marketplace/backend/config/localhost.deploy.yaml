@@ -2,5 +2,4 @@ url: https://node1.mercata-testnet.blockapps.net
 dapp:
   contract:
     name: Dapp
-    address: '0000000000000000000000000000000000000100'
-    appChainId: 9de9b4eb80f3e019715ca5af00cddd81f90d19534e8fa9e7329e39e4ce7b780d
+    address: 28ea269c821ac77814eab50ef44f00610308144b

@@ -39,7 +39,7 @@ class EventController {
 
       if (inventoryId) {
         args = { inventoryId, eventTypeId }
-        chainOptions = { ...options, chainIds: [dapp.chainId] }
+        chainOptions = { ...options }
       }
 
       const result = await dapp.getInventoryEventTypeDetails(args, chainOptions)
@@ -73,6 +73,8 @@ class EventController {
       const result = await dapp.createEvent(body)
       rest.response.status200(res, result)
 
+      console.log("*Event added*");
+
       return next()
     } catch (e) {
       return next(e)
@@ -88,6 +90,9 @@ class EventController {
       const result = await dapp.certifyEvent(body, options)
 
       rest.response.status200(res, result)
+
+      console.log("*Event certified*");
+
       return next()
     } catch (e) {
       return next(e)

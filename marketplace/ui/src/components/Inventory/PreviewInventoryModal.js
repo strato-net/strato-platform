@@ -2,9 +2,14 @@ import React, { useState } from "react";
 import { Modal, Tabs,Button } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { useAuthenticateState } from "../../contexts/authentication";
+
 
 const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
   const [quantity, setQuantity] = useState(1);
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
 
   const subtract = () => {
     if (quantity > 1) {
@@ -40,6 +45,12 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <Button
                         className="h-11 bg-primary text-white w-9/12"
                         disabled
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                          }
+                        }}
                       >
                        Add To Cart
                       </Button>
@@ -47,6 +58,12 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
                 <Button
                         className="h-11 bg-primary text-white w-9/12 ml-4"
                         disabled
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                          }
+                        }}
                       >
                         Buy now
                       </Button>

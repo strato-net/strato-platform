@@ -9,16 +9,13 @@ class OrderLineItemController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req;
-      const { address, chainId } = params;
+      const { orderLineId } = params;
 
       let args;
       let chainOptions = options;
 
-      if (address) {
-        args = { address };
-        if (chainId) {
-          chainOptions = { ...options, chainIds: [chainId] };
-        }
+      if (orderLineId) {
+        args = { orderLineId };
       }
 
       const result = await dapp.getOrderLineItem(args, chainOptions);
@@ -76,10 +73,10 @@ class OrderLineItemController {
   static async audit(req, res, next) {
     try {
       const { dapp, params } = req;
-      const { address, chainId } = params;
+      const { address } = params;
 
       const result = await dapp.auditOrderLineItem(
-        { address, chainId },
+        { address },
         options
       );
       rest.response.status200(res, result);
@@ -105,15 +102,14 @@ class OrderLineItemController {
   static validateCreateOrderLineItemArgs(args) {
     const createOrderLineItemSchema = Joi.object({
       orderId: Joi.string().required(),
+      orderAddress:Joi.string().required(),
       orderLineId: Joi.string().required(),
       serialNumber: Joi.array().items().optional(),
       chainId: Joi.string().required(),
       quantity: Joi.number().optional(),
     });
-
     const validation = createOrderLineItemSchema.validate(args);
-    // console.log(validation);
-    // process.exit();
+
     if (validation.error) {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
@@ -128,7 +124,6 @@ class OrderLineItemController {
   static validateUpdateOrderLineItemArgs(args) {
     const updateOrderLineItemSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         orderId: Joi.string(),
         inventoryId: Joi.string(),
@@ -155,7 +150,6 @@ class OrderLineItemController {
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipOrderLineItemSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       newOwner: Joi.string().required(),
     });
 

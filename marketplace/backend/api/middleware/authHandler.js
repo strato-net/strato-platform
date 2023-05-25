@@ -20,16 +20,20 @@ const getTokenFromCookie = async (req, res) => {
 }
 
 const getTokenFromHeader = async (req) => {
-  if (!req.headers.authorization) return null
-  const [bearer, token] = req.headers.authorization.split(' ')
-  if (bearer !== 'Bearer') return null
-  return token
+  if(req.headers['x-user-access-token']) 
+    return req.headers['x-user-access-token']
+    
+  if (req.headers['authorization']) {
+    const [bearer, token] = req.headers['authorization'].split(' ')
+    if (bearer !== 'Bearer') return null
+    return token
+  }
+  return null
 }
 
 class AuthHandler {
   static authorizeRequest() {
     return async function (req, res, next) {
-	
       try {
         let token = await getTokenFromCookie(req, res)
         let address

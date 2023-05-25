@@ -64,6 +64,7 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , withCertifiedPeer
     , getPeerX509
     , getMyX509
     , getPeerByParsedSet
@@ -75,6 +76,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
+import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
@@ -506,6 +508,9 @@ instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (Reader
 instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
   res <- action
@@ -535,6 +540,7 @@ type MonadP2P m = ( MonadIO m
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
+                       , BondedPeers
                        , PublicKey
                        ] m
                   , All '[Mod.Modifiable]
@@ -561,6 +567,7 @@ type MonadP2P m = ( MonadIO m
                       '[ '(PPeer, TcpEnableTime)
                        , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
+                       , '(PPeer, T.Text)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
@@ -691,6 +698,9 @@ withActivePeer :: ( MonadUnliftIO m
 withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
+
+withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

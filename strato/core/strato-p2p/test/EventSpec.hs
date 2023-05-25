@@ -1086,7 +1086,14 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
     SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
       stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
 
+instance MonadIO m => A.Replaceable PPeer T.Text (MonadTest m) where
+  replace _ peer' e = do
+    stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p{pPeerDisableException = e})
+
 instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance (Monad m, A.Replaceable PPeer T.Text m) => A.Replaceable PPeer T.Text (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where

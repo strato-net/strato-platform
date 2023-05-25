@@ -1,14 +1,9 @@
- 
-
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
-
 /// @title A representation of Event assets
 contract Event_1 {
-
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -27,26 +22,23 @@ contract Event_1 {
     /// @dev Events to add and remove members to this shard.
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
-    event CommonNameAdded(string orgName, string orgUnit, string commonName); 
+    event CommonNameAdded(string orgName, string orgUnit, string commonName);
 
     event OrgRemoved(string orgName);
     event OrgUnitRemoved(string orgName, string orgUnit);
     event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
-
     constructor(
-        string _appChainId
-        ,   address _eventTypeId
-        ,   string  _eventBatchId
-        ,   string _itemSerialNumber
-        ,   address _itemAddress
-        ,   uint _date
-        ,   string _summary
-        ,   address _certifier
-        ,   uint _createdDate
+        address _eventTypeId,
+        string _eventBatchId,
+        string _itemSerialNumber,
+        address _itemAddress,
+        uint _date,
+        string _summary,
+        address _certifier,
+        uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         eventTypeId = _eventTypeId;
         eventBatchId = _eventBatchId;
@@ -64,22 +56,22 @@ contract Event_1 {
     }
 
     function certify(
-        string _certifierComment
-    ,   uint _certifiedDate
-    ,   uint _scheme
+        string _certifierComment,
+        uint _certifiedDate,
+        uint _scheme
     ) returns (uint) {
-      if(tx.origin != certifier){
-        return RestStatus.FORBIDDEN;
-      }
-      if (_scheme == 0) {
+        if (tx.origin != certifier) {
+            return RestStatus.FORBIDDEN;
+        }
+        if (_scheme == 0) {
+            return RestStatus.OK;
+        }
+        if ((_scheme & (1 << 0)) == (1 << 0)) {
+            certifierComment = _certifierComment;
+        }
+        if ((_scheme & (1 << 1)) == (1 << 1)) {
+            certifiedDate = _certifiedDate;
+        }
         return RestStatus.OK;
-      }
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        certifierComment = _certifierComment;
-      }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        certifiedDate = _certifiedDate;
-      }
-      return RestStatus.OK;
     }
 }

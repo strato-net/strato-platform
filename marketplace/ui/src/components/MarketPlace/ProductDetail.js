@@ -46,6 +46,8 @@ import useDebounce from "../UseDebounce";
 import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
+import { useAuthenticateState } from "../../contexts/authentication";
+
 
 const ProductDetails = ({ user, users }) => {
   const { state } = useLocation();
@@ -64,6 +66,8 @@ const ProductDetails = ({ user, users }) => {
   const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
     if (Id !== undefined) {
@@ -118,7 +122,7 @@ const ProductDetails = ({ user, users }) => {
   }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
@@ -137,9 +141,9 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (categorys.length && details) {
       const prodCategory = categorys.find(
-        (c) => c.address === details.categoryId
+        (c) => c.name === details.category
       );
-      setCategoryName(prodCategory.name);
+      setCategoryName(prodCategory?.name);
     }
   }, [categorys, details]);
 
@@ -203,7 +207,7 @@ const ProductDetails = ({ user, users }) => {
     let items = [];
     if (!found) {
       items = [...cartList, { product: details, qty }];
-     
+
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
       openToast("bottom", false, "Item added to cart");
@@ -355,33 +359,33 @@ const ProductDetails = ({ user, users }) => {
       { state: { serialNumbers: serialNumbers, eventTypeName: eventTypeName } });
   }
 
-  const ownershipDetailColumn =  [
-      {
-        title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
-        dataIndex: "seller",
-        key: "seller",
-        align: "center",
-        render: (text) => <p>{text}</p>,
-      },
-     {
-          title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
-          dataIndex: "newOwner",
-          key: "newOwner",
-          align: "center",
-          render: (text) => <p>{text}</p>,
-        },
-      {
-        title: (
-          <Text className="text-primaryC text-[13px]">
-            OWNERSHIP START DATE
-          </Text>
-        ),
-        dataIndex: "ownershipStartDate",
-        key: "ownershipStartDate",
-        align: "center",
-        render: (epoch) => <p>{epochToDate(epoch)}</p>,
-      },
-    ];
+  const ownershipDetailColumn = [
+    {
+      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      dataIndex: "seller",
+      key: "seller",
+      align: "center",
+      render: (text) => <p>{text}</p>,
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      dataIndex: "newOwner",
+      key: "newOwner",
+      align: "center",
+      render: (text) => <p>{text}</p>,
+    },
+    {
+      title: (
+        <Text className="text-primaryC text-[13px]">
+          OWNERSHIP START DATE
+        </Text>
+      ),
+      dataIndex: "ownershipStartDate",
+      key: "ownershipStartDate",
+      align: "center",
+      render: (epoch) => <p>{epochToDate(epoch)}</p>,
+    },
+  ];
 
   const transformationColumn = [
     {
@@ -561,14 +565,26 @@ const ProductDetails = ({ user, users }) => {
               <Row className="justify-center my-7">
                 {isCalledFromInventory ? <Button
                   className="group w-1/3 h-9 border border-primary"
-                  onClick={addItemToCart}
                   disabled={true}
                   id="addToCart"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                    }
+                  }}
                 >
                   Add To Cart
                 </Button> : <Button
                   className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                  onClick={addItemToCart}
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                    }
+                  }}
                 >
                   <div className="text-primary group-hover:text-white">
                     Add To Cart
@@ -578,8 +594,12 @@ const ProductDetails = ({ user, users }) => {
                   type="primary"
                   className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
                   onClick={() => {
-                    addItemToCart();
-                    navigate("/marketplace/checkout");
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      addItemToCart();
+                      navigate("/marketplace/checkout");
+                    }
                   }}
                   disabled={isCalledFromInventory}
                   id="buyNow"
@@ -658,6 +678,7 @@ const ProductDetails = ({ user, users }) => {
                           showSizeChanger: false,
                           position: ["bottomCenter"],
                         }}
+                        rowKey={(record) => record.serialNumber}
                       />
                     ),
                   },
@@ -675,6 +696,7 @@ const ProductDetails = ({ user, users }) => {
                           showSizeChanger: false,
                           position: ["bottomCenter"],
                         }}
+                        rowKey={(record) => record.serialNumber}
                       />
                     ),
                   },
@@ -711,7 +733,7 @@ const ProductDetails = ({ user, users }) => {
                 </Card>
               ) : null}
 
-          {isSerialNumberSelected? (
+          {isSerialNumberSelected ? (
             <Card className="mb-12 mx-16">
               <Text className="font-semibold text-lg">Ownership History</Text>
               <Row className="my-6">

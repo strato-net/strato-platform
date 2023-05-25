@@ -11,16 +11,15 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
     mapping(string => mapping(uint => address)) orgToUPCToProduct;
     mapping(address => mapping(string => bool)) private uniqueSerialNumberByProductAddress;
 
-    function addProduct(string _appChainId, string _name, string _description, string _manufacturer, 
+    function addProduct(string _name, string _description, string _manufacturer, 
         UnitOfMeasurement _unitOfMeasurement, string _userUniqueProductCode, uint _uniqueProductCode, int _leastSellableUnit, 
-        string _imageKey, bool _isActive, address _categoryId, 
-        address _subCategoryId, uint _createdDate) 
+        string _imageKey, bool _isActive, string _category, 
+        string _subCategory, uint _createdDate) 
         returns (uint256, address) {
-
         
-        Product_3 product = new Product_3(_appChainId, _name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
-        _uniqueProductCode, _leastSellableUnit, _imageKey, _isActive, _categoryId, 
-        _subCategoryId, _createdDate, tx.origin);
+        Product_3 product = new Product_3(_name, _description, _manufacturer, _unitOfMeasurement, _userUniqueProductCode, 
+        _uniqueProductCode, _leastSellableUnit, _imageKey, _isActive, _category, 
+        _subCategory, _createdDate, tx.origin);
 
         string _organization = getOrganization(tx.origin);
         orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
