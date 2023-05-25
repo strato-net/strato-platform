@@ -8,7 +8,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract UserAddress_1 is RestStatus {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -39,8 +38,7 @@ contract UserAddress_1 is RestStatus {
 
 
     constructor(
-        string _appChainId           
-        ,   string _shippingName
+            string _shippingName
         ,   string _shippingZipcode
         ,   string _shippingState
         ,   string _shippingCity
@@ -55,7 +53,6 @@ contract UserAddress_1 is RestStatus {
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         shippingName = _shippingName;
         shippingZipcode = _shippingZipcode;

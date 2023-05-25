@@ -883,7 +883,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
-  decrementGas 50000
+  decrementGas 1
   ret <- runStatement s
 
   case ret of
@@ -1304,7 +1304,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-  decrementGas 50000
+  decrementGas 1
   if c
     then do
       result <- code
@@ -1318,7 +1318,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
-  decrementGas 50000
+  decrementGas 1
   case result of
     Nothing -> do
       c <- condition
@@ -1408,7 +1408,7 @@ expToPath x = todo "expToPath/unhandled" x
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
-  decrementGas 50000
+  decrementGas 1
   return v
 
 decrementGas :: MonadSM m => Gas -> m ()

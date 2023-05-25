@@ -12,13 +12,13 @@ echo 'STRATO is available via nginx'
 
 # Validate configuration
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
-  if [ -z ${MP_DAPP_SHARD_ID} ]; then
-    echo "MP_IS_BOOTNODE=false but there was no MP_DAPP_SHARD_ID value provided. Exit."
+  if [ -z ${MP_DAPP_ADDRESS} ]; then
+    echo "MP_IS_BOOTNODE=false but there was no MP_DAPP_ADDRESS value provided. Exit."
     exit 53
   else
     if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
       cp ./config/template.deploy.tpl.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
-      sed -i 's*__DAPP_SHARD_ID__*'"${MP_DAPP_SHARD_ID}"'*g' "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"
+      sed -i 's*__DAPP_CONTRACT_ADDRESS__*'"${MP_DAPP_ADDRESS}"'*g' "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"
       sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
     fi
   fi

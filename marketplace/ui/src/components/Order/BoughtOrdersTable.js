@@ -67,7 +67,7 @@ const BoughtOrdersTable = ({ user }) => {
               `${routes.BoughtOrderDetails.url.replace(
                 ":id",
                 order.address
-              )}?chainId=${order.chainId}`
+              )}`
             );
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"
@@ -99,8 +99,7 @@ const BoughtOrdersTable = ({ user }) => {
       dataIndex: "invoice",
       key: "invoice",
       render: (text) => (
-        <Link to={`${routes.Invoice.url.replace(":id", text.address)}?chainId=${text.chainId
-          }`} target="_blank" >
+        <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
           <div className="flex items-center cursor-pointer hover:text-primary">
             <EyeOutlined className="mr-2" />
             <p>View</p>

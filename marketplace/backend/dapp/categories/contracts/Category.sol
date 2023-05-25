@@ -9,7 +9,6 @@ import "./SubCategory.sol";
 contract Category {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -30,14 +29,12 @@ contract Category {
 
 
     constructor(
-        string _appChainId,
             string _name
         ,   string _description
         ,   string _imageKey
         ,   uint _createdDate
     ) public {
         owner = tx.origin;
-        appChainId = _appChainId;
 
         name = _name;
         description = _description;
@@ -81,7 +78,7 @@ contract Category {
       mapping(string => string) ownerCert = getUserCert(owner);
       ownerOrganization = ownerCert["organization"];
 
-      SubCategory subCategory=new SubCategory(appChainId, _name, _description, _createdDate);
+      SubCategory subCategory=new SubCategory(_name, _description, _createdDate);
       return (RestStatus.OK,address(subCategory));
     }
 
