@@ -548,7 +548,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getProduct({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
   contract.getProducts = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
@@ -561,18 +561,18 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
+      { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization },
       getOptions
     );
   };
   contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventory({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getInventory({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
@@ -735,7 +735,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions);
+    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
@@ -746,7 +746,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
   }
 
   contract.getItem = async function (args, options = optionsNoChainIds) {
@@ -799,7 +799,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       let userStripeAccount, generatedAccountLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: contract.userOrganization, accountDeauthorized: false }, getOptions)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: userOrganization, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
@@ -912,7 +912,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const inventoryOrganization = inventoriesList[0].ownerOrganization;
       for (const curr_inventory of inventoriesList) {
 
-        if (curr_inventory.ownerOrganization == contract.userOrganization) {
+        if (curr_inventory.ownerOrganization == userOrganization) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
         }
 
@@ -1367,7 +1367,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return userAddressJs.getAll(rawAdmin, { ownerOrganization: contract.userOrganization, ...args }, getOptions);
+    return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
   };
 
 
@@ -1387,7 +1387,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getEventTypes = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.eventTypeManager.getAll({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.eventTypeManager.getAll({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
 
   contract.transferOwnershipEvent = async function (args, options = defaultOptions) {
