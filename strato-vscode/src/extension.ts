@@ -341,20 +341,16 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Register the quick tools provider
+	vscode.window.registerTreeDataProvider('project-management', new ProjectActionProvider())
+
 	// Register the contracts provider for the sidebar
 	const contractsProvider = new ContractsProvider();
-	vscode.window.registerTreeDataProvider('contracts', contractsProvider);
-	vscode.commands.registerCommand('contracts.refreshEntry', () =>
-		contractsProvider.refresh()
-	);
-	vscode.window.registerTreeDataProvider(
-		'contracts',
-		contractsProvider
-	)
+	vscode.commands.registerCommand('contracts.refreshEntry', () => contractsProvider.refresh());
+	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 
 	// Register the Cirrus provider
 	const cirrusProvider = new CirrusProvider();
-	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider);
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
 			placeHolder: '',
@@ -363,25 +359,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (!argInput) return;
 		cirrusProvider.query(argInput);
 	});
-	vscode.window.registerTreeDataProvider(
-		'cirrus',
-		cirrusProvider
-	)
+	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider)
 
 	// Register the nodes provider
 	const nodesProvider = new NodesProvider();
-	vscode.window.registerTreeDataProvider('nodes', nodesProvider);
-	vscode.commands.registerCommand('nodes.refreshEntry', () =>
-		nodesProvider.refresh()
-	);
-	vscode.window.registerTreeDataProvider(
-		'nodes',
-		nodesProvider
-	)
-	vscode.window.registerTreeDataProvider(
-		'project-management',
-		new ProjectActionProvider()
-	)
+	vscode.commands.registerCommand('nodes.refreshEntry', () => nodesProvider.refresh());
+	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Activate debug mode and diagnostics
 	activateStratoDebug(context);
