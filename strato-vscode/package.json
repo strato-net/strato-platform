@@ -4,7 +4,7 @@
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/balogo.png",
-	"version": "0.1.26",
+	"version": "0.1.3",
 	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
@@ -44,35 +44,38 @@
 				},
 				"strato-vscode.deployProjectCommand": {
 					"type": "string",
-					"default": "CONFIG=mercata yarn deploy"
+					"default": "CONFIG=mercata yarn deploy",
+					"description": "Script that deploys the project contracts to a STRATO node"
 				},
 				"strato-vscode.runServerCommand": {
 					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; MOCK_INT_SERVER=true yarn start:prod; popd"
-				},
-				"strato-vscode.testServerCommand": {
-					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; yarn test; popd"
+					"default": "yarn install; yarn start",
+					"description": "Script that runs the project backend server"
 				},
 				"strato-vscode.runUICommand": {
 					"type": "string",
-					"default": "pushd ui; yarn install; yarn build; touch .env; REACT_APP_URL=http://localhost yarn start; popd"
+					"default": "yarn install; yarn develop",
+					"description": "Script that runs the project frontend server"
+				},
+				"strato-vscode.testServerCommand": {
+					"type": "string",
+					"default": "yarn install; yarn test",
+					"description": "Script that runs the backend test suite"
 				},
 				"strato-vscode.testUICommand": {
 					"type": "string",
-					"default": "pushd ui; yarn install; yarn build; touch .env; yarn test; popd"
-				},
-				"strato-vscode.serverPath": {
-					"type": "string",
-					"default": "server"
+					"default": "yarn install; yarn test",
+					"description": "Script that runs the frontend test suite"
 				},
 				"strato-vscode.configPath": {
 					"type": "string",
-					"default": "server/config"
+					"default": "backend/config",
+					"description": "The default directory for the configuration file(s) location"
 				},
 				"strato-vscode.configFile": {
 					"type": "string",
-					"default": "config.yaml"
+					"default": "mercata.config.yaml",
+					"description": "The default configuration file containing STRATO node(s) information"
 				}
 			}
 		},
@@ -139,6 +142,11 @@
 				"command": "nodes.refreshEntry",
 				"title": "Refresh",
 				"icon": "$(refresh)"
+			},
+			{
+				"command": "project-management.settings",
+				"title": "Open Settings",
+				"icon": "$(settings-gear)"
 			},
 			{
 				"command": "extension.strato-debug.debugEditorContents",
@@ -233,6 +241,11 @@
 				{
 					"command": "nodes.refreshEntry",
 					"when": "view == nodes",
+					"group": "navigation"
+				},
+				{
+					"command": "project-management.settings",
+					"when": "view == project-management",
 					"group": "navigation"
 				}
 			],
