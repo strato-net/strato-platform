@@ -15,7 +15,8 @@
 	"activationEvents": [
 		"onDebugDynamicConfigurations:strato",
 		"onLanguage:solidity",
-		"onCommand:strato-vscode.createProject",
+		"onCommand:strato-vscode.importProject",
+		"onCommand:strato-vscode.buildProject",
 		"onCommand:strato-vscode.deployProject",
 		"onCommand:strato-vscode.runServer",
 		"onCommand:strato-vscode.testServer",
@@ -41,13 +42,9 @@
 					"type": "boolean",
 					"default": true
 				},
-				"strato-vscode.createProjectCommand": {
-					"type": "string",
-					"default": "git clone https://github.com/blockapps/traceability-framework $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
-				},
 				"strato-vscode.deployProjectCommand": {
 					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; yarn deploy; popd"
+					"default": "CONFIG=mercata yarn deploy"
 				},
 				"strato-vscode.runServerCommand": {
 					"type": "string",
@@ -88,6 +85,10 @@
 			{
 				"command": "strato-vscode.createProject",
 				"title": "Create STRATO Project"
+			},
+			{
+				"command": "strato-vscode.buildProject",
+				"title": "Build STRATO Project"
 			},
 			{
 				"command": "strato-vscode.deployProject",
@@ -293,8 +294,10 @@
 	},
 	"dependencies": {
 		"await-notify": "1.0.1",
+		"axios": "^1.4.0",
 		"blockapps-rest": "../blockapps-rest",
 		"js-yaml": "^4.0.0",
+		"qs": "^6.11.2",
 		"vscode-debugadapter": "^1.43.0",
 		"ws": "^7.4.2"
 	},

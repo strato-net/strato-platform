@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
 
 			context.workspaceState.update('strato-vscode.workspaceDir', projectName)
-				.then(v => console.debug(`importProject/set strato-vscode.workspaceDir to ${projectName}`))
+				.then(() => console.debug(`importProject/set strato-vscode.workspaceDir to ${projectName}`))
 			vscode.window.showInformationMessage(`STRATO project succesfully imported to workspace at ${projectName}`)
 		}
 	}))
@@ -95,7 +95,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					}
 				})
 			})
-			.then(() => vscode.window.showInformationMessage("dApp build success!"))
+			.then(() => vscode.window.showInformationMessage("Building your dApp..."))
 	}))
 
 
@@ -104,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		// Check if .env exists
 		const folders = vscode.workspace.workspaceFolders || [];
 		const cwd = folders[0].uri.path
-		const backendDir = context.workspaceState.get('strato-vscode.backendDir')
+		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const envPath = `${cwd}/${backendDir}/.env`
 
 		if (!fs.existsSync(envPath)) {
@@ -113,37 +113,54 @@ export async function activate(context: vscode.ExtensionContext) {
 			return
 		}
 
-		// Runs CONFIG=mercata yarn deploy using the backend package.json
+		// Runs 'CONFIG=mercata yarn deploy' using backend/package.json
+		// TODO(moncayo): should enumerate all the test:<test_case> commands in package.json
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
+		runCommand(`cd ${backendDir}`)
 		runCommand(cmd)
+		runCommand('cd ..')
 
-		vscode.window.showInformationMessage("dApp smart contract deployment successful!")
+		vscode.window.showInformationMessage("Deploying your dApp...")
 	}));
 
 
 	// Runs the project backend server
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
+		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';
+		runCommand(`cd ${backendDir}`)
 		runCommand(cmd)
+		runCommand('cd ..')
 	}));
 
-	// Runs the project backend test server
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', () => {
-		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
-		runCommand(cmd)
-	}));
 
 	// Runs the project UI
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runUI', () => {
+		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runUICommand') || '';
+		runCommand(`cd ${frontendDir}`)
 		runCommand(cmd)
+		runCommand('cd ..')
 	}));
 
 
-	// Runs the project test UI
-	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', () => {
-		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
+	// Runs the project tests against the server
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testServer', () => {
+		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
+		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testServerCommand') || '';
+		runCommand(`cd ${backendDir}`)
 		runCommand(cmd)
+		runCommand('cd ..')
+	}));
+
+
+	// Runs the project tests against the UI
+	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.testUI', () => {
+		const frontendDir = context.workspaceState.get('strato-vscode.frontendDir') || 'ui'
+		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.testUICommand') || '';
+		runCommand(`cd ${frontendDir}`)
+		runCommand(cmd)
+		runCommand('cd ..')
 	}));
 
 
