@@ -600,17 +600,15 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         const randomNumber = parseInt(util.iuid())
         transformedArray.push({
           "itemNumber": randomNumber,
-          "serialNumber": "N/A",
+          "serialNumber": " ",
           "rawMaterialProductName": [],
           "rawMaterialSerialNumber": [],
           "rawMaterialProductId": []
         });
       }
 
-      console.log("create inventory trasformed array: ", transformedArray, console.log(serialNumbers.length, "sssssssssss"))
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
-
 
     const itemParams = {
       itemObject: transformedArray,
@@ -1213,8 +1211,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.updateSellerDetails = async function (args, options = defaultOptions) {
     try {
       const { address, chainId, updates } = args;
-
-      console.log("dapp seller order args", args)
       const contract = { name: orderJs.contractName, address: address, };
 
       const chainOptions = { chainIds: [chainId], ...options };
@@ -1228,15 +1224,11 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
         return { status };
       } else if (updates.status == ORDER_STATUS.CLOSED) {
-
-        console.log("am I here? ")
+        
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await orderJs.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
-        console.log("Update Seller status response", statusResponse, "2", inventoryAddresses, "3", quantitiesToUpdate)
         const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: mainChainContractName }
 
         const orderLines = await orderLineJs.getAll(rawAdmin, {}, newOptions);
-
-        console.log("dapp seller order lines", orderLines, "New Options ========> ", newOptions)
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
         let itemAddresses
@@ -1245,17 +1237,14 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
         for (let orderLineAddress of orderLinesAddresses) {
           const orderLineItems = await orderLineItemJs.getAll(rawAdmin, { orderLineId: orderLineAddress }, newOptions)
-          console.log("dapp seller order line items", orderLineItems, "address", orderLineAddress)
 
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
 
-          console.log("dapp seller order line itemsAddresses", itemAddresses, "new Owner", newOwner)
           const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner });
           result.push({ status, productId, inventoryId });
         }
         return result;
       }
-      console.log("dapp seller order updates", updates)
       return orderJs.updateSellerDetails(rawAdmin, contract, updates, chainOptions);
     } catch (error) {
       if (error.response) {
@@ -1336,8 +1325,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     try {
       const { orderLineId, serialNumber, chainId } = args;
       const quantity = args.quantity || 0;
-      console.log("dapp order line item quantity", quantity)
-      console.log("dapp order line item args", args)
+
       const chainOptions = {
         ...options,
         chainIds: [chainId],
@@ -1346,12 +1334,11 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       };
 
       const orderLine = await orderLineJs.get(rawAdmin, { chainId, address: orderLineId }, chainOptions);
-      console.log("dapp order line item: orderLine", orderLine)
       const { productId, inventoryId } = orderLine;
       
-      // If ther were no serial numbers at inventory creation the serial numbers are set to N/A
-
-      console.log("dapp order line item: inventoryID", inventoryId)
+      // If no serial numbers are passed, a quantity is passed from the front end. 
+      // This will allow us to get the first n items from the inventory
+      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
       let items;
       if (quantity > 0) {
         items = await managers.itemManager.getItems(
@@ -1359,6 +1346,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
             productId,
             inventoryId,
             chainId: contract.chainId,
+            offset: 0,
+            limit: quantity
           },
           chainOptions
         );
@@ -1373,7 +1362,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
           chainOptions
         );
       }
-        console.log("dapp order line item: item", items, "address", orderLineId)
 
       if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
         throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
@@ -1382,31 +1370,26 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
       const itemsAddresses = items.map(_item => _item.address);
-      console.log("dapp order line item: itemsAddresses", itemsAddresses)
-      const totalItemAddresses = quantity === 0 ? itemsAddresses : itemsAddresses.slice(0, quantity);
+
       
       const _args = {
         orderLineId,
-        items: totalItemAddresses,
+        items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
-      console.log("dapp order line item: _args", _args)
       
       // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
-      // Its possible this line isn't working in orderLine.sol 
+      // See orderLine.sol 
       // Item_3 item = Item_3(account(address(_items[i]),"parent"));
       const [status, orderLineItems, _items] = await orderLineJs.addOrderLineItems(rawAdmin, _contract, _args, chainOptions);
       const result = orderLineItems.split(",");
 
-      console.log("dapp order line item: result", result, "status", status, "items", _items)
-      // Still getting an error from here. Update is unsuccessful
       const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: totalItemAddresses,
+        itemsAddress: itemsAddresses,
         status: ITEM_STATUS.SOLD,
         comment: "",
       });
-      console.log("dapp order line item: soldStatus", soldStatus)
-      if (soldStatus !== 200) {
+      if (soldStatus !== "200") {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
       }
 
