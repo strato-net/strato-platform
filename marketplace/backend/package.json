@@ -12,7 +12,7 @@
     "test:category": "yarn mocha-babel dapp/categories/test -b",
     "test:product": "yarn mocha-babel dapp/products/test -b",
     "test:item": "yarn mocha-babel dapp/items/test -b",
-    "test:order": "yarn mocha-babel dapp/assets/Order/test -b",
+    "test:order": "yarn mocha-babel dapp/orders/test -b",
     "test:userAddress": "yarn mocha-babel dapp/addresses/test -b",
     "test:eventType": "yarn mocha-babel dapp/eventType/test -b",
     "test:event": "yarn mocha-babel dapp/assets/Event/test -b",

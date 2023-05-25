@@ -5,8 +5,8 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'OrderLine_1';
-const contractFilename = `${util.cwd}/dapp/assets/Order/contracts/OrderLine.sol`;
+const contractName = 'OrderLine_2';
+const contractFilename = `${util.cwd}/dapp/orders/contracts/OrderLine.sol`;
 
 /** 
  * Upload a new OrderLine 
@@ -33,7 +33,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const copyOfOptions = {
         ...options,
         history: contractName
-      }
+    }
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
@@ -54,16 +54,16 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        orderChainId: 0,
         productId: 0,
         inventoryId: 0,
         quantity: 0,
         pricePerUnit: 0,
         tax: 0,
         shippingCharges: 0,
-        createdDate: 0
+        createdDate: 0,
+        orderAddress: 0
     };
-    
+
     const args = {
         ...defaultArgs,
         ..._args,
@@ -168,7 +168,8 @@ async function get(user, args, options) {
     }
 
 
-    return marshalOut({ ...orderLine, 
+    return marshalOut({
+        ...orderLine,
     });
 }
 
@@ -179,23 +180,23 @@ async function getAll(admin, args = {}, options) {
 
 async function addOrderLineItems(admin, contract, _args, baseOptions) {
     const callArgs = {
-      contract,
-      method: 'addOrderLineItems',
-      args: util.usc({
-        ..._args
-      }),
+        contract,
+        method: 'addOrderLineItems',
+        args: util.usc({
+            ..._args
+        }),
     }
     const options = {
-      ...baseOptions,
-      history: [contractName],
+        ...baseOptions,
+        history: [contractName],
     }
-  
+
     const [restStatus, orderLineItemAddress] = await rest.call(admin, callArgs, options)
-  
+
     if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
-  
+
     return [restStatus, orderLineItemAddress];
-  }
+}
 
 /**
  * Get contract state in bloc.

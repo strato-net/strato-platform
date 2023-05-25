@@ -10,15 +10,14 @@ contract CategoryManager is RestStatus{
     SubCategory[] subCategories;
 
 
-    function createCategory(string _appChainId, string _name, string _description, string _imageKey, uint _createdDate) public returns(uint256, address){
+    function createCategory(string _name, string _description,string _imageKey, uint _createdDate) public returns(uint256, address){
+        // if(categoriesMap[_name] != 0) {
+        //     return (RestStatus.CONFLICT,address(0));
+        // }
 
-        if(categoriesMap[_name] != 0) {
-            return (RestStatus.CONFLICT,address(0));
-        }
-
-        Category category = new Category(_appChainId, _name, _description,_imageKey, _createdDate);
+        Category category = new Category( _name, _description,_imageKey, _createdDate);
         categories.push(category);
-        categoriesMap[_name]=categories.length;
+        // categoriesMap[_name]=categories.length;
         return (RestStatus.CREATED, address(category));
     }
 

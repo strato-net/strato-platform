@@ -25,7 +25,7 @@ describe('Inventory', function () {
     let dapp;
     let newOptions;
     let adminOrganization;
-    const factoryArgs = (userAddress) => ({ ...(factory.getInventoryArgs(util.uid(),userAddress)) });
+    const factoryArgs = (userAddress) => ({ ...(factory.getInventoryArgs(util.uid(), userAddress)) });
 
     before(async () => {
         assert.isDefined(
@@ -68,7 +68,7 @@ describe('Inventory', function () {
             adminResponse.message
         )
         globalAdmin = { ...adminResponse.user, ...adminCredentials }
-        
+
         const adminCert = await certificateJs.getCertificateMe(globalAdmin)
         adminOrganization = adminCert.organization;
 
@@ -80,7 +80,7 @@ describe('Inventory', function () {
     });
 
     it('Create Inventory - 201', async () => {
-        
+
         // Create Inventory via upload
         const args = factoryArgs(globalAdmin.address)
         contract = await inventoryJs.uploadContract(globalAdmin, args, newOptions);

@@ -20,12 +20,12 @@ class CategoryController {
       if (address) {
         args = { address }
       }
-  
-      chainOptions = { ...options, chainIds: [dapp.chainId] }
+
+      chainOptions = { ...options }
 
       const category = await dapp.getCategory(args, chainOptions)
-      const categoryImageUrl=getSignedUrlFromS3(category.imageKey, req.app.get(constants.s3ParamName))
-      const result={...category,imageUrl:categoryImageUrl}
+      const categoryImageUrl = getSignedUrlFromS3(category.imageKey, req.app.get(constants.s3ParamName))
+      const result = { ...category, imageUrl: categoryImageUrl }
       rest.response.status200(res, result)
 
       return next()
@@ -37,11 +37,11 @@ class CategoryController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-      
-      const categories = await dapp.getCategories({ ...query, chainIds: [dapp.chainId] })
-      const categoriesWithImageUrl=categories.map(category=>({
+
+      const categories = await dapp.getCategories({ ...query })
+      const categoriesWithImageUrl = categories.map(category => ({
         ...category,
-        imageUrl:getSignedUrlFromS3(category.imageKey,req.app.get(constants.s3ParamName))
+        imageUrl: getSignedUrlFromS3(category.imageKey, req.app.get(constants.s3ParamName))
       }))
       rest.response.status200(res, categoriesWithImageUrl)
 
@@ -56,7 +56,7 @@ class CategoryController {
       const { dapp, body } = req
 
       CategoryController.validateCreateCategoryArgs(body)
- 
+
       const result = await dapp.createCategory(body)
       rest.response.status200(res, result)
 
@@ -101,9 +101,9 @@ class CategoryController {
 
   static validateCreateCategoryArgs(args) {
     const createCategorySchema = Joi.object({
-        name: Joi.string().required(),
-        description: Joi.string().required(),
-        imageKey:Joi.string().required()
+      name: Joi.string().required(),
+      description: Joi.string().required(),
+      imageKey: Joi.string().required()
     });
 
     const validation = createCategorySchema.validate(args);
@@ -121,7 +121,7 @@ class CategoryController {
       updates: Joi.object({
         name: Joi.string(),
         description: Joi.string(),
-        imageKey:Joi.string()
+        imageKey: Joi.string()
       }).required(),
     });
 

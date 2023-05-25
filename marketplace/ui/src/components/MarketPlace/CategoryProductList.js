@@ -34,6 +34,7 @@ import useDebounce from "../UseDebounce";
 import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -56,9 +57,10 @@ const CategoryProductList = () => {
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
+  let { hasChecked, isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+      categoryActions.fetchCategory(categoryDispatch);
   }, [categoryDispatch]);
 
   const routeMatch = useMatch({
@@ -143,6 +145,8 @@ const CategoryProductList = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
+    if (hasChecked && !isAuthenticated) {
+      console.log(hasChecked, !isAuthenticated);
     if (categoryID !== "") {
       actions.fetchMarketplace(
         marketplaceDispatch,
@@ -156,6 +160,21 @@ const CategoryProductList = () => {
         debouncedMaxPrice
       );
     }
+  } else {
+    if (categoryID !== "") {
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
+    }
+  }
   }, [
     marketplaceDispatch,
     selectedCategories,
@@ -191,11 +210,11 @@ const CategoryProductList = () => {
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
-    if(e.target.checked) {
-      if(existingIndex === -1){
+    if (e.target.checked) {
+      if (existingIndex === -1) {
         tempValues.push(e.target.value)
       }
-    }else{
+    } else {
       tempValues.splice(existingIndex, 1);
     }
     return tempValues;
@@ -207,9 +226,9 @@ const CategoryProductList = () => {
       <Breadcrumb className="text-xs ml-14 mt-14">
         <Breadcrumb.Item href="javascript:;">
           <ClickableCell href={routes.Marketplace.url}>
-          <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
-            Home
-          </p>
+            <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
+              Home
+            </p>
           </ClickableCell>
         </Breadcrumb.Item>
         <Breadcrumb.Item className="text-primary">
@@ -366,7 +385,7 @@ const CategoryProductList = () => {
                     >
                       <div className="flex flex-col gap-3">
                         {productsForFilter.map((product, index) => (
-                          <Checkbox value={product.address} key={index} className="m-0"  onChange={onChangeProduct}>
+                          <Checkbox value={product.address} key={index} className="m-0" onChange={onChangeProduct}>
                             {decodeURIComponent(product.name)}
                           </Checkbox>
                         ))}
@@ -431,13 +450,13 @@ const CategoryProductList = () => {
                     <CategoryProductCard
                       product={product}
                       key={index}
-                      category={prodCategory==null?"": prodCategory.name}
+                      category={prodCategory == null ? "" : prodCategory.name}
                     />
                   );
                 })}
               </div>
             ) : (
-              <div className="h-96 flex justify-center items-center"  id="product-list">
+              <div className="h-96 flex justify-center items-center" id="product-list">
                 No data found
               </div>
             )}

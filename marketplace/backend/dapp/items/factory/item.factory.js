@@ -5,7 +5,6 @@ const factory = {
     getItemArgs(uid) {
         const args = {
             itemArgs: {
-                appChainId: `${uid}`,
                 productId: '0000000000000000000000000000000000000000',
                 uniqueProductCode: parseInt(util.iuid()),
                 inventoryId: '0000000000000000000000000000000000000000',

@@ -39,7 +39,7 @@ describe('Category End-To-End Tests', function () {
 
     const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
     const dapp = await dappJs.loadFromDeployment(globalAdminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
-    
+
 
     assert.strictEqual(
       globalAdminResponse.status,
@@ -50,7 +50,7 @@ describe('Category End-To-End Tests', function () {
 
   })
 
-it('Create a subCategory', async () => {
+  it('Create a subCategory', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }
