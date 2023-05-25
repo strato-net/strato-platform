@@ -218,19 +218,19 @@ function newnode {
   if [ -n "${seqEventsBatchSize}" ]; then
     sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
   fi
-  if [-n "${seqEventsCostHeuristic}" ]; then
+  if [ -n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
-  if [-n "${cacheTransactionResults}"] ; then
+  if [ -n "${cacheTransactionResults}" ]; then
       ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
   fi
-  if [-n "${accountNonceLimit}"] ; then
+  if [ -n "${accountNonceLimit}" ]; then
       aclFlag="--accountNonceLimit=${accountNonceLimit}"
   fi
-  if [-n "${txSizeLimit}"] ; then
+  if [ -n "${txSizeLimit}" ]; then
       txsFlag="--txSizeLimit=${txSizeLimit}"
   fi
-  if [-n "${gasLimit}"] ; then
+  if [ -n "${gasLimit}"]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
   echo "Starting vm-runner"
