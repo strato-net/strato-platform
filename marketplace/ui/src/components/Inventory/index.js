@@ -69,7 +69,9 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user.organization);
+    if(user) {
+      actions.sellerStripeStatus(dispatch, user.organization);
+    }
   }, [dispatch, user]);
 
   useEffect(() => {
