@@ -9,14 +9,13 @@ const router = express.Router();
 
 router.get(
   Item.getAll,
-  authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getAll
 );
 
 router.get(
   Item.ownershipHistory,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ItemController.getOwnershipHistory
 );
