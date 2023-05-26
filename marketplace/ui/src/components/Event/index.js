@@ -96,7 +96,7 @@ const Event = ({ user }) => {
 
   useEffect(() => {
     if (currentTab === 'Events')
-      eventActions.fetchEvent(eventsDispatch, limit, eventOffset, debouncedEventSearchTerm, user.organization);
+      eventActions.fetchEvent(eventsDispatch, limit, eventOffset, debouncedEventSearchTerm, user?.organization);
   }, [currentTab, eventsDispatch, limit, eventOffset, debouncedEventSearchTerm]);
 
   const openToast = (placement) => {
