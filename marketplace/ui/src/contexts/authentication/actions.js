@@ -17,14 +17,18 @@ const actions = {
   check: async (dispatch) => {
     dispatch({ type: actionDescriptors.check });
     try {
+      //FIXME: There is a second fetch of the users/me endpoint there
+      // This is because when we log in the first time, it gives us a badgateway 502 error.
       let response = await fetch(`${apiUrl}/users/me`, {
         method: HTTP_METHODS.GET,
         credentials: "same-origin",
       });
-      response = await fetch(`${apiUrl}/users/me`, {
-        method: HTTP_METHODS.GET,
-        credentials: "same-origin",
-      });
+      if (response.status === RestStatus.BAD_GATEWAY){
+        response = await fetch(`${apiUrl}/users/me`, {
+          method: HTTP_METHODS.GET,
+          credentials: "same-origin",
+        });
+      }
       const body = await response.json();
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
