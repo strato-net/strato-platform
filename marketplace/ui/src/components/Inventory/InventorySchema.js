@@ -20,10 +20,10 @@ const getSchema = () => {
     serialNumber: yup.object().shape({
       serialNumStr: yup
         .string()
-        .required("Serial Number is required")
+        .optional()
         .nullable(),
       serialNumArr: yup.array()
-        .required()
+        .optional()
         .of(
           yup.object({
             itemSerialNumber: yup.string().required("Serial Number is required"),

@@ -56,11 +56,17 @@ function marshalIn(_args) {
     const defaultArgs = {
         productId: '',
         inventoryId: '',
-        serialNumber: [''],
         status: 1,
         comment: '',
         createdDate: 0,
-        uniqueProductCode: ''
+        uniqueProductCode: '',
+        itemObject: {
+            itemNumber: 0,
+            serialNumber: '',
+            rawMaterialProductName: [''],
+            rawMaterialProductId: [''],
+            rawMaterialSerialNumber: ['']
+        }
     };
 
     const args = {

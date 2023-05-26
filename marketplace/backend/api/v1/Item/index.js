@@ -50,6 +50,7 @@ router.get(
 
 router.get(
   Item.getRawMaterials,
+  authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getAllRawMaterials
 )
