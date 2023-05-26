@@ -122,7 +122,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_redirectUri_value>*'"${SERVER_URL}/auth/openidc/return"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<oauth_redirectUri_value>*'"${SERVER_URL}/mp-login/"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
