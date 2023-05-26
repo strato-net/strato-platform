@@ -505,13 +505,14 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    } else {
+    } 
+    // For some reason an else statement is not working here
+    if (serialNumber.length === 0 || serialNumber.length === undefined) {
       const quantity = args.quantity;
       for (let i = 0; i < quantity; i++) {
-        const randomNumber = parseInt(util.iuid())
         transformedArray.push({
-          "itemNumber": randomNumber,
-          "serialNumber": " ",
+          "itemNumber": parseInt(util.iuid()),
+          "serialNumber": "",
           "rawMaterialProductName": [],
           "rawMaterialSerialNumber": [],
           "rawMaterialProductId": []

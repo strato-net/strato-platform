@@ -32,10 +32,10 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
 
-        if (_itemObject[0].serialNumber == " ") {
+        if (_itemObject[0].serialNumber == "") {
 
             for (uint256 i = 0; i < _itemObject.length; i++) {
-                Item_3 itemAddr= new Item_3(_productId, _uniqueProductCode, _inventoryId, " ", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
+                Item_3 itemAddr= new Item_3(_productId, _uniqueProductCode, _inventoryId, "", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
                 _createdDate);
 
                 address itemContractAddress= address(itemAddr);
