@@ -429,7 +429,7 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
+      creates = [(c, cp, o, a, hl, rm) | CodeCollectionAdded c cp o a hl rm <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
@@ -438,7 +438,7 @@ processTheMessages env sqlEnv conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, rm) -> do
     cc' <- getCC cp ccString
     case cc' of
       Right cc -> do

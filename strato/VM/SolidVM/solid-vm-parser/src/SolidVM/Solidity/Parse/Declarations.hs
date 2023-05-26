@@ -194,7 +194,7 @@ structDeclaration = do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _ _)) <- simpleVariableDeclaration
       return (fieldName, decl)
     pure (structName, structFields)
   return
@@ -214,7 +214,7 @@ solidityFLStruct = do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _ _)) <- simpleVariableDeclaration
       return (fieldName, decl)
     pure (structName, structFields)
   return $ FLStruct (Text.pack structName) (SolidVM.Struct{ SolidVM.fields = zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..], SolidVM.bytes = 0, SolidVM.context = a})
@@ -303,7 +303,7 @@ usingDeclaration = do
 variableDeclaration :: SolidityParser (String, Declaration)
 variableDeclaration = simpleVariableDeclaration
 
-data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal | KImmutable
+data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal | KImmutable | KRecord
   deriving (Eq, Show, Enum, Ord)
 
 stateVariableKeyword :: SolidityParser StateVariableKeyword
@@ -312,11 +312,12 @@ stateVariableKeyword =
      (try (reserved "immutable") >> return KImmutable) <|>
      (try (reserved "public") >> return KPublic) <|>
      (try (reserved "private") >> return KPrivate) <|>
-     (try (reserved "internal") >> return KInternal)
+     (try (reserved "internal") >> return KInternal) <|>
+     (try (reserved "record") >> return KRecord)
 
 public :: [StateVariableKeyword] -> SolidityParser Bool
 public keywords =
-  let visibilities = nub . filter (\x -> (x /= KConstant) && (x /= KImmutable) ) $ keywords
+  let visibilities = nub . filter (`elem` [KPublic, KPrivate, KInternal] ) $ keywords
   in case visibilities of
         (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
         [KPublic] -> return True
@@ -361,6 +362,7 @@ simpleVariableDeclaration = do
   -- generate accessor functions
   keywords <- many stateVariableKeyword
   isPublic <- public keywords
+  let isRecord = KRecord `elem` keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
   pragmaVersion' <- getPragmaVersion
@@ -375,7 +377,7 @@ simpleVariableDeclaration = do
   let isConstant   = KConstant  `elem` keywords
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable isRecord )
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do
