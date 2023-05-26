@@ -17,7 +17,11 @@ const actions = {
   check: async (dispatch) => {
     dispatch({ type: actionDescriptors.check });
     try {
-      const response = await fetch(`${apiUrl}/users/me`, {
+      let response = await fetch(`${apiUrl}/users/me`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      response = await fetch(`${apiUrl}/users/me`, {
         method: HTTP_METHODS.GET,
         credentials: "same-origin",
       });
