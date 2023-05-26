@@ -384,6 +384,14 @@ export async function activate(context: vscode.ExtensionContext) {
 	})
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
+	// Register clipboard copier
+	vscode.commands.registerCommand('extension.copyToClipboard', async (element) => {
+		const { tooltip } = element
+		console.debug(`copyToClipboard/element: ${element}`)
+		console.debug(`copyToClipboard/tooltip: ${tooltip}`)
+		copyToClipboard(tooltip)
+	})
+
 	// Activate debug mode and diagnostics
 	activateStratoDebug(context);
 	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
@@ -429,5 +437,13 @@ function runCommand(cmd: string) {
 	terminal.show()
 	terminal.sendText(cmd, true)
 }
+
+
+// Helper function for copying data to user clipboard
+export function copyToClipboard(t: string) {
+	vscode.env.clipboard.writeText(t)
+		.then(() => { vscode.window.showInformationMessage('Copied to clipboard') })
+}
+
 
 // todo(moncayo): accepts a vscode terminal and sets it to the root workspace dir

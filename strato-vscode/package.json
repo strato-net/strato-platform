@@ -149,6 +149,11 @@
 				"category": "Debug SolidVM",
 				"enablement": "!inDebugMode",
 				"icon": "$(debug-alt)"
+			},
+			{
+				"command": "extension.copyToClipboard",
+				"title": "Copy to Clipboard",
+				"icon": "$(clippy)"
 			}
 		],
 		"debuggers": [
@@ -253,6 +258,11 @@
 				{
 					"command": "contracts.callFunction",
 					"when": "view == contracts && viewItem == function",
+					"group": "inline"
+				},
+				{
+					"command": "extension.copyToClipboard",
+					"when": "view == contracts && viewItem == address",
 					"group": "inline"
 				}
 			]
