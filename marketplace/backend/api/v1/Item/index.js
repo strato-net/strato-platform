@@ -16,6 +16,7 @@ router.get(
 
 router.get(
   Item.ownershipHistory,
+  authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getOwnershipHistory
 );
@@ -49,6 +50,7 @@ router.get(
 
 router.get(
   Item.getRawMaterials,
+  authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getAllRawMaterials
 )

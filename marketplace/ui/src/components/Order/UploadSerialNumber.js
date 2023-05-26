@@ -71,7 +71,7 @@ const UploadSerialNumberModal = ({
   };
 
   const handleFormSubmit = async () => {
-    if (serialNumbers.length !== product.quantity) {
+    if (serialNumbers.length !== 0 && serialNumbers.length !== product.quantity) {
       setUploadErr("Serial number length and quantity must be same");
       return;
     }
