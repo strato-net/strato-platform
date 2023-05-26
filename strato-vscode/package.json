@@ -119,11 +119,6 @@
 				"icon": "$(refresh)"
 			},
 			{
-				"command": "contracts.createChain",
-				"title": "Create Private Chain",
-				"icon": "$(add)"
-			},
-			{
 				"command": "contracts.uploadContract",
 				"title": "Upload Contract",
 				"icon": "$(add)"

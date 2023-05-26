@@ -75,14 +75,14 @@ export async function activate(context: vscode.ExtensionContext) {
 			})
 			.then(() => {
 				vscode.window.showQuickPick(subDirectories, { placeHolder: 'Select the frontend directory', ignoreFocusOut: true })
-				.then(sp => {
-					if (sp) {
-						frontendDir = sp
-						context.workspaceState.update('strato-vscode.frontendDir', frontendDir)
-							.then(() => console.debug(`buildProject/frontendDir: ${frontendDir}`))
-						runCommand(`cd ${folderPath}/${frontendDir}; yarn install; cd ..`)
-					}
-				})
+					.then(sp => {
+						if (sp) {
+							frontendDir = sp
+							context.workspaceState.update('strato-vscode.frontendDir', frontendDir)
+								.then(() => console.debug(`buildProject/frontendDir: ${frontendDir}`))
+							runCommand(`cd ${folderPath}/${frontendDir}; yarn install; cd ..`)
+						}
+					})
 			})
 			.then(() => vscode.window.showInformationMessage("Building your dApp..."))
 	}))
