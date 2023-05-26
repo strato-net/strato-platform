@@ -130,10 +130,10 @@ class AuthenticationController {
 
   static async logout(req, res) {
     let oauthSignOutUrl
-    if (process.env.DEV_MODE === 'true') {
-      oauthSignOutUrl = oauth.getLogOutUrl()
-    } else {
+    if (process.env.STRATO_NODE_HOST === 'nginx') {
       oauthSignOutUrl = '/auth/logout'
+    } else {
+      oauthSignOutUrl = oauth.getLogOutUrl()
     }
     res.clearCookie(oauth.getCookieNameAccessToken())
     res.clearCookie(oauth.getCookieNameAccessTokenExpiry())
