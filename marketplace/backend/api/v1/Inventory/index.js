@@ -14,6 +14,7 @@ router.get(
 
 router.get(
   Inventory.getAll,
+  authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.getAll
 );
