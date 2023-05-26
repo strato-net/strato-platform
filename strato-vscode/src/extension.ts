@@ -280,7 +280,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						chainid: chainId,
 					}
 					const res = await rest.createContract(user, uploadArgs, nodeOptions);
-					vscode.window.showInformationMessage(`${res}`);
+					vscode.window.showInformationMessage(`Contract ${contractName} created at address: ${res}`);
 				} catch (e) {
 					vscode.window.showErrorMessage(`${e}`);
 				}
