@@ -78,23 +78,26 @@ else
   else
     -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
     authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
-    if (authenticate_res == authenticate_err and authenticate_res == nil) then
+    if (authenticate_res == authenticate_err and authenticate_res == nil and ngx.var.allow_optional_anon_access ~= "true") then
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
       ngx.exit(ngx.HTTP_UNAUTHORIZED)
     end
   end
 
   -- in case if authentication failed (case unhandled - server error)
-  if authenticate_err then
+  if (authenticate_err) then
     ngx.status = 500
     ngx.say(authenticate_err)
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
-  user_access_token = authenticate_res.access_token
+  if authenticate_res ~= nil and authenticate_res.access_token then
+    user_access_token = authenticate_res.access_token
+  end
 end
 
-
-ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+if user_access_token ~= '' then
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")
