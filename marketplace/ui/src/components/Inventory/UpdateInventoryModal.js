@@ -31,7 +31,7 @@ const UpdateInventoryModal = ({
   const { categorys, iscategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
-  console.log(open)
+  
 
   const { isinventoryUpdating } =
     useInventoryState();
