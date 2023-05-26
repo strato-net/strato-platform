@@ -70,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					backendDir = sp
 					context.workspaceState.update('strato-vscode.backendDir', backendDir)
 						.then(() => console.debug(`buildProject/backendDir: ${backendDir}`))
-					runCommand(`cd ${backendDir}; yarn install; cd ..`)
+					runCommand(`cd ${folderPath}/${backendDir}; yarn install; cd ..`)
 				}
 			})
 			.then(() => {
@@ -80,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						frontendDir = sp
 						context.workspaceState.update('strato-vscode.frontendDir', frontendDir)
 							.then(() => console.debug(`buildProject/frontendDir: ${frontendDir}`))
-						runCommand(`cd ${frontendDir}; yarn install; cd ..`)
+						runCommand(`cd ${folderPath}/${frontendDir}; yarn install; cd ..`)
 					}
 				})
 			})
@@ -94,8 +94,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		const folders = vscode.workspace.workspaceFolders || [];
 		const cwd = folders[0].uri.path
 		const backendDir = context.workspaceState.get('strato-vscode.backendDir') || 'backend'
-		const envPath = `${cwd}/${backendDir}/.env`
+		console.debug(`deployProject/backendDir: ${backendDir}`)
 
+		const envPath = `${cwd}/${backendDir}/.env`
 		if (!fs.existsSync(envPath)) {
 			vscode.window.showWarningMessage('.env file does not exist, creating one for you. Consult your project README for additional help.')
 			runCommand(`touch ${envPath}`)
@@ -105,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		// Runs 'CONFIG=mercata yarn deploy' using backend/package.json
 		// TODO(moncayo): should enumerate all the test:<test_case> commands in package.json
 		const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
-		runCommand(`cd ${backendDir}`)
+		runCommand(`cd ${cwd}/${backendDir}`)
 		runCommand(cmd)
 		runCommand('cd ..')
 
