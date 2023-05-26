@@ -70,10 +70,12 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
+    if(user) {
     if (Id !== undefined) {
       eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
     }
-  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id])
+  }
+  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
   useEffect(() => {
@@ -128,7 +130,9 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      if(user)  {
+        itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      }
     }
   }, [Id, dispatch, itemDispatch]);
 
