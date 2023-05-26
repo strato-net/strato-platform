@@ -200,8 +200,8 @@ Cypress.Commands.add("certifyEvents", () => {
                 "leastSellableUnit": productData.leastSellableUnit,
                 "imageKey": productData.imageKey,
                 "isActive": productData.isActive,
-                "categoryId": category.address,
-                "subCategoryId": subCategory.address,
+                "category": category.address,
+                "subCategory": subCategory.address,
                 "userUniqueProductCode": productData.userUniqueProductCode
               }
             }

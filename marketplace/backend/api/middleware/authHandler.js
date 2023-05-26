@@ -32,7 +32,7 @@ const getTokenFromHeader = async (req) => {
 }
 
 class AuthHandler {
-  static authorizeRequest() {
+  static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
       try {
         let token = await getTokenFromCookie(req, res)
@@ -40,6 +40,12 @@ class AuthHandler {
         if (!token) {
           token = await getTokenFromHeader(req)
         }
+        let isServiceUser = false
+        if (!token && allowAnonAccess === true) {
+          token = await oauthHelper.getServiceToken()
+          isServiceUser = true
+        }
+
         if (token) {
           console.log('Got token')
           let decodedToken
@@ -65,7 +71,7 @@ class AuthHandler {
           req.address = address
           req.accessToken = { token }
           req.decodedToken = decodedToken
-          req.username = decodedToken.preferred_username
+          req.username = isServiceUser === true ? 'serviceUser' : decodedToken.preferred_username
           console.log('Authorization success, moving on...')
           return next()
         }

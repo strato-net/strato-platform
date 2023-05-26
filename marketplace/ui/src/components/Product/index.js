@@ -56,12 +56,8 @@ const Product = () => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
-
-  useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
 
   const openToast = (placement) => {
     if (success) {

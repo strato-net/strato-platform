@@ -7,8 +7,7 @@ import RestStatus from "http-status-codes"
 import dotenv from 'dotenv'
 
 import dappJs from "./dapp"
-import SeederJs from "/seeder-utility/seeder";
-import SeederJson from "/seeder-utility/seeder.json";
+import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
@@ -92,20 +91,10 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
   })
 
 
+})
   // it('Should create and assign admin role', async () => {
   //   await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
   //   if (adminUser.address !== bayer.address) {
   //     await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: bayer.address })
   //   }
   // })
-
-  // This should not be executed when using existing appchainId
-  // it('Should populate categories and subCategories', async () => {
-
-  //   let _dapp = await dappJs.bindAddress(bayer, dapp.address, { ...options })
-  //   const result = await SeederJs.createCategoriesWithSubCategories(_dapp)
-  //   assert(Array.isArray(result), 'result should be an array')
-  //   assert.equal(result.length, SeederJson.categories.length)
-  // })
-
-})

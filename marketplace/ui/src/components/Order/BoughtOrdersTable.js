@@ -29,7 +29,7 @@ const BoughtOrdersTable = ({ user }) => {
       limit,
       offset,
       debouncedSearchTerm,
-      user.organization
+      user?.organization
     );
   }, [dispatch, limit, offset, debouncedSearchTerm, user]);
 

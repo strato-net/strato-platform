@@ -13,8 +13,8 @@ contract Inventory is InventoryStatus{
     string public ownerCommonName;
 
     address public productId;
-    address public categoryId;
-    address public subCategoryId;
+    string public category;
+    string public subCategory;
     int public quantity;
     int public pricePerUnit;
     string public batchId;
@@ -24,8 +24,8 @@ contract Inventory is InventoryStatus{
 
 
     constructor(
-            address _categoryId
-        ,   address _subCategoryId
+            string _category
+        ,   string _subCategory
         ,   int _quantity
         ,   int _pricePerUnit
         ,   string _batchId
@@ -36,8 +36,8 @@ contract Inventory is InventoryStatus{
         owner = _owner;
 
         productId = msg.sender;
-        categoryId = _categoryId;
-        subCategoryId = _subCategoryId;
+        category = _category;
+        subCategory = _subCategory;
         quantity = _quantity;
         pricePerUnit = _pricePerUnit;
         batchId = _batchId;

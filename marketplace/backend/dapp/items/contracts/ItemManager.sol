@@ -32,6 +32,23 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
 
+        if (_itemObject[0].serialNumber == "") {
+
+            for (uint256 i = 0; i < _itemObject.length; i++) {
+                Item_3 itemAddr= new Item_3(_productId, _uniqueProductCode, _inventoryId, "", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
+                _createdDate);
+
+                address itemContractAddress= address(itemAddr);
+                itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
+
+                uniqueSerialNumberByUPC[_itemObject[0].serialNumber] = _uniqueProductCode;
+                itemProductIdMapping[itemContractAddress] = _productId;
+                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                itemAddresses += string(address(itemAddr)) + ",";
+            }
+                return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
+
+        }
         for (uint256 i = 0; i < _itemObject.length; i++) {
             string currentSerialNumber = _itemObject[i].serialNumber;
             uint exisitngUPC = uniqueSerialNumberByUPC[currentSerialNumber];
@@ -187,8 +204,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 oldProduct.leastSellableUnit(),
                 oldProduct.imageKey(),
                 oldProduct.isActive(),
-                oldProduct.categoryId(),
-                oldProduct.subCategoryId(),
+                oldProduct.category(),
+                oldProduct.subCategory(),
                 block.timestamp,
                 _newOwner
             )

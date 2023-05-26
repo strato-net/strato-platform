@@ -124,7 +124,7 @@ const ProductDetails = ({ user, users }) => {
   }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
@@ -145,7 +145,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (categorys.length && details) {
       const prodCategory = categorys.find(
-        (c) => c.address === details.categoryId
+        (c) => c.name === details.category
       );
       setCategoryName(prodCategory?.name);
     }

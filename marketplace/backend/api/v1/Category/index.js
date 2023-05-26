@@ -8,29 +8,17 @@ const router = express.Router();
 
 router.get(
   Category.get,
+  authHandler.authorizeRequest(true),
   loadDapp,
   CategoryController.get
 );
 
 router.get(
   Category.getAll,
+  authHandler.authorizeRequest(true),
   loadDapp,
   CategoryController.getAll
 );
-
-router.post(
-  Category.create,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  CategoryController.create
-);
-
-router.put(
-  Category.update,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  CategoryController.update
-)
 
 
 export default router;

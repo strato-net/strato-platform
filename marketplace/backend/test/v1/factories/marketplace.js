@@ -18,7 +18,7 @@ export const subCategoryArgs = (categoryAddress, uid) => {
     return args
 }
 
-export const productArgs = (uid, categoryId, subCategoryId) => {
+export const productArgs = (uid, category, subCategory) => {
     const args = {
         productArgs: {
             name: `name_${uid}`,
@@ -29,8 +29,8 @@ export const productArgs = (uid, categoryId, subCategoryId) => {
             leastSellableUnit: uid,
             imageKey: `1673855860544_seeds.jpg`,
             isActive: true,
-            categoryId: categoryId,
-            subCategoryId: subCategoryId
+            category: category,
+            subCategory: subCategory
         }
     }
 
@@ -66,8 +66,8 @@ export const inventoryArgs = (address, uid) => {
 
 export const marketplaceArgs = (category, subCategory, productName, brandName) => {
     const args = {
-        categoryId: [category],
-        subCategoryId: [subCategory],
+        category: [category],
+        subCategory: [subCategory],
         name: [productName],
         manufacturer: [brandName]
     }

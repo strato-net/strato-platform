@@ -142,6 +142,13 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
   else
     echo "deploy file does not exist - bootnode - running 'deploy'"
+    if [ "${MP_DELAY_DEPLOYMENT}" == "true" ]; then
+      touch _deploy_blocked_while_I_exist
+      echo "Deployment blocked until file ./_deploy_blocked_while_I_exist is removed from the container... Waiting..."
+      until [ ! -f ./_deploy_blocked_while_I_exist ]; do sleep 1; done
+      echo "_deploy_blocked_while_I_exist file removed, continue with deploy script..."
+    fi
+    
     CONFIG=generated yarn deploy
   fi
   

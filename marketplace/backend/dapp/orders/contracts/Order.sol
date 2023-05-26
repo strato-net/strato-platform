@@ -129,9 +129,9 @@ contract Order is OrderStatus {
      if(_status == OrderStatus.CLOSED){
        for(uint i=0;i<orderLines.length;i++){
         OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
-        if(!orderLine.isSerialUploaded()){
-          return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
-        }
+        // if(!orderLine.isSerialUploaded()){
+        //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
+        // }
       }
       fullfilmentDate = _fullfilmentDate;
       return getInventoriesAndAvailableQuantity(_status,_sellerComments,orderLines,false);

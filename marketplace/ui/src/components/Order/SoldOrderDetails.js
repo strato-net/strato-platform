@@ -81,7 +81,7 @@ const SoldOrderDetails = ({ user, users }) => {
     success,
     isCreateOrderLineItem,
   } = useOrderState();
-
+  console.log("orderDetails", orderDetails)
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
     strict: true,
@@ -211,15 +211,32 @@ const SoldOrderDetails = ({ user, users }) => {
         serialUploaded = false;
       }
     });
-    if (!serialUploaded && (parseInt(getStatusByValue(status)) !== 1)) {
-      openToast(
-        "bottom",
-        true,
-        "Upload all serial numbers to close this order"
-      );
-      return;
-    }
+    // if (!serialUploaded && (parseInt(getStatusByValue(status)) !== 1)) {
+    //   openToast(
+    //     "bottom",
+    //     true,
+    //     "Upload all serial numbers to close this order"
+    //   );
+    //   return;
+    // }
     let body = {};
+    if (serialUploaded === false) {
+      for (let i = 0; i < orderDetails.orderLines.length; i++) {
+        setselectedProd(orderDetails.orderLines[i]);
+        body = {
+          orderId: details.orderId,
+          orderAddress: details.address,
+          orderLineId: details.orderLines[i].address,
+          serialNumber: [],
+          quantity: details.orderLines[i].quantity
+        };
+
+        let createOrderLine = await actions.createOrderLineItem(dispatch, body);
+        if (createOrderLine) {
+          console.log("createOrderLine", createOrderLine);
+        }
+      }
+    }
     if (selectedDate == null) {
       body = {
         address: Id,
@@ -241,7 +258,6 @@ const SoldOrderDetails = ({ user, users }) => {
         },
       };
     }
-
     let isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
@@ -322,6 +338,7 @@ const SoldOrderDetails = ({ user, users }) => {
       align: "center",
       // width: "192px",
       render: (text) =>
+        console.log("text", text) &&
         text.isSerialUploaded == null || text.isSerialUploaded === false ? (
           <Button
             id="upload-button"
@@ -461,7 +478,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     </div>
                   }
                 </div>
-                <Text className="text-primaryB">Please upload serial number(s) and enter the fulfillment date to close the order</Text>
+                <Text className="text-primaryB">Please upload serial number(s) (if any) and/or enter the fulfillment date to close the order</Text>
               </div>
               <Button
                 id="save-button"
@@ -580,7 +597,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     return selectedDate.isBefore(specificDate.startOf('day')) || selectedDate.isAfter(currentDate.endOf('day'));
                   }}
                   onChange={onDateChange}
-                  disabled={status !== getStatus(2)}
+                  disabled={false}
                 />
               </div>
             </Row>

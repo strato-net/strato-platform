@@ -202,6 +202,7 @@ describe('Inventory End-To-End Tests', function () {
     assert.isArray(updateInventory.body.data, 'body.data is array')
   });
 
+  // TODO: This test should be updated. If the user does not enter a serial number, it will cause this test to fial. If numbers are entered this test still works fine.
   it('should not create inventories of duplicate serial numbers for same product', async () => {
     // create product
     const createProductArgs = {
