@@ -14,8 +14,8 @@ const factory = {
                 leastSellableUnit: uid,
                 imageKey: `imageKey_${uid}`,
                 isActive: true,
-                categoryId: '0000000000000000000000000000000000000000',
-                subCategoryId: '0000000000000000000000000000000000000000',
+                category: 'Carbon',
+                subCategory: 'Carbon Credit',
                 createdDate: new Date().getTime(),
                 owner: userAddress
             }

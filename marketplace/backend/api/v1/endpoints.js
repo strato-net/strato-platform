@@ -15,8 +15,6 @@ export const Category = {
   prefix: '/category',
   get: '/:address/',
   getAll: '/',
-  create: '/',
-  update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
 }

@@ -17,7 +17,7 @@ const MarketPlace = () => {
   const { iscategorysLoading } = useCategoryState();
 
   useEffect(() => {
-    actions.fetchCategory(dispatch, limit, offset, debouncedSearchTerm);
+    actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   return (

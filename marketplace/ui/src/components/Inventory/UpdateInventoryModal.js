@@ -8,10 +8,10 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
+  useCategoryDispatch,
+  useCategoryState,
+} from "../../contexts/category";
+import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 
@@ -20,19 +20,18 @@ const { Option } = Select;
 const UpdateInventoryModal = ({
   open,
   handleCancel,
-  categorys,
   debouncedSearchTerm,
   inventoryToUpdate,
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
   const dispatch = useInventoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
+  const categoryDispatch = useCategoryDispatch();
 
-  //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
+  console.log(open)
 
   const { isinventoryUpdating } =
     useInventoryState();
@@ -67,23 +66,27 @@ const UpdateInventoryModal = ({
   });
 
   useEffect(() => {
-    subCategoryActions.fetchSubCategory(subCategoryDispatch, "");
-  }, [subCategoryDispatch]);
+    categoryActions.fetchCategories(categoryDispatch);
+  }, [categoryDispatch]);
 
   useEffect(() => {
-    if (inventoryToUpdate && subCategorys.length) {
-      let subCategory = subCategorys.find(
-        (s) => s.address === inventoryToUpdate.inventory.subCategoryId
+    if (inventoryToUpdate) {
+      let subCategory; 
+      categorys.map(
+        (category) => category.subCategories.map(
+          (subCategoryRecord) => {
+            if (subCategoryRecord.name === inventoryToUpdate.inventory.subCategory) {
+              subCategory = subCategoryRecord;
+            } 
+          }
+        )
       );
-
       let nextState = {
         category: {
           name: inventoryToUpdate.category.name,
-          address: inventoryToUpdate.category.address,
         },
         subCategory: {
           name: subCategory.name ?? "",
-          address: subCategory.address ?? "",
         },
         productName: {
           name: inventoryToUpdate.inventory.name,
@@ -98,7 +101,7 @@ const UpdateInventoryModal = ({
     
       setFormState(nextState);
     }
-  }, [inventoryToUpdate, subCategorys]);
+  }, [inventoryToUpdate]);
 
   const handleUpdateFormSubmit = async (values) => {
     const body = {
@@ -144,9 +147,9 @@ const UpdateInventoryModal = ({
         Edit Inventory
       </h1>
       <hr className="text-secondryD mt-3" />
-      {inventoryToUpdate && issubCategorysLoading ? (
+      {inventoryToUpdate && iscategorysLoading ? (
         <div className="h-44 flex justify-center items-center">
-          <Spin spinning={issubCategorysLoading} size="large" />
+          <Spin spinning={iscategorysLoading} size="large" />
         </div>
       ) : (
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
@@ -162,18 +165,8 @@ const UpdateInventoryModal = ({
                   disabled={true}
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    let selectedCategory = { address: "" };
-                    if (value) {
-                      selectedCategory = categorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue(
-                      "category.address",
-                      selectedCategory.address
-                    );
-                    formik.setFieldTouched("category.name", false, false);
+                    formik.setFieldValue("subCategory.name", null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -201,33 +194,18 @@ const UpdateInventoryModal = ({
                   id="subCategory"
                   name="subCategory.name"
                   disabled={true}
-                  loading={inventoryToUpdate ? false : issubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    let selectedSubCategory = { address: "" };
-                    if (value) {
-                      selectedSubCategory = subCategorys.find(
-                        (e) => e.name === value
-                      );
-                    }
                     formik.setFieldValue("subCategory.name", value);
-                    formik.setFieldValue(
-                      "subCategory.address",
-                      selectedSubCategory.address
-                    );
-                    formik.setFieldTouched("subCategory.name", false, false);
                   }}
                 >
-                  {subCategorys.map((e, index) => {
-                    if (e.categoryId === formik.values.category.address) {
-                      return (
-                        <Option value={e.name} key={index}>
-                          {e.name}
-                        </Option>
-                      );
-                    }
-                    return <></>;
-                  })}
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
+                      <Option value={e.name} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
+                  )}
                 </Select>
                 {getIn(formik.touched, "subCategory.name") &&
                   getIn(formik.errors, "subCategory.name") && (

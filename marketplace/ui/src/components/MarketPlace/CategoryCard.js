@@ -4,6 +4,7 @@ import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
+import { Images } from "../../images";
 
 const { Title, Text } = Typography;
 
@@ -11,6 +12,12 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
+
+  const categoryImages = [
+    Images.art,
+    Images.carbon,
+    Images.realEstate
+  ];
 
   return (
     <Card className="w-full">
@@ -34,15 +41,15 @@ const CategoryCard = () => {
               className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
               onClick={() =>
                 navigate(
-                  `${naviroute.replace(":categoryId", category.address)}`
+                  `${naviroute.replace(":category", category.name)}`
                 )
               }
             >
               <div className="flex flex-col items-center text-center">
                 <Image
-                  src={category.imageUrl}
+                  src={categoryImages[index]}
                   height={108}
-                  width={108}
+                  width={150}
                   preview={false}
                 />
                 <Text type="secondary" className="mt-2 text-sm !text-primaryB">

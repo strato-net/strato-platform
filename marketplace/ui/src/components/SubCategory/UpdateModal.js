@@ -20,7 +20,7 @@ const UpdateModal = ({
 
       const [name, setname] = useState("");
       const [description, setdescription] = useState("");
-      const [categoryId, setcategoryId] = useState("");
+      const [category, setcategory] = useState("");
       const [createdAt, setcreatedAt] = useState("");
 
   useEffect(() => {
@@ -29,7 +29,7 @@ const UpdateModal = ({
 
           setname(product["name"]);
           setdescription(product["description"]);
-          setcategoryId(product["categoryId"]);
+          setcategory(product["category"]);
           setcreatedAt(product["createdAt"]);
     }
   }, [selectedObj]);
@@ -42,7 +42,7 @@ const UpdateModal = ({
       updates: {
             name,
             description,
-            categoryId,
+            category,
             createdAt,
       },
     };
@@ -55,7 +55,7 @@ const UpdateModal = ({
     }
   }
 
-  // const isDisabled = (  !name  ||  !description  ||  !categoryId  ||  !createdAt    );
+  // const isDisabled = (  !name  ||  !description  ||  !category  ||  !createdAt    );
 
   const primaryAction = {
     content: "Update SubCategory",
@@ -95,10 +95,10 @@ const UpdateModal = ({
 
 
                     <TextField
-                        label="categoryId"
+                        label="category"
                         type={ "text" }
-                        value={ categoryId }
-                        onChange={(val) => setcategoryId(val) }
+                        value={ category }
+                        onChange={(val) => setcategory(val) }
                       />
 
 

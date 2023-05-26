@@ -65,8 +65,8 @@ const SubCategoryDetails = ({ users }) => {
       dataIndex: "description",
     },
     {
-      title: "categoryId",
-      dataIndex: "categoryId",
+      title: "category",
+      dataIndex: "category",
     },
     {
       title: "createdAt",
@@ -122,10 +122,10 @@ const SubCategoryDetails = ({ users }) => {
           </Row>
           <Row gutter={30} style={{ marginBottom: 10 }}>
             <Col span={4} style={{ textAlign: 'right' }}>
-              <p> categoryId: </p>
+              <p> category: </p>
             </Col>
             <Col span={4}> 
-              <p> {details['categoryId']} </p> 
+              <p> {details['category']} </p> 
             </Col>
           </Row>
           <Row gutter={30} style={{ marginBottom: 10 }}>

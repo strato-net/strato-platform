@@ -9,7 +9,6 @@ import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 const ProductCard = ({
   product,
   categorys,
-  subCategorys,
   debouncedSearchTerm,
 }) => {
   const [state, setState] = useState(null);
@@ -43,22 +42,8 @@ const ProductCard = ({
   };
 
   useEffect(() => {
-    let category = categorys.find(
-      (category) => category.address === product.categoryId
-    );
-    let subCategory = subCategorys.find(
-      (subCategory) => subCategory.address === product.subCategoryId
-    );
-
-    if (product) {
-      let newProduct = {
-        ...product,
-        categoryName: category?.name ?? "",
-        subCategoryName: subCategory?.name ?? "",
-      };
-      setState(newProduct);
-    }
-  }, [product, categorys, subCategorys]);
+    setState(product);
+  }, [product]);
 
 
   return (
@@ -82,7 +67,7 @@ const ProductCard = ({
                     {decodeURIComponent(state.name)}
                   </h3>
                   <p className="font-medium text-secondryB text-base ml-2">
-                    ({state.categoryName})
+                    ({state.category})
                   </p>
                 </div>
                 <Popover
@@ -123,7 +108,7 @@ const ProductCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  {state.subCategoryName}
+                  {state.subCategory}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
