@@ -351,7 +351,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const cirrusProvider = new CirrusProvider();
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
-			placeHolder: '',
+			placeHolder: 'ex: Certificate?address=eq.0000000000000000000000000000000000001337',
 			prompt: `Enter cirrus query`
 		});
 		if (!argInput) return;
