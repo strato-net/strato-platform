@@ -105,7 +105,6 @@ class OrderLineItemController {
       orderAddress:Joi.string().required(),
       orderLineId: Joi.string().required(),
       serialNumber: Joi.array().items().optional(),
-      chainId: Joi.string().required(),
       quantity: Joi.number().optional(),
     });
     const validation = createOrderLineItemSchema.validate(args);

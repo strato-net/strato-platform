@@ -225,7 +225,7 @@ const SoldOrderDetails = ({ user, users }) => {
         setselectedProd(orderDetails.orderLines[i]);
         body = {
           orderId: details.orderId,
-          chainId: chainId,
+          orderAddress: details.address,
           orderLineId: details.orderLines[i].address,
           serialNumber: [],
           quantity: details.orderLines[i].quantity
