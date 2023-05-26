@@ -129,11 +129,6 @@
 				"icon": "$(play)"
 			},
 			{
-				"command": "contracts.createChain",
-				"title": "Create Private Chain",
-				"icon": "$(add)"
-			},
-			{
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"

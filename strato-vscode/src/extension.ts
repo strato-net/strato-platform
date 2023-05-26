@@ -155,76 +155,76 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Creates a private chain on the targetted node
-	vscode.commands.registerCommand('contracts.createChain', async (element) => {
-		const { nodeId } = element;
-		const user = await getApplicationUser(nodeId);
-		const config = getConfig() || {};
-		const nodeOptions = { config, node: nodeId };
-		const userAddress = await rest.getKey(user, nodeOptions);
-		if (vscode.window.activeTextEditor) {
-			const doc = vscode.window.activeTextEditor.document;
-			if (doc.uri.path.slice(-4) === '.sol') {
-				let src: any = doc.getText();
-				let srcMap = {}
-				const folders = vscode.workspace.workspaceFolders || [];
-				if (folders.length > 0) {
-					const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
-					const currentFolder = folders[0]
-					const folder = currentFolder.uri.path;
-					// eslint-disable-next-line import/no-mutable-exports
-					const dirPath = `${folder}/${serverPath}`
-					srcMap = await importer.combine(doc.uri.path, true, dirPath);
-					srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
-					src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
-				}
-				try {
-					const chainLabel = await vscode.window.showInputBox({
-						placeHolder: '',
-						prompt: `Enter a value for the chain label: `
-					});
-					if (!chainLabel) return;
-					const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
-					const xabiKeys = Object.keys(xabis);
-					const items = xabiKeys.map((x) => ({ label: x }))
-					const quickPickOption = await vscode.window.showQuickPick(items, {
-						placeHolder: 'Pick a contract to use as the chain\'s governance contract',
-					});
-					if (!quickPickOption) return;
-					const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
-					const govXabi = xabis[contractName] || {};
-					let args = {}
-					if (govXabi.constr) {
-						const constr = govXabi.constr;
-						const argNames = Object.keys(constr.args || {});
-						for (let i = 0; i < argNames.length; i++) {
-							const argInput = await vscode.window.showInputBox({
-								placeHolder: '',
-								prompt: `Enter a value for ${argNames[i]}: `
-							});
-							if (!argInput) return;
-							args = { ...args, [argNames[i]]: argInput }
-						}
-					}
-					const chainArgs = {
-						label: chainLabel,
-						src: srcMap,
-						args,
-						members: [{ "address": userAddress, "enode": "enode://abcd@1.2.3.4:30303" }],
-						balances: [{ "address": userAddress, "balance": 100000000000000 }],
-					}
-					const contract = { name: contractName }
-					const res = await rest.createChain(user, chainArgs, contract, nodeOptions);
-					vscode.window.showInformationMessage(`${res}`);
-				} catch (e) {
-					vscode.window.showErrorMessage(`${e}`);
-				}
-			} else {
-				vscode.window.showErrorMessage(`Please open a Solidity file to begin creating a private chain.`);
-			}
-		} else {
-			vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
-		}
-	});
+	// vscode.commands.registerCommand('contracts.createChain', async (element) => {
+	// 	const { nodeId } = element;
+	// 	const user = await getApplicationUser(nodeId);
+	// 	const config = getConfig() || {};
+	// 	const nodeOptions = { config, node: nodeId };
+	// 	const userAddress = await rest.getKey(user, nodeOptions);
+	// 	if (vscode.window.activeTextEditor) {
+	// 		const doc = vscode.window.activeTextEditor.document;
+	// 		if (doc.uri.path.slice(-4) === '.sol') {
+	// 			let src: any = doc.getText();
+	// 			let srcMap = {}
+	// 			const folders = vscode.workspace.workspaceFolders || [];
+	// 			if (folders.length > 0) {
+	// 				const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+	// 				const currentFolder = folders[0]
+	// 				const folder = currentFolder.uri.path;
+	// 				// eslint-disable-next-line import/no-mutable-exports
+	// 				const dirPath = `${folder}/${serverPath}`
+	// 				srcMap = await importer.combine(doc.uri.path, true, dirPath);
+	// 				srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+	// 				src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
+	// 			}
+	// 			try {
+	// 				const chainLabel = await vscode.window.showInputBox({
+	// 					placeHolder: '',
+	// 					prompt: `Enter a value for the chain label: `
+	// 				});
+	// 				if (!chainLabel) return;
+	// 				const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
+	// 				const xabiKeys = Object.keys(xabis);
+	// 				const items = xabiKeys.map((x) => ({ label: x }))
+	// 				const quickPickOption = await vscode.window.showQuickPick(items, {
+	// 					placeHolder: 'Pick a contract to use as the chain\'s governance contract',
+	// 				});
+	// 				if (!quickPickOption) return;
+	// 				const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
+	// 				const govXabi = xabis[contractName] || {};
+	// 				let args = {}
+	// 				if (govXabi.constr) {
+	// 					const constr = govXabi.constr;
+	// 					const argNames = Object.keys(constr.args || {});
+	// 					for (let i = 0; i < argNames.length; i++) {
+	// 						const argInput = await vscode.window.showInputBox({
+	// 							placeHolder: '',
+	// 							prompt: `Enter a value for ${argNames[i]}: `
+	// 						});
+	// 						if (!argInput) return;
+	// 						args = { ...args, [argNames[i]]: argInput }
+	// 					}
+	// 				}
+	// 				const chainArgs = {
+	// 					label: chainLabel,
+	// 					src: srcMap,
+	// 					args,
+	// 					members: [{ "address": userAddress, "enode": "enode://abcd@1.2.3.4:30303" }],
+	// 					balances: [{ "address": userAddress, "balance": 100000000000000 }],
+	// 				}
+	// 				const contract = { name: contractName }
+	// 				const res = await rest.createChain(user, chainArgs, contract, nodeOptions);
+	// 				vscode.window.showInformationMessage(`${res}`);
+	// 			} catch (e) {
+	// 				vscode.window.showErrorMessage(`${e}`);
+	// 			}
+	// 		} else {
+	// 			vscode.window.showErrorMessage(`Please open a Solidity file to begin creating a private chain.`);
+	// 		}
+	// 	} else {
+	// 		vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
+	// 	}
+	// });
 
 
 	// Uploads a contract to the targetted node
