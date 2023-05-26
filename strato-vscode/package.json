@@ -129,6 +129,11 @@
 				"icon": "$(play)"
 			},
 			{
+				"command": "contracts.createChain",
+				"title": "Create Private Chain",
+				"icon": "$(add)"
+			},
+			{
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"
@@ -245,11 +250,6 @@
 				}
 			],
 			"view/item/context": [
-				{
-					"command": "contracts.createChain",
-					"when": "view == contracts && viewItem == node",
-					"group": "inline"
-				},
 				{
 					"command": "contracts.uploadContract",
 					"when": "view == contracts && viewItem == chainId",
