@@ -90,7 +90,7 @@ pipeline {
                 EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
                 EXT_STORAGE_S3_BUCKET='tcommerce-dev' \\
                 MP_IS_BOOTNODE='true' \\
-                MP_BLOCK_DEPLOYMENT='true' \\
+                MP_DELAY_DEPLOYMENT='true' \\
                 ./strato --single
             """
           }
