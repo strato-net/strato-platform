@@ -262,7 +262,12 @@
 				},
 				{
 					"command": "extension.copyToClipboard",
-					"when": "view == contracts && viewItem == address",
+					"when": "view == contracts && (viewItem == address || viewItem == stateItem)",
+					"group": "inline"
+				},
+				{
+					"command": "extension.copyToClipboard",
+					"when": "view == nodes || view == cirrus",
 					"group": "inline"
 				}
 			]
