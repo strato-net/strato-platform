@@ -22,7 +22,7 @@ router.get(
 
 router.get(
   Product.getAllProductNames,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ProductController.getAllProductNames
 );

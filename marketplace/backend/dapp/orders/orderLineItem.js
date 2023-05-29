@@ -168,6 +168,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
+  console.log('getAll args', args, 'options', options, 'admin', admin)
     const orderLineItems = await searchAllWithQueryArgs(contractName, args, options, admin)
     return orderLineItems.map((orderLineItem) => marshalOut(orderLineItem))
 }

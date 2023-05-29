@@ -27,6 +27,24 @@ class MarketplaceController {
     }
   }
 
+  static async getAllLoggedIn(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
+
+      const productsWithImageUrl = inventories
+        .map(product => ({
+          ...product,
+          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+        }))
+      rest.response.status200(res, productsWithImageUrl)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async getTopSellingProducts(req, res, next) {
     try {
       const { dapp, query } = req
@@ -43,6 +61,25 @@ class MarketplaceController {
       return next(e)
     }
   }
+
+  static async getTopSellingProductsLoggedIn(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
+      const productsWithImageUrl = inventories.map(product => ({
+        ...product,
+        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        )
+      }))
+      rest.response.status200(res, productsWithImageUrl)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 }
+
+
 
 export default MarketplaceController

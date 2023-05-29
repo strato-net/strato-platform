@@ -8,9 +8,6 @@ import RestStatus from 'http-status-codes';
 // import organizationManagerJs from '/dapp/organizations/organizationManager'
 import certificateJs from "/dapp/certificates/certificate";
 
-import categoryManagerJs from "/dapp/categories/categoryManager";
-import categoryJs from "/dapp/categories/category";
-import subCategoryJs from "/dapp/categories/subCategory";
 import itemJs from "/dapp/items/item";
 import orderJs from "/dapp/orders/order";
 import orderLineItemJs from "/dapp/orders/orderLineItem";
@@ -22,7 +19,6 @@ import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import userAddressJs from "/dapp/addresses/userAddress.js";
-import { orderLineItemArgs } from "../../test/v1/factories/orderLineItem";
 import { RestError } from "blockapps-rest/dist/util/rest.util";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
@@ -31,9 +27,6 @@ import orderManagerJs from '/dapp/orders/orderManager';
 const allAssetNames = [
   orderJs.contractName,
   // orderLineItemJs.contractName,
-  categoryJs.contractName,
-  subCategoryJs.contractName,
-  categoryManagerJs.contractName,
   eventTypeJs.contractName,
   eventTypeManagerJs.contractName,
 ];
@@ -123,7 +116,6 @@ async function uploadContract(token, options) {
 
 async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
-  const categoryManager = categoryManagerJs.bindAddress(admin, state.categoryManager, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
@@ -132,16 +124,21 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, categoryManager, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions) {
   const contract = _contract;
+  console.log(contract)
   const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+  console.log('dapp - userCertificate', userCertificate)
   contract.userOrganization = userCertificate.organization
+  let userOrganization = userCertificate.organization
+
+  console.log('dapp - userCertificate.organization', userCertificate.organization)
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, };
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [],};
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -461,19 +458,21 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const repeatedSerialNumber = [];
     const serialNumbers = []
 
-    for (let i = 0; i < serialNumber.length; i += 200) {
-      serialNo.push(serialNumber[i].itemSerialNumber)
-      const serialNumberArr = serialNo.slice(i, i + 200);
-      const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
 
-      items.forEach(obj => {
-        const item = serialNumberArr.find(num => num === obj.serialNumber);
-        if (item) {
-          repeatedSerialNumber.push(item);
-        }
-      });
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      for (let i = 0; i < serialNumber.length; i += 200) {
+        serialNo.push(serialNumber[i].itemSerialNumber)
+        const serialNumberArr = serialNo.slice(i, i + 200);
+        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
+
+        items.forEach(obj => {
+          const item = serialNumberArr.find(num => num === obj.serialNumber);
+          if (item) {
+            repeatedSerialNumber.push(item);
+          }
+        });
+      }
     }
-
     if (repeatedSerialNumber.length != 0) {
       throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
     }
@@ -482,35 +481,49 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
     let transformedArray = [];
 
-    serialNumber.forEach(function (item) {
-      let rawMaterialProductNameArray = [];
-      let rawMaterialSerialNumberArray = [];
-      let rawMaterialProductIdArray = [];
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      serialNumber.forEach(function (item) {
+        let rawMaterialProductNameArray = [];
+        let rawMaterialSerialNumberArray = [];
+        let rawMaterialProductIdArray = [];
 
-      if (item.rawMaterials.length != 0) {
-        item.rawMaterials.forEach(function (rawMaterial) {
-          let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-          let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-          let rawMaterialProductId = rawMaterial.rawMaterialProductId;
+        if (item.rawMaterials.length != 0) {
+          item.rawMaterials.forEach(function (rawMaterial) {
+            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
+            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
+            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
 
-          for (const element of rawMaterialSerialNumbers) {
-            rawMaterialProductNameArray.push(rawMaterialProductName);
-            rawMaterialSerialNumberArray.push(element);
-            rawMaterialProductIdArray.push(rawMaterialProductId);
-          }
+            for (const element of rawMaterialSerialNumbers) {
+              rawMaterialProductNameArray.push(rawMaterialProductName);
+              rawMaterialSerialNumberArray.push(element);
+              rawMaterialProductIdArray.push(rawMaterialProductId);
+            }
+          });
+        }
+
+        transformedArray.push({
+          "itemNumber": parseInt(util.iuid()),
+          "serialNumber": item.itemSerialNumber,
+          "rawMaterialProductName": rawMaterialProductNameArray,
+          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
+          "rawMaterialProductId": rawMaterialProductIdArray
+        });
+        serialNumbers.push(item.itemSerialNumber)
+      });
+    } 
+    // For some reason an else statement is not working here
+    if (serialNumber.length === 0 || serialNumber.length === undefined) {
+      const quantity = args.quantity;
+      for (let i = 0; i < quantity; i++) {
+        transformedArray.push({
+          "itemNumber": parseInt(util.iuid()),
+          "serialNumber": "",
+          "rawMaterialProductName": [],
+          "rawMaterialSerialNumber": [],
+          "rawMaterialProductId": []
         });
       }
-
-      transformedArray.push({
-        "itemNumber": parseInt(util.iuid()),
-        "serialNumber": item.itemSerialNumber,
-        "rawMaterialProductName": rawMaterialProductNameArray,
-        "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-        "rawMaterialProductId": rawMaterialProductIdArray
-      });
-      serialNumbers.push(item.itemSerialNumber)
-    });
-
+    }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
     const itemParams = {
@@ -531,6 +544,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       itemAddress.slice(0, -1),
       repeatedSerialNumbers.slice(0, -1),
     ];
+
   };
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { inventory: inventoryId } = args;
@@ -541,195 +555,55 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
     return await managers.itemManager.updateItem(itemParams);
   };
-  contract.getProduct = async function (args, options = defaultOptions) {
+  contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getProduct({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
-  contract.getProducts = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+  contract.getProducts = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    console.log('dapp.getProducts - userOrganization', userOrganization)
     return managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: contract.userOrganization },
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
       getOptions
     );
   };
-  contract.getProductNames = async function (args, options = defaultOptions) {
+  contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization },
+      { ...args, sort: '-createdDate' },
       getOptions
     );
   };
-  contract.getInventory = async function (args, options = defaultOptions) {
+  contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventory({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getInventory({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
-  contract.getInventories = async function (args, options = defaultOptions) {
+  contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
-  // ---------------------------------Category Manager ---------------------------
-
-  contract.getCategory = async function (args, options = optionsNoChainIds) {
-    return managers.categoryManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName, });
-  };
-
-  contract.getCategories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.categoryManager.getAll({ ...args, }, getOptions);
-  };
-
-  contract.createCategory = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const createdDate = Math.floor(Date.now() / 1000);
-    return managers.categoryManager.createCategory({ ...args, createdDate, }, createOptions);
-  };
-
-  contract.updateCategory = async function (args, options = defaultOptions) {
-    const { address: category, updates } = args;
-    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName, chainIds: [contract.chainId], };
-    return managers.categoryManager.updateCategory({ category, ...updates, }, createOptions);
-  };
-
-  contract.getSubCategory = async function (args, options = optionsNoChainIds) {
-    return managers.categoryManager.getSubCategory(args, { ...options, org: managers.cirrusOrg, app: contractName, });
-  };
-
-  contract.getSubCategories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.categoryManager.getSubCategories({ ...args, }, getOptions);
-  };
-
-  contract.createSubCategory = async function (args, options = defaultOptions) {
-    const { categoryAddress: category, ...subCategoryArgs } = args;
-    const chainOptions = { ...options, chainIds: [contract.chainId] };
-    const createdDate = Math.floor(Date.now() / 1000);
-    return managers.categoryManager.createSubCategory({ category, createdDate, ...subCategoryArgs }, chainOptions);
-  };
-
-  contract.updateSubCategory = async function (args, options = defaultOptions) {
-    const { categoryAddress: category, subCategoryAddress: subCategory, updates, } = args;
-    const chainOptions = { ...options, chainIds: [contract.chainId] };
-    return managers.categoryManager.updateSubCategory({ ...updates, subCategory, category }, chainOptions);
-  };
-
-  //TODO: remove this method if not required
-  // contract.auditSubCategory = async function (args, options = defaultOptions) {
-  //   const { address, chainId } = args;
-  //   const auditOptions = {...options, org: managers.cirrusOrg, app: contractName}
-  //   return subCategoryJs.getHistory(rawAdmin, chainId, address, auditOptions);
-  // }
-
-  // ---------------------------------Category Manager ends here---------------------------
-  /* TODO: TO be removed in future iterations since product/inventory is managed via product manager */
-  // contract.createProduct = async function (args, options = defaultOptions) {
-  //   const { productArgs, isPublic } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //   if (isPublic) {
-  //     return productJs.uploadContract(rawAdmin, {
-  //       
-  //       ...productArgs,
-  //     }, createOptions);
-  //   } else {
-  //     return productChainJs.createProduct(rawAdmin, {
-  //       
-  //       ...productArgs,
-  //     }, createOptions);
-  //   }
-  // }
-
-  // contract.getProduct = async function (args, options = optionsNoChainIds) {
-  //   return productJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
-  // }
-
-  // contract.getProducts = async function (args = {}, options = optionsNoChainIds) {
-  //   const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //   return productJs.getAll(rawAdmin, {
-  //     
-  //     ...args
-  //   }, getOptions)
-  // }
-
-  // contract.transferOwnershipProduct = async function (args, options = defaultOptions) {
-  //   const { address, chainId, newOwner } = args
-
-  //   const contract = {
-  //     name: productJs.contractName,
-  //     address: address,
-  //   }
-
-  //   const chainOptions = { chainIds: [chainId], ...options }
-
-  //   return productJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner)
-  // }
-
-  // contract.auditProduct = async function (args, options = defaultOptions) {
-  //   const { address, chainId } = args;
-  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //   return productJs.getHistory(rawAdmin, chainId, address, auditOptions);
-  // }
-
-  // contract.getInventory = async function (args, options = optionsNoChainIds) {
-  //   return inventoryJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
-  // }
-
-  // contract.createInventory = async function (args, options = defaultOptions) {
-  //   const { inventoryArgs, isPublic } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //   if (isPublic) {
-  //     return inventoryJs.uploadContract(rawAdmin, {
-  //       
-  //       ...inventoryArgs,
-  //     }, createOptions);
-  //   } else {
-  //     return inventoryChainJs.createInventory(rawAdmin, {
-  //       
-  //       ...inventoryArgs,
-  //     }, createOptions);
-  //   }
-  // }
-
-  // contract.transferOwnershipInventory = async function (args, options = defaultOptions) {
-  // const { address, chainId, newOwner } = args
-
-  //   const contract = {
-  //     name: inventoryJs.contractName,
-  //     address: address,
-  //   }
-
-  //   const chainOptions = { chainIds: [chainId], ...options }
-
-  //   return inventoryJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner)
-  // }
-
-  // contract.auditInventory = async function (args, options = defaultOptions) {
-  //   const { address, chainId } = args;
-  //   const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //   return inventoryJs.getHistory(rawAdmin, chainId, address, auditOptions);
-  // }
-
-  // contract.createItem = async function (args, options = defaultOptions) {
-  //   const { itemArgs } = args;
-  //   const createOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-
-  //   return itemChainJs.createItem(rawAdmin, {
-  //     
-  //     ...itemArgs,
-  //   }, createOptions);
-  // }
-
-  //-----------------------------TO be removed till here-------------------------------
-
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
+  };
+
+  contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: contract.userOrganization }, getOptions)
+    // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+  }
+
+  contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
   }
 
   contract.getItem = async function (args, options = optionsNoChainIds) {
@@ -782,7 +656,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       let userStripeAccount, generatedAccountLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: contract.userOrganization, accountDeauthorized: false }, getOptions)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: userOrganization, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
@@ -895,7 +769,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const inventoryOrganization = inventoriesList[0].ownerOrganization;
       for (const curr_inventory of inventoriesList) {
 
-        if (curr_inventory.ownerOrganization == contract.userOrganization) {
+        if (curr_inventory.ownerOrganization == userOrganization) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
         }
 
@@ -1310,44 +1184,72 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
       const { orderLineId, serialNumber } = args;
+      const quantity = args.quantity || 0;
       const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
-      const { productId } = orderLine
+      const { productId, inventoryId } = orderLine
 
-      const items = await managers.itemManager.getItems({ serialNumber: [...serialNumber], productId }, chainOptions);
-
-      if (serialNumber.length != items.length) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different then the actual inventory")
+      // If no serial numbers are passed, a quantity is passed from the front end. 
+      // This will allow us to get the first n items from the inventory
+      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
+      let items;
+      if (quantity > 0) {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            offset: 0,
+            limit: quantity
+          },
+          chainOptions
+        );
+      } else {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            serialNumber: [...serialNumber]
+          },
+          chainOptions
+        );
+      }
+      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
       }
 
-      const _contract = { name: orderLineJs.contractName, address: orderLineId, };
+      const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
-      // array of item Addresses
-      const itemsAddresses = items.map((_item) => _item.address);
+      const itemsAddresses = items.map(_item => _item.address);
 
+      
       const _args = {
         orderLineId,
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
+      // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
+      // See orderLine.sol 
+      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
 
-      // create orderlineitem for orderline
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
 
-      // update status of all items to sold
-      const [soldStatus] = await managers.itemManager.updateItem({ itemsAddress: itemsAddresses, status: ITEM_STATUS.SOLD, comment: "", });
-
-      if (soldStatus != 200) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "sold status is not updated");
+      const [soldStatus] = await managers.itemManager.updateItem({
+        itemsAddress: itemsAddresses,
+        status: ITEM_STATUS.SOLD,
+        comment: "",
+      });
+      if (soldStatus !== "200") {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
       }
+
       return result;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Creating  the Order Line Item");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the Order Line Item");
     }
   };
 
@@ -1407,7 +1309,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return userAddressJs.getAll(rawAdmin, { ownerOrganization: contract.userOrganization, ...args }, getOptions);
+    return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
   };
 
 
@@ -1427,7 +1329,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
   contract.getEventTypes = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.eventTypeManager.getAll({ ...args, ownerOrganization: contract.userOrganization }, getOptions);
+    return managers.eventTypeManager.getAll({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
 
   contract.transferOwnershipEvent = async function (args, options = defaultOptions) {

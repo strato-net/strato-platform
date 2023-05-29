@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import CategoriesJson from  "../../../category-utility/categories.json"
 
 const options = { config, cacheNonce: true }
 
@@ -9,19 +10,7 @@ class SubCategoryController {
 
   static async get(req, res, next) {
     try {
-      const { dapp, params } = req
-      const { address } = params
-
-      let args
-      let chainOptions = options
-
-      if (address) {
-        args = { address }
-      }
-  
-      chainOptions = { ...options, chainIds: [dapp.chainId] }
-
-      const result = await dapp.getSubCategory(args, chainOptions)
+      let result;
       rest.response.status200(res, result)
 
       return next()
@@ -32,10 +21,34 @@ class SubCategoryController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { query } = req
+      const { category } = query
+      const categories = CategoriesJson.categories;
+
+      if (Array.isArray(category)) {
+        if (category[0].indexOf(",") > -1) {
+          let subCategoryList = [];
+          categories.map((record) => {
+            if (category[0].includes(record.name)) {
+              record.subCategories.map((subCategory) => {
+                subCategoryList.push(subCategory);
+              })
+            }
+          });
+          rest.response.status200(res, subCategoryList)
+        }
+        else {
+          const categoryRecord = categories.find((record) => record.name === category[0]);
+          const subCategories = categoryRecord.subCategories;
+          
+          rest.response.status200(res, subCategories)
+        }
+      }
+
+      const categoryRecord = categories.find((record) => record.name === category);
+      const subCategories = categoryRecord.subCategories;
       
-      const subCategorys = await dapp.getSubCategories({ ...query })
-      rest.response.status200(res, subCategorys)
+      rest.response.status200(res, subCategories)
      
       return next()
     } catch (e) {
@@ -45,11 +58,11 @@ class SubCategoryController {
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { body } = req
 
       SubCategoryController.validateCreateSubCategoryArgs(body)
     
-      const result = await dapp.createSubCategory(body)
+      let result;
       rest.response.status200(res, result)
       
       return next()
@@ -60,32 +73,17 @@ class SubCategoryController {
 
   static async update(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { body } = req
 
       SubCategoryController.validateUpdateSubCategoryArgs(body)
 
-      const result = await dapp.updateSubCategory(body, options)
-
+      let result;
       rest.response.status200(res, result)
       return next()
     } catch (e) {
       return next(e)
     }
   }
-
-   // TODO - remove it post developement
-  // static async audit(req, res, next) {
-  //   try {
-  //     const { dapp, params } = req
-  //     const { address, chainId } = params 
-
-  //     const result = await dapp.auditSubCategory( { address, chainId }, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
-
 
 
 

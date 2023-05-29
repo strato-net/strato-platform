@@ -38,7 +38,7 @@ const CreateModal = ({
     let isDone = await actions.createCategory(dispatch, body); 
 
     if (isDone) {
-      actions.fetchCategory(dispatch, 10, 0, debouncedSearchTerm);
+      actions.fetchCategories(dispatch, 10, 0, debouncedSearchTerm);
       toggleCreateModal(false);
     }
   }

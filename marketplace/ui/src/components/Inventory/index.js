@@ -27,6 +27,7 @@ import { useEventDispatch, useEventState } from "../../contexts/event";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Search } = Input;
 
@@ -43,12 +44,14 @@ const Inventory = ({ user }) => {
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
 
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
   //Categories
   const categoryDispatch = useCategoryDispatch();
-
+  
   const { categorys, iscategorysLoading } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
-    useInventoryState();
+  useInventoryState();
 
   //events
   const eventsDispatch = useEventDispatch();
@@ -58,7 +61,7 @@ const Inventory = ({ user }) => {
   } = useEventState();
 
   useEffect(() => {
-    categoryActions.fetchCategory(categoryDispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
@@ -66,7 +69,7 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user.organization);
+       actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
 
   useEffect(() => {
@@ -135,7 +138,7 @@ const Inventory = ({ user }) => {
   return (
     <>
       {contextHolder}
-      {stripeStatus == null || iscategorysLoading || isInventoriesLoading || isLoadingStripeStatus ? (
+      {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>
@@ -152,16 +155,28 @@ const Inventory = ({ user }) => {
                 <Button
                   type="primary"
                   className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
-                  onClick={onboardSeller}
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      onboardSeller()
+                    }
+                  }}
                   disabled={stripeStatus.detailsSubmitted}
-                >
+                  >
                   {"Connect Stripe"}
                 </Button>
                 <Button
                   id="add-inventory-button"
                   type="primary"
                   className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                  onClick={showModal}
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      showModal()
+                    }
+                  }}
                 >
                   Add Inventory
                 </Button>
@@ -184,10 +199,26 @@ const Inventory = ({ user }) => {
                 </Breadcrumb>
                 <div className="flex">
                   <Search placeholder="Search" className="w-80 mr-3" />
-                  <Button type="primary" className="w-48 mr-3" onClick={onboardSeller} disabled={stripeStatus.detailsSubmitted}>
+                  <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        onboardSeller()
+                      }
+                    }}
+                  >
                     {"Connect Stripe"}
                   </Button>
-                  <Button id="add-inventory-button" type="primary" className="w-48" onClick={showModal}>
+                  <Button id="add-inventory-button" type="primary" className="w-48"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        showModal()
+                      }
+                    }}
+                  >
                     Add Inventory
                   </Button>
                 </div>
@@ -197,7 +228,7 @@ const Inventory = ({ user }) => {
                   <div className="my-4" id="inventory-list">
                     {inventories.map((inventory, index) => {
                       let category = categorys.find(
-                        (c) => c.address === inventory.categoryId
+                        (c) => c.name === inventory.category
                       );
                       return (
                         <InventoryCard

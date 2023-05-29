@@ -15,8 +15,6 @@ export const Category = {
   prefix: '/category',
   get: '/:address/',
   getAll: '/',
-  create: '/',
-  update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
 }
@@ -119,7 +117,9 @@ export const Image = {
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',
-  getTopSellingProducts: '/topselling'
+  getAllLoggedIn: '/all',
+  getTopSellingProducts: '/topselling',
+  getTopSellingProductsLoggedIn: '/user/topselling'
 }
 
 export const PaymentService = {

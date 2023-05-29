@@ -129,7 +129,7 @@ definitions:
             type: string
           description:
             type: string
-          categoryId:
+          category:
             type: string
           createdAt:
             type: string
@@ -147,7 +147,7 @@ definitions:
             type: string
           description:
             type: string
-          categoryId:
+          category:
             type: string
           createdAt:
             type: string

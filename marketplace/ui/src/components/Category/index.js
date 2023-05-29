@@ -63,7 +63,7 @@ const Category = () => {
 
 
   useEffect(() => {
-    actions.fetchCategory(
+    actions.fetchCategories(
       dispatch,
       limit,
       offset,
@@ -201,7 +201,7 @@ const Category = () => {
       />
       <DataTableComponent
         columns={columns}
-        data={ categorys}
+        data={categorys}
         isLoading={iscategorysLoading}
         naviroute={naviroute}
         rowKey={'chainId'}   

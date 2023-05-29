@@ -22,8 +22,8 @@ router.get(
 );
 
 router.get(
-  Event.getAll,
-  authHandler.authorizeRequest(),
+  Event.getAll,  
+  authHandler.authorizeRequest(true),
   loadDapp,
   EventController.getAll
 );
@@ -51,6 +51,7 @@ router.put(
 
 router.get(
   Event.audit,
+  authHandler.authorizeRequest(true),
   loadDapp,
   EventController.audit
 )
