@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.get(
   Item.getAll,
+  authHandler.authorizeRequest(true),
   loadDapp,
   ItemController.getAll
 );

@@ -650,8 +650,14 @@ const ProductDetails = ({ user, users }) => {
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}
-                items={[
-                  {
+                items={!user ?
+                  [{
+                    label: `Description`,
+                    key: "1",
+                    children: <DescriptionComponent />,
+                  }]
+                  :
+                  [{
                     label: `Description`,
                     key: "1",
                     children: <DescriptionComponent />,
