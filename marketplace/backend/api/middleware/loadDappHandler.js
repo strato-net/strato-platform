@@ -68,26 +68,14 @@ const loadDapp = async (req, res, next) => {
     // } else {
   
     try {
-      address = await rest.getKey(userCredentials, options);
+      address = await rest.createOrGetKey(userCredentials, options);
     } catch (e) {
       // user isn't created in STRATO
       if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
-        rest.response.status(RestStatus.FORBIDDEN, res);
-        // return next(); I don't think this is needed since we want to create the user if it doesn't exist?
+        console.log('User not created in STRATO! but now created')
       }
-    
-      // create new user
-      try {
-        address = await rest.createKey(userCredentials, options);
-      } catch (e) {
-        console.error("Error in createKey:", e);
-        // Better error handling here?
-      }
+      return next(e)
     }
-    // TODO: if there are multiple simultaneous calls made to different endpoints (by a browser when the page loads),
-    //       then these lines can be hit multiple times at the same time.
-    //       So when you try to createKey, it is possible that it was already 
-    //       created in the same moment of time by another thread. So the exception here in such case should not fail the app
     
   
       const user = {
