@@ -67,18 +67,19 @@ const loadDapp = async (req, res, next) => {
   
     // } else {
   
-      try {
-        address = await rest.getKey(userCredentials, options)
-      } catch (e) {
-        // user isn't created in STRATO
-        if (e.response.status === RestStatus.BAD_REQUEST) {
-          rest.response.status(RestStatus.FORBIDDEN, res)
-          return next()
-        }
-  
-        // unexpected error
-        return next(e)
+    try {
+      address = await rest.getKey(userCredentials, options);
+    } catch (e) {
+      // user isn't created in STRATO
+      if (e.response.status === RestStatus.BAD_REQUEST) {
+        rest.response.status(RestStatus.FORBIDDEN, res)
+        return next()
       }
+      
+      // unexpected error
+      return next(e)
+    }
+    
   
       const user = {
         ...userCredentials,
