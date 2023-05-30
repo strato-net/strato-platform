@@ -357,7 +357,7 @@ const actions = {
     dispatch({ type: actionDescriptors.updateBuyerDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/order/updateBuyerDetails`, {
+      const response = await fetch(`${apiUrl}/order/details`, {
         method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
@@ -397,7 +397,7 @@ const actions = {
     dispatch({ type: actionDescriptors.updateSellerDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/order/updateSellerDetails`, {
+      const response = await fetch(`${apiUrl}/order/details`, {
         method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {

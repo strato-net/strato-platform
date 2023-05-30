@@ -98,7 +98,7 @@ const SoldOrderDetails = ({ user, users }) => {
       } else {
         setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
       }
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -122,7 +122,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-   
+
   }, [routeMatch]);
 
   useEffect(() => {
@@ -160,7 +160,7 @@ const SoldOrderDetails = ({ user, users }) => {
         }
 
       } catch (err) {
-       
+
       }
     }
 
@@ -240,9 +240,9 @@ const SoldOrderDetails = ({ user, users }) => {
     if (selectedDate == null) {
       body = {
         address: Id,
-      
+        type: 'seller',
         updates: {
-          sellerComments: comment,
+          comments: comment,
           status: parseInt(getStatusByValue(status)),
 
         },
@@ -250,9 +250,9 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-      
+        type: 'seller',
         updates: {
-          sellerComments: comment,
+          comments: comment,
           status: 3,
           fullfilmentDate: dayjs(selectedDate).unix(),
         },
@@ -275,23 +275,23 @@ const SoldOrderDetails = ({ user, users }) => {
       }
       body = {
         address: Id,
-      
+        type: 'seller',
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
-          sellerComments: comment,
+          comments: comment,
           // fullfilmentDate: dayjs(selectedDate).unix(),
         },
       };
     } else {
       body = {
         address: Id,
-        
+        type: 'seller',
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
         },
       };
     }
-   
+
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
@@ -339,7 +339,7 @@ const SoldOrderDetails = ({ user, users }) => {
       // width: "192px",
       render: (text) =>
         console.log("text", text) &&
-        text.isSerialUploaded == null || text.isSerialUploaded === false ? (
+          text.isSerialUploaded == null || text.isSerialUploaded === false ? (
           <Button
             id="upload-button"
             className="text-primary text-[17px]"
@@ -360,7 +360,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 navigate(
                   `${routes.SoldOrderItemDetail.url
                     .replace(":id", text.address)}`,
-                    // .replace(":chainId", text.chainId)}`
+                  // .replace(":chainId", text.chainId)}`
                   { state: { orderId: orderDetails.orderId, address: Id } }
                 );
               }}
@@ -635,7 +635,7 @@ const SoldOrderDetails = ({ user, users }) => {
           isUploadSerialNumberModalOpen={isUploadSerialNumberModalOpen}
           toggleUploadSerialNumberModal={setisUploadSerialNumberModalOpen}
           product={selectedProd}
-       
+
           orderId={details.orderId}
           orderAddress={details.address}
           dispatch={dispatch}

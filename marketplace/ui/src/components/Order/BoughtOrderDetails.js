@@ -295,8 +295,9 @@ const BoughtOrderDetails = ({ user, users }) => {
   const handleCancelOrder = async () => {
     const body = {
       address: Id,
+      type: 'buyer',
       updates: {
-        buyerComments: encodeURIComponent(comment),
+        comments: encodeURIComponent(comment),
         status: 4,
       },
     };
