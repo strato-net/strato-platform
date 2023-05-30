@@ -199,7 +199,7 @@ class OrderController {
       updates: Joi.object({
         status: Joi.number().required(),
         comments: Joi.string().allow(''),
-        fullfilmentDate: Joi.number()
+        fullfilmentDate: Joi.number().allow(0)
       })
     });
 
