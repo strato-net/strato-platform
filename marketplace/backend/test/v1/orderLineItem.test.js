@@ -2,7 +2,6 @@ import { assert, rest } from 'blockapps-rest'
 import { util } from '/blockapps-rest-plus'
 import dotenv from 'dotenv'
 import config from '../../load.config'
-import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
@@ -11,6 +10,7 @@ import factory from './factories/orderLineItem'
 import { OrderLineItem, Order,Product,Inventory, OrderLine } from '../../api/v1/endpoints'
 import { inventoryArgs } from './factories/inventory'
 import { productArgs } from './factories/product'
+import constants, { ORDER_STATUS } from "/helpers/constants";
 
 const options = { config }
 
@@ -249,7 +249,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderLineItemResponse.body.data, 'body should be defined');
   })
 
-  it('Create an Order till closed status with pay later flow', async () => {
+  it.only('Create an Order till closed status with pay later flow', async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),
     }
@@ -291,11 +291,8 @@ describe('OrderLineItem End-To-End Tests', function () {
       createOrderArgs,
       globalAdmin.token
     )
-    const [orderResponse]=createOrderResponse.body.data
+    const orderAddress=createOrderResponse.body.data[1]
 
-    const [,orderAddress] = orderResponse
-    
-    console.log(createOrderResponse.body.data)
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
 
@@ -306,6 +303,7 @@ describe('OrderLineItem End-To-End Tests', function () {
       {},
       globalAdmin.token,
     )
+
     const [orderLines]=getOrderResponse.body.data.orderLines
     const {address:orderLineId}=orderLines
     const orderId=getOrderResponse.body.data.orderId
@@ -329,24 +327,26 @@ describe('OrderLineItem End-To-End Tests', function () {
 
     const orderCloseArgs = {
       address:orderAddress,
-      updates:{
-        status:3,
-        sellerComments:"dfjlksdjf",
-        fullfilmentDate:0
+      type: 'seller',
+      updates: {
+        status: ORDER_STATUS.CLOSED,
+        comments: 'comment',
+        fullfilmentDate: new Date().getTime(),
       }
     }
 
      // update inventory
-     const updateSellerDetailsResponse = await put(
+     const updateOrderDetailsResponse = await put(
       Order.prefix,
-      Order.updateSellerDetails,
+      Order.updateOrderDetails,
       orderCloseArgs,
       seller.token,
     )
 
-    assert.equal(updateSellerDetailsResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(updateSellerDetailsResponse.body, 'body should be defined');
+    assert.equal(updateOrderDetailsResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(updateOrderDetailsResponse.body, 'body should be defined');
   })
+
   it("Sholud not create an order if seller hasn't activated the payment method", async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),

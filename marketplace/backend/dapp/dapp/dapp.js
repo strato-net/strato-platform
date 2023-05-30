@@ -989,49 +989,34 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   // }
 
   contract.createOrder = async function (args, options = defaultOptions) {
-    const { paymentSessionId = "" } = args;
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
-    const orderId = util.uid();
-    return managers.orderManager.createOrder({ orderId, ...args, paymentSessionId, orderDate, createdDate, shippingCharges: CHARGES.SHIPPING, tax: CHARGES.TAX });
+    try{
+      const { paymentSessionId = "" } = args;
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
+      const orderId = util.uid();
+      return managers.orderManager.createOrder({ orderId, ...args, paymentSessionId, orderDate, createdDate, shippingCharges: CHARGES.SHIPPING, tax: CHARGES.TAX });
+    }catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the order");
+    }
   }
 
   contract.updateOrderDetails = async function (args, options = defaultOptions) {
     try {
-      const { address, chainId, type, updates } = args;
-
-      const contract = { name: orderJs.contractName, address: address, };
+      const { address, type, updates } = args;
       const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
-      if (updates.status == ORDER_STATUS.CANCELED) {
+      const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
+      const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateOrderDetails({ orderAddress: address, type, ...updates });
-        return { statusResponse }
+      let itemAddresses;
+      const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLinesAddresses }, createOptions)
+      itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
 
-      } else if (updates.status == ORDER_STATUS.CLOSED && type == 'seller') {
-
-        await managers.orderManager.updateOrderDetails({ orderAddress: address, ...updates });
-
-        const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-        const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
-
-        let itemAddresses
-        let newOwner = orderLines[0].owner
-        let result = []
-
-        for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-          itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
-          result.push({ status, productId, inventoryId });
-        }
-        return result;
-      }
-
-      return managers.orderManager.updateOrderDetails({ orderAddress: address, ...updates });
+      return managers.orderManager.updateOrderDetails({ orderAddress: address, type, ...updates, dappAddress, itemAddresses });
     } catch (error) {
-      console.log("......................error", error)
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
