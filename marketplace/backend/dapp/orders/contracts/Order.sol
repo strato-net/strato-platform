@@ -5,6 +5,8 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "../../../products/contracts/Inventory.sol";
 import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
+import "/dapp/orders/contracts/OrderLineItem.sol";
+import "/dapp/items/contracts/ItemManager.sol";
 
 /// @title A representation of Order assets
 contract Order is OrderStatus {
@@ -84,6 +86,8 @@ contract Order is OrderStatus {
         , uint _fullfilmentDate
         , string _comments
         , uint _scheme
+        , address _dappAddress
+        , address[] _itemAddresses
     ) public  returns (uint,string,string) {
 
       mapping(string => string) ownerCert = getUserCert(tx.origin);
@@ -94,15 +98,25 @@ contract Order is OrderStatus {
 
     // check for open status to closed status
      if(_status == OrderStatus.CLOSED && _type == 'seller'){
-       for(uint i=0;i<orderLines.length;i++){
+      address newOwner;
+      string productIds = "";
+      string inventoryIds = "";
+
+      for(uint i=0;i<orderLines.length;i++){
         OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
+        newOwner = orderLine.owner();
+        
         // if(!orderLine.isSerialUploaded()){
         //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
         // }
       }
       fullfilmentDate = _fullfilmentDate;
-      (uint statusResponse, address[] inventoryIdArray, int[] inventoryQuantityArray) = getInventoriesAndAvailableQuantity(_status,_comments,orderLines,false);
-      return (RestStatus.OK,string(address(0)),string(address(0)));
+      getInventoriesAndAvailableQuantity(_status,_comments,orderLines,false);
+      (uint status, address productId, address InventoryId) = ItemManager.transferOwnership(_itemAddresses, newOwner, _dappAddress);
+
+      productIds += string(address(productId)) + ",";
+      inventoryIds += string(address(InventoryId)) + ",";
+      return (status, productIds, inventoryIds);
      }
 
      bool val;
@@ -272,8 +286,8 @@ contract Order is OrderStatus {
       for (uint i = 0; i < orderLines.length; i++) {
         OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
         Inventory inventory = Inventory(address(orderLine.inventoryId()));
-        inventories[i] = address(orderLine.inventoryId());
-        orderLineQuantities[i] = int(orderLine.quantity());
+        inventories.push(address(orderLine.inventoryId()));
+        orderLineQuantities.push(int(orderLine.quantity()));
       }
 
       return (RestStatus.OK,inventories,orderLineQuantities);
