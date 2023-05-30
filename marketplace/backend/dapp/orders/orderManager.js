@@ -260,29 +260,29 @@ async function createOrder(admin, contract, _args, baseOptions) {
 // }
 
 async function updateOrderDetails(admin, contract, _args, baseOptions) {
-  // const args = marshalInUpdateOrder(_args);
-    var scheme = Object.keys(_args).reduce((agg, key) => {
-      const base = 1;
-      switch (key) {
-        case "type":
-          return agg | (base << 0);
-        case "status":
-          return agg | (base << 1);
-        case "fullfilmentDate":
-          return agg | (base << 2);
-        case "comments":
-          return agg | (base << 3);
-        default:
-          return agg;
-      }
-    }, 0);
+  const args = marshalInUpdateOrder(_args);
+  var scheme = Object.keys(args).reduce((agg, key) => {
+    const base = 1;
+    switch (key) {
+      case "type":
+        return agg | (base << 0);
+      case "status":
+        return agg | (base << 1);
+      case "fullfilmentDate":
+        return agg | (base << 2);
+      case "comments":
+        return agg | (base << 3);
+      default:
+        return agg;
+    }
+  }, 0);
 
   const callArgs = {
     contract,
     method: "updateOrderDetails",
     args: util.usc({
       scheme,
-      ..._args,
+      ...args,
     }),
   };
 
