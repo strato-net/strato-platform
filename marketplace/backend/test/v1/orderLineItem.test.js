@@ -249,7 +249,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(getOrderLineItemResponse.body.data, 'body should be defined');
   })
 
-  it.only('Create an Order till closed status with pay later flow', async () => {
+  it('Create an Order till closed status with pay later flow', async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),
     }
@@ -347,7 +347,7 @@ describe('OrderLineItem End-To-End Tests', function () {
     assert.isDefined(updateOrderDetailsResponse.body, 'body should be defined');
   })
 
-  it("Sholud not create an order if seller hasn't activated the payment method", async () => {
+  it("Should not create an order if seller hasn't activated the payment method", async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),
     }

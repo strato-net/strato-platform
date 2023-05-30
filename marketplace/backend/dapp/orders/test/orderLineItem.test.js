@@ -8,7 +8,6 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderLineItemJs from '../orderLineItem';
 import factory from '../factory/orderLineItem.factory';
 import { args } from 'commander';
