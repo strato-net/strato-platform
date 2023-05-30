@@ -261,34 +261,21 @@ async function createOrder(admin, contract, _args, baseOptions) {
 
 async function updateOrderDetails(admin, contract, _args, baseOptions) {
   // const args = marshalInUpdateOrder(_args);
-  if (_args.type == 'buyer') {
     var scheme = Object.keys(_args).reduce((agg, key) => {
       const base = 1;
       switch (key) {
-        case "status":
+        case "type":
           return agg | (base << 0);
-        case "buyerComments":
+        case "status":
           return agg | (base << 1);
-        default:
-          return agg;
-      }
-    }, 0);
-  }
-  else if (_args.type == 'seller') {
-    var scheme = Object.keys(_args).reduce((agg, key) => {
-      const base = 1;
-      switch (key) {
-        case "status":
-          return agg | (base << 0);
         case "fullfilmentDate":
-          return agg | (base << 1);
-        case "sellerComments":
           return agg | (base << 2);
+        case "comments":
+          return agg | (base << 3);
         default:
           return agg;
       }
     }, 0);
-  }
 
   const callArgs = {
     contract,
