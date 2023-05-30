@@ -110,9 +110,9 @@ contract OrderManager is RestStatus,OrderStatus{
     //      return order.updateSellerDetails(_status,_fullfilmentDate,_sellerComments,_scheme);
     // } 
 
-     function updateOrderDetails(string _type,address _orderAddress,OrderStatus _status,uint _fullfilmentDate,string _comments,uint _scheme) public  returns (uint,string,string){
+     function updateOrderDetails(address _orderAddress,string _type,OrderStatus _status,uint _fullfilmentDate,string _comments,uint _scheme, address _dappAddress, address[] _itemAddresses) public  returns (uint,string,string){
          Order order = Order(_orderAddress);
-         return order.updateDetails(_type,_status,_fullfilmentDate,_comments,_scheme);
+         return order.updateDetails(_type,_status,_fullfilmentDate,_comments,_scheme,_dappAddress,_itemAddresses);
     }
 
     function getInventoriesAndAvailableQuantity(address _orderAddress,OrderStatus _status,string _comments,address[] _orderLines,bool _isBuyer)  public returns (uint,address[],int[]) {
