@@ -12,7 +12,7 @@ import * as R from 'ramda';
 import factory from './factories/order'
 import { inventoryArgs } from './factories/inventory'
 import { productArgs } from './factories/product'
-import { Order, Product,Inventory } from '../../api/v1/endpoints'
+import { Order, Product, Inventory } from '../../api/v1/endpoints'
 
 const options = { config }
 
@@ -36,7 +36,7 @@ describe('Order End-To-End Tests', function () {
       sellerToken = await oauthHelper.getUserToken(
         `${process.env.TEST_SELLER_ORG}`,
         `${process.env.TEST_SELLER_PASSWORD}`,
-      ) 
+      )
     } catch (e) {
       console.error(
         'ERROR: Unable to fetch the  user token, check your OAuth settings in config',
@@ -46,7 +46,7 @@ describe('Order End-To-End Tests', function () {
     }
 
     const globalAdminCredentials = { token: globalAdminToken }
-    const sellerCredentials = {token:sellerToken}
+    const sellerCredentials = { token: sellerToken }
 
     const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
     const sellerResponse = await oauthHelper.getStratoUserFromToken(sellerCredentials.token)
@@ -62,7 +62,7 @@ describe('Order End-To-End Tests', function () {
       sellerResponse.message
     )
     seller = { ...sellerResponse.user, ...sellerCredentials }
-    globalAdmin = {...globalAdminResponse.user,...globalAdminCredentials}
+    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
 
     const buyerCert = await certificateJs.getCertificateMe(globalAdmin)
     buyerOrganization = buyerCert.organization;
@@ -79,29 +79,29 @@ describe('Order End-To-End Tests', function () {
       createProductArgs,
       seller.token,
     )
-    const [,productAddress]=createProductResponse.body.data;
-    
+    const [, productAddress] = createProductResponse.body.data;
+
     assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createProductResponse.body, 'body should be defined')
-    
-    const createInventoryArgs={
+
+    const createInventoryArgs = {
       ...inventoryArgs(productAddress, util.uid()),
     }
 
-    const createInventoryResponse=await post(
+    const createInventoryResponse = await post(
       Inventory.prefix,
       Inventory.create,
       createInventoryArgs,
       seller.token,
     )
-    const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
- 
+    const [, inventoryAddress, serialNumbers] = createInventoryResponse.body.data
+
     assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
 
-    const inventories=[inventoryAddress]
-    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-    
+    const inventories = [inventoryAddress]
+    const createOrderArgs = factory.getCreateOrderArgs(util.uid(), buyerOrganization, inventories)
+
     const createOrderResponse = await post(
       Order.prefix,
       Order.create,
@@ -124,29 +124,29 @@ describe('Order End-To-End Tests', function () {
       createProductArgs,
       seller.token,
     )
-    const [,productAddress]=createProductResponse.body.data;
-    
+    const [, productAddress] = createProductResponse.body.data;
+
     assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createProductResponse.body, 'body should be defined')
-    
-    const createInventoryArgs={
+
+    const createInventoryArgs = {
       ...inventoryArgs(productAddress, util.uid()),
     }
 
-    const createInventoryResponse=await post(
+    const createInventoryResponse = await post(
       Inventory.prefix,
       Inventory.create,
       createInventoryArgs,
       seller.token,
     )
-    const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
- 
+    const [, inventoryAddress, serialNumbers] = createInventoryResponse.body.data
+
     assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
 
-    const inventories=[inventoryAddress]
-    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-    
+    const inventories = [inventoryAddress]
+    const createOrderArgs = factory.getCreateOrderArgs(util.uid(), buyerOrganization, inventories)
+
     const createOrderResponse = await post(
       Order.prefix,
       Order.create,
@@ -155,18 +155,14 @@ describe('Order End-To-End Tests', function () {
     )
 
     const orderAddress = createOrderResponse.body.data[1]
-    // const orderAddress = createOrderResponse.body.data[0].address
-    // const orderChainId = createOrderResponse.body.data[0].chainIds[0]
 
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
-    console.log("createOrderResponse", createOrderResponse.body.data[1]);
 
     // get
     const getOrderResponse = await get(
       Order.prefix,
-      // Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
-      Order.get.replace(':address',orderAddress),
+      Order.get.replace(':address', orderAddress),
       {},
       globalAdmin.token,
     )
@@ -203,7 +199,7 @@ describe('Order End-To-End Tests', function () {
 
     assert.equal(createUserAddressResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createUserAddressResponse.body, 'body should be defined')
-    
+
   })
 
   it('Get all user address', async () => {

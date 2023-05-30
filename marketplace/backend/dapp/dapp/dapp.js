@@ -138,7 +138,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   console.log('dapp - userCertificate.organization', userCertificate.organization)
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [],};
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -510,7 +510,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    } 
+    }
     // For some reason an else statement is not working here
     if (serialNumber.length === 0 || serialNumber.length === undefined) {
       const quantity = args.quantity;
@@ -865,137 +865,14 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
     }
   };
 
-  // contract.createOrder = async function (args, options = defaultOptions) {
-
-  //   try {
-  //     const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
-  //     const currentTimestamp = Math.floor(Date.now() / 1000);
-
-  //     const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
-
-  //     const createOptions = { ...optionsNoChainIds, org: managers.cirrusOrg }
-  //     const orderOptions = { ..._defaultOptions, org: managers.cirrusOrg }
-
-  //     if (paymentSessionId.length > 1) {
-  //       const order = await managers.orderManager.getOrders(rawAdmin, { paymentSessionId }, createOptions);
-  //       if (order.length > 0) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, `Order already placed for payment_id ${paymentSessionId}`)
-  //       }
-  //     }
-
-  //     // get inventories data
-  //     const inventoryIdArray = orderList.map(order => order.inventoryId);
-  //     const inventories = await managers.productManager.getInventories(
-  //       { address: [...inventoryIdArray] },
-  //       createOptions
-  //     );
-
-  //     if (!Array.isArray(inventories)) {
-  //       throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
-  //     }
-
-  //     const quantitiesToReduce = orderList.map(order => order.quantity);
-
-  //     // reducing quantity inside inventories to place order and checking the buyerOrganization should not be equal to inventory organization
-  //     inventories.forEach(inventory => {
-  //       if (buyerOrganization == inventory.ownerOrganization) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller can not buy his own product");
-  //       }
-  //       const orderItem = orderList.find(item => item.inventoryId === inventory.address);
-  //       if (orderItem) {
-  //         inventory.quantity = orderItem.quantity;
-  //       }
-
-  //     });
-
-  //     const groupedData = inventories.reduce((acc, inventory) => {
-  //       if (!acc[inventory.ownerOrganization]) {
-  //         acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
-  //       }
-  //       acc[inventory.ownerOrganization].data.push(inventory);
-  //       return acc;
-  //     }, {});
-
-  //     console.log("groupedData",groupedData);
-
-  //     const inventoriesData = Object.values(groupedData);
-  //     const total = inventoriesData.reduce((acc, obj) => {
-  //       const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
-  //       return acc + result;
-  //     }, 0);
-  //     console.log("inventoriesData",inventoriesData)
-  //     if (total != recievedOrderTotal) {
-  //       throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
-  //     }
-
-  //     let orders = [];
-  //     for (const inventory of inventoriesData) {
-  //       const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
-  //       const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
-  //       const tax = inventoryTotal * CHARGES.TAX;
-
-  //       // shipping charge for order 
-  //       const orderTotal = inventoryTotal + shippingCharge + tax;
-  //       const amountPaid = orderTotal;  // need to remove if no further use
-
-  //       const orderArgs = {
-
-  //         orderId: util.uid(),
-  //         buyerOrganization,
-  //         sellerOrganization: inventory.ownerOrganization,
-  //         orderDate,
-  //         orderTotal,
-  //         orderShippingCharges: shippingCharge,
-  //         status: ORDER_STATUS.AWAITING_FULFILLMENT,
-  //         amountPaid,
-  //         buyerComments: '',
-  //         sellerComments: '',
-  //         createdDate, paymentSessionId, shippingAddress
-  //       }
-
-  //       // console.log(createOptions)
-  //       // process.exit()
-
-  //       const order = await managers.orderManager.createOrder(orderArgs);
-  //       orders.push(order);
-
-  //       // add orderLine for inventories
-  //       for (const inventoryObject of inventory.data) {
-
-  //         const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-  //         const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-
-  //         await managers.orderManager.addOrderLine({
-  //           // inventoryOwner: inventoryObject.owner,
-  //           orderAddress: order[1],
-  //           productId: inventoryObject.productId,
-  //           inventoryId: inventoryObject.address,
-  //           quantity: inventoryObject.quantity,
-  //           pricePerUnit: inventoryObject.pricePerUnit,
-  //           shippingCharges,
-  //           tax,
-  //           createdDate
-  //         });
-  //       };
-  //     }
-  //     await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantitiesToReduce, isReduce: true })
-  //     return orders;
-  //   } catch (error) {
-  //     if (error.response) {
-  //       throw new rest.RestError(error.response.status, error.response.statusText);
-  //     }
-  //     throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the order");
-  //   }
-  // }
-
   contract.createOrder = async function (args, options = defaultOptions) {
-    try{
+    try {
       const { paymentSessionId = "" } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
       const orderId = util.uid();
       return managers.orderManager.createOrder({ orderId, ...args, paymentSessionId, orderDate, createdDate, shippingCharges: CHARGES.SHIPPING, tax: CHARGES.TAX });
-    }catch (error) {
+    } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
@@ -1023,81 +900,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
     }
   };
-
-  // contract.updateBuyerDetails = async function (args, options = defaultOptions) {
-  //   try {
-  //     const { address, chainId, updates } = args;
-
-  //     const contract = { name: orderJs.contractName, address: address };
-
-  //     const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-  //     if (updates.status == ORDER_STATUS.CANCELED) {
-  //       const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-  //         await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
-
-  //       const inventories = inventoryAddresses.split(",").slice(0, -1);
-  //       const quantities = quantitiesToUpdate.split(",").slice(0, -1);
-  //       const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
-
-  //       return { status };
-  //     }
-
-  //     return managers.orderManager.updateBuyerDetails({ orderAddress: address, updates });
-  //   } catch (error) {
-  //     if (error.response) {
-  //       throw new rest.RestError(error.response.status, error.response.statusText);
-  //     }
-  //     throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-  //   }
-  // };
-
-  // contract.updateSellerDetails = async function (args, options = defaultOptions) {
-  //   try {
-  //     const { address, chainId, updates } = args;
-
-  //     const contract = { name: orderJs.contractName, address: address, };
-
-  //     const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-  //     if (updates.status == ORDER_STATUS.CANCELED) {
-  //       const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-  //         await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-
-  //       const inventories = inventoryAddresses.split(",").slice(0, -1);
-  //       const quantities = quantitiesToUpdate.split(",").slice(0, -1);
-  //       const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
-
-  //       return { status };
-  //     } else if (updates.status == ORDER_STATUS.CLOSED) {
-
-
-  //       const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-
-  //       // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: contractName }
-
-  //       const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-  //       const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
-
-  //       let itemAddresses
-  //       let newOwner = orderLines[0].owner
-  //       let result = []
-
-  //       for (let orderLineAddress of orderLinesAddresses) {
-  //         const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-  //         itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-  //         const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
-  //         result.push({ status, productId, inventoryId });
-  //       }
-  //       return result;
-  //     }
-
-  //     return managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-  //   } catch (error) {
-  //     if (error.response) {
-  //       throw new rest.RestError(error.response.status, error.response.statusText);
-  //     }
-  //     throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-  //   }
-  // };
 
   contract.getOrder = async function (args, options = optionsNoChainIds) {
     try {
@@ -1207,7 +1009,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const itemsAddresses = items.map(_item => _item.address);
 
-      
+
       const _args = {
         orderLineId,
         items: itemsAddresses,
