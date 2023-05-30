@@ -657,8 +657,7 @@ const ProductDetails = ({ user, users }) => {
                     children: <DescriptionComponent />,
                   }]
                   :
-                  [
-                  {
+                  [{
                     label: `Description`,
                     key: "1",
                     children: <DescriptionComponent />,
