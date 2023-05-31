@@ -1,5 +1,6 @@
 {-# LANGUAGE
-      DataKinds
+    BangPatterns
+    , DataKinds
     , DeriveGeneric
     , FlexibleContexts
     , FlexibleInstances
@@ -35,6 +36,7 @@ import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.IORef
+import qualified Data.Set as S
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -304,20 +306,14 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-processedContractToProcessedMappings :: MonadIO m => ProcessedContract -> m [ProcessedMapping]
-processedContractToProcessedMappings pc = do
-  let vMappings = Map.filter (/= ValueMapping) (Map.elems contractData pc) 
-      (mapKeys, mapValues) = foldr (\mapping (ks, vs) -> let (km, vm) = getKeysAndValues mapping in (km ++ ks, vm ++ vs)) ([], []) vMappings
-    
-  pMappings <- zipWith (processedMapping pc) keys values
-  return $ pMappings
-  
-  -- look at contract data in processedcontract 
-  -- filter out the maps 
-  -- convert each key value to a ProcessedMapping and add to a list
-  -- return list of mappings
-
-
+processedContractToProcessedMappings :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMapping]
+processedContractToProcessedMappings pc mapNames = do
+  let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _-> True;_ -> False) (contractData pc)
+      onlyRecord = Map.restrictKeys valueMappingsMap (S.fromList mapNames)
+      list_onlyRecord = Map.toList onlyRecord
+      list_mapNames_ = filter (not . null . snd) $ map (\(y, x) -> (y, case x of ValueMapping value_map -> Map.toList value_map; _ -> [])) list_mapNames
+      result = concatMap (\(keyA, map_of_a_b) -> concatMap (\(keyB, value) -> [processedMapping keyA pc (SimpleValue keyB) value]) map_of_a_b) list_mapNames_
+  return $ result
 
 
 -- Things to do 
@@ -403,7 +399,7 @@ parseActions events' =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events' = [a | EventEmitted a <- events']
 
-convertToMap :: [Text] -> Maybe (Map.Map Text [(Value, Value)])
+convertToMap :: [Text] -> [(Text,Text,Text)]
 convertToMap maps = do
   let jsonString = T.unpack $ T.concat maps
   jsonValue <- Aeson.decode $ fromString jsonString
@@ -494,6 +490,7 @@ processTheMessages env sqlEnv conn g messages = do
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
+      allMaps = 
 
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
@@ -520,9 +517,9 @@ processTheMessages env sqlEnv conn g messages = do
                 let nameParts = (o, a', n)
 
                 --Create mapping tables
-                let mapNames = Map.keys $ fromMaybe Map.empty (convertToMap mapz)
+
                 forM mapNames $ \m -> do 
-                  outputData' conn $ createMappingTable g nameParts m
+                  outputData' conn $ createMappingTable g nameParts m --Tables are created
 
 -- mark
                 outputData' conn $ createExpandHistoryTable g c nameParts
@@ -570,7 +567,7 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          pMappings <- processedContractToProcessedMappings indexContract --get all procsesed mappings
+          pMappings <- processedContractToProcessedMappings indexContract bigMapsNames --get all procsesed mappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs pMappings

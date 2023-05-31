@@ -38,7 +38,7 @@ data ProcessedContract = ProcessedContract
 
   -- map1 ValueMapping (Map.Map SimpleValue Value)
 
-  map1 Map(key1 value1, key2 value2 , key3 value3 )
+  -- map1 Map(key1 value1, key2 value2 , key3 value3 )
 
 data ProcessedMapping = ProcessedMapping
   { m_address           :: Address
