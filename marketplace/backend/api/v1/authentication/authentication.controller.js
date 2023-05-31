@@ -45,7 +45,7 @@ class AuthenticationController {
         // user isn't created in STRATO
         if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
           console.log('User not created in STRATO!')
-          return next(e)
+          next(e)
         }
       }
       const userCredentials = { token: accessToken }
