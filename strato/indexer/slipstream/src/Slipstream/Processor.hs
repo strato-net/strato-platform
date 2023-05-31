@@ -89,6 +89,7 @@ import Slipstream.Options
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 
 import Text.Format
 
@@ -452,6 +453,15 @@ processTheMessages env sqlEnv conn g messages = do
                            else case cp of
                             SolidVMCode n' _ | nameString /= n' -> T.pack n'
                             _ -> a
+
+
+                -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
+                -- We will then create a table for each of these mappings and add a foreign key to the main table
+
+                let storageDefs' = c ^. storageDefs
+                    storageDefsList = Map.toList storageDefs'
+                    listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
+                    listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames

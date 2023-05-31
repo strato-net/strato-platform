@@ -842,8 +842,8 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                   setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
                 forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
                   case theType of
-                    SVMType.Mapping _ _ _-> return ()
-                    SVMType.Array _ _-> return ()
+                    SVMType.Mapping _ _ _ -> return () 
+                    SVMType.Array _ _ -> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
@@ -2778,8 +2778,8 @@ runTheConstructors from to hsh cc contractName' argExps = do
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
   forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
-    case theType of
-      SVMType.Mapping _ _ _-> return ()
+    case theType  of
+      SVMType.Mapping _ _ _ -> return ()
       SVMType.Array _ _-> return ()
       t -> do 
         defVal <- createDefaultValue cc contract' t

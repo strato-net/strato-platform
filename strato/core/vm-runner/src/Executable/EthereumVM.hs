@@ -569,6 +569,7 @@ sendOutEvent (OutAction act) =
                   case join $ fmap (M.lookup "history") (a^.Action.metadata) of
                     Nothing -> []
                     Just v -> T.splitOn "," v
+              
             }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
