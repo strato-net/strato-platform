@@ -1,4 +1,5 @@
 import { getEnvVariable } from 'helpers/utils'
+import config from '/load.config'
 
 export default {
   baseUrl: `/api/v1`,
@@ -31,13 +32,13 @@ export const STRIPE_ENV = {
   },
   CHECKOUT: {
     PAYMENT_METHOD_TYPES: ["card"],
-    SUCCESS_URL: `${getEnvVariable("CLIENT_URL")}/order/status?session_id={CHECKOUT_SESSION_ID}`,
-    CANCEL_URL: `${getEnvVariable("CLIENT_URL")}/marketplace/checkout`
+    SUCCESS_URL: `${config.serverHost}/order/status?session_id={CHECKOUT_SESSION_ID}`,
+    CANCEL_URL: `${config.serverHost}/marketplace/checkout`
   },
   ACCOUNT_ONBOARDING: {
     TYPE: 'accountOnboarding',
-    REFRESH_URL: `${getEnvVariable("CLIENT_URL")}/inventories/stripe/onboarding`,
-    RETURN_URL: `${getEnvVariable("CLIENT_URL")}/inventories`
+    REFRESH_URL: `${config.serverHost}/inventories/stripe/onboarding`,
+    RETURN_URL: `${config.serverHost}/inventories`
   }
 }
 Object.freeze(STRIPE_ENV)
