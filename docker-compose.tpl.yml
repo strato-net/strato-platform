@@ -2,6 +2,8 @@
 #strato-getting-started-min-version:4.0
 version: "3"
 volumes:
+  marketplacedata:
+   driver: local
   pgdata:
     driver: local
   prometheusdata:
@@ -50,6 +52,63 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  marketplace-backend:
+    depends_on:
+    - nginx
+    environment:
+    - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
+    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-c93f9a422a4508a6501a63537291128122f7bcf2}
+    - MP_API_DEBUG=${MP_API_DEBUG:-false}
+    - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
+    - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
+    - MP_SERVER_HOST=${NODE_HOST}
+    - MP_SERVER_SSL=${ssl}
+    - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
+    - STRATO_NODE_HOST=${STRATO_NODE_HOST}
+    - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
+    - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
+    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
+    - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
+    - OAUTH_SERVICE_OAUTH_FLOW=client-credential
+    - OAUTH_TOKEN_FIELD=access_token
+    - OAUTH_TOKEN_USERNAME_PROPERTY=${OAUTH_TOKEN_USERNAME_PROPERTY:-email}
+    - OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW=${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:-sub}
+    - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - CLIENT_URL=${CLIENT_URL} # TODO: remove in favor of SERVER_HOST (pending app change)
+    - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
+    - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+    - ORG_NAME='BlockApps' # TODO: can be removed?
+    build: .
+    image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    volumes:
+       - marketplacedata:/config:rw
+  marketplace-ui:
+    depends_on:
+      - marketplace-backend
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+    build: .
+    image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -216,6 +275,8 @@ services:
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
+    - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
+    - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}

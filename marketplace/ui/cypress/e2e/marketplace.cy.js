@@ -1,0 +1,357 @@
+describe("Renders Marketplace Page", () => {
+  it("it should render marketplace dashboard", () => {
+    cy.login();
+    cy.wait(30000);
+    cy.url().should("include", "/marketplace");
+    cy.contains("Explore New Products").should("exist");
+    cy.get(".relative").find("img").should('have.attr', 'src').should("include", "hero");
+    cy.get("#viewMore").contains("View More").should("exist");
+    cy.request({
+      method: "GET",
+      url: "/api/v1/category",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      cy.contains("Categories").should("be.visible");
+
+      if (body.data.length !== 0) {
+        let name = body.data[0].name;
+        cy.contains(name).should("be.visible");
+      }
+    });
+    cy.request({
+      method: "GET",
+      url: "/api/v1/marketplace/topSelling?offset=0",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      cy.contains("Top Selling Products").should("be.visible");
+      if (body.data.length !== 0) {
+        let name = decodeURIComponent(body.data[0].name);
+        cy.contains(name).should("be.visible");
+      }
+      cy.get("#topSelling").children().should('have.length', 3);
+    });
+  });
+
+  it("it should render product list page", () => {
+    cy.login();
+    cy.wait(20000);
+    cy.url().should("contain", "marketplace");
+    cy.get("#viewMore").should("be.enabled").click();
+    cy.wait(20000);
+    cy.url().should("contain", "/marketplace/category");
+    cy.get("nav").contains("Home").should("exist");
+    cy.contains("Filters").should("exist");
+    cy.contains("Categories").should("exist");
+    cy.contains("Price").should("exist");
+    cy.contains("Quantity").should("exist");
+    cy.get(".ant-slider").should("have.length", 2);
+    cy.get("Sub-Category").should("not.exist");
+    cy.get("Product").should("not.exist");
+    cy.get("Brand").should("not.exist");
+    cy.contains("Products found").should("be.visible");
+    cy.get("#product-list").should("exist");
+    cy.request({
+        method: "GET",
+        url: "/api/v1/marketplace?&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000",
+      }).then(({ status, body }) => {
+        expect(status).to.eq(200);    
+        cy.get("#product-list").children().should("have.length",  body.data.length);
+      });
+  });
+
+
+  it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
+    cy.login();
+    cy.wait(30000);
+    cy.url().should("contain", "marketplace");
+    cy.get("#viewMore").should("be.enabled").click();
+    cy.wait(20000);
+    cy.url().should("contain", "/marketplace/category");
+    cy.get("nav").contains("Home").should("exist");
+    cy.contains("Filters").should("exist");
+    cy.contains("Categories").should("exist");
+    cy.contains("Price").should("exist");
+    cy.contains("Quantity").should("exist");
+    cy.get(".ant-slider").should("have.length", 2);
+    cy.get("Sub-Category").should("not.exist");
+    cy.get("Product").should("not.exist");
+    cy.get("Brand").should("not.exist");
+
+    cy.request({
+      method: "GET",
+      url: `/api/v1/marketplace?range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      cy.contains(`${body.data.length} Products found`).should("be.visible");
+      cy.get("#product-list").children().should("have.length", body.data.length);
+      if (body.data.length > 0) {
+        let card = cy.get("#product-list").children().first();
+        card.find("img").should("have.attr", "src");
+        card.get("#prod-name").should("be.visible");
+        card.get("#prod-category").should("exist")
+        card.get("#prod-desc").should("exist")
+        card.get("#prod-price").should("be.visible")
+        card.get("#prod-quantity").should("be.visible")
+        card.get("button").contains("Add To Cart").should("exist");
+        card.get("button").contains("Buy Now").should("exist");
+      }
+    });
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/category",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      if (body.data.length !== 0) {
+        let category = body.data[3];
+        cy.get('[type="checkbox"]').check(category.address);
+        cy.wait(15000)
+        cy.contains("Sub-Category").should("exist")
+
+        cy.request({
+          method: "GET",
+          url: `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`,
+        }).then(({ status, body }) => {
+          expect(status).to.eq(200);
+          if (body.data.length !== 0) {
+            cy.contains("Product").should("exist");
+            cy.contains("Brand").should("exist");
+          }
+        });
+
+        cy.request({
+          method: "GET",
+          url: `/api/v1/marketplace?&category[]=${category.address}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+        }).then(({ status, body }) => {
+          expect(status).to.eq(200);
+          cy.contains(`${body.data.length} Products found`).should("be.visible");
+          cy.get("#product-list").children().should("have.length", body.data.length);
+        });
+      }
+    });
+  });
+
+   it("it should render inventories based on filter selection", () => {
+    cy.login();
+    cy.wait(30000);
+    cy.url().should("contain", "marketplace");
+    cy.get("#viewMore").should("be.enabled").click();
+    cy.wait(20000);
+    cy.url().should("contain", "/marketplace/category");
+
+    let category, subCategory, product;
+    cy.request({
+      method: "GET",
+      url: "/api/v1/category",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);    
+      if (body.data.length !== 0) {
+        category = body.data[3];
+        cy.get('[type="checkbox"]').check(category.address);
+        cy.wait(15000)
+
+        cy.request({
+          method: "GET",
+          url: `api/v1/subcategory?category[]=${category.address}`,
+        }).then(({ status, body }) => {
+          expect(status).to.eq(200);    
+          if (body.data.length !== 0) {
+            subCategory = body.data[0];
+            cy.contains("Sub-Category").should("exist")
+            cy.get('[type="checkbox"]').check(subCategory.address);
+            let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}&subCategory[]=${subCategory.address}` 
+            : `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`
+            cy.wait(15000)
+
+            cy.request({
+              method: "GET",
+              url: productUrl,
+            }).then(({ status, body }) => {
+              expect(status).to.eq(200);    
+              if (body.data.length !== 0) {
+                product = body.data[0];
+                cy.contains("Product").should("exist");
+                cy.contains("Brand").should("exist");
+                cy.get('[type="checkbox"]').check(product.address);
+                cy.get('[type="checkbox"]').check(product.manufacturer);
+                cy.wait(15000)
+
+                cy.request({
+                  method: "GET",
+                  url: `/api/v1/marketplace?&category[]=${category.address}&subCategory[]=${subCategory.address}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+                }).then(({ status, body }) => {
+                  expect(status).to.eq(200);    
+                  cy.contains(`${body.data.length} Products found`).should("be.visible");
+                  cy.get("#product-list").children().should("have.length",  body.data.length);
+                  if(body.data.length === 0){
+                    cy.contains("No data found")
+                  }
+                });
+              }
+            });
+          }
+        });
+
+      }
+    });
+  });
+
+
+  it("it should render product detail page", () => {
+    cy.login();
+    cy.wait(30000);
+    cy.request({
+      method: "GET",
+      url: `/api/v1/marketplace/topselling?offset=0`,
+    }).then(({ status, body }) => {
+        expect(status).to.eq(200);
+        cy.wait(30000);    
+        if(body.data.length !==0){
+        let inventory = body.data[0];
+        cy.get("#topSelling").children().first().click();
+        cy.wait(20000);
+        cy.url().should("include", "/marketplace/productList/")
+        cy.get("nav").contains("Home").should("exist");
+        cy.get("nav").contains(decodeURIComponent(inventory.name)).should("exist");
+        cy.get("div").find("img").should('have.attr', 'src');
+        cy.get("button").contains("Add To Cart").should("exist");
+        cy.get("button").contains("Buy Now").should("exist");
+
+        cy.contains(decodeURIComponent(inventory.name)).should("be.visible");
+        if(inventory.description) cy.get("#details").contains(decodeURIComponent(inventory.description)).should("exist");
+        cy.get("#details").contains(`$ ${inventory.pricePerUnit}`).should("be.visible");
+        cy.get("#details").contains("Quantity").should("be.visible");
+        cy.get("#quantity").should("exist");
+        cy.get(".ant-tabs-tab").should("have.length", 4);
+        cy.get(".ant-tabs-tab").first().should('have.class', 'ant-tabs-tab-active')
+        cy.get(".ant-tabs-tab").eq(1).should('not.have.class', 'ant-tabs-tab-active')
+        cy.contains("Product Id").should("be.visible");
+        cy.contains("Unique Product Code").should("be.visible");
+        cy.contains("Manufacturer").should("be.visible");
+        cy.contains("Unit of Measurement").should("be.visible");
+        cy.contains("Least Sellable Unit").should("be.visible");
+
+        cy.get(".ant-tabs-tab").eq(1).click();
+        cy.get(".ant-tabs-tab").eq(1).should('have.class', 'ant-tabs-tab-active')
+        cy.get(".ant-tabs-tab").first().should('not.have.class', 'ant-tabs-tab-active')
+        cy.get("th").contains("NAME").should("be.visible");
+        cy.get("th").contains("DESCRIPTION").should("be.visible");
+
+        cy.get(".ant-tabs-tab").eq(2).click();
+        cy.get(".ant-tabs-tab").eq(2).should('have.class', 'ant-tabs-tab-active')
+        cy.get("th").contains("SERIAL NUMBER").should("be.visible");
+        cy.get("th").contains("ITEM NUMBER").should("be.visible");
+        cy.request({
+          method: "GET",
+          url: `/api/v1/item?inventoryId=${inventory.address}`,
+        }).then(({ status, body }) => {
+            expect(status).to.eq(200);  
+            if(body.data.length > 0)  {
+              cy.get("td").eq(5).click();
+              cy.wait(13000);
+              cy.get("#ownership").contains("Ownership History").should("be.visible");
+              cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
+              cy.get("#ownership-serial").should("exist");
+              cy.get("#ownership").contains("SELLER").should("exist");
+              cy.get("#ownership").contains("OWNER").should("exist");
+              cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+            }
+
+            if(body.data.length > 1){
+              cy.get("td").eq(7).click();
+              cy.wait(13000);
+              cy.get("#ownership").contains("Ownership History").should("be.visible");
+              cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
+              cy.get("#ownership-serial").should("exist");
+              cy.get("#ownership").contains("SELLER").should("exist");
+              cy.get("#ownership").contains("BUYER").should("exist");
+              cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+            }
+        });
+
+        cy.get(".ant-tabs-tab").eq(3).click();
+        cy.get(".ant-tabs-tab").eq(3).should('have.class', 'ant-tabs-tab-active')
+        cy.get("th").contains("SERIAL NUMBER").should("exist");
+        cy.get("th").contains("ITEM NUMBER").should("exist");
+        cy.request({
+          method: "GET",
+          url: `/api/v1/item?inventoryId=${inventory.address}`,
+        }).then(({ status, body }) => {
+            expect(status).to.eq(200);  
+            if(body.data.length > 0)  {
+              cy.get("td").eq(9).click();
+              cy.wait(13000);
+              cy.get("#transformation").contains("Transformation").should("be.visible");
+              cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
+              cy.get("#trans-serial").should("exist");
+              cy.get("#transformation").contains("RAW MATERIALS").should("exist")
+              cy.get("#transformation").contains("SERIAL NUMBER").should("exist")
+            }
+        });
+      }
+    });
+  });
+
+  // it("it should render product detail page", () => {
+  //   cy.login();
+  //   cy.wait(30000);
+  //   cy.get("#topSelling").children().first().click();
+  //   cy.wait(15000);
+  //   cy.url().should("include", "/marketplace/productList/")
+  //   cy.get("nav").contains("Home").should("exist");
+  //   cy.get("div").find("img").should('have.attr', 'src');
+  //   cy.get("button").contains("Add To Cart").should("exist");
+  //   cy.get("button").contains("Buy Now").should("exist");
+
+  //   cy.get("#inventory-name").should("exist");
+  //   cy.get("#inventory-desc").should("exist");
+  //   cy.get("#inventory-price").should("exist");
+  //   cy.contains("Quantity").should("be.visible");
+  //   cy.get("#quantity").should("exist");
+  //   cy.get(".ant-tabs-tab").should("have.length", 4);
+  //   cy.get(".ant-tabs-tab").first().should('have.class', 'ant-tabs-tab-active')
+  //   cy.get(".ant-tabs-tab").eq(1).should('not.have.class', 'ant-tabs-tab-active')
+  //   cy.contains("Product Id").should("be.visible");
+  //   cy.contains("Unique Product Code").should("be.visible");
+  //   cy.contains("Manufacturer").should("be.visible");
+  //   cy.contains("Unit of Measurement").should("be.visible");
+  //   cy.contains("Least Sellable Unit").should("be.visible");
+
+  //   cy.get(".ant-tabs-tab").eq(1).click();
+  //   cy.get(".ant-tabs-tab").eq(1).should('have.class', 'ant-tabs-tab-active')
+  //   cy.get(".ant-tabs-tab").first().should('not.have.class', 'ant-tabs-tab-active')
+  //   cy.get("th").contains("NAME").should("be.visible");
+  //   cy.get("th").contains("DESCRIPTION").should("be.visible");
+
+  //   cy.get(".ant-tabs-tab").eq(2).click();
+  //   cy.get(".ant-tabs-tab").eq(2).should('have.class', 'ant-tabs-tab-active')
+  //   cy.get("th").contains("SERIAL NUMBER").should("be.visible");
+  //   cy.get("th").contains("ITEM NUMBER").should("be.visible");
+  //   cy.get("td").eq(5).click();
+  //   cy.wait(13000);
+  //   cy.get("#ownership").contains("Ownership History").should("be.visible");
+  //   cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
+  //   cy.get("#ownership-serial").should("exist");
+  //   cy.get("#ownership").contains("SELLER").should("exist");
+  //   cy.get("#ownership").contains("OWNER").should("exist");
+  //   cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+  //   cy.get("td").eq(7).click();
+  //   cy.wait(13000);
+  //   cy.get("#ownership").contains("SELLER").should("exist");
+  //   cy.get("#ownership").contains("BUYER").should("exist");
+  //   cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+
+  //   cy.get(".ant-tabs-tab").eq(3).click();
+  //   cy.get(".ant-tabs-tab").eq(3).should('have.class', 'ant-tabs-tab-active')
+  //   cy.get("th").contains("SERIAL NUMBER").should("exist");
+  //   cy.get("th").contains("ITEM NUMBER").should("exist");
+  //   cy.get("td").eq(17).click();
+  //   cy.wait(13000);
+  //   cy.get("#transformation").contains("Transformation").should("be.visible");
+  //   cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
+  //   cy.get("#trans-serial").should("exist");
+  //   cy.get("#nested-trans").get("RAW MATERIALS").should("exist")
+  //   cy.get("#nested-trans").get("SERIAL NUMBER").should("exist")
+  // });
+  
+})
