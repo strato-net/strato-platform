@@ -115,6 +115,12 @@ flags:
     ecdh: true
     recovery: true
 
+nix:
+  enable: true
+  pure: false
+  # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
+  shell-file: nix/stack-integration.nix
+
 resolver: lts-20.10 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:

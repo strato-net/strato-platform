@@ -92,6 +92,7 @@ import Slipstream.Options
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 
 import Text.Format
 
@@ -485,7 +486,7 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a, hl, m) | CodeCollectionAdded c cp o a hl m <- messages] --mappinf here
+      creates = [(c, cp, o, a, hl, rm) | CodeCollectionAdded c cp o a hl rm <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
@@ -495,7 +496,7 @@ processTheMessages env sqlEnv conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, rm) -> do
     cc' <- getCC cp ccString
     case cc' of
       Right cc -> do
@@ -509,6 +510,15 @@ processTheMessages env sqlEnv conn g messages = do
                            else case cp of
                             SolidVMCode n' _ | nameString /= n' -> T.pack n'
                             _ -> a
+
+
+                -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
+                -- We will then create a table for each of these mappings and add a foreign key to the main table
+
+                let storageDefs' = c ^. storageDefs
+                    storageDefsList = Map.toList storageDefs'
+                    listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
+                    listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
