@@ -41,6 +41,7 @@ import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
+import Data.Maybe (fromMaybe)
 import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
 
@@ -153,6 +154,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
+  , mappingInserts  :: [ProcessedMapping]
   } deriving (Show)
 
 enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
@@ -302,6 +304,30 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
+processedContractToProcessedMappings :: MonadIO m => ProcessedContract -> m [ProcessedMapping]
+processedContractToProcessedMappings pc = do
+  let vMappings = Map.filter (/= ValueMapping) (Map.elems contractData pc) 
+      (mapKeys, mapValues) = foldr (\mapping (ks, vs) -> let (km, vm) = getKeysAndValues mapping in (km ++ ks, vm ++ vs)) ([], []) vMappings
+    
+  pMappings <- zipWith (processedMapping pc) keys values
+  return $ pMappings
+  
+  -- look at contract data in processedcontract 
+  -- filter out the maps 
+  -- convert each key value to a ProcessedMapping and add to a list
+  -- return list of mappings
+
+
+
+
+-- Things to do 
+-- 1. function to convert whatever Ben sends to what I need
+-- 2. processedContractToProcessedMappings
+-- 3. Complete insertMappingTableQuery
+
+
+
+
 rowToHistories :: (MonadIO m) =>
                   IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
@@ -344,6 +370,24 @@ contractToEventTables (org, app, name) c =
           eventFields = map fst $ _eventLogs fields
         }
 
+processedMapping ::  Text -> ProcessedContract -> Value -> Value-> ProcessedMapping
+processedMapping mapping ProcessedContract{..} k v =
+   ProcessedMapping {
+    m_address           =  address 
+  , m_codehash          =  codehash 
+  , m_organization      =  organization 
+  , m_application       =  application 
+  , m_contractName      =  contractName 
+  , m_mapName           =  mapping
+  , m_chain             =  chain 
+  , m_blockHash         =  blockHash 
+  , m_blockTimestamp    =  blockTimestamp 
+  , m_blockNumber       =  blockNumber 
+  , m_transactionHash   =  transactionHash 
+  , m_transactionSender =  transactionSender 
+  , m_mapDataKey        = k 
+  , m_mapDataValue      = v
+   }
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
@@ -358,6 +402,22 @@ parseActions events' =
 
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events' = [a | EventEmitted a <- events']
+
+convertToMap :: [Text] -> Maybe (Map.Map Text [(Value, Value)])
+convertToMap maps = do
+  let jsonString = T.unpack $ T.concat maps
+  jsonValue <- Aeson.decode $ fromString jsonString
+  case jsonValue of
+    Aeson.Object obj -> Just $ Map.fromList $ map parseMapEntry $ Map.toList obj
+    _ -> Nothing
+  where
+    parseMapEntry :: (Text, Aeson.Value) -> (Text, [(Value, Value)])
+    parseMapEntry (name, Aeson.Object obj) = (name, map parseField $ Map.toList obj)
+    parseMapEntry _ = error "Invalid map entry"
+
+    parseField :: (Text, Aeson.Value) -> (Value, Value)
+    parseField (fieldName, Aeson.String fieldValue) = (SimpleValue $ ValueString $ show fieldName, SimpleValue $ ValueString $ show fieldValue)
+    parseField _ = error "Invalid field"
 
 getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)))
@@ -429,7 +489,7 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
+      creates = [(c, cp, o, a, hl, m) | CodeCollectionAdded c cp o a hl m <- messages] --mappinf here
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
@@ -459,7 +519,10 @@ processTheMessages env sqlEnv conn g messages = do
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
                 let nameParts = (o, a', n)
 
-                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+                --Create mapping tables
+                let mapNames = Map.keys $ fromMaybe Map.empty (convertToMap mapz)
+                forM mapNames $ \m -> do 
+                  outputData' conn $ createMappingTable g nameParts m
 
 -- mark
                 outputData' conn $ createExpandHistoryTable g c nameParts
@@ -507,9 +570,10 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          pMappings <- processedContractToProcessedMappings indexContract --get all procsesed mappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
-          pure . Right $ BatchedInserts indexContract hs
+          pure . Right $ BatchedInserts indexContract hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -522,7 +586,8 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
-    outputData conn . insertHistoryTable $ concatMap historyInserts ins
+    unless (null ins) $ outputData conn . insertHistoryTable $ concatMap historyInserts ins
+    unless (null ins) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins

@@ -16,7 +16,9 @@ module Slipstream.OutputData (
   insertExpandEventTables,
   insertIndexTable,
   insertForeignKeys,
+  insertMappingTable,
   createIndexTable,
+  createMappingTable,
   createHistoryTable,
   insertHistoryTable,
   createEventTables,
@@ -37,7 +39,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe, maybeToList)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -135,6 +137,14 @@ makeAccount c = T.concat [
   chain c
   ]
 
+makeAccountM:: ProcessedMapping -> Text
+makeAccountM m@ProcessedMapping{m_chain=""} = tshow $ m_address m
+makeAccountM m = T.concat [
+  tshow $ m_address m,
+  ":",
+  m_chain m
+  ]
+
 tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
   where go x = let y = wrapDoubleQuotes $ escapeQuotes x
@@ -217,8 +227,20 @@ constructTableNameParameters org app contract =
          then (org, "", contract)
          else (org, app, contract)
 
+constructMappingTableNameParameters :: Text -> Text -> Text -> Text -> (Text, Text, Text, Text)
+constructMappingTableNameParameters org app contract mapping=
+  if T.null org
+    then ("", "", contract, mapping)
+    else if app == contract
+         then (org, "", contract, mapping)
+         else (org, app, contract, mapping)
+
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
+
+uncurry3' :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+uncurry3' f (v, x, y, z) = f v x y z
 
 historyTableName :: Text -> Text -> Text -> TableName
 historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
@@ -226,7 +248,8 @@ historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameter
 indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
-
+mappingTableName :: Text -> Text -> Text -> Text -> TableName
+mappingTableName o a n m = uncurry3' MappingTableName $ constructMappingTableNameParameters o a n m
 
 -- sometimes we need the unwrapped tablename
 tableNameToDoubleQuoteText :: TableName -> Text
@@ -241,6 +264,13 @@ tableNameToText (IndexTableName o a c) =
                    then o <> tableSeparator
                    else o <> tableSeparator <> a <> tableSeparator
   in prefix <> c
+tableNameToText (MappingTableName o a c m ) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator <> c <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
+  in prefix <> m
 tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
@@ -334,6 +364,23 @@ createIndexTable globalsIORef contract (o, a, n) = do
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
 
+-- if flag from solidvm that it is a record, vmevent
+createMappingTable :: OutputM m
+                 => IORef Globals
+                 -> (Text, Text, Text)
+                 -> Text
+                 -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m ()
+createMappingTable globalsIORef (o, a, n) m = do
+  let tableName = mappingTableName o a n m
+  tableExists <- isTableCreated globalsIORef tableName
+
+  $logInfoLS "createHistoryTable/mappingTableExists" (tableName, tableExists)
+
+  when (not tableExists) $ do
+    incNumMappingTables
+    yield $ ((createMappingTableQuery (o, a, n, m)), Nothing)
+    let list = ["key","value"]
+    setTableCreated globalsIORef tableName list
 
 createHistoryTable' :: OutputM m
                    => IORef Globals
@@ -497,6 +544,12 @@ insertIndexTable :: OutputM m
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yieldMany $ insertIndexTableQuery contracts
 
+insertMappingTable :: OutputM m
+                 => [ProcessedMapping]
+                 -> ConduitM () Text m ()
+insertMappingTable [] = error "insertMappingTable: unhandled empty list"
+insertMappingTable maps = yieldMany $ insertMappingTableQuery maps
+
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
 insertForeignKeys conn contracts = do
@@ -552,6 +605,16 @@ createIndexTableQuery contract (o, a, n) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y)) list)
+        , ",\n  PRIMARY KEY (record_id) );"
+        ]
+
+createMappingTableQuery :: (Text, Text, Text, Text) -> Text
+createMappingTableQuery (o, a, n, m) =
+  let tableName = mappingTableName o a n m
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text", "key", "value"]
         , ",\n  PRIMARY KEY (record_id) );"
         ]
 
@@ -627,6 +690,57 @@ insertIndexTableQuery cs = concat $
     transaction_sender = excluded.transaction_sender|]
                 , if null list then "" else ",\n    "
                 , tableUpsert $ map fst list
+                , ";"
+                ]
+
+insertMappingTableQuery :: [ProcessedMapping] -> [Text] --DAVID
+insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
+insertMappingTableQuery mappings = concat $
+  let mappings' = (\m -> (m, maybeToList $ valueToSQLTextFilterMapping $ m_mapDataKey m)) <$> mappings --(k,v)
+   in flip map (map snd $ partitionWith (length . snd) mappings') $ \case
+        [] -> []
+        mappings''@((x,mk):_) ->
+          let tableName = mappingTableName
+                  (m_organization x)
+                  (m_application x)
+                  (m_contractName x)
+                  (m_mapName x)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ mk
+              baseVals = [ makeAccountM
+                         , tshow . m_address
+                         , m_chain
+                         , T.pack . keccak256ToHex . m_blockHash
+                         , tshow . m_blockTimestamp
+                         , tshow . m_blockNumber
+                         , T.pack . keccak256ToHex . m_transactionHash
+                         , tshow . m_transactionSender
+                         , tshow . m_mapDataKey
+                         , tshow . m_mapDataValue
+                         ]
+              vals = flip map mappings'' $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ rowList
+              inserts = csv vals
+           in (:[]) $ T.concat
+                [ "INSERT INTO "
+                , tableNameToDoubleQuoteText tableName
+                , " "
+                , keySt
+                , "\n  VALUES "
+                , inserts
+                , [r|
+  ON CONFLICT (record_id) DO UPDATE SET
+    m_record_id = excluded.m_record_id,
+    m_address = excluded.m_address,
+    "m_chainId" = excluded."m_chainId",
+    m_block_hash = excluded.m_block_hash,
+    m_block_timestamp = excluded.m_block_timestamp,
+    m_block_number = excluded.m_block_number,
+    m_transaction_hash = excluded.m_transaction_hash,
+    m_transaction_sender = excluded.m_transaction_sender
+    m_mapDataKey = excluded.m_mapDataKey,
+    m_mapDataValue = excluded.m_mapDataValue|]
+                , if null mappings'' then "" else ",\n    "
+                , tableUpsert $ (map (\(_, texts) -> (T.concat texts)) mappings'')
                 , ";"
                 ]
 
@@ -847,6 +961,9 @@ valueToSQLTextFilterContract :: Value -> Maybe Text
 valueToSQLTextFilterContract (ValueContract _) = Just "NULL"
 valueToSQLTextFilterContract x = valueToSQLText x
 
+valueToSQLTextFilterMapping :: Value -> Maybe Text
+valueToSQLTextFilterMapping (ValueMapping _) = Just "NULL"
+valueToSQLTextFilterMapping x = valueToSQLText x
 
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x

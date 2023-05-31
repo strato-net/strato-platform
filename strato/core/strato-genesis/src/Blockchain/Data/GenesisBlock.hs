@@ -310,7 +310,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) org app = do
 
   let resolveAndProduce cp = resolveCodePtr chainId cp >>= \case
         Just (SolidVMCode name ch) -> fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
-          Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app []]
+          Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app [] []]
           _ -> pure ()
         _ -> pure ()
   forM_ accountInfo $ \case

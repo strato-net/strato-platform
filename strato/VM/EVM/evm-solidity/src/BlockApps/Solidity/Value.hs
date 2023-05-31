@@ -57,7 +57,7 @@ data Value
   | ValueContract NamedAccount
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  | ValueMapping (Map.Map SimpleValue Value)
+  | ValueMapping (Map.Map SimpleValue Value) -- 
   | ValueStruct (Map.Map Text Value)
   | ValueArraySentinel Int
   deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)

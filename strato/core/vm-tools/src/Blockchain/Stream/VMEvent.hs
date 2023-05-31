@@ -60,7 +60,9 @@ data VMEvent =
     codePtr :: CodePtr,
     organization :: Text,
     application :: Text,
-    historyList :: [Text]
+    historyList :: [Text],
+    mappings :: [Text]
+    -- Map ContractName MappingName 
     } |
   NewTransactionResult TransactionResult deriving (Show, Generic)
 
@@ -77,9 +79,9 @@ vmType (CodeAtAccount _ _) = "CodeAtAccount"
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
   format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
-  format (CodeCollectionAdded c cp o a hl) =
+  format (CodeCollectionAdded c cp o a hl m) =
     "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
-    ++ (if (not $ null hl) then " " ++ show hl else "") ++ "\n    "
+    ++ (if (not $ null hl) then " " ++ show hl else "") ++ (if (not $ null m) then " " ++ show m else "")++"\n    "
     ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 

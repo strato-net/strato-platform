@@ -18,6 +18,7 @@ dependencies:
   - milena-tools
   - strato-conf
   - strato-model
+  - vector
 
 library:
   source-dirs: src/
