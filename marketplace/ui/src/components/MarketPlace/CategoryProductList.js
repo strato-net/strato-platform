@@ -54,6 +54,7 @@ const CategoryProductList = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
   let currentCategory;
+
   let { hasChecked, isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
@@ -80,6 +81,7 @@ const CategoryProductList = ({ user }) => {
   }, []);
 
   currentCategory = categorys.find((c) => c.name === category);
+  currentCategory ?? (currentCategory = " ");
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
@@ -101,6 +103,11 @@ const CategoryProductList = ({ user }) => {
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
+  };
+
+  const onChangeBrand = (e) => {
+    let valuesChecked = checkValues(e, selectedBrands)
+    setSelectedBrands(valuesChecked);
   };
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -151,19 +158,14 @@ const CategoryProductList = ({ user }) => {
   //============================Manufacturers/Brands=============================//
   useEffect(() => {
     if (marketplaceList.length > 0) {
-      var uniqueBrands = marketplaceList
-        .map((p) => p.manufacturer)
+      var uniqueBrands = 
+      marketplaceList.map((p) => p.manufacturer)
         .filter(
           (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
         );
       setBrands(uniqueBrands);
     }
   }, [marketplaceList]);
-
-  const onChangeBrand = (e) => {
-    let valuesChecked = checkValues(e, selectedBrands)
-    setSelectedBrands(valuesChecked);
-  };
 
   //=========================Other functions===============================//
 
@@ -314,7 +316,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {currentCategory && currentCategory.subCategories.length > 0 && (
+            {currentCategory && (
               <>
                 <Collapse
                   bordered={false}
@@ -386,7 +388,6 @@ const CategoryProductList = ({ user }) => {
                 >
                   <Panel header={<Text strong>Brand</Text>} key="1">
                     <Checkbox.Group
-                      // onChange={onChangeBrand}
                       value={selectedBrands}
                     >
                       <div className="flex flex-col gap-3">
