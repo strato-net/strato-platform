@@ -166,7 +166,7 @@ services:
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
-    - network=${network:-blockappsnet}
+    - network=${network:-mercata-hydrogen}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
