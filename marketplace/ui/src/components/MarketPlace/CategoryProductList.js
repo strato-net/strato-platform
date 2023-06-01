@@ -111,34 +111,18 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      if (category !== "") {
-        actions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-        );
-      }
-    } else {
-      if (category !== "") {
-        actions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-        );
-      }
+    if (category !== "") {
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
     }
   }, [
     marketplaceDispatch,
@@ -210,11 +194,11 @@ const CategoryProductList = ({ user }) => {
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
-        { selectedCategories?.map((category, index) => (
-            <Breadcrumb.Item key={index} className="text-primary">
-              {category ? category : ""}
-            </Breadcrumb.Item>
-          ))}
+        {selectedCategories?.map((category, index) => (
+          <Breadcrumb.Item key={index} className="text-primary">
+            {category ? category : ""}
+          </Breadcrumb.Item>
+        ))}
       </Breadcrumb>
       <div className="flex pt-4">
         {/* Filter section */}
