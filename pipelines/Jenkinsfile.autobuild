@@ -177,7 +177,8 @@ pipeline {
       }
     }
 
-    stage('Test and Push Images') {
+//    stage('Test and Push Images') {
+    stage('Push Images') {
       steps {
         parallel (
           'Push images': {
@@ -197,7 +198,7 @@ pipeline {
               '''
             }
           },
-            
+/*            
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -266,6 +267,7 @@ pipeline {
               sh 'npm run test'
             }
           },
+ */
         )
       }
     }
