@@ -11,6 +11,9 @@ const actionDescriptors = {
   fetchProductsForFilter: "fetch_products_for_filter",
   fetchProductsForFilterSuccessful: "fetch_products_for_filter_successful",
   fetchProductsForFilterFailed: "fetch_products_for_filter_failed",
+  fetchProductsForFilterLoggedIn: "fetch_products_for_filter_logged_in",
+  fetchProductsForFilterLoggedInSuccessful: "fetch_products_for_filter_logged_in_successful",
+  fetchProductsForFilterLoggedInFailed: "fetch_products_for_filter_logged_in_failed",
   fetchCategoryBasedProduct: "fetch_category_based_products",
   fetchCategoryBasedProductSuccessful:
     "fetch_category_based_product_successful",
@@ -66,7 +69,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Product created successfully", true);
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.createProductFailed,
           error: "Error while creating Product",
@@ -77,7 +80,7 @@ const actions = {
 
       dispatch({
         type: actionDescriptors.createProductFailed,
-        error:  body.error,
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
@@ -107,7 +110,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductDetailsFailed,
           error: "Error while fetching Product Details",
@@ -144,14 +147,14 @@ const actions = {
       );
 
       const body = await response.json();
-      console.log('products',body)
+      console.log('products', body)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductFailed,
           error: "Error while fetching product list",
@@ -187,7 +190,7 @@ const actions = {
         });
         // actions.setMessage(dispatch, "Image uploaded successfully", true);
         return body.data;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.uploadImageFailed,
           error: "Image upload failed",
@@ -234,7 +237,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Product has been updated", true);
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateProductFailed,
           error: "Error while updating Product",
@@ -291,7 +294,7 @@ const actions = {
           true
         );
         return false;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.deleteProductFailed,
           error: "Error while deleting Product",
@@ -334,7 +337,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchCategoryBasedProductFailed,
           error: "Error while fetching products",
@@ -363,7 +366,7 @@ const actions = {
       });
 
       const body = await response.json();
-     
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.updateImageSuccessful,
@@ -371,7 +374,7 @@ const actions = {
         });
         // actions.setMessage(dispatch, "Image updated successfully", true);
         return body.data;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateImageFailed,
           error: "Image update failed",
@@ -401,11 +404,11 @@ const actions = {
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
     const subCategoryQuery = subCategorys
-    ? `&subCategory[]=${subCategorys}`
-    : "";
+      ? `&subCategory[]=${subCategorys}`
+      : "";
     try {
       const response = await fetch(
-        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
+        `${apiUrl}/product/all/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -419,7 +422,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductsForFilterFailed,
           error: "Error while fetching products",
@@ -433,6 +436,48 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchProductsForFilterFailed,
+        error: "Error while fetching products",
+      });
+    }
+  },
+  fetchProductsForFilterLoggedIn: async (dispatch, categorys, subCategorys) => {
+    dispatch({ type: actionDescriptors.fetchProductsForFilterLoggedIn });
+
+    const categoryQuery = categorys ? `&category[]=${categorys}` : "";
+
+    const subCategoryQuery = subCategorys
+      ? `&subCategory[]=${subCategorys}`
+      : "";
+    try {
+      const response = await fetch(
+        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchProductsForFilterLoggedInSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
+          error: "Error while fetching products",
+        });
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
         error: "Error while fetching products",
       });
     }

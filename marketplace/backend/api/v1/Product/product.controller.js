@@ -65,6 +65,19 @@ class ProductController {
     }
   }
 
+  static async getAllProductNamesLoggedIn(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const products = await dapp.getProductNamesLoggedIn({ ...query })
+      rest.response.status200(res, products)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async create(req, res, next) {
     try {
       const { dapp, body } = req

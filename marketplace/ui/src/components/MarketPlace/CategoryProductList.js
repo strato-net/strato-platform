@@ -39,7 +39,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 const { Panel } = Collapse;
 const { Text } = Typography;
 
-const CategoryProductList = () => {
+const CategoryProductList = ({user}) => {
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -112,11 +112,19 @@ const CategoryProductList = () => {
     if (selectedCategories.length || selectedSubCategories.length) {
       categorys = arrayToStr(selectedCategories);
       subCategorys = arrayToStr(selectedSubCategories);
-      productActions.fetchProductsForFilter(
-        productDispatch,
-        categorys,
-        subCategorys
-      );
+      if (hasChecked && !isAuthenticated) {
+        productActions.fetchProductsForFilter(
+          productDispatch,
+          categorys,
+          subCategorys
+        );
+      } else {
+        productActions.fetchProductsForFilterLoggedIn(
+          productDispatch,
+          categorys,
+          subCategorys
+        );
+      }
     }
   }, [productDispatch, selectedCategories, selectedSubCategories]);
 
@@ -145,35 +153,34 @@ const CategoryProductList = () => {
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
-      console.log(hasChecked, !isAuthenticated);
-    if (category !== "") {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
-      );
+      if (category !== "") {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          debouncedMinQty,
+          debouncedMaxQty,
+          debouncedMinPrice,
+          debouncedMaxPrice
+        );
+      }
+    } else {
+      if (category !== "") {
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          debouncedMinQty,
+          debouncedMaxQty,
+          debouncedMinPrice,
+          debouncedMaxPrice
+        );
+      }
     }
-  } else {
-    if (category !== "") {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
-      );
-    }
-  }
   }, [
     marketplaceDispatch,
     selectedCategories,
@@ -220,6 +227,8 @@ const CategoryProductList = () => {
   }
   //============================================================================//
 
+  console.log(productsForFilter)
+  console.log(marketplaceList)
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -364,7 +373,7 @@ const CategoryProductList = () => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )} 
+            )}
 
             {/* Panel - Product */}
             {productsForFilter.length > 0 && (
