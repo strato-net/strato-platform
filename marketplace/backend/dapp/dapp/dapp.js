@@ -1065,11 +1065,22 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
+      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);    
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
+
+      for(let i = 0; i < result.orderLines.length; i++) {
+        const {productId, inventoryId } = result.orderLines[i];
+        const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
+
+        if (items[0].serialNumber == "") {
+          result.orderLines[i].containsSerialNumber = false;
+        } else {
+          result.orderLines[i].containsSerialNumber = true;
+        }
+      }
 
       const productIds = [
         ...new Set(result.orderLines.map((orderLines) => orderLines.productId)),
@@ -1142,7 +1153,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
             productId,
             inventoryId,
             offset: 0,
-            limit: quantity
+            limit: quantity,
+            status: 1
           },
           chainOptions
         );

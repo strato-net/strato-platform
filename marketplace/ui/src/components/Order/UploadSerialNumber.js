@@ -21,6 +21,8 @@ import { usePapaParse } from "react-papaparse";
 const UploadSerialNumberModal = ({
   isUploadSerialNumberModalOpen,
   toggleUploadSerialNumberModal,
+  setSerialNumberCount,
+  serialnumberCount,
   product,
   Id,
   orderId,
@@ -85,6 +87,7 @@ const UploadSerialNumberModal = ({
     };
     let isDone = await actions.createOrderLineItem(dispatch, body);
     if (isDone) {
+      setSerialNumberCount(serialnumberCount + 1);
       toggleUploadSerialNumberModal(false);
       actions.fetchOrderDetails(dispatch, Id);
     }
