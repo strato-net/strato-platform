@@ -77,7 +77,7 @@ const BoughtOrdersTable = ({ user }) => {
       ),
     },
     {
-      title: "seller organization".toUpperCase(),
+      title: "seller".toUpperCase(),
       dataIndex: "sellerOrganization",
       key: "sellerOrganization",
       render: (text) => <p>{text}</p>,
