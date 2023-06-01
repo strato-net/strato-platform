@@ -574,10 +574,6 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       getOptions
     );
   };
-  contract.getProductNamesLoggedIn = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getProducts({ ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization, sort: '-createdDate' }, getOptions);
-  };
   contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventory({ ...args, ownerOrganization: userOrganization }, getOptions);

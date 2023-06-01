@@ -179,23 +179,6 @@ const reducer = (state, action) => {
         error: action.error,
         isProductsForFilterLoading: false,
       };
-    case actionDescriptors.fetchProductsForFilterLoggedIn:
-      return {
-        ...state,
-        isProductsForFilterLoading: true,
-      };
-    case actionDescriptors.fetchProductsForFilterLoggedInSuccessful:
-      return {
-        ...state,
-        productsForFilter: action.payload,
-        isProductsForFilterLoading: false,
-      };
-    case actionDescriptors.fetchProductsForFilterLoggedInFailed:
-      return {
-        ...state,
-        error: action.error,
-        isProductsForFilterLoading: false,
-      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

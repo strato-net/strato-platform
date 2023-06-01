@@ -27,13 +27,6 @@ router.get(
   ProductController.getAllProductNames
 );
 
-router.get(
-  Product.getAllProductNamesLoggedIn,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ProductController.getAllProductNamesLoggedIn
-);
-
 router.post(
   Product.create,
   authHandler.authorizeRequest(),

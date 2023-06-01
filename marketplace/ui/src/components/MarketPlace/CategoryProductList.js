@@ -198,6 +198,8 @@ const CategoryProductList = ({ user }) => {
   }
   //============================================================================//
 
+  console.log(marketplaceList);
+
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -208,13 +210,12 @@ const CategoryProductList = ({ user }) => {
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
-        <Breadcrumb.Item className="text-primary">
-          {currentCategory ? currentCategory.name : ""}
-        </Breadcrumb.Item>
+        { selectedCategories?.map((category, index) => (
+            <Breadcrumb.Item key={index} className="text-primary">
+              {category ? category : ""}
+            </Breadcrumb.Item>
+          ))}
       </Breadcrumb>
-      <Text className="mt-2 ml-12 text-2xl font-semibold">
-        {currentCategory ? currentCategory.name : ""}
-      </Text>
       <div className="flex pt-4">
         {/* Filter section */}
         <div className="mr-6 pt-4">

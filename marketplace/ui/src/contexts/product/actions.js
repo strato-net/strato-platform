@@ -11,9 +11,6 @@ const actionDescriptors = {
   fetchProductsForFilter: "fetch_products_for_filter",
   fetchProductsForFilterSuccessful: "fetch_products_for_filter_successful",
   fetchProductsForFilterFailed: "fetch_products_for_filter_failed",
-  fetchProductsForFilterLoggedIn: "fetch_products_for_filter_logged_in",
-  fetchProductsForFilterLoggedInSuccessful: "fetch_products_for_filter_logged_in_successful",
-  fetchProductsForFilterLoggedInFailed: "fetch_products_for_filter_logged_in_failed",
   fetchCategoryBasedProduct: "fetch_category_based_products",
   fetchCategoryBasedProductSuccessful:
     "fetch_category_based_product_successful",
@@ -408,7 +405,7 @@ const actions = {
       : "";
     try {
       const response = await fetch(
-        `${apiUrl}/product/all/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
+        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -436,48 +433,6 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchProductsForFilterFailed,
-        error: "Error while fetching products",
-      });
-    }
-  },
-  fetchProductsForFilterLoggedIn: async (dispatch, categorys, subCategorys) => {
-    dispatch({ type: actionDescriptors.fetchProductsForFilterLoggedIn });
-
-    const categoryQuery = categorys ? `&category[]=${categorys}` : "";
-
-    const subCategoryQuery = subCategorys
-      ? `&subCategory[]=${subCategorys}`
-      : "";
-    try {
-      const response = await fetch(
-        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchProductsForFilterLoggedInSuccessful,
-          payload: body.data,
-        });
-        return;
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({
-          type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
-          error: "Error while fetching products",
-        });
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
-        error: body.error,
-      });
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchProductsForFilterLoggedInFailed,
         error: "Error while fetching products",
       });
     }
