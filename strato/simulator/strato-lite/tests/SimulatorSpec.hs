@@ -49,7 +49,6 @@ import           BlockApps.X509.Certificate
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
-import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -81,11 +80,6 @@ import           UnliftIO.Concurrent                   (threadDelay)
 
 instance Eq SomeException where
   _ == _ = True -- for the purpose of my test, all exceptions are equal
-
-createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
-createPeer' pk identity as certs n ip = do
-  inet <- newTVarIO preAlGoreInternet
-  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
 
 spec :: Spec
 spec = do
