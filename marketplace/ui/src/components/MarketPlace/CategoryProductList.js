@@ -124,56 +124,39 @@ const CategoryProductList = () => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
   };
-  //============================Manufacturers/Brands=============================//
-  useEffect(() => {
-    if (productsForFilter.length > 0) {
-      var uniqueBrands = productsForFilter
-        .map((p) => p.manufacturer)
-        .filter(
-          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
-        );
-      setBrands(uniqueBrands);
-    }
-  }, [productsForFilter]);
-
-  const onChangeBrand = (e) => {
-    let valuesChecked = checkValues(e, selectedBrands)
-    setSelectedBrands(valuesChecked);
-  };
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
-      console.log(hasChecked, !isAuthenticated);
-    if (category !== "") {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
-      );
+      if (category !== "") {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          debouncedMinQty,
+          debouncedMaxQty,
+          debouncedMinPrice,
+          debouncedMaxPrice
+        );
+      }
+    } else {
+      if (category !== "") {
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          debouncedMinQty,
+          debouncedMaxQty,
+          debouncedMinPrice,
+          debouncedMaxPrice
+        );
+      }
     }
-  } else {
-    if (category !== "") {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
-      );
-    }
-  }
   }, [
     marketplaceDispatch,
     selectedCategories,
@@ -186,6 +169,23 @@ const CategoryProductList = () => {
     debouncedMaxPrice,
     category,
   ]);
+
+  //============================Manufacturers/Brands=============================//
+  useEffect(() => {
+    if (marketplaceList.length > 0) {
+      var uniqueBrands = marketplaceList
+        .map((p) => p.manufacturer)
+        .filter(
+          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
+        );
+      setBrands(uniqueBrands);
+    }
+  }, [marketplaceList]);
+
+  const onChangeBrand = (e) => {
+    let valuesChecked = checkValues(e, selectedBrands)
+    setSelectedBrands(valuesChecked);
+  };
 
   //=========================Other functions===============================//
 
@@ -220,6 +220,7 @@ const CategoryProductList = () => {
   }
   //============================================================================//
 
+  console.log(marketplaceList)
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -230,13 +231,12 @@ const CategoryProductList = () => {
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
-        <Breadcrumb.Item className="text-primary">
-          {currentCategory ? currentCategory.name : ""}
-        </Breadcrumb.Item>
+        {selectedCategories?.map((category, index) => (
+          <Breadcrumb.Item key={index} className="text-primary">
+            {category ? category : ""}
+          </Breadcrumb.Item>
+        ))}
       </Breadcrumb>
-      <Text className="mt-2 ml-12 text-2xl font-semibold">
-        {currentCategory ? currentCategory.name : ""}
-      </Text>
       <div className="flex pt-4">
         {/* Filter section */}
         <div className="mr-6 pt-4">
@@ -364,7 +364,7 @@ const CategoryProductList = () => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )} 
+            )}
 
             {/* Panel - Product */}
             {productsForFilter.length > 0 && (
@@ -383,8 +383,8 @@ const CategoryProductList = () => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {productsForFilter.map((product, index) => (
-                          <Checkbox value={product.address} key={index} className="m-0" onChange={onChangeProduct}>
+                        {marketplaceList.map((product, index) => (
+                          <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {decodeURIComponent(product.name)}
                           </Checkbox>
                         ))}
@@ -397,7 +397,7 @@ const CategoryProductList = () => {
             )}
 
             {/* Panel - Manufacturer/Brand */}
-            {brands.length > 0 && productsForFilter.length > 0 && (
+            {brands.length > 0 && marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
