@@ -7,21 +7,17 @@ import {
   Checkbox,
   Spin,
 } from "antd";
-import { Images } from "../../images";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 //sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import {
   useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
-//Products
-import { actions as productActions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
 //Marketplace
 import { actions } from "../../contexts/marketplace/actions";
 import {
@@ -39,7 +35,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 const { Panel } = Collapse;
 const { Text } = Typography;
 
-const CategoryProductList = () => {
+const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -101,24 +97,6 @@ const CategoryProductList = () => {
     let valuesChecked = checkValues(e, selectedSubCategories)
     setSelectedSubCategories(valuesChecked);
   };
-  //============================Products===================================//
-  // Filter - Products
-  const productDispatch = useProductDispatch();
-  const { productsForFilter, isProductsLoading } = useProductState();
-
-  useEffect(() => {
-    let categorys = null,
-      subCategorys = null;
-    if (selectedCategories.length || selectedSubCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategorys = arrayToStr(selectedSubCategories);
-      productActions.fetchProductsForFilter(
-        productDispatch,
-        categorys,
-        subCategorys
-      );
-    }
-  }, [productDispatch, selectedCategories, selectedSubCategories]);
 
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
@@ -220,7 +198,6 @@ const CategoryProductList = () => {
   }
   //============================================================================//
 
-  console.log(marketplaceList)
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -367,7 +344,7 @@ const CategoryProductList = () => {
             )}
 
             {/* Panel - Product */}
-            {productsForFilter.length > 0 && (
+            {marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
