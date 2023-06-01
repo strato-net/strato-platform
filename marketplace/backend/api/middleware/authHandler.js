@@ -60,12 +60,12 @@ class AuthHandler {
             return next()
           }
           try {
-            address = await rest.getKey({ username: decodedToken.preferred_username, token }, { config })
+            address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
@@ -120,7 +120,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
