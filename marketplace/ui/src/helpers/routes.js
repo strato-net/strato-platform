@@ -3,17 +3,18 @@
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
   Certifier: { label: "Certifier", url: "/certifier" },
-  Marketplace: { label: "Marketplace", url: "/marketplace" },
+  Marketplace: { label: "Marketplace", url: "/" },
   MarketplaceProductList: {
     label: "Marketplace Product List",
-    url: "/marketplace/category/:category",
+    url: "/category/:category",
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
-    url: "/marketplace/productList/:address",
+    url: "/productList/:address",
   },
-  Checkout: { label: "Checkout", url: "/marketplace/checkout" },
-  ConfirmOrder: { label: "Confirm Order", url: "/marketplace/confirmOrder" },
+  FinishLogin: { label: "FinishLogin", url: "/finishLogin" },
+  Checkout: { label: "Checkout", url: "/checkout" },
+  ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
   Inventories: { label: "Inventory", url: "/inventories" },

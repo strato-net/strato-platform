@@ -129,7 +129,7 @@ class AuthenticationController {
 
   static async logout(req, res) {
     let oauthSignOutUrl
-    if (process.env.STRATO_NODE_HOST === 'nginx') {
+    if (process.env.STRATO_NODE_HOST === 'nginx' || process.env.MP_SERVER_HOST === 'localhost:8080') {
       oauthSignOutUrl = '/auth/logout'
     } else {
       oauthSignOutUrl = oauth.getLogOutUrl()
