@@ -9,7 +9,6 @@ serverIP:
 orgName: blockapps
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
-marketplaceUiUrlPrefix: ""
 
 nodes:
   - id: 0
