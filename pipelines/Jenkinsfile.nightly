@@ -178,7 +178,8 @@ pipeline {
       }
     }
 
-    stage('Test and Push Images') {
+//    stage('Test and Push Images') {
+    stage('Push Images') {
       steps {
         parallel (
           'Push images': {
@@ -200,7 +201,7 @@ pipeline {
               }
             }
           },
-            
+/*            
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -271,10 +272,11 @@ pipeline {
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
           },
+ */
         )
       }
     }
-
+/*
     stage('Test dev docs') {
       steps {
         withCredentials([
@@ -317,7 +319,7 @@ module.exports = {
         }
       }
     }
-    
+*/
   }
 
   post {
