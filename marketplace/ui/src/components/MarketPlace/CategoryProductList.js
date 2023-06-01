@@ -7,21 +7,17 @@ import {
   Checkbox,
   Spin,
 } from "antd";
-import { Images } from "../../images";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 //sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import {
   useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
-//Products
-import { actions as productActions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
 //Marketplace
 import { actions } from "../../contexts/marketplace/actions";
 import {
@@ -101,32 +97,6 @@ const CategoryProductList = ({ user }) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
     setSelectedSubCategories(valuesChecked);
   };
-  //============================Products===================================//
-  // Filter - Products
-  const productDispatch = useProductDispatch();
-  const { productsForFilter, isProductsLoading } = useProductState();
-
-  useEffect(() => {
-    let categorys = null,
-      subCategorys = null;
-    if (selectedCategories.length || selectedSubCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategorys = arrayToStr(selectedSubCategories);
-      if (hasChecked && !isAuthenticated) {
-        productActions.fetchProductsForFilter(
-          productDispatch,
-          categorys,
-          subCategorys
-        );
-      } else {
-        productActions.fetchProductsForFilterLoggedIn(
-          productDispatch,
-          categorys,
-          subCategorys
-        );
-      }
-    }
-  }, [productDispatch, selectedCategories, selectedSubCategories]);
 
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
@@ -405,7 +375,7 @@ const CategoryProductList = ({ user }) => {
             )}
 
             {/* Panel - Manufacturer/Brand */}
-            {brands.length > 0 && productsForFilter.length > 0 && (
+            {brands.length > 0 && marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
