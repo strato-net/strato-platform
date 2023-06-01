@@ -6,6 +6,7 @@ deployFilename: <deployFilename_value>
 orgDeployFilename: <orgDeployFilename_value>
 serverHost: <serverHost_value>
 orgName: <orgName_value>
+marketplaceUiUrlPrefix: "/marketplace"
 
 nodes:
   - id: 0
