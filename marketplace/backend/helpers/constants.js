@@ -32,13 +32,13 @@ export const STRIPE_ENV = {
   },
   CHECKOUT: {
     PAYMENT_METHOD_TYPES: ["card"],
-    SUCCESS_URL: `${config.serverHost}/order/status?session_id={CHECKOUT_SESSION_ID}`,
-    CANCEL_URL: `${config.serverHost}/marketplace/checkout`
+    SUCCESS_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/order/status?session_id={CHECKOUT_SESSION_ID}`,
+    CANCEL_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/marketplace/checkout`
   },
   ACCOUNT_ONBOARDING: {
     TYPE: 'accountOnboarding',
-    REFRESH_URL: `${config.serverHost}/inventories/stripe/onboarding`,
-    RETURN_URL: `${config.serverHost}/inventories`
+    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories/stripe/onboarding`,
+    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories`
   }
 }
 Object.freeze(STRIPE_ENV)
