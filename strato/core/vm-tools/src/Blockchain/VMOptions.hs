@@ -60,5 +60,5 @@ defineFlag "accountNonceLimit" (1000::Integer) "The maximum number of transactio
 defineFlag "gasLimit" (1000000::Integer) "The maximum amount of gas a transaction can use"
 
 defineFlag "network" (""::String) "Choose a network to join"
-defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
+defineFlag "networkID" (-1::Integer) "set a custom network ID for the client"
 defineFlag "testnet" False "connect to testnet"
