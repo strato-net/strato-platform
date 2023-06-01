@@ -39,7 +39,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 const { Panel } = Collapse;
 const { Text } = Typography;
 
-const CategoryProductList = ({user}) => {
+const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -132,17 +132,6 @@ const CategoryProductList = ({user}) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
   };
-  //============================Manufacturers/Brands=============================//
-  useEffect(() => {
-    if (productsForFilter.length > 0) {
-      var uniqueBrands = productsForFilter
-        .map((p) => p.manufacturer)
-        .filter(
-          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
-        );
-      setBrands(uniqueBrands);
-    }
-  }, [productsForFilter]);
 
   const onChangeBrand = (e) => {
     let valuesChecked = checkValues(e, selectedBrands)
@@ -194,6 +183,18 @@ const CategoryProductList = ({user}) => {
     category,
   ]);
 
+  //============================Manufacturers/Brands=============================//
+  useEffect(() => {
+    if (marketplaceList.length > 0) {
+      var uniqueBrands = marketplaceList
+        .map((p) => p.manufacturer)
+        .filter(
+          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
+        );
+      setBrands(uniqueBrands);
+    }
+  }, [marketplaceList]);
+
   //=========================Other functions===============================//
 
   const onChangeQuantity = (val) => {
@@ -227,8 +228,6 @@ const CategoryProductList = ({user}) => {
   }
   //============================================================================//
 
-  console.log(productsForFilter)
-  console.log(marketplaceList)
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -376,7 +375,7 @@ const CategoryProductList = ({user}) => {
             )}
 
             {/* Panel - Product */}
-            {productsForFilter.length > 0 && (
+            {marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -392,8 +391,8 @@ const CategoryProductList = ({user}) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {productsForFilter.map((product, index) => (
-                          <Checkbox value={product.address} key={index} className="m-0" onChange={onChangeProduct}>
+                        {marketplaceList.map((product, index) => (
+                          <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {decodeURIComponent(product.name)}
                           </Checkbox>
                         ))}
