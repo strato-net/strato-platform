@@ -36,7 +36,7 @@ data ProcessedContract = ProcessedContract
   , contractData      :: Map Text V.Value
   } deriving (Show)
 
-data ProcessedMapping = ProcessedMapping
+data ProcessedMappingRow = ProcessedMappingRow
   { m_address           :: Address
   , m_codehash          :: CodePtr
   , m_organization      :: Text

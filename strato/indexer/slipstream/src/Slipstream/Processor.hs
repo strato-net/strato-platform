@@ -19,7 +19,8 @@
 
 module Slipstream.Processor
   ( processTheMessages
-  , parseActions -- For testing
+  , parseActions
+  , processedContractToProcessedMappingRows  -- For testing
   ) where
 
 import Prelude hiding (lookup)
@@ -156,7 +157,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
-  , mappingInserts  :: [ProcessedMapping]
+  , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
 
 enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
@@ -306,8 +307,8 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-processedContractToProcessedMappings :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMapping]
-processedContractToProcessedMappings pc mapNames = do
+processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
+processedContractToProcessedMappingRows pc mapNames = do
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
       onlyRecord = Map.toList(Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
       recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord 
@@ -320,8 +321,8 @@ processedContractToProcessedMappings pc mapNames = do
           flattenInnerMap mapName key value flatList = (mapName, key, value) : flatList
       result = convertToPMapping flattenedMap 
         where 
-          convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMapping]
-          convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMapping mapName pc (SimpleValue key) value ) flatMap
+          convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMappingRow]
+          convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMappingRow mapName pc (SimpleValue key) value ) flatMap
   return $ result
 
 rowToHistories :: (MonadIO m) =>
@@ -366,9 +367,9 @@ contractToEventTables (org, app, name) c =
           eventFields = map fst $ _eventLogs fields
         }
 
-processedMapping ::  Text -> ProcessedContract -> Value -> Value-> ProcessedMapping
-processedMapping mapping ProcessedContract{..} k v =
-   ProcessedMapping {
+processedMappingRow ::  Text -> ProcessedContract -> Value -> Value-> ProcessedMappingRow
+processedMappingRow mapping ProcessedContract{..} k v =
+   ProcessedMappingRow {
     m_address           =  address 
   , m_codehash          =  codehash 
   , m_organization      =  organization 
@@ -511,7 +512,7 @@ processTheMessages env sqlEnv conn g messages = do
                 --Create mapping tables
 
                 forM_ mapNames $ \m -> do 
-                  outputData' conn $ createMappingTable g nameParts (T.pack m) --Tables are created
+                  outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
                 deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
@@ -564,7 +565,7 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          pMappings <- processedContractToProcessedMappings indexContract bigMapNames --get all procsesed mappings
+          pMappings <- processedContractToProcessedMappingRows indexContract bigMapNames --get all procsesed mappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs pMappings

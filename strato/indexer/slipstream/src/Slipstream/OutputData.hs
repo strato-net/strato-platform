@@ -137,8 +137,8 @@ makeAccount c = T.concat [
   chain c
   ]
 
-makeAccountM:: ProcessedMapping -> Text
-makeAccountM m@ProcessedMapping{m_chain=""} = tshow $ m_address m
+makeAccountM:: ProcessedMappingRow -> Text
+makeAccountM m@ProcessedMappingRow{m_chain=""} = tshow $ m_address m
 makeAccountM m = T.concat [
   tshow $ m_address m,
   ":",
@@ -369,7 +369,7 @@ createMappingTable :: OutputM m
                  => IORef Globals
                  -> (Text, Text, Text)
                  -> Text
-                 -> ConduitM () (Text, Maybe (IORef Globals,TableName,TableColumns)) m ()
+                 -> ConduitM () Text m ()
 createMappingTable globalsIORef (o, a, n) m = do
   let tableName = mappingTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
@@ -378,7 +378,7 @@ createMappingTable globalsIORef (o, a, n) m = do
 
   when (not tableExists) $ do
     incNumMappingTables
-    yield $ ((createMappingTableQuery (o, a, n, m)), Nothing)
+    yield $ (createMappingTableQuery (o, a, n, m))
     let list = ["key","value"]
     setTableCreated globalsIORef tableName list
 
@@ -545,7 +545,7 @@ insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yieldMany $ insertIndexTableQuery contracts
 
 insertMappingTable :: OutputM m
-                 => [ProcessedMapping]
+                 => [ProcessedMappingRow]
                  -> ConduitM () Text m ()
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = yieldMany $ insertMappingTableQuery maps
@@ -693,7 +693,7 @@ insertIndexTableQuery cs = concat $
                 , ";"
                 ]
 
-insertMappingTableQuery :: [ProcessedMapping] -> [Text]
+insertMappingTableQuery :: [ProcessedMappingRow] -> [Text]
 insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
 insertMappingTableQuery ms = concat $
   let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", m_mapDataKey m), ("value", m_mapDataValue m)])) <$> ms
@@ -714,6 +714,8 @@ insertMappingTableQuery ms = concat $
                          , tshow . m_blockNumber
                          , T.pack . keccak256ToHex . m_transactionHash
                          , tshow . m_transactionSender
+                         , m_contractName
+                         , m_mapName
                          ]
               vals = flip map mappings $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -727,14 +729,16 @@ insertMappingTableQuery ms = concat $
                 , inserts
                 , [r|
   ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
-    address = excluded.address,
-    "chainId" = excluded."chainId",
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender|]
+    m_record_id = excluded.m_record_id,
+    m_address = excluded.m_address,
+    "m_chainId" = excluded."m_chainId",
+    m_block_hash = excluded.m_block_hash,
+    m_block_timestamp = excluded.m_block_timestamp,
+    m_block_number = excluded.m_block_number,
+    m_transaction_hash = excluded.m_transaction_hash,
+    m_transaction_sender = excluded.m_transaction_sender,
+    m_contractName = excluded.m_contractName,
+    m_mapName = excluded.m_mapName|]
                 , if null list then "" else ",\n    "
                 , tableUpsert $ map fst list
                 , ";"
