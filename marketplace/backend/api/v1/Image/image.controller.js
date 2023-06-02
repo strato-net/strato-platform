@@ -37,7 +37,7 @@ class ImageController {
   
       rest.response.status201(res, result);
     } catch (e) {
-      next(e);
+      return next(e);
     }
   }
 
@@ -73,7 +73,7 @@ class ImageController {
   
       rest.response.status200(res, result);
     } catch (e) {
-      next(e);
+      return next(e);
     }
   }
 

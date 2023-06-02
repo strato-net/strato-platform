@@ -81,7 +81,6 @@ const SoldOrderDetails = ({ user, users }) => {
     success,
     isCreateOrderLineItem,
   } = useOrderState();
-  console.log("orderDetails", orderDetails)
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
     strict: true,
@@ -93,7 +92,8 @@ const SoldOrderDetails = ({ user, users }) => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
       setcomment(orderDetails.sellerComments);
-      if (orderDetails.fullfilmentDate == null) {
+      // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
+      if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
         setSelectedDate(null);
       } else {
         setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
@@ -197,6 +197,7 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const onDateChange = (date) => {
+    console.log("date", date)
     setSelectedDate(date);
   };
 
@@ -338,7 +339,6 @@ const SoldOrderDetails = ({ user, users }) => {
       align: "center",
       // width: "192px",
       render: (text) =>
-        console.log("text", text) &&
         text.isSerialUploaded == null || text.isSerialUploaded === false ? (
           <Button
             id="upload-button"
