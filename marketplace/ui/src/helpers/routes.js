@@ -12,7 +12,7 @@ export default {
     label: "Marketplace Product Detail",
     url: "/productList/:address",
   },
-  FinishLogin: { label: "FinishLogin", url: "/finishLogin" },
+  LoginRedirect: { label: "LoginRedirect", url: "/login" },
   Checkout: { label: "Checkout", url: "/checkout" },
   ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },

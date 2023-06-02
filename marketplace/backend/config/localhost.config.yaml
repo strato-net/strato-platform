@@ -9,6 +9,7 @@ serverIP:
 orgName: blockapps
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
+dockerized: false
 
 nodes:
   - id: 0
