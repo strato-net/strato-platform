@@ -31,6 +31,8 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
+const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
@@ -65,7 +67,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              return next(e)
+              next(e)
             }
           }
           req.address = address
@@ -81,7 +83,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }
@@ -120,7 +122,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              return next(e)
+              next(e)
             }
           }
           req.address = address
@@ -136,7 +138,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }

@@ -43,7 +43,7 @@ import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
-import ExternalRedirect from "./components/ExternalRedirect";
+import LoginRedirect from "./components/LoginRedirect";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -61,9 +61,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.FinishLogin.url}
+        path={routes.LoginRedirect.url}
         element={
-          <ExternalRedirect/>
+          <LoginRedirect/>
         }
       />
       <Route

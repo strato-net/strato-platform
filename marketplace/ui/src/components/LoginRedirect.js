@@ -1,6 +1,6 @@
 import React from 'react';
 
-class ExternalRedirect extends React.Component {
+class LoginRedirect extends React.Component {
   componentDidMount() {
     window.location.replace("/marketplace/")
   }
@@ -10,4 +10,4 @@ class ExternalRedirect extends React.Component {
   }
 }
 
-export default ExternalRedirect;
+export default LoginRedirect;

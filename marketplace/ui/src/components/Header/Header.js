@@ -120,7 +120,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     {
       key: '2',
       label: (
-        <Link to={loginUrl}> Login </Link>
+        <a href={loginUrl}> Login </a>
       ),
     },
   ];
@@ -195,7 +195,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <Link to={loginUrl} className="text-base text-white"> Login / Register </Link> : null
+            loginUrl ? <a href={loginUrl} className="text-base text-white"> Login / Register </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
