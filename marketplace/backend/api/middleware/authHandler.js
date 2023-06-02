@@ -67,7 +67,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
@@ -122,7 +122,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
