@@ -56,17 +56,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const [isConfirmStatusModalOpen, toggleConfirmStatusModal] = useState(false);
   const [selectedProd, setselectedProd] = useState(null);
 
-// This is for the serial number upload. I need to count the amount of serial numbers that are uploaded and make sure it matches the total amount required.
-// Using local storage incase the user refreshes the page. If the page is refreshed the user is unable to finish the order without storing the variable value. 
-  const [serialNumberCount, setSerialNumberCount] = useState(() => {
-    const storedValue = localStorage.getItem("serialNumberCount");
-    return storedValue !== null ? JSON.parse(storedValue) : 0;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("serialNumberCount", JSON.stringify(serialNumberCount));
-  }, [serialNumberCount]);
-
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -212,21 +201,21 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-// This is checking how many serial numbers we need to compare against the serialNumber count. 
-// If the item contains a serial number we need to upload one and add it to the totalSerialNumbersNeeded.
-  const totalSerialNumbersNeeded = () => {
+// This is checking if we need to upload serial numbers. 
+// Used to disable the sae button if the serial numbers aren't uploaded.
+  const allSerialNumbersUploaded = () => {
+    let serialsUploaded = true;
     if (orderDetails === null) {
-      return 0;
+      return serialsUploaded;
     }
-
-    let serialsNeeded = 0;
     for (const orderLine of orderDetails.orderLines) {
       if (orderLine.containsSerialNumber === true) {
-        serialsNeeded++;
+        if (orderLine.isSerialUploaded === false) {
+          serialsUploaded = false;
+        }
       }
     }
-
-    return serialsNeeded;
+    return serialsUploaded;
   };
 
 
@@ -521,7 +510,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || (serialNumberCount < totalSerialNumbersNeeded)}
+                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
                 onClick={handleUpdateComment}
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
               >
@@ -673,8 +662,6 @@ const SoldOrderDetails = ({ user, users }) => {
           isUploadSerialNumberModalOpen={isUploadSerialNumberModalOpen}
           toggleUploadSerialNumberModal={setisUploadSerialNumberModalOpen}
           product={selectedProd}
-          setSerialNumberCount={setSerialNumberCount}
-          serialnumberCount={serialNumberCount}
           orderId={details.orderId}
           orderAddress={details.address}
           dispatch={dispatch}
