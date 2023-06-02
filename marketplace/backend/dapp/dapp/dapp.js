@@ -1075,7 +1075,10 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         const {productId, inventoryId } = result.orderLines[i];
         const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
 
-        if (items[0].serialNumber == "") {
+        if (items === null || items === undefined || items.length === 0) {
+          result.orderLines[i].containsSerialNumber = false;
+        }
+        else if (items.length > 0 && items[0].serialNumber == "") {
           result.orderLines[i].containsSerialNumber = false;
         } else {
           result.orderLines[i].containsSerialNumber = true;
