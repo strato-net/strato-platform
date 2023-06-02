@@ -66,7 +66,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Product created successfully", true);
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.createProductFailed,
           error: "Error while creating Product",
@@ -77,7 +77,7 @@ const actions = {
 
       dispatch({
         type: actionDescriptors.createProductFailed,
-        error:  body.error,
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
@@ -107,7 +107,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductDetailsFailed,
           error: "Error while fetching Product Details",
@@ -144,14 +144,14 @@ const actions = {
       );
 
       const body = await response.json();
-      console.log('products',body)
+      console.log('products', body)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductFailed,
           error: "Error while fetching product list",
@@ -187,7 +187,7 @@ const actions = {
         });
         // actions.setMessage(dispatch, "Image uploaded successfully", true);
         return body.data;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.uploadImageFailed,
           error: "Image upload failed",
@@ -234,7 +234,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Product has been updated", true);
         return true;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateProductFailed,
           error: "Error while updating Product",
@@ -291,7 +291,7 @@ const actions = {
           true
         );
         return false;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.deleteProductFailed,
           error: "Error while deleting Product",
@@ -334,7 +334,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchCategoryBasedProductFailed,
           error: "Error while fetching products",
@@ -363,7 +363,7 @@ const actions = {
       });
 
       const body = await response.json();
-     
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.updateImageSuccessful,
@@ -371,7 +371,7 @@ const actions = {
         });
         // actions.setMessage(dispatch, "Image updated successfully", true);
         return body.data;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateImageFailed,
           error: "Image update failed",
@@ -401,8 +401,8 @@ const actions = {
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
     const subCategoryQuery = subCategorys
-    ? `&subCategory[]=${subCategorys}`
-    : "";
+      ? `&subCategory[]=${subCategorys}`
+      : "";
     try {
       const response = await fetch(
         `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
@@ -419,7 +419,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductsForFilterFailed,
           error: "Error while fetching products",

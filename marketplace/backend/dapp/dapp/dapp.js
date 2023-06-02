@@ -138,7 +138,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
   console.log('dapp - userCertificate.organization', userCertificate.organization)
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [],};
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -510,7 +510,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    } 
+    }
     // For some reason an else statement is not working here
     if (serialNumber.length === 0 || serialNumber.length === undefined) {
       const quantity = args.quantity;
@@ -1164,7 +1164,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const itemsAddresses = items.map(_item => _item.address);
 
-      
+
       const _args = {
         orderLineId,
         items: itemsAddresses,
