@@ -4,7 +4,7 @@ VM: SolidVM
 configDirPath: ./config
 deployFilename: localhost.deploy.yaml
 orgDeployFilename: org.deploy.yaml
-serverHost: 
+serverHost: http://localhost
 serverIP: 
 orgName: blockapps
 bootMembersFilename: boot_members.yaml
