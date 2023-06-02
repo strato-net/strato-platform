@@ -39,7 +39,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe, maybeToList)
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -693,19 +693,19 @@ insertIndexTableQuery cs = concat $
                 , ";"
                 ]
 
-insertMappingTableQuery :: [ProcessedMapping] -> [Text] --DAVID
+insertMappingTableQuery :: [ProcessedMapping] -> [Text]
 insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
-insertMappingTableQuery mappings = concat $
-  let mappings' = (\m -> (m, maybeToList $ valueToSQLTextFilterMapping $ m_mapDataKey m)) <$> mappings --(k,v)
-   in flip map (map snd $ partitionWith (length . snd) mappings') $ \case
+insertMappingTableQuery ms = concat $
+  let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", m_mapDataKey m), ("value", m_mapDataValue m)])) <$> ms
+   in flip map (map snd $ partitionWith (length . snd) ms') $ \case
         [] -> []
-        mappings''@((x,mk):_) ->
+        mappings@((x,list):_) ->
           let tableName = mappingTableName
                   (m_organization x)
                   (m_application x)
                   (m_contractName x)
                   (m_mapName x)
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ mk
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
               baseVals = [ makeAccountM
                          , tshow . m_address
                          , m_chain
@@ -714,11 +714,9 @@ insertMappingTableQuery mappings = concat $
                          , tshow . m_blockNumber
                          , T.pack . keccak256ToHex . m_transactionHash
                          , tshow . m_transactionSender
-                         , tshow . m_mapDataKey
-                         , tshow . m_mapDataValue
                          ]
-              vals = flip map mappings'' $ \(row, rowList) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ rowList
+              vals = flip map mappings $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
@@ -729,18 +727,16 @@ insertMappingTableQuery mappings = concat $
                 , inserts
                 , [r|
   ON CONFLICT (record_id) DO UPDATE SET
-    m_record_id = excluded.m_record_id,
-    m_address = excluded.m_address,
-    "m_chainId" = excluded."m_chainId",
-    m_block_hash = excluded.m_block_hash,
-    m_block_timestamp = excluded.m_block_timestamp,
-    m_block_number = excluded.m_block_number,
-    m_transaction_hash = excluded.m_transaction_hash,
-    m_transaction_sender = excluded.m_transaction_sender
-    m_mapDataKey = excluded.m_mapDataKey,
-    m_mapDataValue = excluded.m_mapDataValue|]
-                , if null mappings'' then "" else ",\n    "
-                , tableUpsert $ (map (\(_, texts) -> (T.concat texts)) mappings'')
+    record_id = excluded.record_id,
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender|]
+                , if null list then "" else ",\n    "
+                , tableUpsert $ map fst list
                 , ";"
                 ]
 
@@ -961,9 +957,6 @@ valueToSQLTextFilterContract :: Value -> Maybe Text
 valueToSQLTextFilterContract (ValueContract _) = Just "NULL"
 valueToSQLTextFilterContract x = valueToSQLText x
 
-valueToSQLTextFilterMapping :: Value -> Maybe Text
-valueToSQLTextFilterMapping (ValueMapping _) = Just "NULL"
-valueToSQLTextFilterMapping x = valueToSQLText x
 
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x

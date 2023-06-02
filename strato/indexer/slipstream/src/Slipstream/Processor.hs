@@ -43,7 +43,6 @@ import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Maybe (fromMaybe)
 import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
 
@@ -511,7 +510,7 @@ processTheMessages env sqlEnv conn g messages = do
 
                 --Create mapping tables
 
-                _ <- forM mapNames $ \m -> do 
+                forM_ mapNames $ \m -> do 
                   outputData' conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
