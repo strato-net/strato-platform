@@ -602,7 +602,7 @@ const ProductDetails = ({ user, users }) => {
                       window.location.href = loginUrl;
                     } else {
                       addItemToCart();
-                      navigate("/marketplace/checkout");
+                      navigate("/checkout");
                     }
                   }}
                   disabled={isCalledFromInventory}
