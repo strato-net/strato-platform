@@ -10,7 +10,7 @@ orgName: blockapps
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
 dockerized: false
-marketplaceUiUrlPrefix: ""
+marketplaceUiUrlPrefix: "/marketplace"
 
 nodes:
   - id: 0
