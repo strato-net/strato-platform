@@ -156,7 +156,7 @@ const actions = {
       ? `&manufacturer[]=${manufacturers}`
       : "";
 
-    const productQuery = products ? `&product[]=${products}` : "";
+    const productQuery = products ? `&productId[]=${products}` : "";
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
