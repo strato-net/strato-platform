@@ -634,7 +634,8 @@ createDummyContract v =
         _varIsPublic=True,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False
+        _isImmutable = False,
+        _isRecord = True
         }
   in
     Contract{
