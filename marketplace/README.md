@@ -61,8 +61,6 @@ TEST_SELLER_PASSWORD=<sellerPassword>
 # blockapps stripe account
 STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>
 STRIPE_SECRET_KEY=<stripeSecretKey>
-
-CLIENT_URL=<clientUrl>
 ```
 2. Install dependencies: 
 ```
@@ -112,24 +110,45 @@ docker stop nginx-docker_nginx_1
 
 ### Run tCommerce app in Docker (the production way)
 
-#### 1. Build docker images
+#### 1. Build the APP
+
+Inside strato-platform directory run the follow commands:
+
 ```
-sudo docker-compose build
+REPO=local make
 ```
+
+Copy the `docker-compose.yml` file from `strato-platform` to `strato-getting-started` directory.
+
+```
+cp ../strato-platform/docker-compose.yml ../strato-getting-started
+```
+
+#### 2. Build docker images
+
+Inside strato-getting-started directory run the docker containers using the executale script `run-app.sh`:
 
 #### 2a. Run as tCommerce bootnode (main node in multi-node environment)
 1. Fill in the following fields in the run-app.sh script and run it:
     ```
-
-    export MP_IS_BOOTNODE=true
-    export MP_API_DEBUG=true
-    export MP_SERVER_HOST=<your external IP address> # can't use 127.0.0.1
-    export SERVER_IP=<your external IP address> # can't use 127.0.0.1
-    export OAUTH_OPENID_DISCOVERY_URL=https://<oauth provider url>/.well-known/openid-configuration
-    export OAUTH_CLIENT_ID=<oauth provider client id>
-    export OAUTH_CLIENT_SECRET=<oauth provider client secret>
-    export NODE_LABEL='My boot node'
-    export SSL=true
+    MP_IS_BOOTNODE=true
+    BOOT_NODE_IP="52.4.166.179" \
+    NODE_HOST="localhost:8080" \
+    HTTP_PORT="8080" \
+    networkID="145412593591711493194520550465176298862" \
+    OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration" \
+    OAUTH_CLIENT_ID="localhost" \
+    OAUTH_CLIENT_SECRET="???" \
+    ssl="true" \
+    VAULT_URL="https://vault.blockapps.net:8093" \
+    EXT_STORAGE_S3_BUCKET='mercata-testnet2' \
+    EXT_STORAGE_S3_ACCESS_KEY_ID='???' \
+    EXT_STORAGE_S3_SECRET_ACCESS_KEY='???' \
+    STRIPE_PUBLISHABLE_KEY='??' \
+    STRIPE_SECRET_KEY='???' \
+    STRATO_NODE_HOST="node1.mercata-testnet2.blockapps.net" \
+    STRATO_NODE_PROTOCOL="https" \
+    ./strato
     ```
    (For additional parameters, see "docker-compose.yml env vars reference" below)
 
@@ -138,7 +157,12 @@ sudo docker-compose build
     chmod +x run-app.sh
     ```
    
-3. Wait for all docker containers to become healthy (`sudo docker ps`)
+3. Run the script:
+    ```
+    ./run-app.sh
+    ```
+
+4. Wait for all docker containers to become healthy (`sudo docker ps`)
 
 *NOTE: Running the command `sudo docker-compose down -vt0 && sudo ./run-app.sh` will clean the app data and then run the app from scratch*
 
@@ -146,37 +170,26 @@ sudo docker-compose build
 #### 2b. Run as app secondary node (in multi-node environment)
 Secondary node is the one that connects to the existing Dapp contract on the blockchain (which is initially deployed on app bootnode)
 
-1. On bootnode - Get deploy file content:
+1. Fill in the following fields in the `run-app-secondary.sh` script and run it:
     ```
-    sudo docker exec tcommerce_backend_1 cat /config/tCommerce.deploy.yaml
-    ```
-2. On secondary node - create docker volume and add the same tCommerce.deploy.yaml file using commands:
-    ```
-    sudo su
-    docker volume create tcommerce_config
-    APP_CONFIG_VOLUME_DIR=$(docker volume inspect --format '\{\{ .Mountpoint \}\}' tcommerce_config)
-    nano ${APP_CONFIG_VOLUME_DIR}/tCommerce.deploy.yaml
-    # paste content and save
-    exit
-    ```
-3. Fill in the following fields in the `run-app-secondary.sh` script and run it:
-    ```
-    export MP_IS_BOOTNODE='false'
-    export MP_API_DEBUG='true'
-    export MP_SERVER_HOST='<MP_SERVER_HOST>'                                # ex: localhost
-    export SERVER_IP='<SERVER_IP>'                                          # ex: 123.123.123.123
-    export NODE_LABEL='<NODE_LABEL>                                         # ex: tcommerce_secondary                         
-    export OAUTH_APP_TOKEN_COOKIE_NAME='<OAUTH_APP_TOKEN_COOKIE_NAME>'      # ex: tCommerce-node1-session
-    export OAUTH_OPENID_DISCOVERY_URL='<OAUTH_OPENID_DISCOVERY_URL>'        # ex: https://<oauth provider url>/.well-known/openid-configuration
-    export OAUTH_CLIENT_ID='<OAUTH_CLIENT_ID>'                              # ex: abcdef
-    export OAUTH_CLIENT_SECRET='<OAUTH_CLIENT_SECRET>'                      # ex: abcdef12-abcd-abcd-abcd-abcdefabcedf
-    export OAUTH_TOKEN_USERNAME_PROPERTY='preferred_username'               # Do not change unless you know what you are doing.
-    export OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW='preferred_username'  # Do not change unless you know what you are doing.
-    export STRATO_NODE_PROTOCOL='https'
-    export STRATO_NODE_HOST='<STRATO_NODE_HOST>'                            # ex: node1.mercata-testnet.blockapps.net
-    export SSL=true
-    export SSL_CERT_TYPE=pem
-    export DAEMONS_ENABLED='true'
+    MP_IS_BOOTNODE=false
+    BOOT_NODE_IP="52.4.166.179" \
+    NODE_HOST="localhost:8080" \
+    HTTP_PORT="8080" \
+    networkID="145412593591711493194520550465176298862" \
+    OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration" \
+    OAUTH_CLIENT_ID="localhost" \
+    OAUTH_CLIENT_SECRET="???" \
+    ssl="true" \
+    VAULT_URL="https://vault.blockapps.net:8093" \
+    EXT_STORAGE_S3_BUCKET='mercata-testnet2' \
+    EXT_STORAGE_S3_ACCESS_KEY_ID='???' \
+    EXT_STORAGE_S3_SECRET_ACCESS_KEY='???' \
+    STRIPE_PUBLISHABLE_KEY='??' \
+    STRIPE_SECRET_KEY='???' \
+    STRATO_NODE_HOST="node1.mercata-testnet2.blockapps.net" \
+    STRATO_NODE_PROTOCOL="https" \
+    ./strato
     ```
     (For additional parameters or further information, see "docker-compose.yml env vars reference" below)  
 
