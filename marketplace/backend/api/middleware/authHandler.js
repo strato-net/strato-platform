@@ -31,6 +31,8 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
+const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
@@ -81,7 +83,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }
@@ -136,7 +138,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }
