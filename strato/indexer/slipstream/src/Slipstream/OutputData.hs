@@ -374,7 +374,7 @@ createMappingTable globalsIORef (o, a, n) m = do
   let tableName = mappingTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createHistoryTable/mappingTableExists" (tableName, tableExists)
+  $logInfoLS "createMappingTable/mappingTableExists" (tableName, tableExists)
 
   when (not tableExists) $ do
     incNumMappingTables
@@ -613,9 +613,9 @@ createMappingTableQuery (o, a, n, m) =
   let tableName = mappingTableName o a n m
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "key", "value"]
-        , ",\n  PRIMARY KEY (record_id) );"
+        , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
+               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "key", "value"]
+        , ",\n  PRIMARY KEY (m_record_id) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
