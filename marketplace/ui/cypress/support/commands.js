@@ -41,8 +41,6 @@ Cypress.on('uncaught:exception', (err) => {
 })
 
 Cypress.Commands.add("login", (username, password) => {
-  cy.clearCookies();
-  cy.visit("/");
   let un = username ? username :  Cypress.env("email");
   let pwd = password ? password :  Cypress.env("password")
 
@@ -56,8 +54,6 @@ Cypress.Commands.add("login", (username, password) => {
 });
 
 Cypress.Commands.add("loginAsSeller", () => {
-  cy.clearCookies();
-  cy.visit("/");
   cy.origin(Cypress.env("login_url"), () => {
     cy.get("input[name=username]", { timeout: 10000 }).type(
       Cypress.env("sellerEmail")

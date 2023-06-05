@@ -107,7 +107,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     {
       key: '1',
       label: (
-        <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
+        <div type="text" id="logout" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
           Logout
         </div>
       ),
@@ -191,10 +191,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <Link to={loginUrl} className="text-base text-white"> Login / Register </Link> : null
+            loginUrl ? <Link to={loginUrl} id="Login" className="text-base text-white"> Login / Register </Link> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
+              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
                 {initials}
               </a>
             </Dropdown>
