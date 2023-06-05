@@ -49,6 +49,8 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
                              | TFCodeCollectionNotFound Account String OutputTx
                              | TFInvalidPragma [(String, String)] OutputTx
+                             | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
+                             | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
                              deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -177,6 +179,8 @@ tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Qu
 tfToBaggerTxRejection (TFChainIdMismatch _ _ tx) = WrongChainId Validation Queued tx
 tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
 tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
+tfToBaggerTxRejection (TFNonceLimitExceeded limit actual tx) = NonceLimitExceeded Execution Queued actual limit tx
+tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 
 instance Format TransactionFailureCause where
     format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -186,3 +190,5 @@ instance Format TransactionFailureCause where
     format (TFChainIdMismatch expected actual _) = "Chain ID mismatch: expecting " ++ TD.formatChainId expected ++ ", actual " ++ TD.formatChainId actual
     format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
     format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
+    format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
+    format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual

@@ -1,0 +1,22 @@
+.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected,
+.ant-menu-light
+  .ant-menu-item:hover:not(.ant-menu-item-selected):not(
+    .ant-menu-submenu-selected
+  ) {
+  color: white;
+  font-weight: bold;
+}
+
+.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
+  border-width: 2px;
+  border-bottom-color: white;
+}
+
+.ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover::after {
+  border-width: 2px;
+  border-bottom-color: white;
+}
+
+.anticon svg{
+  display: block;
+}

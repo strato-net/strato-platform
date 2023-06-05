@@ -1,0 +1,5 @@
+url: __URL__
+dapp:
+  contract:
+    name: Dapp
+    address: '__DAPP_CONTRACT_ADDRESS__'

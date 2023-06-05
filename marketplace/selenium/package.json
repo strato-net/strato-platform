@@ -1,0 +1,20 @@
+{
+    "scripts": {
+        "mocha-babel": "mocha --require @babel/register",
+        "test:selenium": "yarn mocha-babel test/* -b"
+    },
+    "name": "selenium",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT",
+    "private": true,
+    "dependencies": {
+        "chai": "^4.3.7",
+        "mocha": "^10.2.0"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.20.7",
+        "@babel/preset-env": "^7.20.2",
+        "@babel/register": "^7.18.9"
+    }
+}

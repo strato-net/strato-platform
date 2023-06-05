@@ -1,0 +1,12 @@
+:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th,
+:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > td {
+  padding: 14px;
+}
+
+img.ant-image-preview-img { display: inline-block; } 
