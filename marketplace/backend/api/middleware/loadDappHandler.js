@@ -15,7 +15,7 @@ const loadDapp = async (req, res, next) => {
     username,
     ...accessToken,
   }
-  console.log('req: \n\n\n\n\n', req)
+  console.log('User Credentials: \n\n\n\n\n', userCredentials)
 
   let address
 

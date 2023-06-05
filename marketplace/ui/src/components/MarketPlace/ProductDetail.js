@@ -134,7 +134,7 @@ const ProductDetails = ({ user, users }) => {
         itemsActions.fetchSerialNumbers(itemDispatch, Id);
       }
     }
-  }, [Id, dispatch, itemDispatch]);
+  }, [Id, dispatch, itemDispatch, user]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -273,7 +273,8 @@ const ProductDetails = ({ user, users }) => {
     {
       title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
       dataIndex: "serialNumber",
-      key: "serialNumber",
+      // Fixes UI issue of children having the same key
+      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
       align: "center",
       onCell: (record) => {
         return {
