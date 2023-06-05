@@ -582,7 +582,7 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     unless (null ins) $ outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless (null ins && (length (concatMap mappingInserts ins) > 0) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    unless (null ins || (length (concatMap mappingInserts ins) > 0) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
