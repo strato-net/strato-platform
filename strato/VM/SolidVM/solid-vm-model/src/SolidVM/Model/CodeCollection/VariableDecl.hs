@@ -16,7 +16,8 @@ module SolidVM.Model.CodeCollection.VariableDecl (
   varIsPublic,
   varInitialVal,
   varContext,
-  isImmutable
+  isImmutable,
+  isRecord
   ) where
 
 import           Control.Lens
@@ -37,6 +38,7 @@ data VariableDeclF a = VariableDecl
   , _varInitialVal :: Maybe (ExpressionF a)
   , _varContext    :: a
   , _isImmutable   :: Bool
+  , _isRecord      :: Bool
   } deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''VariableDeclF
@@ -48,6 +50,6 @@ type VariableDecl = Positioned VariableDeclF
 
 instance Arbitrary VariableDecl  where
   arbitrary =  oneof  [ 
-    (VariableDecl  (SVMType.Int Nothing Nothing) True) <$> arbitrary <*> arbitrary <*> pure False,
-    (VariableDecl  (SVMType.String  $ Just True) True) <$> arbitrary <*> arbitrary <*> pure False
+    (VariableDecl  (SVMType.Int Nothing Nothing) True) <$> arbitrary <*> arbitrary <*> arbitrary <*> pure False,
+    (VariableDecl  (SVMType.String  $ Just True) True) <$> arbitrary <*> arbitrary <*> arbitrary <*> pure False
     ]

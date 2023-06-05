@@ -36,6 +36,23 @@ data ProcessedContract = ProcessedContract
   , contractData      :: Map Text V.Value
   } deriving (Show)
 
+data ProcessedMappingRow = ProcessedMappingRow
+  { m_address           :: Address
+  , m_codehash          :: CodePtr
+  , m_organization      :: Text
+  , m_application       :: Text
+  , m_contractName      :: Text
+  , m_mapName           :: Text
+  , m_chain             :: Text
+  , m_blockHash         :: Keccak256
+  , m_blockTimestamp    :: UTCTime
+  , m_blockNumber       :: Integer
+  , m_transactionHash   :: Keccak256
+  , m_transactionSender :: Address
+  , m_mapDataKey        :: V.Value
+  , m_mapDataValue      :: V.Value
+  } deriving (Show)
+
 data EventTable = EventTable
   { eventOrganization :: Text
   , eventApplication  :: Text

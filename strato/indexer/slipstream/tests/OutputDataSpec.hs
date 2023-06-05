@@ -29,6 +29,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+-- import Slipstream.Processor
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
@@ -59,6 +60,16 @@ createInserts globalsIORef contracts = do
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
 
+
+-- createMappings :: OutputM m
+--               => IORef Globals
+--               -> [ProcessedMappingRow]
+--               -> ConduitM () Text m ()
+-- createMappings globalsIORef mappings = do
+--   unless (null mappings) $ do
+--     let mapping = head mappings
+--     createMappingTable globalsIORef (m_organization mapping, m_application mapping, m_contractName mapping) (m_mapName mapping)
+--     insertMappingTable $ mappings
 
 
 spec :: Spec
@@ -625,6 +636,91 @@ spec = do
       "str" text,
       PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
 
+  -- describe "Cirrus mapping tests" $ do
+    -- it "should store maps in cirrus in the right format" $ do
+    --   let testAdd = Address 0x98eaddede
+    --       input = [(ProcessedContract {
+    --         address = testAdd,
+    --         codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+    --         organization = "MyOrg",
+    --         application = "MyApp",
+    --         contractName = "SwissArmy",
+    --         chain = "<CHAIN>",
+    --         blockHash = hash "<BLOCKHASH>",
+    --         blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+    --         blockNumber = 123,
+    --         transactionHash = hash "<TRANSACTIONHASH>",
+    --         transactionSender = testAdd,
+    --         contractData = M.fromList
+    --           [("set", V.ValueMapping $ M.fromList
+    --               [ (V.valueInt 22, V.SimpleValue $ V.valueInt 21)
+    --               , (V.valueInt 23, V.SimpleValue $ V.valueInt 21)
+    --               , (V.valueInt 46, V.SimpleValue $ V.valueInt 21)
+    --               ])
+    --           ]
+    --         }, createDummyContract [
+    --                   ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
+    --                 ])]
+    --       pcs = (map fst input):: [ProcessedContract] 
+    --   mappings <- concat <$> map (\pc -> processedContractToProcessedMappingRows pc ["set"]) pcs 
+    --   g <- newGlobals M.empty fakeHandle
+    --   [swissArmyCreate, swissArmyInsert1,_,_] <-
+    --       runLoggingT . runConduit $ createMappings g mappings .| sinkList
+
+    --   swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy-set" (m_record_id text,
+    --       m_address text,
+    --       "m_chainId" text,
+    --       m_block_hash text,
+    --       m_block_timestamp text,
+    --       m_block_number text,
+    --       m_transaction_hash text,
+    --       m_transaction_sender text,
+    --       m_contractName text,
+    --       m_mapName text,
+    --       "key" text,
+    --       "value" text,
+    --       PRIMARY KEY (record_id) );|]
+
+    --   swissArmyInsert1 `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy-set" ("m_record_id",
+    --   "m_address",
+    --   "m_chainId",
+    --   "m_block_hash",
+    --   "m_block_timestamp",
+    --   "m_block_number",
+    --   "m_transaction_hash",
+    --   "m_transaction_sender",
+    --   "m_contractName",
+    --   "m_mapName",
+    --   "key",
+    --   "value")
+    -- VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+    --   '000000000000000000000000000000098eaddede',
+    --   '<CHAIN>',
+    --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    --   '2018-09-16 18:28:52.607875 UTC',
+    --   '123',
+    --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    --   '000000000000000000000000000000098eaddede',
+    --   '00000000000000000000000000000000deadbeef'
+    --   'MyOrg-MyApp-SwissArmy',
+    --   'set',
+    --   '[22,23,46]',
+    --   '[21,21,21]')
+    -- ON CONFLICT (record_id) DO UPDATE SET
+    --   m_record_id = excluded.m_record_id,
+    --   m_address = excluded.m_address,
+    --   "m_chainId" = excluded."m_chainId",
+    --   m_block_hash = excluded.m_block_hash,
+    --   m_block_timestamp = excluded.m_block_timestamp,
+    --   m_block_number = excluded.m_block_number,
+    --   m_transaction_hash = excluded.m_transaction_hash,
+    --   m_ transaction_sender = excluded.m_transaction_sender;
+    --   m_contractName = excluded.m_contractName,
+    --   m_mapName = excluded.m_mapName,
+    --   "key" = excluded."key",
+    --   "value" = excluded."value",
+    --   |]
+
 
 
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
@@ -634,7 +730,8 @@ createDummyContract v =
         _varIsPublic=True,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False
+        _isImmutable = False,
+        _isRecord = True
         }
   in
     Contract{

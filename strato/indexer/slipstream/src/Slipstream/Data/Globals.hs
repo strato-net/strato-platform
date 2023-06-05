@@ -53,6 +53,12 @@ data TableName =
       , etApplication  :: T.Text
       , etContractName :: T.Text
       , etEventName    :: T.Text
+      } 
+  | MappingTableName
+      { mtOrganization :: T.Text
+      , mtApplication  :: T.Text
+      , mtContractName :: T.Text
+      , mtMappingName  :: T.Text
       } deriving (Show, Eq, Ord)
 
 type TableColumns = [T.Text]
@@ -69,6 +75,13 @@ textArrToIndexTableName [contract]           = IndexTableName T.empty T.empty  c
 textArrToIndexTableName [org, contract]      = IndexTableName  org  T.empty  contract
 textArrToIndexTableName [org, app, contract] = IndexTableName  org  app  contract
 textArrToIndexTableName _ = error "whoops"
+
+textArrToMappingTableName :: [T.Text]  -> TableName
+textArrToMappingTableName [mapping]                    = MappingTableName T.empty T.empty T.empty mapping
+textArrToMappingTableName [contract,mapping]           = MappingTableName T.empty T.empty  contract mapping
+textArrToMappingTableName [org, contract,mapping]      = MappingTableName  org  T.empty  contract mapping
+textArrToMappingTableName [org, app, contract,mapping] = MappingTableName  org  app  contract mapping
+textArrToMappingTableName _ = error "whoops"
   
 textArrToEventTableName :: [T.Text]  -> TableName
 textArrToEventTableName [contract, eventName]           = EventTableName T.empty T.empty contract eventName
@@ -82,11 +95,16 @@ period = "\\."
 history :: String         
 history = "history@" 
 
+mappingS :: String
+mappingS = "mapping@"
+
 parseStringToTableName :: String -> TableName
 parseStringToTableName bs
     | bs =~ period  :: Bool = let (tableStuff, _, eventName) = bs =~ period  :: (String, String, String)
                                  in textArrToEventTableName $ (T.splitOn (T.pack "-") $ T.pack tableStuff ) ++ [(T.pack eventName)]
     | bs =~ history :: Bool = let (_, _, tableStuff) = bs =~ history  :: (String, String, String) 
                                  in textArrToHistoryTableName $ T.splitOn  (T.pack "-") $ T.pack tableStuff
+    | bs =~ mappingS :: Bool = let (_, _, tableStuff) = bs =~ mappingS  :: (String, String, String) 
+                                 in textArrToMappingTableName $ T.splitOn  (T.pack "-") $ T.pack tableStuff      
     | otherwise                = textArrToIndexTableName $ T.splitOn (T.pack "-") (T.pack bs)                                           
         
