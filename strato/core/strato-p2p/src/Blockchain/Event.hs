@@ -16,7 +16,6 @@ module Blockchain.Event (
   handleEvents,
   handleGetChainDetails,
   checkPeerIsMember,
-  cleanUpGlobalHeadersCache
   ) where
 
 import           Control.Arrow                         ((&&&), second)
@@ -212,11 +211,7 @@ handleEvents peer = awaitForever $ \case
         let headers = morphBlockHeader <$> bHeaders
         lift stampActionTimestamp
         alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
-        when (null alreadyRequestedHeaders) $ do        -- proceed if we are not already requesting headers
-            -- let headerHashes = S.fromList $ map headerHash headers
-            --     parentHashes = S.fromList $ map parentHash headers
-            --     allNeeded = headerHashes `S.union` parentHashes
-
+        if null alreadyRequestedHeaders then do       -- proceed if we are not already requesting headers
             -- check if blockheaders we recieved have parents.
             let parents = map blockDataParentHash headers
             existingParents <- lift $ lookupMany (Proxy @BlockData) parents
@@ -251,6 +246,11 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
             yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
             lift stampActionTimestamp
+          else $logInfoS "handleEvents/BlockHeaders" $ T.unlines [
+            "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
+            "If this message shows up a lot but the node's best block # doesn't increase,",
+            "there might be something wrong with the cache."
+          ]
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
     -- todo: e.g. if they have bodies for Keccak256s [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
@@ -488,7 +488,6 @@ handleEvents peer = awaitForever $ \case
                 maxTime <- fromIntegral . unConnectionTimeout <$> lift (access (Proxy @ConnectionTimeout))
                 liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
                 when (diffTime > maxTime) $ do
-                    lift cleanUpGlobalHeadersCache
                     yieldR $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
@@ -501,11 +500,6 @@ handleEvents peer = awaitForever $ \case
       $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
       yieldR $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
-
-cleanUpGlobalHeadersCache :: MonadP2P m => m ()
-cleanUpGlobalHeadersCache = do
-  putBlockHeaders []
-  putRemainingBHeaders [] 
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadLogger m
@@ -553,6 +547,7 @@ numberFromBestBlock (BestBlock _ n _) = n
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
 syncFetch :: ( MonadIO m
+             , MonadLogger m
              , Modifiable ActionTimestamp m
              , Accessible [BlockData] m
              , Accessible MaxReturnedHeaders m
@@ -560,10 +555,15 @@ syncFetch :: ( MonadIO m
           => Direction -> Integer -> ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
-    when (null blockHeaders') $ do
+    if null blockHeaders' then do
         mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
         yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
         lift stampActionTimestamp
+      else $logInfoS "syncFetch" $ T.unlines [
+        "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
+        "If this message shows up a lot but the node's best block # doesn't increase,",
+        "there might be something wrong with the cache."
+      ]
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of

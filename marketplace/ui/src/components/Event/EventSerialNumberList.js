@@ -37,7 +37,7 @@ const EventSerialNumberList = ({ user }) => {
                 <Breadcrumb className="mb-6">
                     <Breadcrumb.Item href="javascript:;">
                         <ClickableCell
-                            href={user?.roles.includes("Certifier") && user?.roles.length === 1 ?
+                            href={user?.roles?.includes("Certifier") && user?.roles.length === 1 ?
                                 routes.Certifier.url : routes.Marketplace.url}
                         >
                             Home

@@ -123,18 +123,23 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   const contract = _contract;
   console.log(contract)
-  const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-  console.log('dapp - userCertificate', userCertificate)
-  contract.userOrganization = userCertificate.organization
-  let userOrganization = userCertificate.organization
+  let userOrganization
+  
+  if (!serviceUser) {
+    const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    console.log('dapp - userCertificate', userCertificate)
+    contract.userOrganization = userCertificate.organization
+    userOrganization = userCertificate.organization
 
-  console.log('dapp - userCertificate.organization', userCertificate.organization)
+    console.log('dapp - userCertificate.organization', userCertificate.organization)
+  }
+  
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [],};
+  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -506,7 +511,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
         });
         serialNumbers.push(item.itemSerialNumber)
       });
-    } 
+    }
     // For some reason an else statement is not working here
     if (serialNumber.length === 0 || serialNumber.length === undefined) {
       const quantity = args.quantity;
@@ -1061,11 +1066,25 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
+      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);    
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
+
+      for(let i = 0; i < result.orderLines.length; i++) {
+        const {productId, inventoryId } = result.orderLines[i];
+        const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
+
+        if (items === null || items === undefined || items.length === 0) {
+          result.orderLines[i].containsSerialNumber = false;
+        }
+        else if (items.length > 0 && items[0].serialNumber == "") {
+          result.orderLines[i].containsSerialNumber = false;
+        } else {
+          result.orderLines[i].containsSerialNumber = true;
+        }
+      }
 
       const productIds = [
         ...new Set(result.orderLines.map((orderLines) => orderLines.productId)),
@@ -1138,7 +1157,8 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
             productId,
             inventoryId,
             offset: 0,
-            limit: quantity
+            limit: quantity,
+            status: 1
           },
           chainOptions
         );
@@ -1160,7 +1180,7 @@ async function bind(rawAdmin, _contract, _defaultOptions) {
 
       const itemsAddresses = items.map(_item => _item.address);
 
-      
+
       const _args = {
         orderLineId,
         items: itemsAddresses,

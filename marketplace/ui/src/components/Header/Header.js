@@ -77,9 +77,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    if (pathName.includes("/marketplace")) {
-      setSelectedTab("0");
-    } else if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
+    // if (pathName.includes("/marketplace")) {
+    //   setSelectedTab("0");
+    // } else 
+    if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
       setSelectedTab("2");
@@ -87,6 +88,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
+    }
+    else{
+      setSelectedTab("0");
     }
   }, [window.location.pathname]);
 
@@ -116,7 +120,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     {
       key: '2',
       label: (
-        <Link to={loginUrl}> Login </Link>
+        <a href={loginUrl}> Login </a>
       ),
     },
   ];
@@ -179,7 +183,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
-          onClick={() => navigate("/marketplace/checkout")}
+          onClick={() => navigate("/checkout")}
         >
           <Avatar
             style={{
@@ -191,7 +195,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <Link to={loginUrl} className="text-base text-white"> Login / Register </Link> : null
+            loginUrl ? <a href={loginUrl} className="text-base text-white"> Login / Register </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">

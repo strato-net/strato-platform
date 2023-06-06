@@ -199,8 +199,8 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , blockHeaders          :: [BlockData]
-  , remainingBlockHeaders :: RemainingBlockHeaders
+  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
@@ -402,15 +402,38 @@ instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
-  get _   = blockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
+  get _   = do
+    (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      Mod.put (Proxy @[BlockData]) []
+      pure []
+    else 
+      pure bHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
   access _ = Mod.get (Proxy @[BlockData])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
-  get _   = remainingBlockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
+  get _   = do
+    (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      let emptyRBH = RemainingBlockHeaders []
+      Mod.put (Proxy @RemainingBlockHeaders) emptyRBH
+      pure emptyRBH
+    else 
+      pure remBHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
@@ -637,8 +660,8 @@ initContext :: Context
 initContext = Context
   { actionTimestamp = emptyActionTimestamp
   , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-  , blockHeaders = []
-  , remainingBlockHeaders = RemainingBlockHeaders []
+  , blockHeaders = ([], jamshidBirth)
+  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
   }

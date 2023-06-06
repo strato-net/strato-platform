@@ -40,5 +40,5 @@ computeNetworkID =
       if flags_testnet
       then 0
       else 1
-    (network, -1) -> bytes2Integer $ map c2w network
-    (_, _) -> toInteger flags_networkID
+    (network, -1) -> toInteger (fromInteger . bytes2Integer $ map c2w network :: Int)
+    (_, _) -> toInteger (fromInteger flags_networkID :: Int)
