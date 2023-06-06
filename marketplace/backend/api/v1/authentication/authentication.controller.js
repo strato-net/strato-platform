@@ -45,7 +45,7 @@ class AuthenticationController {
         // user isn't created in STRATO
         if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
           console.log('User not created in STRATO!')
-          next(e)
+          return next(e)
         }
       }
       const userCredentials = { token: accessToken }
@@ -128,8 +128,12 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
-    const oauthSignOutUrl = oauth.getLogOutUrl()
-
+    let oauthSignOutUrl
+    if (config.dockerized) {
+      oauthSignOutUrl = '/auth/logout'
+    } else {
+      oauthSignOutUrl = oauth.getLogOutUrl()
+    }
     res.clearCookie(oauth.getCookieNameAccessToken())
     res.clearCookie(oauth.getCookieNameAccessTokenExpiry())
     res.clearCookie(oauth.getCookieNameRefreshToken())

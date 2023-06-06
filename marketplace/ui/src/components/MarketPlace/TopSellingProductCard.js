@@ -172,7 +172,7 @@ const TopSellingProductCard = () => {
                             window.location.href = loginUrl;
                           } else {
                             addItemToCart(topSellingProduct);
-                            navigate("/marketplace/checkout");
+                            navigate("/checkout");
                           }
                         }}
                       >
@@ -184,7 +184,7 @@ const TopSellingProductCard = () => {
                             window.location.href = loginUrl;
                           } else {
                             addItemToCart(topSellingProduct);
-                            navigate("/marketplace/checkout");
+                            navigate("/checkout");
                           }
                         }}
                         className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"

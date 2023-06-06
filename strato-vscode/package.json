@@ -3,8 +3,8 @@
 	"publisher": "BlockApps",
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
-	"icon": "resources/balogo.png",
-	"version": "0.1.26",
+	"icon": "resources/rebrand-logo.png",
+	"version": "0.2.0",
 	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
@@ -15,7 +15,8 @@
 	"activationEvents": [
 		"onDebugDynamicConfigurations:strato",
 		"onLanguage:solidity",
-		"onCommand:strato-vscode.createProject",
+		"onCommand:strato-vscode.importProject",
+		"onCommand:strato-vscode.buildProject",
 		"onCommand:strato-vscode.deployProject",
 		"onCommand:strato-vscode.runServer",
 		"onCommand:strato-vscode.testServer",
@@ -41,41 +42,40 @@
 					"type": "boolean",
 					"default": true
 				},
-				"strato-vscode.createProjectCommand": {
-					"type": "string",
-					"default": "git clone https://github.com/blockapps/traceability-framework $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
-				},
 				"strato-vscode.deployProjectCommand": {
 					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; yarn deploy; popd"
+					"default": "CONFIG=mercata yarn deploy",
+					"description": "Script that deploys the project contracts to a STRATO node"
 				},
 				"strato-vscode.runServerCommand": {
 					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; MOCK_INT_SERVER=true yarn start:prod; popd"
-				},
-				"strato-vscode.testServerCommand": {
-					"type": "string",
-					"default": "pushd server; yarn install; yarn build; touch .env; yarn test; popd"
+					"default": "yarn install; yarn start",
+					"description": "Script that runs the project backend server"
 				},
 				"strato-vscode.runUICommand": {
 					"type": "string",
-					"default": "pushd ui; yarn install; yarn build; touch .env; REACT_APP_URL=http://localhost yarn start; popd"
+					"default": "yarn install; yarn develop",
+					"description": "Script that runs the project frontend server"
+				},
+				"strato-vscode.testServerCommand": {
+					"type": "string",
+					"default": "yarn install; yarn test",
+					"description": "Script that runs the backend test suite"
 				},
 				"strato-vscode.testUICommand": {
 					"type": "string",
-					"default": "pushd ui; yarn install; yarn build; touch .env; yarn test; popd"
-				},
-				"strato-vscode.serverPath": {
-					"type": "string",
-					"default": "server"
+					"default": "yarn install; yarn test",
+					"description": "Script that runs the frontend test suite"
 				},
 				"strato-vscode.configPath": {
 					"type": "string",
-					"default": "server/config"
+					"default": "backend/config",
+					"description": "The default directory for the configuration file(s) location"
 				},
 				"strato-vscode.configFile": {
 					"type": "string",
-					"default": "config.yaml"
+					"default": "mercata.config.yaml",
+					"description": "The default configuration file containing STRATO node(s) information"
 				}
 			}
 		},
@@ -88,6 +88,10 @@
 			{
 				"command": "strato-vscode.createProject",
 				"title": "Create STRATO Project"
+			},
+			{
+				"command": "strato-vscode.buildProject",
+				"title": "Build STRATO Project"
 			},
 			{
 				"command": "strato-vscode.deployProject",
@@ -115,11 +119,6 @@
 				"icon": "$(refresh)"
 			},
 			{
-				"command": "contracts.createChain",
-				"title": "Create Private Chain",
-				"icon": "$(add)"
-			},
-			{
 				"command": "contracts.uploadContract",
 				"title": "Upload Contract",
 				"icon": "$(add)"
@@ -140,11 +139,21 @@
 				"icon": "$(refresh)"
 			},
 			{
+				"command": "project-management.settings",
+				"title": "Open Settings",
+				"icon": "$(settings-gear)"
+			},
+			{
 				"command": "extension.strato-debug.debugEditorContents",
 				"title": "Debug SolidVM",
 				"category": "Debug SolidVM",
 				"enablement": "!inDebugMode",
 				"icon": "$(debug-alt)"
+			},
+			{
+				"command": "extension.copyToClipboard",
+				"title": "Copy to Clipboard",
+				"icon": "$(clippy)"
 			}
 		],
 		"debuggers": [
@@ -233,14 +242,14 @@
 					"command": "nodes.refreshEntry",
 					"when": "view == nodes",
 					"group": "navigation"
+				},
+				{
+					"command": "project-management.settings",
+					"when": "view == project-management",
+					"group": "navigation"
 				}
 			],
 			"view/item/context": [
-				{
-					"command": "contracts.createChain",
-					"when": "view == contracts && viewItem == node",
-					"group": "inline"
-				},
 				{
 					"command": "contracts.uploadContract",
 					"when": "view == contracts && viewItem == chainId",
@@ -250,6 +259,16 @@
 					"command": "contracts.callFunction",
 					"when": "view == contracts && viewItem == function",
 					"group": "inline"
+				},
+				{
+					"command": "extension.copyToClipboard",
+					"when": "view == contracts && (viewItem == address || viewItem == stateItem)",
+					"group": "inline"
+				},
+				{
+					"command": "extension.copyToClipboard",
+					"when": "view == nodes || view == cirrus",
+					"group": "inline"
 				}
 			]
 		},
@@ -258,7 +277,7 @@
 				{
 					"id": "strato-project",
 					"title": "STRATO Project Manager",
-					"icon": "resources/balogo-gray.svg"
+					"icon": "resources/rebrand-logo.png"
 				}
 			]
 		},
@@ -293,8 +312,10 @@
 	},
 	"dependencies": {
 		"await-notify": "1.0.1",
+		"axios": "^1.4.0",
 		"blockapps-rest": "../blockapps-rest",
 		"js-yaml": "^4.0.0",
+		"qs": "^6.11.2",
 		"vscode-debugadapter": "^1.43.0",
 		"ws": "^7.4.2"
 	},

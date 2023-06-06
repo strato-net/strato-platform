@@ -122,8 +122,8 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_redirectUri_value>*'"${MP_SERVER_HOST}/api/v1/authentication/callback"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_logoutRedirectUri_value>*'"${MP_SERVER_HOST}"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<oauth_redirectUri_value>*'"${SERVER_URL}/mp-login/"'*g' /tmp/tmp.config.yaml
+  sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
@@ -142,6 +142,13 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
   else
     echo "deploy file does not exist - bootnode - running 'deploy'"
+    if [ "${MP_DELAY_DEPLOYMENT}" == "true" ]; then
+      touch _deploy_blocked_while_I_exist
+      echo "Deployment blocked until file ./_deploy_blocked_while_I_exist is removed from the container... Waiting..."
+      until [ ! -f ./_deploy_blocked_while_I_exist ]; do sleep 1; done
+      echo "_deploy_blocked_while_I_exist file removed, continue with deploy script..."
+    fi
+    
     CONFIG=generated yarn deploy
   fi
   

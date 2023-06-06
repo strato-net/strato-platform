@@ -95,7 +95,7 @@ const CartComponent = ({ columns, data }) => {
                                     window.location.href = loginUrl;
                                 } else {
                                 actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                                navigate("/marketplace/confirmOrder");
+                                navigate("/confirmOrder");
                             }}}
                             disabled={data.length === 0}
                         >

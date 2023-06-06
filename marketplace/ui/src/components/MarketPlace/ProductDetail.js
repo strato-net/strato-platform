@@ -66,10 +66,12 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
+    if(user) {
     if (Id !== undefined) {
       eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
     }
-  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id])
+  }
+  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
   useEffect(() => {
@@ -124,9 +126,11 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      if(user)  {
+        itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      }
     }
-  }, [Id, dispatch, itemDispatch]);
+  }, [Id, dispatch, itemDispatch, user]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -265,7 +269,8 @@ const ProductDetails = ({ user, users }) => {
     {
       title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
       dataIndex: "serialNumber",
-      key: "serialNumber",
+      // Fixes UI issue of children having the same key
+      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
       align: "center",
       onCell: (record) => {
         return {
@@ -595,7 +600,7 @@ const ProductDetails = ({ user, users }) => {
                       window.location.href = loginUrl;
                     } else {
                       addItemToCart();
-                      navigate("/marketplace/checkout");
+                      navigate("/checkout");
                     }
                   }}
                   disabled={isCalledFromInventory}
@@ -643,8 +648,14 @@ const ProductDetails = ({ user, users }) => {
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}
-                items={[
-                  {
+                items={!user ?
+                  [{
+                    label: `Description`,
+                    key: "1",
+                    children: <DescriptionComponent />,
+                  }]
+                  :
+                  [{
                     label: `Description`,
                     key: "1",
                     children: <DescriptionComponent />,

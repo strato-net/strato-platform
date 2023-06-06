@@ -190,7 +190,7 @@ const CategoryProductCard = ({ product, category }) => {
                   window.location.href = loginUrl;
                 } else {
                   addItemToCart();
-                  navigate("/marketplace/checkout");
+                  navigate("/checkout");
                 }
               }}
             >

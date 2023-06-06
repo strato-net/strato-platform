@@ -341,12 +341,12 @@ const BoughtOrderDetails = ({ user, users }) => {
               <OrderData title="NUMBER" value={`#${details.orderId}`} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
-                title="BUYER ORGANIZATION"
+                title="BUYER"
                 value={details.buyerOrganization}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
-                title="SELLER ORGANIZATION"
+                title="SELLER"
                 value={details.sellerOrganization}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />

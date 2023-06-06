@@ -31,8 +31,10 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
+const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+
 class AuthHandler {
-  static authorizeRequest() {
+  static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
       try {
         let token = await getTokenFromCookie(req, res)
@@ -40,6 +42,12 @@ class AuthHandler {
         if (!token) {
           token = await getTokenFromHeader(req)
         }
+        let isServiceUser = false
+        if (!token && allowAnonAccess === true) {
+          token = await oauthHelper.getServiceToken()
+          isServiceUser = true
+        }
+
         if (token) {
           console.log('Got token')
           let decodedToken
@@ -54,18 +62,18 @@ class AuthHandler {
             return next()
           }
           try {
-            address = await rest.getKey({ username: decodedToken.preferred_username, token }, { config })
+            address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
           req.accessToken = { token }
           req.decodedToken = decodedToken
-          req.username = decodedToken.preferred_username
+          req.username = isServiceUser === true ? 'serviceUser' : decodedToken.preferred_username
           console.log('Authorization success, moving on...')
           return next()
         }
@@ -75,7 +83,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }
@@ -114,7 +122,7 @@ class AuthHandler {
             // user isn't created in STRATO
             if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
               console.log('User not created in STRATO!')
-              next(e)
+              return next(e)
             }
           }
           req.address = address
@@ -130,7 +138,7 @@ class AuthHandler {
       }
 
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: req.app.oauth.getSigninURL(),
+        loginUrl: getLoginUrl(req),
       })
       return next()
     }

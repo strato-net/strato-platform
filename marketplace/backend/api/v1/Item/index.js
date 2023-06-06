@@ -9,13 +9,14 @@ const router = express.Router();
 
 router.get(
   Item.getAll,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ItemController.getAll
 );
 
 router.get(
   Item.ownershipHistory,
+  authHandler.authorizeRequest(true),
   loadDapp,
   ItemController.getOwnershipHistory
 );
@@ -49,6 +50,7 @@ router.get(
 
 router.get(
   Item.getRawMaterials,
+  authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getAllRawMaterials
 )

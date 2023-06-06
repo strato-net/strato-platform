@@ -54,7 +54,6 @@ class InventoryController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
-
       InventoryController.validateCreateInventoryArgs(body)
 
       const result = await dapp.createInventory(body)
@@ -117,19 +116,24 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
-      serialNumber: Joi.array().length(Joi.ref('quantity')).required().items(Joi.object({
-        itemSerialNumber: Joi.string().required(),
-        rawMaterials: Joi.array().items(Joi.object({
-          rawMaterialProductName: Joi.string().required(),
-          rawMaterialProductId: Joi.string().required(),
-          rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
+      serialNumber: Joi.array().when(Joi.array().length(0), {
+        then: Joi.array().length(0).required(),
+        otherwise: Joi.array().length(Joi.ref('quantity')).items(Joi.object({
+          itemSerialNumber: Joi.string().required(),
+          rawMaterials: Joi.array().items(Joi.object({
+            rawMaterialProductName: Joi.string().required(),
+            rawMaterialProductId: Joi.string().required(),
+            rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
+          })).required()
         })).required()
-      })).required()
+      }).required(),
     });
 
+    
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
+      console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Inventory Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })

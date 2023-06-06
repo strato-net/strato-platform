@@ -37,7 +37,7 @@ contract OrderLineItem {
 
         orderLineId = _orderLineId;
         itemId = _itemId;
-        itemSerialNumber = _itemSerialNumber;
+        itemSerialNumber = _itemSerialNumber == "" ? _itemId : _itemSerialNumber;
         createdDate = _createdDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
