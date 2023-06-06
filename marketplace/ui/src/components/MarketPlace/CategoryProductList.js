@@ -197,8 +197,6 @@ const CategoryProductList = ({ user }) => {
   }
   //============================================================================//
 
-  console.log(marketplaceList)
-
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
@@ -269,8 +267,7 @@ const CategoryProductList = ({ user }) => {
                   -
                   <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
                     e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                  }
-                  } />
+                  }} />
                 </Space>
               </Panel>
             </Collapse>
