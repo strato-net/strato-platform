@@ -171,11 +171,6 @@ const CategoryProductList = ({ user }) => {
 
   //=========================Other functions===============================//
 
-  const onChangeQuantity = (val) => {
-    setMaxQty(val[1]);
-    setMinQty(val[0]);
-  };
-
   const clearSelection = () => {
     setSelectedSubCategories([]);
     setSelectedProducts([]);
@@ -283,23 +278,15 @@ const CategoryProductList = ({ user }) => {
               className="pl-8 pr-7"
             >
               <Panel header={<Text strong>Quantity</Text>} key="1">
-                <div className="flex justify-between text-sm text-primaryB">
-                  <Text>{minQty}</Text>
-                  <Text>{maxQty}</Text>
-                </div>
-                <Slider
-                  range
-                  min={0}
-                  max={MAX_QUANTITY}
-                  step={100}
-                  defaultValue={[0, MAX_QUANTITY]}
-                  trackStyle={{ backgroundColor: "#181EAC" }}
-                  handleStyle={{
-                    borderColor: "#C5C5C4",
-                    boxShadow: "0 0 10px rgb(197, 197, 196) !important",
-                  }}
-                  onChange={onChangeQuantity}
-                />
+              <Space>
+                  <InputNumber min={0} placeholder="min" onChange={(e) => {
+                    e === null ? setMinQty(0) : setMinQty(e)
+                  }} />
+                  -
+                  <InputNumber min={minPrice} placeholder="max" onChange={(e) => {
+                    e === null ? setMaxQty(MAX_QUANTITY) : setMaxQty(e)
+                  }} />
+                </Space>
               </Panel>
             </Collapse>
             <Divider className="m-0" />
