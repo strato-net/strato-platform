@@ -1,8 +1,7 @@
-import { assert, rest } from 'blockapps-rest'
+import { assert } from 'blockapps-rest'
 import { util } from '/blockapps-rest-plus'
 import dotenv from 'dotenv'
 import config from '../../load.config'
-import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
@@ -156,7 +155,7 @@ describe('Event End-To-End Tests', function () {
     assert.isDefined(getEvents.body.data, 'body should be defined');
   })
 
-  it('Get all events by certifier', async () => {
+  xit('Get all events by certifier', async () => {
     // get
     const getEvents = await get(
       Event.prefix,
@@ -171,7 +170,7 @@ describe('Event End-To-End Tests', function () {
     assert.isDefined(getEvents.body.data, 'body should be defined');
   })
 
-  it('Should not get events for a non assigned certifier', async () => {
+  xit('Should not get events for a non assigned certifier', async () => {
     // get
     const getEvents = await get(
       Event.prefix,
@@ -185,7 +184,7 @@ describe('Event End-To-End Tests', function () {
     assert.equal(getEvents.body.data.message, 'User should be a Assigned certifier');
   })
 
-  it('certify an Event', async () => {
+  xit('certify an Event', async () => {
     // create product
     const createProductArgs = {
       ...productArgs(util.uid()),

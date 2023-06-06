@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import config from '/load.config';
 import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';

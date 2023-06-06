@@ -1,19 +1,13 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import config from '/load.config';
 import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
 import dappJs from '/dapp/dapp/dapp'
 import constants from '/helpers/constants';
-
 import RestStatus from 'http-status-codes';
-
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderJs from '../order';
-import orderChainJs from '../orderChain';
-import orderLineJS from '../orderLine'
 import factory from '../factory/order.factory';
-import { args } from 'commander';
 
 const options = { config };
 
@@ -35,7 +29,6 @@ describe('Order', function () {
     const updateBuyerFactoryArgs = (user) => ({ ...(factory.getUpdateBuyerOrderArgs(util.uid()))});
     const updateSellerFactoryArgs = (user) => ({ ...(factory.getUpdateSellerOrderArgs(util.uid()))});
     const OrderLineFactoryArgs = (user) => ({ ...(factory.getOrderLineArgs(util.uid()))});
-    const OrderLineItemFactoryArgs = (user) => ({ ...(factory.getOrderLineItemArgs(util.uid()))});
 
     before(async () => {
         assert.isDefined(

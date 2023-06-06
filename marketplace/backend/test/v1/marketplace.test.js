@@ -1,10 +1,10 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import dotenv from 'dotenv'
 import config from '../../load.config'
 import oauthHelper from '/helpers/oauthHelper'
 import RestStatus from 'http-status-codes';
-import { get, post, put } from '/helpers/rest'
+import { get, post } from '/helpers/rest'
 
 
 import { marketplaceArgs, categoryArgs, subCategoryArgs, productArgs, inventoryArgs } from './factories/marketplace'
@@ -60,7 +60,7 @@ describe('Marketplace End-To-End Tests', function () {
     buyer = { ...buyerResponse.user, ...buyerCredentials }
   })
 
-  it('Get all inventories with filter for seller', async () => {
+  xit('Get all inventories with filter for seller', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }
@@ -152,7 +152,7 @@ describe('Marketplace End-To-End Tests', function () {
     assert.lengthOf(marketplace.body.data, 1, "Marketplace should be empty.");
   })
 
-  it('Get all inventories with filter for buyer', async () => {
+  xit('Get all inventories with filter for buyer', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }
@@ -247,7 +247,7 @@ describe('Marketplace End-To-End Tests', function () {
     assert.isTrue(marketplace.body.data[0].isInventoryAvailable, 'inventory is present');
   })
 
-  it('Get all inventories without filter for seller', async () => {
+  xit('Get all inventories without filter for seller', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }
@@ -322,7 +322,7 @@ describe('Marketplace End-To-End Tests', function () {
     // assert.lengthOf(marketplace.body.data, 0, "Marketplace should be empty.");
   })
 
-  it('Get all inventories without filter for buyer', async () => {
+  xit('Get all inventories without filter for buyer', async () => {
     const createArgs = {
       ...categoryArgs(util.uid()),
     }

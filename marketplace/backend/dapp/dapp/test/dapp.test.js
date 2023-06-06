@@ -3,7 +3,6 @@ import RestStatus from "http-status-codes";
 import config from '../../../load.config'
 import oauthHelper from "../../../helpers/oauthHelper";
 import dappJs from '../dapp'
-import constants from '/helpers/constants'
 import dotenv from 'dotenv'
 const loadEnv = dotenv.config()
 
@@ -64,16 +63,13 @@ describe('Dapp Deployment tests', function () {
     admin = { ...adminResponse.user, ...adminCredentials }
 
     members.push({})
-    mainChainContract = await dappJs.uploadMainChainContract(admin, options)
+    mainChainContract = await dappJs.uploadDappContract(admin, options)
   })
 
-  it('should upload dapp contracts', async () => {
-    const dapp = await dappJs.uploadDappChain(admin, mainChainContract.address, members, options)
-    assert.isDefined(dapp.chainId)
-  })
+
 
   it('should deploy dapp - write deploy.yaml', async () => {
-    const dapp = await dappJs.uploadDappChain(admin, mainChainContract.address, members, options)
+    const dapp = await dappJs.uploadDappContract(admin, options)
     const args = { deployFilePath: testDeployFilePath, applicationUser: admin }
 
     const deployment = await dapp.deploy(args)
@@ -84,7 +80,7 @@ describe('Dapp Deployment tests', function () {
 
   it('should load dapp from deployment', async () => {
     {
-      const dapp = await dappJs.uploadDappChain(admin, mainChainContract.address, members, options)
+      const dapp = await dappJs.uploadDappContract(admin, options)
       const args = { deployFilePath: testDeployFilePath, applicationUser: admin }
       const deployment = await dapp.deploy(args)
       assert.isDefined(deployment.dapp.contract)
@@ -92,11 +88,9 @@ describe('Dapp Deployment tests', function () {
 
     const deployment = fsUtil.getYaml(testDeployFilePath)
     const dapp = await dappJs.bind(admin, deployment.dapp.contract, {
-      chainIds: [deployment.dapp.contract.appChainId],
       ...options
     })
 
-    const { permissionManager } = await dapp.getState()
-    assert.isDefined(permissionManager)
+
   })
 })

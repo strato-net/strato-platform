@@ -2,14 +2,13 @@ import { assert, rest } from 'blockapps-rest'
 import { util } from '/blockapps-rest-plus'
 import dotenv from 'dotenv'
 import config from '../../load.config'
-import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
-import { get, post, put } from '/helpers/rest'
+import { get, post } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
 import dappJs from '../../dapp/dapp/dapp'
 
-import { eventTypeArgs, updateEventTypeArgs } from './factories/eventType'
-import { EventType, Organizations } from '../../api/v1/endpoints'
+import { eventTypeArgs } from './factories/eventType'
+import { EventType } from '../../api/v1/endpoints'
 
 const options = { config }
 
