@@ -127,15 +127,20 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   const contract = _contract;
   console.log(contract)
-  const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-  console.log('dapp - userCertificate', userCertificate)
-  contract.userOrganization = userCertificate.organization
-  let userOrganization = userCertificate.organization
+  let userOrganization
+  
+  if (!serviceUser) {
+    const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    console.log('dapp - userCertificate', userCertificate)
+    contract.userOrganization = userCertificate.organization
+    userOrganization = userCertificate.organization
 
-  console.log('dapp - userCertificate.organization', userCertificate.organization)
+    console.log('dapp - userCertificate.organization', userCertificate.organization)
+  }
+  
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
