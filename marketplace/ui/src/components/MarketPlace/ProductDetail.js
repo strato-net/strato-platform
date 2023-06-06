@@ -365,14 +365,14 @@ const ProductDetails = ({ user, users }) => {
 
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      title: <Text className="text-primaryC text-[13px] ownership">SELLER</Text>,
       dataIndex: "seller",
       key: "seller",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      title: <Text className="text-primaryC text-[13px] ownership">OWNER</Text>,
       dataIndex: "newOwner",
       key: "newOwner",
       align: "center",
@@ -380,7 +380,7 @@ const ProductDetails = ({ user, users }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">
+        <Text className="text-primaryC text-[13px] ownership">
           OWNERSHIP START DATE
         </Text>
       ),
@@ -745,7 +745,7 @@ const ProductDetails = ({ user, users }) => {
 
           {isSerialNumberSelected ? (
             <Card className="mb-12 mx-16">
-              <Text className="font-semibold text-lg">Ownership History</Text>
+              <Text className="font-semibold text-lg ownership">Ownership History</Text>
               <Row className="my-6">
                 <EventDetailsComponent
                   title="SERIAL NUMBER"

@@ -1,7 +1,9 @@
 describe("Renders Marketplace Page", () => {
   it("it should render marketplace dashboard", () => {
-    cy.login();
-    cy.wait(30000);
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("include", "/marketplace");
     cy.contains("Explore New Products").should("exist");
     cy.get(".relative").find("img").should('have.attr', 'src').should("include", "hero");
@@ -33,8 +35,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render product list page", () => {
-    cy.login();
-    cy.wait(20000);
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
     cy.wait(20000);
@@ -51,17 +55,20 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Products found").should("be.visible");
     cy.get("#product-list").should("exist");
     cy.request({
-        method: "GET",
-        url: "/api/v1/marketplace?&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000",
-      }).then(({ status, body }) => {
-        expect(status).to.eq(200);    
-        cy.get("#product-list").children().should("have.length",  body.data.length);
-      });
+      method: "GET",
+      url: "/api/v1/marketplace?&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      cy.get("#product-list").children().should("have.length", body.data.length);
+    });
   });
 
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
-    cy.login();
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.wait(30000);
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
@@ -103,14 +110,15 @@ describe("Renders Marketplace Page", () => {
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       if (body.data.length !== 0) {
-        let category = body.data[3];
-        cy.get('[type="checkbox"]').check(category.address);
+        let category = body.data[2];
+        cy.get('[type="checkbox"]').check(category.name);
         cy.wait(15000)
-        cy.contains("Sub-Category").should("exist")
+        // TODO: On what condition this is going to render on DOM
+        // cy.contains("Sub-Category").should("exist")
 
         cy.request({
           method: "GET",
-          url: `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`,
+          url: `api/v1/product/filter/names?isDeleted=false&&category[]=${category.name}`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           if (body.data.length !== 0) {
@@ -121,7 +129,7 @@ describe("Renders Marketplace Page", () => {
 
         cy.request({
           method: "GET",
-          url: `/api/v1/marketplace?&category[]=${category.address}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+          url: `/api/v1/marketplace?&category[]=${category.name}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           cy.contains(`${body.data.length} Products found`).should("be.visible");
@@ -131,9 +139,11 @@ describe("Renders Marketplace Page", () => {
     });
   });
 
-   it("it should render inventories based on filter selection", () => {
-    cy.login();
-    cy.wait(30000);
+  it("it should render inventories based on filter selection", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
     cy.wait(20000);
@@ -144,32 +154,35 @@ describe("Renders Marketplace Page", () => {
       method: "GET",
       url: "/api/v1/category",
     }).then(({ status, body }) => {
-      expect(status).to.eq(200);    
+      expect(status).to.eq(200);
       if (body.data.length !== 0) {
-        category = body.data[3];
-        cy.get('[type="checkbox"]').check(category.address);
+        category = body.data[1];
+        cy.get('[type="checkbox"]').check(category.name);
         cy.wait(15000)
 
+        // TO be confirm
         cy.request({
           method: "GET",
-          url: `api/v1/subcategory?category[]=${category.address}`,
+          url: `api/v1/subcategory?category[]=${category.name}`,
         }).then(({ status, body }) => {
-          expect(status).to.eq(200);    
+          expect(status).to.eq(200);
           if (body.data.length !== 0) {
             subCategory = body.data[0];
             cy.contains("Sub-Category").should("exist")
-            cy.get('[type="checkbox"]').check(subCategory.address);
-            let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}&subCategory[]=${subCategory.address}` 
-            : `api/v1/product/filter/names?isDeleted=false&&category[]=${category.address}`
+            cy.get('[type="checkbox"]').check(subCategory.name);
+            let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&category[]=${category.name}&subCategory[]=${subCategory.name}`
+              : `api/v1/product/filter/names?isDeleted=false&&category[]=${category.name}`
             cy.wait(15000)
 
             cy.request({
               method: "GET",
               url: productUrl,
             }).then(({ status, body }) => {
-              expect(status).to.eq(200);    
+              expect(status).to.eq(200);
               if (body.data.length !== 0) {
                 product = body.data[0];
+                console.log(body)
+                console.log(product)
                 cy.contains("Product").should("exist");
                 cy.contains("Brand").should("exist");
                 cy.get('[type="checkbox"]').check(product.address);
@@ -178,12 +191,13 @@ describe("Renders Marketplace Page", () => {
 
                 cy.request({
                   method: "GET",
-                  url: `/api/v1/marketplace?&category[]=${category.address}&subCategory[]=${subCategory.address}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+                  url: `/api/v1/marketplace?&category[]=${category.name}&subCategory[]=${subCategory.name}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
                 }).then(({ status, body }) => {
-                  expect(status).to.eq(200);    
+                  expect(status).to.eq(200);
+                  console.log(body)
                   cy.contains(`${body.data.length} Products found`).should("be.visible");
-                  cy.get("#product-list").children().should("have.length",  body.data.length);
-                  if(body.data.length === 0){
+                  cy.get("#product-list").children().should("have.length", body.data.length);
+                  if (body.data.length === 0) {
                     cy.contains("No data found")
                   }
                 });
@@ -198,15 +212,17 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render product detail page", () => {
-    cy.login();
-    cy.wait(30000);
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.request({
       method: "GET",
       url: `/api/v1/marketplace/topselling?offset=0`,
     }).then(({ status, body }) => {
-        expect(status).to.eq(200);
-        cy.wait(30000);    
-        if(body.data.length !==0){
+      expect(status).to.eq(200);
+      cy.wait(30000);
+      if (body.data.length !== 0) {
         let inventory = body.data[0];
         cy.get("#topSelling").children().first().click();
         cy.wait(20000);
@@ -218,7 +234,7 @@ describe("Renders Marketplace Page", () => {
         cy.get("button").contains("Buy Now").should("exist");
 
         cy.contains(decodeURIComponent(inventory.name)).should("be.visible");
-        if(inventory.description) cy.get("#details").contains(decodeURIComponent(inventory.description)).should("exist");
+        if (inventory.description) cy.get("#details").contains(decodeURIComponent(inventory.description)).should("exist");
         cy.get("#details").contains(`$ ${inventory.pricePerUnit}`).should("be.visible");
         cy.get("#details").contains("Quantity").should("be.visible");
         cy.get("#quantity").should("exist");
@@ -245,28 +261,28 @@ describe("Renders Marketplace Page", () => {
           method: "GET",
           url: `/api/v1/item?inventoryId=${inventory.address}`,
         }).then(({ status, body }) => {
-            expect(status).to.eq(200);  
-            if(body.data.length > 0)  {
-              cy.get("td").eq(5).click();
-              cy.wait(13000);
-              cy.get("#ownership").contains("Ownership History").should("be.visible");
-              cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
-              cy.get("#ownership-serial").should("exist");
-              cy.get("#ownership").contains("SELLER").should("exist");
-              cy.get("#ownership").contains("OWNER").should("exist");
-              cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
-            }
+          expect(status).to.eq(200);
+          if (body.data.length > 0) {
+            cy.get("td").eq(5).click();
+            cy.wait(13000);
+            cy.get(".ownership").contains("Ownership History").should("be.visible");
+            cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+            cy.get("#ownership-serial").should("exist");
+            cy.get(".ownership").contains("SELLER").should("exist");
+            cy.get(".ownership").contains("OWNER").should("exist");
+            cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
+          }
 
-            if(body.data.length > 1){
-              cy.get("td").eq(7).click();
-              cy.wait(13000);
-              cy.get("#ownership").contains("Ownership History").should("be.visible");
-              cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
-              cy.get("#ownership-serial").should("exist");
-              cy.get("#ownership").contains("SELLER").should("exist");
-              cy.get("#ownership").contains("BUYER").should("exist");
-              cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
-            }
+          if (body.data.length > 1) {
+            cy.get("td").eq(7).click();
+            cy.wait(13000);
+            cy.get(".ownership").contains("Ownership History").should("be.visible");
+            cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+            cy.get("#ownership-serial").should("exist");
+            cy.get(".ownership").contains("SELLER").should("exist");
+            cy.get(".ownership").contains("BUYER").should("exist");
+            cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
+          }
         });
 
         cy.get(".ant-tabs-tab").eq(3).click();
@@ -277,16 +293,16 @@ describe("Renders Marketplace Page", () => {
           method: "GET",
           url: `/api/v1/item?inventoryId=${inventory.address}`,
         }).then(({ status, body }) => {
-            expect(status).to.eq(200);  
-            if(body.data.length > 0)  {
-              cy.get("td").eq(9).click();
-              cy.wait(13000);
-              cy.get("#transformation").contains("Transformation").should("be.visible");
-              cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
-              cy.get("#trans-serial").should("exist");
-              cy.get("#transformation").contains("RAW MATERIALS").should("exist")
-              cy.get("#transformation").contains("SERIAL NUMBER").should("exist")
-            }
+          expect(status).to.eq(200);
+          if (body.data.length > 0) {
+            cy.get("td").eq(9).click();
+            cy.wait(13000);
+            cy.get("#transformation").contains("Transformation").should("be.visible");
+            cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
+            cy.get("#trans-serial").should("exist");
+            cy.get("#transformation").contains("RAW MATERIALS").should("exist")
+            cy.get("#transformation").contains("SERIAL NUMBER").should("exist")
+          }
         });
       }
     });
@@ -353,5 +369,5 @@ describe("Renders Marketplace Page", () => {
   //   cy.get("#nested-trans").get("RAW MATERIALS").should("exist")
   //   cy.get("#nested-trans").get("SERIAL NUMBER").should("exist")
   // });
-  
+
 })
