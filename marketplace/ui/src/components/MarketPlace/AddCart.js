@@ -14,9 +14,8 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
-import DataTableComponent from "../DataTableComponent";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
@@ -346,12 +345,12 @@ const Checkout = ({ user }) => {
       ) : (
         <div>
           <Breadcrumb>
-            <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <p className=" text-primary">
                 Add to Cart
               </p>

@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Row,
   Col,
   Breadcrumb,
   Typography,
-  Divider,
   Input,
   Spin,
 } from "antd";
@@ -17,12 +16,6 @@ import { EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import ClickableCell from "../ClickableCell";
 
-
-function useQuery() {
-  const { search } = useLocation();
-
-  return useMemo(() => new URLSearchParams(search), [search]);
-}
 
 const BoughtOrderItemDetail = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -84,7 +77,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   const details = orderLineDetails;
   const audits = ordersAudit;
   if (audits && audits.length) {
-    audits.map((val) => {
+    audits.forEach((val) => {
       if (users && users.length) {
         const sender = users.find(
           (data) => val["transaction_sender"] === data.userAdress
@@ -95,7 +88,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   }
 
   if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details["ownerOrganizationalUnit"] == "") {
+    if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }
   }
@@ -151,17 +144,17 @@ const BoughtOrderItemDetail = ({ user, users }) => {
     <div>
       <div className="flex justify-between items-center mx-14  mt-14">
         <Breadcrumb className="text-xs mb-6">
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
               Home
             </ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <div onClick={()=>{  navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });}}>
               Orders (Bought)
             </div>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={`${routes.BoughtOrderDetails.url.replace(":id", state.address)}`}>
               {state.orderId}
             </ClickableCell>

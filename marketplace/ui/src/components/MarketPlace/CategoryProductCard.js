@@ -2,11 +2,10 @@ import {
   Card,
   Image,
   Typography,
-  InputNumber,
   Button,
   notification,
 } from "antd";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions } from "../../contexts/marketplace/actions";
