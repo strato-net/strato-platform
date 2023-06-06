@@ -3,7 +3,6 @@ describe("Renders User onboarding Page", () => {
         cy.visit('/')
         cy.get("#Login").click();
         cy.login()
-        cy.get("#Login").click();
 
         cy.wait(10000);
         cy.get("#Marketplace").should("exist");
@@ -17,8 +16,7 @@ describe("Renders User onboarding Page", () => {
         cy.visit('/')
         cy.get("#Login").click();
         cy.login()
-        cy.get("#Login").click();
-        
+
         cy.wait(10000);
         cy.get("#Marketplace").should("exist");
         cy.get("#Orders").should("exist");
