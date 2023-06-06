@@ -61,8 +61,6 @@ TEST_SELLER_PASSWORD=<sellerPassword>
 # blockapps stripe account
 STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>
 STRIPE_SECRET_KEY=<stripeSecretKey>
-
-CLIENT_URL=<clientUrl>
 ```
 2. Install dependencies: 
 ```
