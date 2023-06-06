@@ -548,7 +548,9 @@ insertMappingTable :: OutputM m
                  => [ProcessedMappingRow]
                  -> ConduitM () Text m ()
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
-insertMappingTable maps = yieldMany $ insertMappingTableQuery maps
+insertMappingTable maps = do
+  $logInfoS "insertMappingTable" $ T.pack $ show maps
+  yieldMany $ insertMappingTableQuery maps
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
@@ -614,7 +616,7 @@ createMappingTableQuery (o, a, n, m) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
-               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "key", "value"]
+               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "key text", "value text"]
         , ",\n  PRIMARY KEY (m_record_id) );"
         ]
 

@@ -307,24 +307,33 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
+processedContractToProcessedMappingRows :: (MonadIO m, MonadLogger m) => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
 processedContractToProcessedMappingRows pc mapNames = do
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
-      onlyRecord = Map.toList(Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-      recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord 
-      flattenedMap =  Map.foldrWithKey flattenOuterMap [] (Map.fromList recordVMs) 
-        where
-          flattenOuterMap :: Text -> Map.Map SimpleValue Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-          flattenOuterMap mapName innerMap flatList = flatList ++ Map.foldrWithKey (flattenInnerMap mapName) [] innerMap
+  $logInfoS "processedContractToProcessedMappingRows contractData" . T.pack $ show (contractData pc) ++ show (contractName pc)
+  $logInfoS "processedContractToProcessedMappingRows valueMappingsMap" . T.pack $ show valueMappingsMap ++ show (contractName pc)
+  if null valueMappingsMap then return $ []
+  else do
+    let onlyRecord = Map.toList(Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
+        recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord 
+        flattenedMap =  Map.foldrWithKey flattenOuterMap [] (Map.fromList recordVMs) 
+          where
+            flattenOuterMap :: Text -> Map.Map SimpleValue Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
+            flattenOuterMap mapName innerMap flatList = flatList ++ Map.foldrWithKey (flattenInnerMap mapName) [] innerMap
 
-          flattenInnerMap :: Text -> SimpleValue -> Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-          flattenInnerMap mapName key value flatList = (mapName, key, value) : flatList
-      result = convertToPMapping flattenedMap 
-        where 
-          convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMappingRow]
-          convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMappingRow mapName pc (SimpleValue key) value ) flatMap
-  return $ result
+            flattenInnerMap :: Text -> SimpleValue -> Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
+            flattenInnerMap mapName key value flatList = (mapName, key, value) : flatList
+        result = convertToPMapping flattenedMap 
+          where 
+            convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMappingRow]
+            convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMappingRow mapName pc (SimpleValue key) value ) flatMap
+    
+    $logInfoS "processedContractToProcessedMappingRows onlyRecord" . T.pack $ show onlyRecord ++ show (contractName pc)
+    $logInfoS "processedContractToProcessedMappingRows recordVMs" . T.pack $ show recordVMs ++ show (contractName pc)
+    $logInfoS "processedContractToProcessedMappingRows flattenedMap" . T.pack $ show flattenedMap ++ show (contractName pc)
+    $logInfoS "processedContractToProcessedMappingRows result " . T.pack $ show result ++ show (contractName pc)
 
+    return $ result
 rowToHistories :: (MonadIO m) =>
                   IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
@@ -566,6 +575,7 @@ processTheMessages env sqlEnv conn g messages = do
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           pMappings <- processedContractToProcessedMappingRows indexContract bigMapNames --get all procsesed mappings
+          $logInfoLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs pMappings
@@ -581,8 +591,8 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
-    unless (null ins) $ outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless (null ins || (length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    outputData conn . insertHistoryTable $ concatMap historyInserts ins
+    unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
