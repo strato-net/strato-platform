@@ -40,10 +40,11 @@ import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Short              as BSS
 import           Data.Default
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
-import qualified Data.Text.Encoding                 as Text            
+import qualified Data.Text.Encoding                 as Text
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import           Data.Traversable                   (for)
@@ -300,19 +301,19 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
 
 instance ((Address,T.Text) `A.Selectable` X509CertificateField ) MemContextM where
   select _ (k,t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) MemContextM where
   select _ k = do
-      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
       mCertAddress <- lookupX509AddrFromCBHash k
       fmap join . for mCertAddress $ \certAddress -> do
         mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
         case mBString of
-            Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+            Just (BString bs) -> pure . eitherToMaybe . bsToCert . BSS.fromShort $ bs
             _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where

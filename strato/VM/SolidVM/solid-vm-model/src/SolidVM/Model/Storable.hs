@@ -10,7 +10,7 @@ import           Control.Exception
 import           Data.Attoparsec.ByteString as Atto
 import           Data.Attoparsec.ByteString.Char8 (scientific)
 import           Data.Binary
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
@@ -33,9 +33,9 @@ import           SolidVM.Model.SolidString
 import           Text.Format
 
 data BasicValue = BInteger !Integer
-                | BString !B.ByteString
+                | BString {-# UNPACK #-} !BSS.ShortByteString
                 | BBool !Bool
-                | BAccount !NamedAccount 
+                | BAccount !NamedAccount
                 | BEnumVal !SolidString !SolidString !Word32
                 | BContract !SolidString !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
@@ -46,9 +46,9 @@ data BasicValue = BInteger !Integer
 
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i)     = i == 0
-isDefault (BString bs)     = B.null bs
+isDefault (BString bs)     = BSS.null bs
 isDefault (BBool b)        = not b
-isDefault (BAccount a)     = a == unspecifiedChain 0x0 
+isDefault (BAccount a)     = a == unspecifiedChain 0x0
 isDefault (BEnumVal _ _ w) = w == 0
 isDefault (BContract _ a)  = a == unspecifiedChain 0x0
 isDefault BMappingSentinel = False
@@ -56,7 +56,7 @@ isDefault BDefault         = True
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = ('"':) . (++"\"") $ UTF8.toString s
+  format (BString s) = ('"':) . (++"\"") $ UTF8.toString (BSS.fromShort s)
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
@@ -66,18 +66,18 @@ instance Format BasicValue where
   format BDefault = "<unknown>"
 
 data IndexType = INum Integer
-               | IText B.ByteString
+               | IText {-# UNPACK #-} !BSS.ShortByteString
                | IBool Bool
                | IAccount NamedAccount
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
-data StoragePathPiece = Field B.ByteString
+data StoragePathPiece = Field {-# UNPACK #-} !BSS.ShortByteString
                       | MapIndex IndexType
                       | ArrayIndex Int
                       deriving (Eq, Show, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
-  format (Field n) = C8.unpack n
+  format (Field n) = C8.unpack . BSS.fromShort $ n
   format (MapIndex i) = "[" ++ show i ++ "]"
   format (ArrayIndex i) = "[" ++ show i ++ "]"
 
@@ -96,10 +96,10 @@ instance Format StoragePath where
 empty :: StoragePath
 empty = StoragePath []
 
-singleton :: B.ByteString -> StoragePath
+singleton :: BSS.ShortByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
-getField :: StoragePath -> B.ByteString
+getField :: StoragePath -> BSS.ShortByteString
 getField (StoragePath (Field f:_)) = f
 getField path = error "StoragePath must begin with field" path
 
@@ -178,7 +178,7 @@ parseMapIndex = do
            ignoreEscapedQuotes _ _ = Just False
        strContents <- scan False ignoreEscapedQuotes
        skip (== c2w8 '"')
-       return . IText . unescapeKey $ strContents
+       return . IText . unescapeKey . BSS.toShort $ strContents
     _ -> INum <$> parseInteger
   skip (== c2w8 '>')
   (MapIndex idx:) <$> pathParser
@@ -187,18 +187,18 @@ parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
   (do n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
-      (Field n:) <$> pathParser)
+      (Field (BSS.toShort n):) <$> pathParser)
     <|> ((string ":creator") *> pathParser)
     <|> ((string ":creatorAddress") *> pathParser)
 
-parsePath :: B.ByteString-> Either String StoragePath
-parsePath = fmap StoragePath . parseOnly pathParser
+parsePath :: BSS.ShortByteString-> Either String StoragePath
+parsePath = fmap StoragePath . parseOnly pathParser . BSS.fromShort
 
-escapeKey :: B.ByteString -> B.ByteString
-escapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim (2 * len) $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
+escapeKey :: BSS.ShortByteString -> BSS.ShortByteString
+escapeKey srcBS = do
+  let len = BSS.length srcBS
+  BSS.toShort . unsafePerformIO $ BI.createAndTrim (2 * len) $ \dst ->
+    BU.unsafeUseAsCString (BSS.fromShort srcBS) $ \src' -> do
       let src = castPtr src'
           copyAndEscape :: Int -> Int -> IO Int
           copyAndEscape !dstOff !srcOff =
@@ -216,11 +216,11 @@ escapeKey srcBS = unsafePerformIO $ do
                    copyAndEscape (dstOff+2) (srcOff+1)
       copyAndEscape 0 0
 
-unescapeKey :: B.ByteString -> B.ByteString
-unescapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim len $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
+unescapeKey :: BSS.ShortByteString -> BSS.ShortByteString
+unescapeKey srcBS = do
+  let len = BSS.length srcBS
+  BSS.toShort . unsafePerformIO $ BI.createAndTrim len $ \dst ->
+    BU.unsafeUseAsCString (BSS.fromShort srcBS) $ \src' -> do
       let src = castPtr src'
           copyAndUnescape :: Int -> Int -> IO Int
           copyAndUnescape !dstOff !srcOff =
@@ -242,22 +242,22 @@ unescapeKey srcBS = unsafePerformIO $ do
               else return dstOff
       copyAndUnescape 0 0
 
-unparsePath :: StoragePath -> B.ByteString
-unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
-  where go :: StoragePathPiece -> [B.ByteString]
+unparsePath :: StoragePath -> BSS.ShortByteString
+unparsePath (StoragePath ps) = BSS.concat . concatMap go $ ps
+  where go :: StoragePathPiece -> [BSS.ShortByteString]
         go (Field p) = [".", p]
-        go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
-        go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
+        go (ArrayIndex n) = ["[", BSS.toShort . C8.pack $ show n, "]"]
+        go (MapIndex (INum n)) = ["<", BSS.toShort . C8.pack $ show n, ">"]
         go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
         go (MapIndex (IBool True)) = ["<true>"]
         go (MapIndex (IBool False)) = ["<false>"]
-        go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
+        go (MapIndex (IAccount a)) = ["<a:", BSS.toShort . C8.pack $ show a, ">"]
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
     BDefault -> RLPString ""
     BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
-    BString t -> RLPArray [RLPScalar 1, rlpEncode t]
+    BString t -> RLPArray [RLPScalar 1, rlpEncode (BSS.fromShort t)]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
     BAccount a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
@@ -266,7 +266,7 @@ instance RLPSerializable BasicValue where
   rlpDecode x@(RLPArray ((RLPScalar t):s)) =
     case (t, s) of
       (0, [f]) -> BInteger $ rlpDecode f
-      (1, [f]) -> BString $ rlpDecode f
+      (1, [f]) -> BString . BSS.toShort $ rlpDecode f
       (2, [f]) -> BBool $ rlpDecode f
       (3, [f]) -> BAccount $ rlpDecode f
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
@@ -277,13 +277,13 @@ instance RLPSerializable BasicValue where
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
 
 pathToHexStorage :: StoragePath -> HexStorage
-pathToHexStorage = HexStorage . unparsePath
+pathToHexStorage = HexStorage . BSS.fromShort . unparsePath
 
 basicToHexStorage :: BasicValue -> HexStorage
 basicToHexStorage = HexStorage . rlpSerialize . rlpEncode
 
 hexStorageToPath :: HexStorage -> Either String StoragePath
-hexStorageToPath (HexStorage hs) = parsePath hs
+hexStorageToPath (HexStorage hs) = parsePath (BSS.toShort hs)
 
 hexStorageToBasic :: HexStorage -> Either String BasicValue
 hexStorageToBasic (HexStorage hs) = unsafeDupablePerformIO . handle handler

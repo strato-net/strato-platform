@@ -19,6 +19,7 @@ import Data.Char
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
@@ -39,7 +40,7 @@ decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
   pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hxs
   totalStorage <- bimap show HM.toList $ synthesize pathValues
-  mapMaybeM (bimapValue bsToText) totalStorage
+  mapMaybeM (bimapValue (bsToText . BSS.fromShort)) totalStorage
 
 bimapValue:: (t1 -> Either String t2) -> (t1, V.Value) -> Either String (Maybe (t2, SolidityValue))
 bimapValue f (name', value') = do
@@ -57,8 +58,8 @@ decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf
   let pathValues' = filter (isBasic . fst) pathValues
   finalState <- bimap show HM.toList $ case prevState of
     [] -> synthesize pathValues'
-    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
-  mapM (bimapM bsToText return) finalState
+    tvs -> replayDeltas pathValues' . HM.fromList . map (first (BSS.toShort . encodeUtf8)) $ tvs
+  mapM (bimapM (bsToText . BSS.fromShort) return) finalState
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
@@ -108,7 +109,7 @@ valueToSolidityValue = \case
           ValueBool True -> Right "true"
           ValueBool False -> Right "false"
 
-type TotalStorage = HM.HashMap B.ByteString V.Value
+type TotalStorage = HM.HashMap BSS.ShortByteString V.Value
 
 data ReplayFailure = MissingPath StoragePath
                    | TypeMismatch StoragePath BasicValue V.Value
@@ -136,7 +137,7 @@ applyDelta' [] bv (SimpleValue{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueEnum{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueContract{}) = Right $ fromBasic bv
 applyDelta' (Field n:sp) bv (ValueStruct ss) = do
-  n' <- first (UnicodeError n) $ decodeUtf8' n
+  n' <- first (UnicodeError $ BSS.fromShort n) $ decodeUtf8' $ BSS.fromShort n
   case M.lookup n' ss of
     Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
     Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
@@ -166,7 +167,7 @@ constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
-constructFromNothing' (Field n:sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
+constructFromNothing' (Field n:sp) = ValueStruct . M.singleton (decodeUtf8 $ BSS.fromShort n) . constructFromNothing' sp
 constructFromNothing' (MapIndex n:sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
 constructFromNothing' (ArrayIndex n:sp) =
@@ -196,7 +197,7 @@ fromBasic :: BasicValue -> V.Value
 fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
-  BString bs -> SimpleValue $! valueBytes bs
+  BString bs -> SimpleValue $! valueBytes (BSS.fromShort bs)
   BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
@@ -208,5 +209,5 @@ fromIndex :: IndexType -> V.SimpleValue
 fromIndex = \case
   IBool b -> ValueBool b
   INum n -> valueInt n
-  IText bs -> valueBytes bs
+  IText bs -> valueBytes (BSS.fromShort bs)
   IAccount a -> ValueAccount a

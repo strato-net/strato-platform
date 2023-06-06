@@ -79,6 +79,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Short              as BSS
 import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
@@ -450,19 +451,19 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
 
 instance ((Address,T.Text) `A.Selectable` X509CertificateField ) ContextM where
   select _ (k,t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) ContextM where
   select _ k = do
-      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+      let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
       mCertAddress <- lookupX509AddrFromCBHash k
       fmap join . for mCertAddress $ \certAddress -> do
         mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
         case mBString of
-            Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+            Just (BString bs) -> pure . eitherToMaybe . bsToCert . BSS.fromShort $ bs
             _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::(
@@ -471,7 +472,7 @@ lookupX509AddrFromCBHash ::(
                       )
       => Address -> m (Maybe Address)
 lookupX509AddrFromCBHash k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
+    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
         certRegistryKey = certKey (Address 0x509)
     mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
     $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
@@ -516,7 +517,7 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
 instance Mod.Modifiable GasCap ContextM where
   get _ = contextGets (GasCap . _vmGasCap)
 
-  put _ (GasCap g) = do 
+  put _ (GasCap g) = do
     contextModify (vmGasCap .~ g)
     $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
 

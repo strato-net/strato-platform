@@ -26,12 +26,13 @@ module Blockchain.SolidVM.SetGet (
 
   toBasic,
   fromBasic,
-    
+
   showSM
   ) where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
 import           Data.Foldable (for_)
@@ -75,7 +76,7 @@ getSolid loc key = case loc of
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . BC.unpack $ s
+  MS.BString s -> SString . BC.unpack . BSS.fromShort $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
@@ -98,7 +99,7 @@ findDefault = \case
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
   SInteger i -> MS.BInteger i
-  SString s -> MS.BString (BC.pack s)
+  SString s -> MS.BString (BSS.toShort . BC.pack $ s)
   SBool b -> MS.BBool b
   SAccount a _ -> MS.BAccount a
   SContract n a -> MS.BContract n a
@@ -115,7 +116,7 @@ setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
 -- is deeper, read the subfields and assign to their adjustment
 
-setVal (SUserDefined a _ _) (SUserDefined _ _ _) = 
+setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
   when (True) (internalError "Unimplemented feature user defined types" (a ))
 
 setVal (SReference dst) (SReference src) = do
@@ -133,7 +134,7 @@ setVal (SReference dst) (SReference src) = do
 
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
-    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
+    setVal (SReference $ dst `apSnoc` MS.Field (BSS.toShort . BC.pack $ labelToString f)) =<< weakGetVar var
 
 setVal (SReference dst) (SArray _ fs) = do
   let len = length fs
@@ -145,7 +146,7 @@ setVal (SReference dst) (SArray _ fs) = do
 
 
 
-setVal (STuple dstVector) (STuple srcVector) = 
+setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
   then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
   else do
@@ -156,7 +157,7 @@ setVal (STuple dstVector) (STuple srcVector) =
       return (dstItem, srcItemVal)
     forM_ zipped' $ \(dstItem, srcItemVal) -> do
       setVar dstItem srcItemVal
-   
+
 setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
@@ -166,7 +167,7 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                             case t of   -- t is evaluated here because Haskell is lazy
                                         -- We ONLY want to evaluate it if we know src is a SString because
                                         -- in some non-SString cases getXabiValueType will throw an exception
-                                SVMType.String{} -> MS.BString . UTF8.fromString $ s 
+                                SVMType.String{} -> MS.BString . BSS.toShort . UTF8.fromString $ s
                                 _             -> toBasic src
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
@@ -181,7 +182,7 @@ setVal (SNULL) _ = return ()
 
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
-  
+
 {-
 
 
@@ -236,7 +237,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
     MS.BString bs -> do
         t <- getXabiValueType addressedPath
         case t of
-                SVMType.String{} -> return . SString $ UTF8.toString bs
+                SVMType.String{} -> return . SString . UTF8.toString . BSS.fromShort $ bs
                 _             -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
 
@@ -260,7 +261,7 @@ getVar (Constant (STuple vct)) = do
       return $ Constant v
     ) vct
   return $ STuple resolved
-  
+
 getVar (Constant (SMap ty mp)) = do
   resolved <- mapM (\var -> do
       v <- getVar var

@@ -17,6 +17,7 @@ module Blockchain.DB.SolidStorageDB (
 
 import           Control.Monad.Change.Alter                  (Alters)
 import           Data.Bifunctor                              (second)
+import qualified Data.ByteString.Short                       as BSS
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
@@ -41,7 +42,7 @@ type FullSolidStorage m = ( HasMemAddressStateDB m
                           )
 
 toKey :: Account -> StoragePath -> RawStorageKey
-toKey =  curry $ fmap unparsePath
+toKey =  curry $ fmap (BSS.fromShort . unparsePath)
 
 toVal :: BasicValue -> RawStorageValue
 toVal bv =

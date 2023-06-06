@@ -75,6 +75,7 @@ import qualified Prelude                            as Ordering (Ordering (..))
 
 
 --import           Data.IORef
+import qualified Data.ByteString.Short as BSS
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -293,7 +294,7 @@ instance Monad m => Mod.Modifiable MemDBs (SM m) where
 
 instance Monad m => Mod.Modifiable GasInfo (SM m) where
   get _ = use gasInfo
-  put _ = assign gasInfo 
+  put _ = assign gasInfo
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -330,7 +331,7 @@ runSM maybeCode env gi chainId' f = do
         ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
+        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit
         }
 
   eValState <- try $ runStateT f startingState
@@ -410,7 +411,7 @@ getVariableOfName name = do
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
-                                                } 
+                                                }
                               }
                     else x
       vars = localVariables currentCallInfo
@@ -467,7 +468,7 @@ getVariableOfName name = do
         if name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
-                (MS.singleton $ BC.pack $ labelToString name)
+                (MS.singleton . BSS.toShort . BC.pack $ labelToString name)
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -574,7 +575,7 @@ pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   (curFrame:rest) -> do
     let localVariables' = localVariables curFrame
         variableStack'  = variableStack curFrame
-    {-- We save the local variables available in this scope to the 'stack', 
+    {-- We save the local variables available in this scope to the 'stack',
     which is simply a list of mappings from name to type/values
     --}
     pure $ curFrame{variableStack = (localVariables':variableStack')} : rest
@@ -587,7 +588,7 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     let (varFrame, st) = case variableStack curFrame of
           (varFrame': st') -> (varFrame', st')
           [] -> (M.empty, [])
-    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars), 
+    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars),
     we simply reassign the local variables to the top frame of the stack
     and the new stack's value is the rest of the frames
     --}
@@ -718,7 +719,7 @@ getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
-  mType <- getXabiType loc field
+  mType <- getXabiType loc (BSS.fromShort field)
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $!! loop ccs' (tail $ MS.toList path) v
@@ -739,7 +740,7 @@ getXabiValueType (AccountPath loc path) = do
            let t' = getTypeOfName' s ccs
             in case (x, t') of
                  (MS.Field n, StructTypo fs) ->
-                   let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                   let mt'' = lookup (textToLabel . decodeUtf8 . BSS.fromShort $ n) fs
                     in case mt'' of
                         Just t'' -> CC.fieldTypeType t''
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)
@@ -766,7 +767,7 @@ initializeAction acct name appName hsh = do
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
-  let key = MS.unparsePath key'
+  let key = (BSS.fromShort . MS.unparsePath) key'
       val = rlpSerialize $ rlpEncode val'
       ins = \case
               Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m

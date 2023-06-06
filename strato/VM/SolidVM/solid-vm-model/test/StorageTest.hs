@@ -1,4 +1,4 @@
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Control.Monad
 import Data.Either (isLeft)
 import Test.Hspec
@@ -20,12 +20,12 @@ spec = do
 
     it "should be able to escape quotes" $ do
       escapeKey "" `shouldBe` ""
-      escapeKey (B.singleton 0x22) `shouldBe` B.pack [0x5c, 0x22]
+      escapeKey (BSS.singleton 0x22) `shouldBe` BSS.pack [0x5c, 0x22]
       escapeKey "ok\"fail\"ok\"" `shouldBe` "ok\\\"fail\\\"ok\\\""
 
     it "should be able to unescape quotes" $ do
       unescapeKey "" `shouldBe` ""
-      unescapeKey (B.pack [0x5c, 0x22]) `shouldBe` B.singleton 0x22
+      unescapeKey (BSS.pack [0x5c, 0x22]) `shouldBe` BSS.singleton 0x22
       unescapeKey "ok\\\"fail\\\"ok\\\"" `shouldBe` "ok\"fail\"ok\""
 
   describe "StoragePath" $ do
@@ -77,11 +77,11 @@ spec = do
         "<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:ca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606>"
 
     it "should allow unbounded map indices" $ do
-      parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
+      parsePath (BSS.concat ["<1", BSS.replicate 100 0x30, ">"])
         `shouldBe` toAns [MapIndex (INum (product (replicate 100 10)))]
 
     it "should not allow unbounded array indices" $ do
-      parsePath (B.concat ["[1", B.replicate 100 0x30, "]"])
+      parsePath (BSS.concat ["[1", BSS.replicate 100 0x30, "]"])
         `shouldSatisfy` isLeft
 
     it "should unescape paths" $ do
@@ -95,9 +95,9 @@ spec = do
       let examples = [ BInteger 3399293429
                      , BString "This is text"
                      , BBool True
-                     , BAccount (unspecifiedChain 0x23421421421341232341bbbb) 
-                     , BAccount (mainChain 0x23421421421341232341bbbb) 
-                     , BAccount (explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d) 
+                     , BAccount (unspecifiedChain 0x23421421421341232341bbbb)
+                     , BAccount (mainChain 0x23421421421341232341bbbb)
+                     , BAccount (explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d)
                      , BContract "Wings!" (unspecifiedChain 0xdeadbeef)
                      , BContract "Wings!" (mainChain 0xdeadbeef)
                      , BContract "Wings!" (explicitChain 0xdeadbeef 0x1234567890)
