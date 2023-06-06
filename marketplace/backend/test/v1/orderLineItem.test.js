@@ -11,7 +11,6 @@ import { OrderLineItem, Order,Product,Inventory } from '../../api/v1/endpoints'
 import { inventoryArgs } from './factories/inventory'
 import { productArgs } from './factories/product'
 
-const options = { config }
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
@@ -347,7 +346,7 @@ describe('OrderLineItem End-To-End Tests', function () {
   })
   
   // The following test case passes all conditions and works well. It's flagged as pending for development purpose.
-  xit("Sholud not create an order if seller hasn't activated the payment method", async () => {
+  it("Sholud not create an order if seller hasn't activated the payment method", async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),
     }
