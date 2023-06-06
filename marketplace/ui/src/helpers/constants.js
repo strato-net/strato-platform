@@ -24,8 +24,8 @@ export const UNIT_OF_MEASUREMENTS = {
 
 export const US_DATE_FORMAT = "MM/DD/YYYY";
 
-export const MAX_QUANTITY = 10000;
-export const MAX_PRICE = 10000;
+export const MAX_QUANTITY = 1000000;
+export const MAX_PRICE = 100000000;
 
 export const INVENTORY_STATUS = {
   PUBLISHED: 1,
