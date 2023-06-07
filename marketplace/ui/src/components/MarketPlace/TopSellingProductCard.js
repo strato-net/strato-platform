@@ -86,7 +86,7 @@ const TopSellingProductCard = () => {
     if (!found) {
       items = [...cartList, { product, qty: 1 }];
       actions.addItemToCart(marketplaceDispatch, items);
-
+      
       openToast("bottom", false, "Item added to cart");
     } else {
       items = [...cartList];
@@ -190,7 +190,7 @@ const TopSellingProductCard = () => {
                             window.location.href = loginUrl;
                           } else {
                             addItemToCart(topSellingProduct);
-                            navigate("/checkout");
+                            // navigate("/checkout"); Should not navigate to checkout page
                           }
                         }}
                         className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"

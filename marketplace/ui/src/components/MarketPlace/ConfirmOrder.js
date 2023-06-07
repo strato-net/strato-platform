@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, } from "react";
+import { useState, useEffect, useMemo} from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -104,18 +104,14 @@ const ConfirmOrder = () => {
     setOpen(false);
   };
 
-
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
+  const storedData = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+  }, []);
   useEffect(() => {
-    actions.fetchUserAddresses(marketplaceDispatch);
-  }, [marketplaceDispatch])
-
-
+    actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
+  }, [marketplaceDispatch, storedData]);
 
   useEffect(() => {
-    actions.fetchConfirmOrderItems(marketplaceDispatch, confirmOrderList);
     let cartData = [];
     confirmOrderList.forEach((item) => {
       cartData.push(item);
