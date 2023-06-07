@@ -103,7 +103,11 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-
+  
+  useEffect(() => {
+    actions.fetchUserAddresses(marketplaceDispatch);
+  }, [marketplaceDispatch])
+  
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
