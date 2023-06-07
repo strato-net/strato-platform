@@ -83,11 +83,11 @@ const ConfirmOrder = () => {
   const [open, setOpen] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const [userOrganization, setUserOrganization] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const [selectedAddress, setSelectedAddress] = useState(0);
   const { cartList, confirmOrderList, isAddingShippingAddress, userAddresses, isLoadingUserAddresses } = useMarketplaceState();
   const { user } = useAuthenticateState();
+  const userOrganization = user?.organization
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [data, setData] = useState([]);
   const [tax, setTax] = useState(0);
@@ -120,8 +120,6 @@ const ConfirmOrder = () => {
     confirmOrderList.forEach((item) => {
       cartData.push(item);
     });
-
-    setUserOrganization(user?.organization);
 
     setData(cartData);
     let t = 0;
@@ -363,7 +361,7 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
     };
-
+    console.log("userOrganization: ", userOrganization);
     let data = await orderActions.createPayment(orderDispatch, body);
    
     if (data != null && data.url !== undefined) {
