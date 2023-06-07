@@ -47,6 +47,17 @@ const factory = {
 
         return args;
     },
+    getInventoryArgsWithNoSN(uid) {
+        const args = {
+            quantity: 3,
+            pricePerUnit: uid,
+            batchId: `batchId_${uid}`,
+            status: 2,
+            createdDate: 1673251301
+        }
+
+        return args;
+    },
     updateInventoryArgs(address, inventoryAddress, uid) {
         const args = {
             productAddress: address,
