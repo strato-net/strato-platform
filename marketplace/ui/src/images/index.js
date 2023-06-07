@@ -2,7 +2,6 @@ export const Images = {
   'logo': require("./resources/logo.png"),
   'noProductSymbol': require('./resources/noProductSymbol.png'),
   'noEventPageSymbol': require('./resources/no_event.png'),
-  'noProductSymbol': require('./resources/noProductSymbol.png'),
   'art': require("./resources/categories/art.png"),
   'carbon': require("./resources/categories/carbon.png"),
   'realEstate': require("./resources/categories/real_estate.png"),

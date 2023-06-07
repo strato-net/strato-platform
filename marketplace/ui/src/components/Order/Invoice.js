@@ -1,18 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PDFViewer } from '@react-pdf/renderer';
 import InvoiceComponent from './InvoiceComponent';
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
-import { useMatch, useLocation } from "react-router-dom";
+import { useMatch } from "react-router-dom";
 import { Spin } from "antd";
-import data from "./invoice.json";
 
-function useQuery() {
-  const { search } = useLocation();
-
-  return useMemo(() => new URLSearchParams(search), [search]);
-}
 
 const Invoice = () => {
   const [Id, setId] = useState(undefined);
@@ -29,7 +23,6 @@ const Invoice = () => {
     strict: true,
   });
 
-  const query = useQuery();
 
   useEffect(() => {
     setId(routeMatch?.params?.id);

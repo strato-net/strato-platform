@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer } from "react";
-import { actions } from "./actions";
+import React, { createContext, useContext, useReducer } from "react";
 import reducer from "./reducer";
 
 const CertifiersStateContext = createContext();

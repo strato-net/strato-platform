@@ -1,21 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from '@ant-design/pro-layout'
 import { Card, Row, Col } from 'antd';
-import { useMatch, useLocation } from "react-router-dom";
+import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/item/actions";
 import DataTableComponent from "../DataTableComponent";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import routes from "../../helpers/routes";
 
-function useQuery() {
-  const { search } = useLocation();
-
-  return useMemo(() => new URLSearchParams(search), [search]);
-}
 
 const ItemDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
-  const [chainId, setChainId] = useState(undefined);
 
   const dispatch = useItemDispatch();
 
@@ -31,24 +25,21 @@ const ItemDetails = ({ user, users }) => {
     strict: true,
   });
 
-  const query = useQuery();
-
   useEffect(() => {
     setId(routeMatch?.params?.id);
-    setChainId(query.get("chainId"));
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
-      actions.fetchItemDetails(dispatch, Id, chainId);
-      actions.fetchItemAudit(dispatch, Id, chainId);
+    if (Id !== undefined) {
+      actions.fetchItemDetails(dispatch, Id);
+      actions.fetchItemAudit(dispatch, Id);
     }
   }, [Id, dispatch]);
 
   const details = itemDetails;
   const audits = itemsAudit;
   if (audits && audits.length) {
-    audits.map((val) => {
+    audits.forEach((val) => {
       if (users && users.length) {
         const sender = users.find((data) => val['transaction_sender'] === data.userAdress);
         audits['sender'] = sender;
@@ -102,7 +93,7 @@ const ItemDetails = ({ user, users }) => {
     },
   ];
   if (Id !== undefined && !isitemDetailsLoading && details !== null) {
-    if (details['ownerOrganizationalUnit'] == '') {
+    if (details['ownerOrganizationalUnit'] === '') {
       details['ownerOrganizationalUnit'] = 'N/A'
     }
   }
