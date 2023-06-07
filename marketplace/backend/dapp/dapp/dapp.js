@@ -5,12 +5,10 @@ import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
-// import organizationManagerJs from '/dapp/organizations/organizationManager'
 import certificateJs from "/dapp/certificates/certificate";
 
 import itemJs from "/dapp/items/item";
 import orderJs from "/dapp/orders/order";
-import orderLineItemJs from "/dapp/orders/orderLineItem";
 import orderLineJs from "/dapp/orders/orderLine";
 
 import eventTypeJs from "/dapp/eventType/eventType";
@@ -19,7 +17,6 @@ import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import userAddressJs from "/dapp/addresses/userAddress.js";
-import { RestError } from "blockapps-rest/dist/util/rest.util";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
@@ -71,7 +68,6 @@ function deploy(contract, args, options) {
 async function loadFromDeployment(admin, deployFilename, options) {
   const deployFile = getYamlFile(deployFilename);
   return await bind(admin, deployFile.dapp.contract, {
-    chainIds: [deployFile.dapp.contract.appChainId],
     ...options,
   });
 }
@@ -127,15 +123,20 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   const contract = _contract;
   console.log(contract)
-  const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-  console.log('dapp - userCertificate', userCertificate)
-  contract.userOrganization = userCertificate.organization
-  let userOrganization = userCertificate.organization
+  let userOrganization
+  
+  if (!serviceUser) {
+    const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    console.log('dapp - userCertificate', userCertificate)
+    contract.userOrganization = userCertificate.organization
+    userOrganization = userCertificate.organization
 
-  console.log('dapp - userCertificate.organization', userCertificate.organization)
+    console.log('dapp - userCertificate.organization', userCertificate.organization)
+  }
+  
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };

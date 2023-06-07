@@ -144,7 +144,7 @@ const actions = {
       );
 
       const body = await response.json();
-      console.log('products', body)
+     
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,

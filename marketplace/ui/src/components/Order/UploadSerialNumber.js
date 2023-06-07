@@ -13,7 +13,6 @@ import {
   Button,
   Spin,
 } from "antd";
-import { Images } from "../../images";
 import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 import { downloadSample } from "../../helpers/utils";
 import { usePapaParse } from "react-papaparse";

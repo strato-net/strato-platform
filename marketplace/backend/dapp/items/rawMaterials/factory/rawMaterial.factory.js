@@ -4,7 +4,6 @@ const factory = {
     /** Sample arguments for creating a RawMaterial contract. Use util.uid() to generate a uid. */
     getRawMaterialArgs(uid) {
         const args = {
-            appChainId: `${uid}`,
             itemSerialNumber: `itemSerialNumber_${uid}`,
             rawMaterialSerialNumber: `rawMaterialSerialNumber_${uid}`,
             rawMaterialProductName: `rawMaterialProductName_${uid}`,

@@ -22,11 +22,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
 
-  const showModal = () => {
-    hide();
-    setOpen(true);
-  };
-
   const showModalEdit = () => {
     hide();
     setOpenEdit(true);

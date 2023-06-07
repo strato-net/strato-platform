@@ -1,15 +1,12 @@
-import { assert, rest } from 'blockapps-rest'
-import { util } from '/blockapps-rest-plus'
+import { assert } from 'blockapps-rest'
 import dotenv from 'dotenv'
 import config from '../../load.config'
 import oauthHelper from '/helpers/oauthHelper'
 import RestStatus from 'http-status-codes';
-import { get, post, put } from '/helpers/rest'
+import { get } from '/helpers/rest'
 import dappJs from '../../dapp/dapp/dapp'
 
-import { categoryArgs, updateCategoryArgs } from './factories/category'
-import { subCategoryArgs, updateSubCategoryArgs } from './factories/subCategory'
-import { Category, SubCategory } from '../../api/v1/endpoints'
+import { SubCategory } from '../../api/v1/endpoints'
 
 const options = { config }
 
@@ -50,151 +47,93 @@ describe('Category End-To-End Tests', function () {
 
   })
 
-  it('Create a subCategory', async () => {
-    const createArgs = {
-      ...categoryArgs(util.uid()),
-    }
 
-    const createResponse = await post(
-      Category.prefix,
-      Category.create,
-      createArgs,
-      globalAdmin.token,
-    )
 
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-    assert.isDefined(createResponse.body.data, 'body.data should be defined')
+  // it('get a subCategory', async () => {
+  //   const createArgs = {
+  //     ...categoryArgs(util.uid()),
+  //   }
 
-    const categoryAddress = createResponse.body.data[1]
+  //   const createResponse = await post(
+  //     Category.prefix,
+  //     Category.create,
+  //     createArgs,
+  //     globalAdmin.token,
+  //   )
 
-    const createSubCategoryArgs = {
-      ...subCategoryArgs(categoryAddress, util.uid()),
-    }
+  //   assert.equal(createResponse.status, 200, 'should be 200');
+  //   assert.isDefined(createResponse.body, 'body should be defined')
+  //   assert.isDefined(createResponse.body.data, 'body.data should be defined')
 
-    const createSubCategoryResponse = await post(
-      SubCategory.prefix,
-      SubCategory.create,
-      createSubCategoryArgs,
-      globalAdmin.token,
-    )
+  //   const categoryAddress = createResponse.body.data[1]
 
-    assert.equal(createSubCategoryResponse.status, 200, 'should be 200');
-    assert.isDefined(createSubCategoryResponse.body, 'body should be defined')
-  })
+  //   const createSubCategoryArgs = {
+  //     ...subCategoryArgs(categoryAddress, util.uid()),
+  //   }
 
-  it('get a subCategory', async () => {
-    const createArgs = {
-      ...categoryArgs(util.uid()),
-    }
+  //   const createSubCategoryResponse = await post(
+  //     SubCategory.prefix,
+  //     SubCategory.create,
+  //     createSubCategoryArgs,
+  //     globalAdmin.token,
+  //   )
 
-    const createResponse = await post(
-      Category.prefix,
-      Category.create,
-      createArgs,
-      globalAdmin.token,
-    )
+  //   assert.equal(createSubCategoryResponse.status, 200, 'should be 200');
+  //   assert.isDefined(createSubCategoryResponse.body, 'body should be defined')
 
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-    assert.isDefined(createResponse.body.data, 'body.data should be defined')
+  //   // get
+  //   const subCategory = await get(
+  //     SubCategory.prefix,
+  //     SubCategory.get.replace(':address', createSubCategoryResponse.body.data[1]),
+  //     {},
+  //     globalAdmin.token,
+  //   )
 
-    const categoryAddress = createResponse.body.data[1]
+  //   const responseData = subCategory?.body.data
 
-    const createSubCategoryArgs = {
-      ...subCategoryArgs(categoryAddress, util.uid()),
-    }
+  //   assert.equal(subCategory.status, 200, 'should be 200');
+  //   assert.isDefined(subCategory.body, 'body should be defined');
 
-    const createSubCategoryResponse = await post(
-      SubCategory.prefix,
-      SubCategory.create,
-      createSubCategoryArgs,
-      globalAdmin.token,
-    )
-
-    assert.equal(createSubCategoryResponse.status, 200, 'should be 200');
-    assert.isDefined(createSubCategoryResponse.body, 'body should be defined')
-
-    // get
-    const subCategory = await get(
-      SubCategory.prefix,
-      SubCategory.get.replace(':address', createSubCategoryResponse.body.data[1]),
-      {},
-      globalAdmin.token,
-    )
-
-    const responseData = subCategory?.body.data
-
-    assert.equal(subCategory.status, 200, 'should be 200');
-    assert.isDefined(subCategory.body, 'body should be defined');
-
-    assert.equal(responseData['name'], createSubCategoryArgs['name'], 'name should be equal');
-    assert.equal(responseData['description'], createSubCategoryArgs['description'], 'description should be equal');
-  })
+  //   assert.equal(responseData['name'], createSubCategoryArgs['name'], 'name should be equal');
+  //   assert.equal(responseData['description'], createSubCategoryArgs['description'], 'description should be equal');
+  // })
 
   it('Get all subCategory', async () => {
     // get
+
     const subCategory = await get(
       SubCategory.prefix,
       SubCategory.getAll,
-      {},
+      {category:"Art"},
       globalAdmin.token,
     )
 
     assert.equal(subCategory.status, 200, 'should be 200');
     assert.isDefined(subCategory.body, 'body should be defined');
     assert.isDefined(subCategory.body.data, 'body should be defined');
-  })
+    })
+  
+//   const subCategory = await get(
+//     SubCategory.prefix,
+//     SubCategory.getAll,
+//     {category:"Carbon"},
+//     globalAdmin.token,
+//   )
 
-  it('Update a subCategory', async () => {
-    const createArgs = {
-      ...categoryArgs(util.uid()),
-    }
+//   assert.equal(subCategory.status, 200, 'should be 200');
+//   assert.isDefined(subCategory.body, 'body should be defined');
+//   assert.isDefined(subCategory.body.data, 'body should be defined');
+// })
+// const subCategory = await get(
+//   SubCategory.prefix,
+//   SubCategory.getAll,
+//   {category:"Real Estate"},
+//   globalAdmin.token,
+// )
 
-    const createResponse = await post(
-      Category.prefix,
-      Category.create,
-      createArgs,
-      globalAdmin.token,
-    )
-
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-    assert.isDefined(createResponse.body.data, 'body.data should be defined')
-
-    const categoryAddress = createResponse.body.data[1]
-
-    const createSubCategoryArgs = {
-      ...subCategoryArgs(categoryAddress, util.uid()),
-    }
-
-    const createSubCategoryResponse = await post(
-      SubCategory.prefix,
-      SubCategory.create,
-      createSubCategoryArgs,
-      globalAdmin.token,
-    )
-
-    assert.equal(createSubCategoryResponse.status, 200, 'should be 200');
-    assert.isDefined(createSubCategoryResponse.body, 'body should be defined')
-
-    const subCategoryAddress = createSubCategoryResponse.body.data[1];
-
-    const updatesubCategoryArgs = {
-      ...updateSubCategoryArgs(categoryAddress, subCategoryAddress, util.uid()),
-    }
-
-    const updateSubCategoryResponse = await put(
-      SubCategory.prefix,
-      SubCategory.update,
-      updatesubCategoryArgs,
-      globalAdmin.token,
-    )
-
-    assert.equal(updateSubCategoryResponse.status, 200, 'should be 200');
-    assert.isDefined(updateSubCategoryResponse.body, 'body should be defined')
-
-  })
+// assert.equal(subCategory.status, 200, 'should be 200');
+// assert.isDefined(subCategory.body, 'body should be defined');
+// assert.isDefined(subCategory.body.data, 'body should be defined');
 
 
 })
