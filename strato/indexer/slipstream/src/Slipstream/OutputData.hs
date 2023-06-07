@@ -214,8 +214,24 @@ baseColumns = [ "record_id"
               , "transaction_sender"
               ]
 
+baseMappingColumns :: TableColumns
+baseMappingColumns = [ "m_record_id"
+              , "m_address"
+              , "m_chainId"
+              , "m_block_hash"
+              , "m_block_timestamp"
+              , "m_block_number"
+              , "m_transaction_hash"
+              , "m_transaction_sender"
+              , "m_contractname"
+              , "m_mapname"
+              ]
+
 baseTableColumns :: TableColumns
 baseTableColumns = baseColumns
+
+baseMappingTableColumns :: TableColumns
+baseMappingTableColumns = baseMappingColumns
 
 
 -- discard app if org is null
@@ -616,7 +632,7 @@ createMappingTableQuery (o, a, n, m) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
-               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "key text", "value text"]
+               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "m_contractname text", "m_mapname text","key text", "value text"]
         , ",\n  PRIMARY KEY (m_record_id) );"
         ]
 
@@ -705,9 +721,9 @@ insertMappingTableQuery ms = concat $
           let tableName = mappingTableName
                   (m_organization x)
                   (m_application x)
-                  (m_contractName x)
-                  (m_mapName x)
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+                  (m_contractname x)
+                  (m_mapname x)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst list
               baseVals = [ makeAccountM
                          , tshow . m_address
                          , m_chain
@@ -716,8 +732,8 @@ insertMappingTableQuery ms = concat $
                          , tshow . m_blockNumber
                          , T.pack . keccak256ToHex . m_transactionHash
                          , tshow . m_transactionSender
-                         , m_contractName
-                         , m_mapName
+                         , m_contractname
+                         , m_mapname
                          ]
               vals = flip map mappings $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -730,7 +746,7 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (record_id) DO UPDATE SET
+  ON CONFLICT (m_record_id) DO UPDATE SET
     m_record_id = excluded.m_record_id,
     m_address = excluded.m_address,
     "m_chainId" = excluded."m_chainId",
@@ -739,8 +755,8 @@ insertMappingTableQuery ms = concat $
     m_block_number = excluded.m_block_number,
     m_transaction_hash = excluded.m_transaction_hash,
     m_transaction_sender = excluded.m_transaction_sender,
-    m_contractName = excluded.m_contractName,
-    m_mapName = excluded.m_mapName|]
+    m_contractname = excluded.m_contractname,
+    m_mapname = excluded.m_mapname|]
                 , if null list then "" else ",\n    "
                 , tableUpsert $ map fst list
                 , ";"
