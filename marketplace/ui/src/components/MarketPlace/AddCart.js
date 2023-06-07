@@ -51,15 +51,14 @@ const Checkout = ({ user }) => {
     return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
   };
 
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
-
+  const storedData = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+  }, []);
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, cartList);
-
-
-
+    actions.fetchCartItems(marketplaceDispatch, storedData);
+  }, [marketplaceDispatch, storedData]);
+  
+  useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerOrganization;
