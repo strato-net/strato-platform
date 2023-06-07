@@ -42,6 +42,8 @@ import qualified Data.Map                        as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
+import           Data.List (nubBy)
+import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
 import           Database.PostgreSQL.Typed
@@ -565,8 +567,9 @@ insertMappingTable :: OutputM m
                  -> ConduitM () Text m ()
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = do
+  let newMaps = nubBy ((==) `on` m_mapDataKey) maps
   $logInfoS "insertMappingTable" $ T.pack $ show maps
-  yieldMany $ insertMappingTableQuery maps
+  yieldMany $ insertMappingTableQuery newMaps
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
@@ -633,7 +636,7 @@ createMappingTableQuery (o, a, n, m) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
                "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "m_contractname text", "m_mapname text","key text", "value text"]
-        , ",\n  PRIMARY KEY (m_record_id) );"
+        , ",\n  PRIMARY KEY (key));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -746,7 +749,7 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (m_record_id) DO UPDATE SET
+  ON CONFLICT (key) DO UPDATE SET
     m_record_id = excluded.m_record_id,
     m_address = excluded.m_address,
     "m_chainId" = excluded."m_chainId",
@@ -756,9 +759,8 @@ insertMappingTableQuery ms = concat $
     m_transaction_hash = excluded.m_transaction_hash,
     m_transaction_sender = excluded.m_transaction_sender,
     m_contractname = excluded.m_contractname,
-    m_mapname = excluded.m_mapname|]
-                , if null list then "" else ",\n    "
-                , tableUpsert $ map fst list
+    m_mapname = excluded.m_mapname,
+    value = excluded.value|]
                 , ";"
                 ]
 
