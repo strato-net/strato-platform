@@ -11,7 +11,6 @@ import {
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
-import { Wallet } from "../../images/SVGComponents";
 import "./header.css";
 import { Link, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -41,26 +40,30 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState()
+  const [pathName, setPathName] = useState("/");
 
 
   const navItems = [
     {
       role: 0,
       items: [
-        "Marketplace",
-        "Orders",
-        "Inventory",
-        "Products",
-        "Events",
+        { label: 'Marketplace', key: '0' },
+        { label: 'Orders', key: '1' },
+        { label: 'Inventory', key: '2' },
+        { label: 'Products', key: '3' },
+        { label: 'Events', key: '4' },
       ]
     },
     {
       role: 1,
       items: [
-        "Marketplace",
-
+        { label: 'Marketplace', key: '0' },
       ]
     },
+  ];
+
+  const demoMenuItems=[
+    { label: 'Marketplace', key: '0' },
   ];
 
   const navUrls = [
@@ -170,15 +173,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
           if (item.key === "4") navigate(navUrls[item.key], { state: { tab: "EventType" } })
           else navigate(navUrls[item.key]);
         }}
-      >
-        {navItems[roleIndex]?.items.map((item, index) => {
-          return (
-            <Menu.Item id={item} key={index}>
-              {item}
-            </Menu.Item>
-          );
-        })}
-      </Menu>
+        items={navItems[roleIndex]?.items}
+      />
       <Space size="large">
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"

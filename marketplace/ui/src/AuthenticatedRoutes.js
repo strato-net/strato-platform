@@ -459,7 +459,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         path="*"
         element={<Navigate
-          to={"/marketplace"}
+          to={"/"}
           replace />}
       />
     </Routes>

@@ -6,6 +6,8 @@ import {
   Typography,
   Checkbox,
   Spin,
+  InputNumber,
+  Space,
 } from "antd";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
@@ -158,26 +160,16 @@ const CategoryProductList = ({ user }) => {
   //============================Manufacturers/Brands=============================//
   useEffect(() => {
     if (marketplaceList.length > 0) {
-      var uniqueBrands = 
-      marketplaceList.map((p) => p.manufacturer)
-        .filter(
-          (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
-        );
+      var uniqueBrands =
+        marketplaceList.map((p) => p.manufacturer)
+          .filter(
+            (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
+          );
       setBrands(uniqueBrands);
     }
   }, [marketplaceList]);
 
   //=========================Other functions===============================//
-
-  const onChangeQuantity = (val) => {
-    setMaxQty(val[1]);
-    setMinQty(val[0]);
-  };
-
-  const onChangePrice = (val) => {
-    setMaxPrice(val[1]);
-    setMinPrice(val[0]);
-  };
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
@@ -203,7 +195,7 @@ const CategoryProductList = ({ user }) => {
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
-        <Breadcrumb.Item href="javascript:;">
+      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
             <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
               Home
@@ -263,23 +255,15 @@ const CategoryProductList = ({ user }) => {
               className="pl-8 pr-7"
             >
               <Panel header={<Text strong>Price</Text>} key="1">
-                <div className="flex justify-between text-sm text-primaryB">
-                  <Text>${minPrice}</Text>
-                  <Text>${maxPrice}</Text>
-                </div>
-                <Slider
-                  range
-                  step={100}
-                  min={0}
-                  max={MAX_PRICE}
-                  defaultValue={[0, MAX_PRICE]}
-                  trackStyle={{ backgroundColor: "#181EAC" }}
-                  handleStyle={{
-                    borderColor: "#C5C5C4",
-                    boxShadow: "0 0 10px rgb(197, 197, 196) !important",
-                  }}
-                  onChange={onChangePrice}
-                />
+                <Space>
+                  <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+                    e === null ? setMinPrice(0) : setMinPrice(e)
+                  }} />
+                  -
+                  <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+                    e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+                  }} />
+                </Space>
               </Panel>
             </Collapse>
             <Divider className="m-0" />
@@ -294,23 +278,15 @@ const CategoryProductList = ({ user }) => {
               className="pl-8 pr-7"
             >
               <Panel header={<Text strong>Quantity</Text>} key="1">
-                <div className="flex justify-between text-sm text-primaryB">
-                  <Text>{minQty}</Text>
-                  <Text>{maxQty}</Text>
-                </div>
-                <Slider
-                  range
-                  min={0}
-                  max={MAX_QUANTITY}
-                  step={100}
-                  defaultValue={[0, MAX_QUANTITY]}
-                  trackStyle={{ backgroundColor: "#181EAC" }}
-                  handleStyle={{
-                    borderColor: "#C5C5C4",
-                    boxShadow: "0 0 10px rgb(197, 197, 196) !important",
-                  }}
-                  onChange={onChangeQuantity}
-                />
+              <Space>
+                  <InputNumber min={0} placeholder="min" onChange={(e) => {
+                    e === null ? setMinQty(0) : setMinQty(e)
+                  }} />
+                  -
+                  <InputNumber min={minPrice} placeholder="max" onChange={(e) => {
+                    e === null ? setMaxQty(MAX_QUANTITY) : setMaxQty(e)
+                  }} />
+                </Space>
               </Panel>
             </Collapse>
             <Divider className="m-0" />

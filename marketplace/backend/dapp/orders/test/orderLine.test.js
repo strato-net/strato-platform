@@ -1,19 +1,12 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import config from '/load.config';
 import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
-import dappJs from '/dapp/dapp/dapp'
-import constants from '/helpers/constants';
-
+import dappJs from '/dapp/dapp/dapp';
 import RestStatus from 'http-status-codes';
-
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import orderLineJs from '../orderLine';
-import orderLineItemJs from '../orderLineItem';
 import orderLineFactory from '../factory/orderLine.factory';
-import orderLineItemFactory from '../factory/orderLineItem.factory';
-import { args } from 'commander';
 
 const options = { config };
 
