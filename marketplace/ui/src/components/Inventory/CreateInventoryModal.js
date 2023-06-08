@@ -27,7 +27,6 @@ import {
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
-import { downloadSample } from "../../helpers/utils";
 import { usePapaParse } from "react-papaparse";
 import { INVENTORY_STATUS, MAX_RAW_MATERIAL } from "../../helpers/constants";
 

@@ -63,7 +63,7 @@ const AddEventModal = ({ open, handleCancel, inventoryId, productId }) => {
 
   useEffect(() => {
     let tempNumbers = "";
-    items.map(elem => {
+    items.forEach(elem => {
       if (elem.serialNumber) {
         tempNumbers += elem.serialNumber + ",";
       }

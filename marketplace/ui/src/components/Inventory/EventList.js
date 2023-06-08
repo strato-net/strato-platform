@@ -17,10 +17,8 @@ const EventList = () => {
   const [data, setdata] = useState([])
   const [Id, setId] = useState(undefined);
   const dispatch = useEventDispatch();
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
+  const limit = 10, offset = 0;
+  const debouncedSearchTerm = useDebounce("", 1000);
   const { inventoryEvents,isInventoryEventsLoading } =
   useEventState();
   const navigate = useNavigate();
@@ -76,10 +74,10 @@ const EventList = () => {
     <div className="mx-16 mt-14">
       <div className="flex justify-between">
         <Breadcrumb>
-          <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()} className="cursor-pointer">
             <ClickableCell href={routes.Marketplace.url}>Home</ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()} className="cursor-pointer">
             <ClickableCell href={routes.Inventories.url}>Inventory</ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item className="text-primary">

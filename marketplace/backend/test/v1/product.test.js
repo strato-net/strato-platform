@@ -1,17 +1,14 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import dotenv from 'dotenv'
 import config from '../../load.config'
 import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
-import dappJs from '../../dapp/dapp/dapp'
-
 import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
 import { Product, Inventory } from '../../api/v1/endpoints'
 
-const options = { config }
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
@@ -39,7 +36,6 @@ describe('Product End-To-End Tests', function () {
     const adminCredentials = { token: adminToken }
 
     const adminResponse = await oauthHelper.getStratoUserFromToken(adminCredentials.token)
-    const dapp = await dappJs.loadFromDeployment(adminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
 
     assert.strictEqual(
       adminResponse.status,

@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import { rest, util, assert } from '/blockapps-rest-plus';
+import { util, assert } from '/blockapps-rest-plus';
 import config from '/load.config';
 import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
@@ -8,7 +8,6 @@ import RestStatus from 'http-status-codes';
 import certificateJs from '/dapp/certificates/certificate'
 import productManagerJs from '../productManager';
 import factory from '../factory/productManager.factory';
-import dappJs from '/dapp/dapp/dapp'
 
 const options = { config };
 
@@ -24,7 +23,6 @@ describe('Product Manager', function () {
     let tradingEntity;
     let contract;
     let newOptions;
-    let args = {};
     let tradingEntityOrganization;
     let certifier;
 
@@ -251,9 +249,9 @@ describe('Product Manager', function () {
         const inventoryArgs4 = inventoryFactoryArgs();
 
         const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1, serialNumbers: ['1', '2', '3'] });
-        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2, serialNumbers: ['1', '2', '3'] });
-        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3, serialNumbers: ['1', '2', '3'] });
-        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4, serialNumbers: ['1', '2', '3'] });
+        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2, serialNumbers: ['4', '5', '6'] });
+        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3, serialNumbers: ['7', '8', '9'] });
+        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4, serialNumbers: ['10', '11', '12'] });
 
         const inventoryData1 = await contract.getInventory({ address: inventory1 }, newOptions);
         const inventoryData2 = await contract.getInventory({ address: inventory2 }, newOptions);
