@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, } from "react";
+import { useState, useEffect, useMemo} from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -83,11 +83,11 @@ const ConfirmOrder = () => {
   const [open, setOpen] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const [userOrganization, setUserOrganization] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const [selectedAddress, setSelectedAddress] = useState(0);
   const { cartList, confirmOrderList, isAddingShippingAddress, userAddresses, isLoadingUserAddresses } = useMarketplaceState();
   const { user } = useAuthenticateState();
+  const userOrganization = user?.organization
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [data, setData] = useState([]);
   const [tax, setTax] = useState(0);
@@ -103,25 +103,21 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-
-
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
+  
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
-
-
-
+  
+  const storedData = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+  }, []);
+  
   useEffect(() => {
-    actions.fetchConfirmOrderItems(marketplaceDispatch, confirmOrderList);
+    actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
     confirmOrderList.forEach((item) => {
       cartData.push(item);
     });
-
-    setUserOrganization(user?.organization);
 
     setData(cartData);
     let t = 0;
@@ -139,7 +135,7 @@ const ConfirmOrder = () => {
       sum += item.amount;
     });
     setTotal(sum);
-  }, [marketplaceDispatch, confirmOrderList]);
+  }, [marketplaceDispatch, confirmOrderList, storedData]);
 
   const openToastOrder = (placement) => {
     if (success) {
@@ -363,7 +359,6 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
     };
-
     let data = await orderActions.createPayment(orderDispatch, body);
    
     if (data != null && data.url !== undefined) {
