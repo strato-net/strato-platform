@@ -1,10 +1,10 @@
 import React from "react";
 import { Card, Typography, Image, Space } from "antd";
-import { Images } from "../../images";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
+import { Images } from "../../images";
 
 const { Title, Text } = Typography;
 

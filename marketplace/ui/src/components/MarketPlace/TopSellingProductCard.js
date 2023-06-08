@@ -8,7 +8,6 @@ import {
   Spin,
   notification,
 } from "antd";
-import { Images } from "../../images";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import { Cart } from "../../images/SVGComponents";
 import { actions } from "../../contexts/marketplace/actions";
@@ -26,15 +25,10 @@ const { Title, Text } = Typography;
 const TopSellingProductCard = () => {
   const [offset, setOffset] = useState(0);
 
-  const categoryImages = [
-    Images.topSelling1,
-    Images.topSelling2,
-    Images.topSelling3,
-  ];
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const [api, contextHolder] = notification.useNotification();
+  const [api] = notification.useNotification();
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {

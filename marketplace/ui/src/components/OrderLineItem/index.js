@@ -1,4 +1,4 @@
-import { Card, Button, notification, Input, Space,  } from 'antd';
+import { Button, notification, Input, Space,  } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { PageHeader } from '@ant-design/pro-layout'
 import React, { useEffect, useState, useRef } from "react";
@@ -13,12 +13,10 @@ import { actions } from "../../contexts/orderLineItem/actions";
 import { useOrderLineItemDispatch, useOrderLineItemState } from "../../contexts/orderLineItem";
 import TransferOwnershipModal from "./TransferOwnershipModal";
 import useDebounce from "../UseDebounce";
-import { getStringDate } from '../../helpers/utils';
 
 const OrderLineItem = () => {
-  const [queryValue, setQueryValue] = useState('');
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
+  let queryValue = '', offset = 0;
+  const limit = 10;
   const [selectedObj, setSelectedObj] = useState([]);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [isTransferOwnershipModalOpen, toggleTransferOwnershipModal] = useState(false);
@@ -72,17 +70,12 @@ const OrderLineItem = () => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
 
-  const [searchText, setSearchText] = useState('');
-  const [searchedColumn, setSearchedColumn] = useState('');
   const searchInput = useRef(null);
   const handleSearch = (selectedKeys, confirm, dataIndex) => {
     confirm();
-    setSearchText(selectedKeys[0]);
-    setSearchedColumn(dataIndex);
   };
   const handleReset = (clearFilters) => {
     clearFilters();
-    setSearchText('');
   };
   const getColumnSearchProps = (dataIndex) => ({
     filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (

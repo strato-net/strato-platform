@@ -52,11 +52,6 @@ const reducer = (state, action) => {
         isAuthenticated: false,
         logoutUrl: action.payload,
       };
-    case actionDescriptors.fetchUsersFailed:
-      return {
-        ...state,
-        isUsersLoading: false,
-      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }
