@@ -247,7 +247,7 @@ const actions = {
         type: actionDescriptors.updateProductFailed,
         error: body.error,
       });
-      actions.setMessage(dispatch, body.error);
+      actions.setMessage(dispatch, "Error while updating Product");
       return false;
     } catch (err) {
       dispatch({

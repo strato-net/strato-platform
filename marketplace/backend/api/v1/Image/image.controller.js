@@ -50,11 +50,11 @@ class ImageController {
       rest.response.status400(res, "Missing file key");
     }
     try {
-      const oldFileKey=req.params.fileKey;
-      const isDeleted=await deleteFileFromS3(oldFileKey,req.app.get(constants.s3ParamName))
-      if(!isDeleted){
-        rest.response.status400(res,"Image is failed to update")
-      }
+      // const oldFileKey=req.params.fileKey;
+      // const isDeleted=await deleteFileFromS3(oldFileKey,req.app.get(constants.s3ParamName))
+      // if(!isDeleted){
+      //   rest.response.status400(res,"Image is failed to update")
+      // }
       
       const fileKey = `${moment()
         .utc()

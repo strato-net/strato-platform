@@ -77,7 +77,7 @@ contract Item_3 is ItemStatus {
         string _comment,
         uint _scheme
     ) returns (uint) {
-        if (tx.origin != owner) {
+        if(ownerOrganization != getUserOrganization(tx.origin)){
             return RestStatus.FORBIDDEN;
         }
 
@@ -95,13 +95,20 @@ contract Item_3 is ItemStatus {
         return RestStatus.OK;
     }
 
+    // Get the userOrganization
+    function getUserOrganization(address caller) public returns (string) {
+      mapping(string => string) ownerCert = getUserCert(caller);
+      string userOrganization = ownerCert["organization"];
+      return userOrganization;
+    }
+
     function generateOwnershipHistory(
         string _seller,
         string _newOwner,
         uint _ownershipStartDate,
         address _itemAddress
     ) returns (uint) {
-        if (tx.origin != owner) {
+        if(ownerOrganization != getUserOrganization(tx.origin)){
             return RestStatus.FORBIDDEN;
         }
         emit OwnershipUpdate(

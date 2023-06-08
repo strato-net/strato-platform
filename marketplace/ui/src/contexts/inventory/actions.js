@@ -156,7 +156,7 @@ const actions = {
         type: actionDescriptors.updateInventoryFailed,
         error: body.error
       });
-      actions.setMessage(dispatch, body.error);
+      actions.setMessage(dispatch, "Error while updating Inventory");
       return false;
     } catch (err) {
       dispatch({
