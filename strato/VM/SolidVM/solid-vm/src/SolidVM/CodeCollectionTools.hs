@@ -82,6 +82,7 @@ addInheritedObjects cc c = do
   st <- toUnionMaker _structs cc c
   ev <- toUnionMaker _events cc c
   co <- toUnionMaker _constants cc c
+  mo <- toUnionMaker _modifiers cc c
   pure $ c{
   _functions=fu,
   _storageDefs=sd,
@@ -89,7 +90,8 @@ addInheritedObjects cc c = do
   _enums=en,
   _structs=st,
   _events = ev,
-  _constants=co
+  _constants=co,
+  _modifiers=mo
   }
 
 toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
