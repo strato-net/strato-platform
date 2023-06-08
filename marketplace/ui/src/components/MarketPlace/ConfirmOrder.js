@@ -361,7 +361,6 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
     };
-    console.log("userOrganization: ", userOrganization);
     let data = await orderActions.createPayment(orderDispatch, body);
    
     if (data != null && data.url !== undefined) {
