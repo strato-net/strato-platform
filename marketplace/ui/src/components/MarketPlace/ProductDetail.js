@@ -12,6 +12,7 @@ import {
   Col,
   Spin,
   notification,
+  InputNumber
 } from "antd";
 import { EyeOutlined, MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
