@@ -37,7 +37,8 @@ const factory = {
     /** Sample arguments for creating an Inventory from ProductManager Contract. Use util.uid() to generate a uid. */
     getInventoryArgs(uid) {
         const args = {
-            quantity: uid,
+            // Number of serial numbers should match the quantity if they are provided.
+            quantity: 2,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,
             serialNumbers: [`A1${uid}`, `A2${uid}`],
@@ -52,6 +53,7 @@ const factory = {
             quantity: 3,
             pricePerUnit: uid,
             batchId: `batchId_${uid}`,
+            serialNumbers: [],
             status: 2,
             createdDate: 1673251301
         }
