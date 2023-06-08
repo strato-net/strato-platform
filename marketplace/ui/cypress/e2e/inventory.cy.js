@@ -232,8 +232,6 @@ describe("Renders Inventory Page", () => {
       }).then(({ status, body }) => {
         expect(status).to.eq(200);
         if (body.data.length > 0) {
-          console.log(status)
-          console.log(body)
           cy.get("td").eq(17).click();
           cy.wait(13000);
           cy.get(".transformation").contains("Transformation").should("be.visible");
