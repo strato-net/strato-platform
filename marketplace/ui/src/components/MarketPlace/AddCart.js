@@ -15,9 +15,8 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
-import DataTableComponent from "../DataTableComponent";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
@@ -299,45 +298,45 @@ const handleOrderConfirm = async () => {
   }
 };
 
-return (
-  <div className="h-screen mx-14  mt-14">
-    {contextHolder}
-    {isCreateOrderSubmitting ? (
-      <div className="h-screen flex justify-center items-center">
-        <Spin spinning={isCreateOrderSubmitting} size="large" />
-      </div>
-    ) : (
-      <div>
-        <Breadcrumb>
-          <Breadcrumb.Item href="javascript:;">
-            <ClickableCell href={routes.Marketplace.url}>
-              Home
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item href="javascript:;">
-            <p className=" text-primary">
-              Add to Cart
-            </p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
-        {
-          mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
-            <Image src={Images.noProductSymbol} preview={false} />
-            <Title level={3} className="mt-2">
-              No item found
-            </Title>
-          </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
-        }
-      </div>
-    )}
-    <ConfirmOrderModel
-      open={open}
-      handleCancel={handleCancel}
-      handleConfirm={handleOrderConfirm}
-    />
-    {message && openToastOrder("bottom")}
-  </div>
-);
+  return (
+    <div className="h-screen mx-14  mt-14">
+      {contextHolder}
+      {isCreateOrderSubmitting ? (
+        <div className="h-screen flex justify-center items-center">
+          <Spin spinning={isCreateOrderSubmitting} size="large" />
+        </div>
+      ) : (
+        <div>
+          <Breadcrumb>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+              <ClickableCell href={routes.Marketplace.url}>
+                Home
+              </ClickableCell>
+            </Breadcrumb.Item>
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+              <p className=" text-primary">
+                Add to Cart
+              </p>
+            </Breadcrumb.Item>
+          </Breadcrumb>
+          {
+            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
+              <Image src={Images.noProductSymbol} preview={false} />
+              <Title level={3} className="mt-2">
+                No item found
+              </Title>
+            </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+          }
+        </div>
+      )}
+      <ConfirmOrderModel
+        open={open}
+        handleCancel={handleCancel}
+        handleConfirm={handleOrderConfirm}
+      />
+      {message && openToastOrder("bottom")}
+    </div>
+  );
 };
 
 export default Checkout;

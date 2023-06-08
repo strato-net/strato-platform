@@ -358,8 +358,6 @@ const actions = {
           body: JSON.stringify(assets[i])
         });
 
-        const body = await response.json();
-
         if (response.status === RestStatus.OK) {
           dispatch({
             type: actionDescriptors.updateAssetImportCount,

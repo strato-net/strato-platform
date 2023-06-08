@@ -2,19 +2,13 @@ import { assert, rest } from 'blockapps-rest'
 import { util } from '/blockapps-rest-plus'
 import dotenv from 'dotenv'
 import config from '../../load.config'
-import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
 import certificateJs from '/dapp/certificates/certificate'
-import { get, post, put } from '/helpers/rest'
+import { get, post } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
-import * as R from 'ramda';
-
 import factory from './factories/order'
-import { inventoryArgs } from './factories/inventory'
-import { productArgs } from './factories/product'
-import { Order, Product,Inventory } from '../../api/v1/endpoints'
+import { Order } from '../../api/v1/endpoints'
 
-const options = { config }
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)

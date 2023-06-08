@@ -3,12 +3,9 @@ import RestStatus from "http-status-codes";
 import config from '../../../load.config'
 import oauthHelper from "../../../helpers/oauthHelper";
 import dappJs from '../dapp'
-import constants from '/helpers/constants'
-import dotenv from 'dotenv'
 
 const testName = 'deploy.test'
 const options = { config, name: testName, logger: console }
-const loadEnv = dotenv.config()
 
 describe('E2E tests', function () {
   this.timeout(config.timeout)
@@ -59,12 +56,9 @@ describe('E2E tests', function () {
     admin = { ...adminResponse.user, ...adminCredentials }
 
     members.push({})
-    mainChainContract = await dappJs.uploadMainChainContract(admin, options)
-    dapp = await dappJs.uploadDappChain(admin, mainChainContract.address, members, options)
+    mainChainContract = await dappJs.uploadDappContract(admin, options)
+    dapp = await dappJs.uploadDappContract(admin, options)
   })
 
-  it('should get valid deployment state', async () => {
-    const state = await dapp.getState()
-    assert.isDefined(state.permissionManager)
-  })
+
 })

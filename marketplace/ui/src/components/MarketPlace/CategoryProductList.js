@@ -195,7 +195,7 @@ const CategoryProductList = ({ user }) => {
   return (
     <div>
       <Breadcrumb className="text-xs ml-14 mt-14">
-        <Breadcrumb.Item href="javascript:;">
+      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
             <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
               Home
