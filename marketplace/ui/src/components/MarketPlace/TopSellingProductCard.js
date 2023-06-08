@@ -28,7 +28,7 @@ const TopSellingProductCard = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const [api] = notification.useNotification();
+  const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {

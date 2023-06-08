@@ -14,7 +14,7 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo} from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
