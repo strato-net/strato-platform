@@ -111,11 +111,9 @@ const ConfirmOrder = () => {
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
+  
   useEffect(() => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
-
-  useEffect(() => {
     let cartData = [];
     confirmOrderList.forEach((item) => {
       cartData.push(item);
@@ -137,7 +135,7 @@ const ConfirmOrder = () => {
       sum += item.amount;
     });
     setTotal(sum);
-  }, [marketplaceDispatch, confirmOrderList]);
+  }, [marketplaceDispatch, confirmOrderList, storedData]);
 
   const openToastOrder = (placement) => {
     if (success) {
