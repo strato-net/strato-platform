@@ -72,6 +72,19 @@ export const inventoryArgs = (address, uid) => {
   return args
 }
 
+export const inventoryArgsWithNoSN = (address, uid) => {
+  const quantity = 5
+  const args = {
+    quantity,
+    productAddress: address,
+    pricePerUnit: 20,
+    batchId: `batchId_${uid}`,
+    status: 1,
+    serialNumber: []
+  }
+  return args
+}
+
 export const newInventoryArgs = (address, uid) => {
   const quantity = 2
   const args = {
