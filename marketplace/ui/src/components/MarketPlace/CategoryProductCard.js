@@ -4,6 +4,7 @@ import {
   Typography,
   Button,
   notification,
+  InputNumber,
 } from "antd";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -39,22 +40,6 @@ const CategoryProductCard = ({ product, category }) => {
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
 
-  const subtract = () => {
-    if (qty !== 1) {
-      let value = qty - 1;
-      setQty(value);
-    }
-  };
-
-  const add = () => {
-    if (qty < product.availableQuantity) {
-      let value = qty + 1;
-      setQty(value);
-    } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
-    }
-  };
-
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -83,7 +68,6 @@ const CategoryProductCard = ({ product, category }) => {
     if (!found) {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
-      setQty(1);
       openToast("bottom", false, "Item added to cart");
     } else {
       items = [...cartList];
@@ -107,7 +91,7 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
-
+  console.log(product)
 
   return (
     <div>
@@ -154,8 +138,11 @@ const CategoryProductCard = ({ product, category }) => {
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
             </Title>
-            <Text className="text-primaryB text-base">Quantity</Text>
             <div className="flex items-center my-2" id="prod-quantity">
+            <Text className="text-primaryB text-base">Quantity</Text>
+            <InputNumber className="ml-5" min={1} max={product.availableQuantity} defaultValue={qty} onChange={e => setQty(e)} />
+          </div>
+          {/* <div className="flex items-center my-2" id="prod-quantity">
               <div
                 onClick={subtract}
                 className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
@@ -169,37 +156,37 @@ const CategoryProductCard = ({ product, category }) => {
                 className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
                 <PlusOutlined className="text-xs text-secondryC" />
               </div>
-            </div>
-            <Button
-              className="group w-40 h-9 border border-primary hover:bg-primary"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                }
-              }}            >
-              <div className="text-primary group-hover:text-white">Add To Cart</div>
-            </Button>
-            <Button
-              type="primary"
-              id="buy-now-button"
-              className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                  navigate("/checkout");
-                }
-              }}
-            >
-              Buy Now
-            </Button>
-          </div>
+            </div> */}
+          <Button
+            className="group w-40 h-9 border border-primary hover:bg-primary"
+            onClick={() => {
+              if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                window.location.href = loginUrl;
+              } else {
+                addItemToCart();
+              }
+            }}            >
+            <div className="text-primary group-hover:text-white">Add To Cart</div>
+          </Button>
+          <Button
+            type="primary"
+            id="buy-now-button"
+            className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
+            onClick={() => {
+              if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                window.location.href = loginUrl;
+              } else {
+                addItemToCart();
+                navigate("/checkout");
+              }
+            }}
+          >
+            Buy Now
+          </Button>
         </div>
-      </Card>
     </div>
+      </Card >
+    </div >
   );
 };
 
