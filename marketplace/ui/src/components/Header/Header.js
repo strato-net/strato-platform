@@ -40,30 +40,25 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState()
-  const [pathName, setPathName] = useState("/");
 
 
   const navItems = [
     {
       role: 0,
       items: [
-        { label: 'Marketplace', key: '0' },
-        { label: 'Orders', key: '1' },
-        { label: 'Inventory', key: '2' },
-        { label: 'Products', key: '3' },
-        { label: 'Events', key: '4' },
+        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+        { label: <div id="Orders">Orders</div>, key: '1' },
+        { label: <div id="Inventory">Inventory</div>, key: '2' },
+        { label: <div id="Products">Products</div>, key: '3' },
+        { label: <div id="Events">Events</div>, key: '4' },
       ]
     },
     {
       role: 1,
       items: [
-        { label: 'Marketplace', key: '0' },
+        { label: <div id="Marketplace"></div>, key: '0' },
       ]
     },
-  ];
-
-  const demoMenuItems=[
-    { label: 'Marketplace', key: '0' },
   ];
 
   const navUrls = [
