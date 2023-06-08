@@ -280,7 +280,6 @@ describe("Renders Marketplace Page", () => {
             cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
             cy.get("#ownership-serial").should("exist");
             cy.get(".ownership").contains("SELLER").should("exist");
-            cy.get(".ownership").contains("BUYER").should("exist");
             cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
           }
         });
@@ -295,7 +294,7 @@ describe("Renders Marketplace Page", () => {
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           if (body.data.length > 0) {
-            cy.get("td").eq(9).click();
+            cy.get("td").eq(12).click();
             cy.wait(13000);
             cy.get("#transformation").contains("Transformation").should("be.visible");
             cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");

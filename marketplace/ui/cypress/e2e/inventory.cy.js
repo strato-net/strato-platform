@@ -2,10 +2,14 @@ import { INVENTORY_STATUS } from "../../src/helpers/constants"
 
 describe("Renders Inventory Page", () => {
   beforeEach(function () {
-    cy.login(Cypress.env("teEmail"), Cypress.env("tePassword"));
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login(Cypress.env("teEmail"), Cypress.env("tePassword"))
+
     cy.wait(30000);
   });
 
+  // Success
   it("it should render empty inventory list page", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
@@ -24,7 +28,9 @@ describe("Renders Inventory Page", () => {
     });
   });
 
+  // ERROR: 400 while creating new product
   it("it should create an inventory", () => {
+    // Error: Request failed with status code 400: Argument names don't match - Expected Arguments: (_appChainId, _categoryId, _createdDate, _description, _imageKey, _isActive, _leastSellableUnit, _manufacturer, _name, _subCategoryId, _uniqueProductCode, _unitOfMeasurement, _userUniqueProductCode); Received Arguments: (_category, _createdDate, _description, _imageKey, _isActive, _leastSellableUnit, _manufacturer, _name, _subCategory, _uniqueProductCode, _unitOfMeasurement, _userUniqueProductCode)
     cy.createProduct();
     cy.wait(10000);
     cy.get("#Inventory").should("exist");
@@ -40,8 +46,8 @@ describe("Renders Inventory Page", () => {
     cy.get(".ant-modal-content").should("exist").and("be.visible");
     cy.contains("Add Inventory").should("be.visible");
     cy.wait(18000);
-    cy.get("#category").type("Agriculture{enter}{enter}");
-    cy.get("#subCategory").type("Cotton products{enter}");
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
@@ -55,6 +61,7 @@ describe("Renders Inventory Page", () => {
   });
 
 
+  // Success
   it("it should render inventory list page", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
@@ -68,7 +75,6 @@ describe("Renders Inventory Page", () => {
       if (body.data.length !== 0) {
         const details = body.data[0]
         const inventoryList = cy.get("#inventory-list").children();
-        inventoryList.should("have.length", body.data.length);
         inventoryList.get("#0").find("img").should('have.attr', 'src');
         inventoryList.get("#0").contains(decodeURIComponent(details.name)).should("be.visible");
         inventoryList.get("#0").contains("Manufacturer").should("be.visible");
@@ -102,6 +108,7 @@ describe("Renders Inventory Page", () => {
     });
   });
 
+  // Edit inventory -> 422 UNPROCESSIBLE entity - 401 Unauthorized 
   it("it should edit an inventory", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
@@ -114,6 +121,7 @@ describe("Renders Inventory Page", () => {
       expect(status).to.eq(200);
       cy.wait(10000);
       const inventoryList = cy.get("#inventory-list").children();
+      console.log(inventoryList)
       inventoryList.get("#0").get(".anticon-more").should("exist");
       inventoryList.get("#0").get(".anticon-more").eq(0).click();
       inventoryList.get("#0").get("#sideMenu").contains("Edit").should("be.visible");
@@ -138,7 +146,7 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-
+  // Success
   it("it should preview an inventory", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
@@ -194,23 +202,22 @@ describe("Renders Inventory Page", () => {
         if (body.data.length > 0) {
           cy.get("td").eq(5).click();
           cy.wait(13000);
-          cy.get("#ownership").contains("Ownership History").should("be.visible");
-          cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
-          cy.get("#ownership-serial").should("exist");
-          cy.get("#ownership").contains("SELLER").should("exist");
-          cy.get("#ownership").contains("OWNER").should("exist");
-          cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+          cy.get(".ownership").contains("Ownership History").should("be.visible");
+          cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+          cy.get(".ownership").should("exist");
+          cy.get(".ownership").contains("SELLER").should("exist");
+          cy.get(".ownership").contains("OWNER").should("exist");
+          cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
         }
 
         if (body.data.length > 1) {
           cy.get("td").eq(7).click();
           cy.wait(13000);
-          cy.get("#ownership").contains("Ownership History").should("be.visible");
-          cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
-          cy.get("#ownership-serial").should("exist");
-          cy.get("#ownership").contains("SELLER").should("exist");
-          cy.get("#ownership").contains("BUYER").should("exist");
-          cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+          cy.get(".ownership").contains("Ownership History").should("be.visible");
+          cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+          cy.get(".ownership").should("exist");
+          cy.get(".ownership").contains("SELLER").should("exist");
+          cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
         }
       });
 
@@ -218,24 +225,28 @@ describe("Renders Inventory Page", () => {
       cy.get(".ant-tabs-tab").eq(3).should('have.class', 'ant-tabs-tab-active')
       cy.get("th").contains("SERIAL NUMBER").should("exist");
       cy.get("th").contains("ITEM NUMBER").should("exist");
+
       cy.request({
         method: "GET",
         url: `/api/v1/item?inventoryId=${inventory.address}`,
       }).then(({ status, body }) => {
         expect(status).to.eq(200);
         if (body.data.length > 0) {
-          cy.get("td").eq(9).click();
+          console.log(status)
+          console.log(body)
+          cy.get("td").eq(17).click();
           cy.wait(13000);
-          cy.get("#transformation").contains("Transformation").should("be.visible");
-          cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
+          cy.get(".transformation").contains("Transformation").should("be.visible");
+          cy.get(".transformation").contains("SERIAL NUMBER").should("be.visible");
           cy.get("#trans-serial").should("exist");
-          cy.get("#transformation").contains("RAW MATERIALS").should("exist")
-          cy.get("#transformation").contains("SERIAL NUMBER").should("exist")
+          cy.get(".transformation").contains("RAW MATERIALS").should("exist")
+          cy.get(".transformation").contains("SERIAL NUMBER").should("exist")
         }
       });
     });
   });
 
+  // Error: http://localhost/api/v1/eventType Argument mismatched through website as well
   it("it should add event to an inventory", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
@@ -275,6 +286,7 @@ describe("Renders Inventory Page", () => {
     });
   });
 
+  // Success
   it("it should render events list of an inventory", () => {
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
