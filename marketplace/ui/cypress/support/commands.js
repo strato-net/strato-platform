@@ -83,9 +83,9 @@ Cypress.Commands.add("createProduct", () => {
   cy.get("#add-product-button").should("exist");
   cy.get("#add-product-button").click();
   cy.get("#modal-title").contains("Add Product");
-  cy.get('input[placeholder="Enter Name"]').type("Corn Seeds");
-  cy.get("#category").type("Agriculture{enter}");
-  cy.get("#subCategory").type("Cotton products{enter}");
+  cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${Math.floor(Math.random() * 100)}`);
+  cy.get("#category").type("Art{enter}");
+  cy.get("#subCategory").type("Art{enter}");
   cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
   cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
   cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
@@ -104,39 +104,7 @@ Cypress.Commands.add("checkCategory", () => {
     method: "GET",
     url: "/api/v1/category",
   }).then(({ status, body }) => {
-    const categoryBody = body;
     expect(status).to.eq(200);
-    if (categoryBody.data.length == 0) {
-      cy.request({
-        method: "POST",
-        url: "/api/v1/category",
-        body: { name: "seeds", description: "plant of seeds" },
-      }).then(({ status }) => {
-        expect(status).to.eq(200);
-      });
-    } else {
-      cy.request({
-        method: "GET",
-        url: "/api/v1/subcategory",
-      }).then(({ status, body }) => {
-        const subCategoryBody = body;
-        expect(status).to.eq(200);
-        if (subCategoryBody.data.length == 0) {
-          const address = categoryBody.data[0].address;
-          cy.request({
-            method: "POST",
-            url: "/api/v1/subcategory",
-            body: {
-              categoryAddress: address,
-              name: "pumpkin seeds",
-              description: "seeds of pumpkin",
-            },
-          }).then(({ status }) => {
-            expect(status).to.eq(200);
-          });
-        }
-      });
-    }
   });
 });
 

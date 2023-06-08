@@ -1,6 +1,10 @@
 describe("Renders Products Page", () => {
   beforeEach(function () {
-    cy.login();
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
+    cy.wait(1000);
     cy.checkCategory();
     cy.wait(1000);
     cy.get("#Products").should("exist");
@@ -23,13 +27,15 @@ describe("Renders Products Page", () => {
   });
 
   it("it should add a product", () => {
+    cy.url().should("include", "/products");
     cy.wait(10000);
     cy.get("#add-product-button").should("exist");
     cy.get("#add-product-button").click();
     cy.get("#modal-title").contains("Add Product");
-    cy.get('input[placeholder="Enter Name"]').type("Corn Seeds");
-    cy.get("#category").type("Agriculture{enter}");
-    cy.get("#subCategory").type("Cotton products{enter}");
+
+    cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${Math.floor(Math.random() * 100)}`);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
     cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
     cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
     cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
@@ -65,11 +71,12 @@ describe("Renders Products Page", () => {
         cy.contains("Are you sure you want to delete?").should("be.visible");
         cy.get("#delete-product-yes").should("exist");
         cy.get("#delete-product-yes").click();
-        cy.wait(5000);
+        cy.wait(10000);
         cy.contains("Product has been deleted").should("be.visible");
       }
     });
   });
+  
   it("it should edit a product", () => {
     cy.createProduct();
     cy.wait(10000);
@@ -93,7 +100,7 @@ describe("Renders Products Page", () => {
         );
         cy.get("#update-product-button").should("exist");
         cy.get("#update-product-button").click();
-        cy.wait(5000);
+        cy.wait(10000);
         cy.contains("Product has been updated").should("be.visible");
       }
     });

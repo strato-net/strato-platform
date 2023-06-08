@@ -393,7 +393,7 @@ const ProductDetails = ({ user, users }) => {
 
   const transformationColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px] transformation">SERIAL NUMBER</Text>,
       dataIndex: "serialNumber",
       key: "serialNumber",
       align: "center",
@@ -420,7 +420,7 @@ const ProductDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px] transformation">ITEM NUMBER</Text>,
       dataIndex: "itemNumber",
       key: "itemNumber",
       align: "center",
@@ -769,7 +769,7 @@ const ProductDetails = ({ user, users }) => {
 
           {isTransformationSelected ? (
             <Card className="mb-12 mx-16" id="transformation">
-              <Text className="font-semibold text-lg">Transformation</Text>
+              <Text className="font-semibold text-lg transformation">Transformation</Text>
               <Row className="my-6">
                 <EventDetailsComponent title="SERIAL NUMBER" value={serialNumber} id="trans-serial" />
               </Row>
