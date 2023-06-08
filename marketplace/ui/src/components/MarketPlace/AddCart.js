@@ -4,6 +4,7 @@ import {
   notification,
   Spin,
   Image,
+  InputNumber
 } from "antd";
 import {
   useMarketplaceState,
@@ -177,7 +178,7 @@ const Checkout = ({ user }) => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -188,7 +189,7 @@ const Checkout = ({ user }) => {
       render: (text) => (
         <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
       ),
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -211,170 +212,132 @@ const Checkout = ({ user }) => {
           }
         });
         return (
-          <div className="flex items-center mt-2">
-            <div
-              onClick={() => {
-                if (qty === 1) {
+          <InputNumber min={1} max={product?.availableQuantity} defaultValue={qty} onChange={e => {
+            let items = [...cartList];
+            cartList.forEach((element, index) => {
+              if (element.product.address === product.address) {
+                if (e <= product?.availableQuantity) {
+                  items[index].qty = e;
+                  actions.addItemToCart(marketplaceDispatch, items);
+                } else {
+                  openToast(
+                    "bottom",
+                    true,
+                    "Cannot add more than available quantity"
+                  );
                   return;
                 }
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    if (items[index].qty - 1 <= product.availableQuantity) {
-                      items[index].qty -= 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
-              }}
-              className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-              <MinusOutlined className="text-xs text-secondryD" />
-            </div>
-            <div className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center">
-              {qty}
-            </div>
-            <div
-              onClick={() => {
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    if (items[index].qty + 1 <= product.availableQuantity) {
-                      items[index].qty += 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
-              }}
-              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-              <PlusOutlined className="text-xs text-secondryC" />
-            </div>
-          </div>
+              }
+            });
+          }} />
         );
       },
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
-      dataIndex: "tax",
+{
+  title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+    dataIndex: "tax",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+        render: (text) => <p className="text-center">{text}</p>,
     },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
-      ),
-      dataIndex: "shippingCharges",
+{
+  title: (
+    <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+  ),
+    dataIndex: "shippingCharges",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+        render: (text) => <p className="text-center">{text}</p>,
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
-      dataIndex: "amount",
+{
+  title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+    dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+        render: (text) => <p className="text-center">{text}</p>,
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">ACTION</Text>,
-      dataIndex: "action",
+{
+  title: <Text className="text-primaryC text-[13px]">ACTION</Text>,
+    dataIndex: "action",
       align: "center",
-      render: (text) => (
-        <DeleteOutlined
-          onClick={() => {
-            let items = [...cartList];
-            items.splice(
-              items.findIndex(function (i) {
-                return i.product.address === text;
-              }),
-              1
-            );
-            actions.deleteCartItem(marketplaceDispatch, items);
-          }}
-          className="hover:text-error cursor-pointer text-xl"
-        />
-      ),
+        render: (text) => (
+          <DeleteOutlined
+            onClick={() => {
+              let items = [...cartList];
+              items.splice(
+                items.findIndex(function (i) {
+                  return i.product.address === text;
+                }),
+                1
+              );
+              actions.deleteCartItem(marketplaceDispatch, items);
+            }}
+            className="hover:text-error cursor-pointer text-xl"
+          />
+        ),
     },
   ];
 
 
-  const navigate = useNavigate();
+const navigate = useNavigate();
 
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    cartList.forEach((item) => {
-      orderList.push({ inventoryId: item.product.address, quantity: item.qty });
-    });
-    const body = {
-      buyerOrganization: user.organization,
-      orderList,
-      orderTotal: total + tax + shipping,
-    };
-
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      actions.addItemToCart(marketplaceDispatch, []);
-      setTimeout(function () {
-        navigate(`/marketplace`);
-      }, 2000);
-    }
+const handleOrderConfirm = async () => {
+  handleCancel();
+  let orderList = [];
+  cartList.forEach((item) => {
+    orderList.push({ inventoryId: item.product.address, quantity: item.qty });
+  });
+  const body = {
+    buyerOrganization: user.organization,
+    orderList,
+    orderTotal: total + tax + shipping,
   };
 
+  let isDone = await orderActions.createOrder(orderDispatch, body);
+  if (isDone) {
+    actions.addItemToCart(marketplaceDispatch, []);
+    setTimeout(function () {
+      navigate(`/marketplace`);
+    }, 2000);
+  }
+};
 
-
-
-
-  return (
-    <div className="h-screen mx-14  mt-14">
-      {contextHolder}
-      {isCreateOrderSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting} size="large" />
-        </div>
-      ) : (
-        <div>
-          <Breadcrumb>
-            <Breadcrumb.Item href="javascript:;">
-              <ClickableCell href={routes.Marketplace.url}>
-                Home
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="javascript:;">
-              <p className=" text-primary">
-                Add to Cart
-              </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-          {
-            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
-              <Image src={Images.noProductSymbol} preview={false} />
-              <Title level={3} className="mt-2">
-                No item found
-              </Title>
-            </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
-          }
-        </div>
-      )}
-      <ConfirmOrderModel
-        open={open}
-        handleCancel={handleCancel}
-        handleConfirm={handleOrderConfirm}
-      />
-      {message && openToastOrder("bottom")}
-    </div>
-  );
+return (
+  <div className="h-screen mx-14  mt-14">
+    {contextHolder}
+    {isCreateOrderSubmitting ? (
+      <div className="h-screen flex justify-center items-center">
+        <Spin spinning={isCreateOrderSubmitting} size="large" />
+      </div>
+    ) : (
+      <div>
+        <Breadcrumb>
+          <Breadcrumb.Item href="javascript:;">
+            <ClickableCell href={routes.Marketplace.url}>
+              Home
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item href="javascript:;">
+            <p className=" text-primary">
+              Add to Cart
+            </p>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+        {
+          mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
+            <Image src={Images.noProductSymbol} preview={false} />
+            <Title level={3} className="mt-2">
+              No item found
+            </Title>
+          </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+        }
+      </div>
+    )}
+    <ConfirmOrderModel
+      open={open}
+      handleCancel={handleCancel}
+      handleConfirm={handleOrderConfirm}
+    />
+    {message && openToastOrder("bottom")}
+  </div>
+);
 };
 
 export default Checkout;
