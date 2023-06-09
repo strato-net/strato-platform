@@ -33,3 +33,5 @@ type VaultWrapperAPI = GetPing
 
 
 type VaultCoreAPI =  GetKey :<|> PostKey  :<|> GetSharedKey :<|> GetUsers :<|> PostSignature
+
+-- TODO: ADD IN NEW ENDPOINT FOR CREATING USER FROM CUSTOM UUID
