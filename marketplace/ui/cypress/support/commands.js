@@ -116,8 +116,9 @@ Cypress.Commands.add("createInventory", () => {
   cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
   cy.get(".ant-upload").contains("Upload CSV").should("exist")
   cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
-  cy.wait(10000);
-  cy.get("#product", { timeout: 20000 }).should("be.enabled").type("{enter}{enter}");
+  cy.get("#product", { timeout: 20000 }).should("be.enabled");
+  cy.wait(5000);
+  cy.get("#product", { timeout: 20000 }).type("{enter}{enter}");
   cy.get("button").contains("Create Inventory").should("be.visible");
   cy.get("button").contains("Create Inventory").click();
   cy.contains("Inventory created successfully", { timeout: 30000 }).should("be.visible");

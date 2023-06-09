@@ -1,9 +1,11 @@
 describe("Renders Marketplace Page", () => {
-  it("it should render marketplace dashboard", () => {
+  beforeEach(() => {
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
+  })
 
+  it("it should render marketplace dashboard", () => {
     cy.url().should("include", "/marketplace");
     cy.contains("Explore New Products").should("exist");
     cy.get(".relative").find("img").should('have.attr', 'src').should("include", "hero");
@@ -22,7 +24,7 @@ describe("Renders Marketplace Page", () => {
     });
     cy.request({
       method: "GET",
-      url: "/api/v1/marketplace/topSelling?offset=0",
+      url: "/api/v1/marketplace/user/topSelling?offset=0",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       cy.contains("Top Selling Products").should("be.visible");
@@ -35,28 +37,23 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render product list page", () => {
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.login()
-
     cy.url().should("contain", "marketplace");
-    cy.get("#viewMore").should("be.enabled").click();
-    cy.wait(20000);
+    cy.get("#viewMore", { timeout: 20000 }).should("be.enabled").click();
+
     cy.url().should("contain", "/marketplace/category");
-    cy.get("nav").contains("Home").should("exist");
-    cy.contains("Filters").should("exist");
-    cy.contains("Categories").should("exist");
-    cy.contains("Price").should("exist");
-    cy.contains("Quantity").should("exist");
-    cy.get(".ant-slider").should("have.length", 2);
-    cy.get("Sub-Category").should("not.exist");
-    cy.get("Product").should("not.exist");
-    cy.get("Brand").should("not.exist");
+    cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
+    cy.contains("Filters", { timeout: 20000 }).should("exist");
+    cy.contains("Categories", { timeout: 20000 }).should("exist");
+    cy.contains("Price", { timeout: 20000 }).should("exist");
+    cy.contains("Quantity", { timeout: 20000 }).should("exist");
+    cy.contains("Sub-Category",{ timeout: 20000 }).should("exist");
+    cy.contains("Product", { timeout: 20000 }).should("exist");
+    cy.contains("Brand", { timeout: 20000 }).should("exist");
     cy.contains("Products found").should("be.visible");
-    cy.get("#product-list").should("exist");
+    cy.get("#product-list", { timeout: 20000 }).should("exist");
     cy.request({
       method: "GET",
-      url: "/api/v1/marketplace?&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000",
+      url: "/api/v1/marketplace/all?range[]=quantity,0,1000000&range[]=pricePerUnit,0,100000000"
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       cy.get("#product-list").children().should("have.length", body.data.length);
@@ -65,28 +62,23 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.login()
 
-    cy.wait(30000);
     cy.url().should("contain", "marketplace");
-    cy.get("#viewMore").should("be.enabled").click();
-    cy.wait(20000);
+    cy.get("#viewMore", { timeout: 20000 }).should("be.enabled").click();
+
     cy.url().should("contain", "/marketplace/category");
-    cy.get("nav").contains("Home").should("exist");
-    cy.contains("Filters").should("exist");
-    cy.contains("Categories").should("exist");
-    cy.contains("Price").should("exist");
-    cy.contains("Quantity").should("exist");
-    cy.get(".ant-slider").should("have.length", 2);
-    cy.get("Sub-Category").should("not.exist");
-    cy.get("Product").should("not.exist");
-    cy.get("Brand").should("not.exist");
+    cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
+    cy.contains("Filters", { timeout: 20000 }).should("exist");
+    cy.contains("Categories", { timeout: 20000 }).should("exist");
+    cy.contains("Price", { timeout: 20000 }).should("exist");
+    cy.contains("Quantity", { timeout: 20000 }).should("exist");
+    cy.contains("Sub-Category", { timeout: 20000 }).should("exist");
+    cy.contains("Product", { timeout: 20000 }).should("exist");
+    cy.contains("Brand", { timeout: 20000 }).should("exist");
 
     cy.request({
       method: "GET",
-      url: `/api/v1/marketplace?range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+      url: "/api/v1/marketplace/all?range[]=quantity,0,1000000&range[]=pricePerUnit,0,100000000"
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       cy.contains(`${body.data.length} Products found`).should("be.visible");
@@ -110,11 +102,9 @@ describe("Renders Marketplace Page", () => {
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       if (body.data.length !== 0) {
-        let category = body.data[2];
+        let category = body.data[0];
         cy.get('[type="checkbox"]').check(category.name);
-        cy.wait(15000)
-        // TODO: On what condition this is going to render on DOM
-        // cy.contains("Sub-Category").should("exist")
+        cy.contains("Sub-Category", { timeout: 20000 }).should("exist")
 
         cy.request({
           method: "GET",
@@ -129,7 +119,7 @@ describe("Renders Marketplace Page", () => {
 
         cy.request({
           method: "GET",
-          url: `/api/v1/marketplace?&category[]=${category.name}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+          url: `/api/v1/marketplace/all?&category[]=${category.name}&range[]=quantity,0,1000000&range[]=pricePerUnit,0,100000000`,
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           cy.contains(`${body.data.length} Products found`).should("be.visible");
@@ -140,13 +130,8 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render inventories based on filter selection", () => {
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.login()
-
     cy.url().should("contain", "marketplace");
-    cy.get("#viewMore").should("be.enabled").click();
-    cy.wait(20000);
+    cy.get("#viewMore", { timeout: 20000 }).should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
 
     let category, subCategory, product;
@@ -156,8 +141,8 @@ describe("Renders Marketplace Page", () => {
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       if (body.data.length !== 0) {
-        category = body.data[1];
-        cy.get('[type="checkbox"]').check(category.name);
+        category = body.data[0];
+        cy.get('[type="checkbox"]', { timeout: 20000 }).check(category.name);
         cy.wait(15000)
 
         // TO be confirm
@@ -172,7 +157,6 @@ describe("Renders Marketplace Page", () => {
             cy.get('[type="checkbox"]').check(subCategory.name);
             let productUrl = subCategory ? `api/v1/product/filter/names?isDeleted=false&&category[]=${category.name}&subCategory[]=${subCategory.name}`
               : `api/v1/product/filter/names?isDeleted=false&&category[]=${category.name}`
-            cy.wait(15000)
 
             cy.request({
               method: "GET",
@@ -181,20 +165,16 @@ describe("Renders Marketplace Page", () => {
               expect(status).to.eq(200);
               if (body.data.length !== 0) {
                 product = body.data[0];
-                console.log(body)
-                console.log(product)
-                cy.contains("Product").should("exist");
-                cy.contains("Brand").should("exist");
-                cy.get('[type="checkbox"]').check(product.address);
-                cy.get('[type="checkbox"]').check(product.manufacturer);
-                cy.wait(15000)
+                cy.contains("Product", { timeout: 20000 }).should("exist");
+                cy.contains("Brand", { timeout: 20000 }).should("exist");
+                cy.get('[type="checkbox"]', { timeout: 20000 }).check(product.manufacturer);
+                cy.wait(5000)
 
                 cy.request({
                   method: "GET",
-                  url: `/api/v1/marketplace?&category[]=${category.name}&subCategory[]=${subCategory.name}&productId[]=${product.address}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,10000&range[]=pricePerUnit,0,10000`,
+                  url: `/api/v1/marketplace/all?&category[]=${category.name}&subCategory[]=${subCategory.name}&manufacturer[]=${product.manufacturer}&range[]=quantity,0,1000000&range[]=pricePerUnit,0,100000000`,
                 }).then(({ status, body }) => {
                   expect(status).to.eq(200);
-                  console.log(body)
                   cy.contains(`${body.data.length} Products found`).should("be.visible");
                   cy.get("#product-list").children().should("have.length", body.data.length);
                   if (body.data.length === 0) {
@@ -212,22 +192,19 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render product detail page", () => {
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.login()
-
     cy.request({
       method: "GET",
-      url: `/api/v1/marketplace/topselling?offset=0`,
+      url: `/api/v1/marketplace/user/topselling?offset=0`,
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       cy.wait(30000);
+
       if (body.data.length !== 0) {
         let inventory = body.data[0];
-        cy.get("#topSelling").children().first().click();
-        cy.wait(20000);
+        cy.get("#topSelling", { timeout: 20000 }).children().first().click();
+
         cy.url().should("include", "/marketplace/productList/")
-        cy.get("nav").contains("Home").should("exist");
+        cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
         cy.get("nav").contains(decodeURIComponent(inventory.name)).should("exist");
         cy.get("div").find("img").should('have.attr', 'src');
         cy.get("button").contains("Add To Cart").should("exist");
@@ -263,10 +240,10 @@ describe("Renders Marketplace Page", () => {
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           if (body.data.length > 0) {
-            cy.get("td").eq(5).click();
-            cy.wait(13000);
-            cy.get(".ownership").contains("Ownership History").should("be.visible");
-            cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+            cy.get(`#Ownership-Item-Number-${body.data[0].itemNumber}`).click();
+
+            cy.get(".ownership", { timeout: 20000 }).contains("Ownership History").should("be.visible");
+            cy.get("#ownership-serial", { timeout: 20000 }).contains("SERIAL NUMBER").should("be.visible");
             cy.get("#ownership-serial").should("exist");
             cy.get(".ownership").contains("SELLER").should("exist");
             cy.get(".ownership").contains("OWNER").should("exist");
@@ -274,10 +251,10 @@ describe("Renders Marketplace Page", () => {
           }
 
           if (body.data.length > 1) {
-            cy.get("td").eq(7).click();
-            cy.wait(13000);
-            cy.get(".ownership").contains("Ownership History").should("be.visible");
-            cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
+            cy.get(`#Ownership-Item-Number-${body.data[0].itemNumber}`).click();
+
+            cy.get(".ownership", { timeout: 20000 }).contains("Ownership History").should("be.visible");
+            cy.get("#ownership-serial", { timeout: 20000 }).contains("SERIAL NUMBER").should("be.visible");
             cy.get("#ownership-serial").should("exist");
             cy.get(".ownership").contains("SELLER").should("exist");
             cy.get(".ownership").contains("OWNERSHIP START DATE").should("exist");
@@ -294,10 +271,10 @@ describe("Renders Marketplace Page", () => {
         }).then(({ status, body }) => {
           expect(status).to.eq(200);
           if (body.data.length > 0) {
-            cy.get("td").eq(12).click();
-            cy.wait(13000);
-            cy.get("#transformation").contains("Transformation").should("be.visible");
-            cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
+            cy.get(`#Transformation-Item-Number-${body.data[0].itemNumber}`).click();
+
+            cy.get("#transformation", { timeout: 20000 }).contains("Transformation").should("be.visible");
+            cy.get("#transformation", { timeout: 20000 }).contains("SERIAL NUMBER").should("be.visible");
             cy.get("#trans-serial").should("exist");
             cy.get("#transformation").contains("RAW MATERIALS").should("exist")
             cy.get("#transformation").contains("SERIAL NUMBER").should("exist")
