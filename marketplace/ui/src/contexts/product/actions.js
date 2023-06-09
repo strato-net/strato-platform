@@ -27,6 +27,9 @@ const actionDescriptors = {
   updateProduct: "update_product",
   updateProductSuccessful: "update_product_successful",
   updateProductFailed: "update_product_failed",
+  deleteImage: "delete_image",
+  deleteImageSuccessful: "delete_image_successful",
+  deleteImageFailed: "delete_image_failed",
   deleteProduct: "delete_product",
   deleteProductSuccessful: "delete_product_successful",
   deleteProductFailed: "delete_product_failed",
@@ -395,6 +398,45 @@ const actions = {
     }
   },
 
+  deleteImage: async (dispatch, fileKey) => {
+    dispatch({ type: actionDescriptors.deleteImage });
+  
+    try {
+      const response = await fetch(`${apiUrl}/Image/delete/${fileKey}`, {
+        method: HTTP_METHODS.PUT,
+        body: '',
+      });
+  
+      const body = await response.json();
+  
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.deleteImageSuccessful,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, "Image deleted successfully", true);
+        return true;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.deleteImageFailed,
+          error: "Image delete failed",
+        });
+        return false;
+      }
+  
+      dispatch({
+        type: actionDescriptors.deleteImageFailed,
+        error: body.error,
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.deleteImageFailed,
+        error: "Image delete failed",
+      });
+    }
+  },
+  
   fetchProductsForFilter: async (dispatch, categorys, subCategorys) => {
     dispatch({ type: actionDescriptors.fetchProductsForFilter });
 

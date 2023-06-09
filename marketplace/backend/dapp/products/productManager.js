@@ -180,7 +180,7 @@ async function updateProduct(admin, contract, _args, baseOptions) {
     history: [contractName],
   };
 
-  const [restStatus, ProductAddress] = await rest.call(
+  const [restStatus] = await rest.call(
     admin,
     callArgs,
     options
@@ -189,7 +189,7 @@ async function updateProduct(admin, contract, _args, baseOptions) {
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
 
-  return [restStatus, ProductAddress];
+  return [restStatus];
 }
 
 /**

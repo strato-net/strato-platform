@@ -112,7 +112,8 @@ export const Event = {
 export const Image = {
   prefix: '/image',
   upload: '/',
-  update: '/:fileKey'
+  update: '/:fileKey',
+  delete: '/delete/:fileKey',
 }
 
 export const Marketplace = {

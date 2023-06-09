@@ -119,6 +119,8 @@ const UpdateProductModal = ({
       let isDone = await actions.updateProduct(dispatch, body);
 
       if (isDone) {
+        // Deletes the previous image if the image was changed successfully
+        const deleteImage = await actions.deleteImage(dispatch, productToUpdate.imageKey);
         actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
         handleCancel();
       }

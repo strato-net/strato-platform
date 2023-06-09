@@ -24,6 +24,13 @@ router.put(
   ImageController.updateImage
 );
 
+router.put(
+  Image.delete,
+  fileUploader.single(constants.fileUploadFieldName),
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ImageController.deleteImage
+);
 
 
 
