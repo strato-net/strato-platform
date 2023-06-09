@@ -56,6 +56,9 @@ const Checkout = ({ user }) => {
   
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
+  }, [marketplaceDispatch, storedData]);
+  
+  useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerOrganization;
@@ -111,7 +114,7 @@ const Checkout = ({ user }) => {
       sum += item.product.pricePerUnit * item.qty;
     });
     setTotal(sum);
-  }, [marketplaceDispatch, storedData, cartList]);
+  }, [marketplaceDispatch, cartList]);
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
