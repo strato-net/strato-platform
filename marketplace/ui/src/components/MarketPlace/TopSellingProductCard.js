@@ -147,11 +147,11 @@ const TopSellingProductCard = () => {
                         width={230}
                         preview={false}
                         onClick={() =>
-                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`)
                         }
                       />
                       <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`)
                       }>
                         {decodeURIComponent(topSellingProduct.name)}
                       </Text>

@@ -50,7 +50,17 @@ import { useAuthenticateState } from "../../contexts/authentication";
 
 const ProductDetails = ({ user, users }) => {
   const { state } = useLocation();
-  const { isCalledFromInventory } = state;
+  console.log("user: ", user)
+  // if (user !== undefined || user !== null){
+  //   window.localStorage.setItem("userOrg", JSON.stringify(user.organization));
+  // }
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  console.log("hasChecked: ", hasChecked)
+  console.log("isAuthenticated: ", isAuthenticated)
+  console.log("loginUrl: ", loginUrl)
+  let isCalledFromInventory = window.location.href.includes("inventories");
+
+  const [userOrg, setUserOrg] = useState(user ? user.organization : null);
   const [eventList, setEventList] = useState([])
   const [eventDetailList, setEventDetailList] = useState([])
   const [Id, setId] = useState(undefined);
@@ -63,7 +73,7 @@ const ProductDetails = ({ user, users }) => {
     useEventState();
   const eventDispatch = useEventDispatch();
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  // let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
     if(user) {
@@ -93,6 +103,21 @@ const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { categorys, iscategorysLoading } = useCategoryState();
   const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+  const [productOrg, setProductOrg] = useState(inventoryDetails ? inventoryDetails.ownerOrganization : null);
+  console.log("inventoryDetails: ", inventoryDetails)
+  if (isCalledFromInventory){
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      window.location.href = loginUrl;
+    }
+    console.log("userOrg: ", userOrg)
+    console.log("productOrg: ", productOrg) 
+    if (userOrg !== null && productOrg !== null){
+      if (userOrg !== productOrg){
+        console.log("Thou shall not pass!!!")
+      }
+    }
+
+  };
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -124,6 +149,7 @@ const ProductDetails = ({ user, users }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
+    setUserOrg(user ? user.organization : null);
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
       if(user)  {
@@ -139,6 +165,7 @@ const ProductDetails = ({ user, users }) => {
   const details = inventoryDetails;
 
   useEffect(() => {
+    setProductOrg(details ? details.ownerOrganization : null);
     if (categorys.length && details) {
       const prodCategory = categorys.find(
         (c) => c.name === details.category
