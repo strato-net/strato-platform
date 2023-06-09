@@ -49,7 +49,7 @@ describe("Renders Inventory Page", () => {
     cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
-    cy.contains("Inventory created successfully", {timeout: 30000}).should("be.visible");
+    cy.contains("Inventory created successfully", { timeout: 30000 }).should("be.visible");
   });
 
   it("it should create an inventory without serial number", () => {
@@ -75,7 +75,7 @@ describe("Renders Inventory Page", () => {
     cy.get(".ant-upload").contains("Upload CSV").should("exist")
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
-    cy.contains("Inventory created successfully", {timeout: 30000}).should("be.visible");
+    cy.contains("Inventory created successfully", { timeout: 30000 }).should("be.visible");
   });
 
 
@@ -142,7 +142,7 @@ describe("Renders Inventory Page", () => {
       inventoryList.get("#0").get("#sideMenu").contains("Edit").click();
       cy.get(".ant-modal-content").should("exist");
       cy.contains("Edit Inventory").should("be.visible");
-      
+
       cy.get("#category", { timeout: 20000 }).should("be.disabled");
       cy.get("#subCategory").should("be.disabled");
       cy.get("#product").should("be.disabled");
@@ -154,8 +154,8 @@ describe("Renders Inventory Page", () => {
       cy.get("button").should("be.enabled").contains("Update Inventory");
       cy.get('[value="false"]').check();
       cy.get("button").contains("Update Inventory").click();
-      cy.contains("Inventory has been updated", {timeout: 30000}).should("be.visible");
-      
+      cy.contains("Inventory has been updated", { timeout: 30000 }).should("be.visible");
+
       cy.get("#inventory-list", { timeout: 10000 }).children().first().contains("Unpublished").should("be.visible");
     });
   });
@@ -173,7 +173,7 @@ describe("Renders Inventory Page", () => {
 
       cy.get("#inventory-list", { timeout: 30000 }).children().get("#0").get("button").contains("Preview").should("exist");
       cy.get("#inventory-list").children().get("#0").get("button").contains("Preview").click();
-      
+
       cy.url().should("include", "/inventories")
       cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
       cy.get("nav").contains(decodeURIComponent(inventory.name)).should("exist");
@@ -222,7 +222,7 @@ describe("Renders Inventory Page", () => {
 
         if (body.data.length > 1) {
           cy.get(`#Ownership-Item-Number-${body.data[0].itemNumber}`).click();
-          
+
           cy.get(".ownership", { timeout: 13000 }).contains("Ownership History").should("be.visible");
           cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
           cy.get(".ownership").should("exist");
@@ -243,7 +243,7 @@ describe("Renders Inventory Page", () => {
         expect(status).to.eq(200);
         if (body.data.length > 0) {
           cy.get(`#Transformation-Item-Number-${body.data[0].itemNumber}`).click();
-          
+
           cy.get(".transformation", { timeout: 13000 }).contains("Transformation").should("be.visible");
           cy.get(".transformation").contains("SERIAL NUMBER").should("be.visible");
           cy.get("#trans-serial").should("exist");
@@ -254,44 +254,34 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-  // it.only("it should add event to an inventory", () => {
-  //   cy.get("#Inventory", { timeout: 20000 }).should("exist");
-  //   cy.get("#Inventory").click();
-  //   cy.url().should("include", "/inventories");
+  it("it should add event to an inventory", () => {
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
 
-  //   cy.request({
-  //     method: "GET",
-  //     url: "/api/v1/inventory",
-  //   }).then(({ status, body }) => {
-  //     expect(status).to.eq(200);
-  //     const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
-  //     inventoryList.get("#0").get(".anticon-more").should("exist");
-  //     inventoryList.get("#0").get(".anticon-more").eq(0).click();
-  //     cy.request({
-  //       method: "POST",
-  //       url: "/api/v1/eventType",
-  //       body: {
-  //         "name": "E1",
-  //         "description": "new%20event%20type%20"
-  //       }
-  //     }).then(({ status, body }) => {
-  //       inventoryList.get("#0").get("#sideMenu").contains("Add Event").should("be.visible");
-  //       inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
-  //       cy.get(".ant-modal-content").should("exist");
-  //       cy.contains("Add Event").should("be.visible");
-  //       cy.wait(30000);
-  //       cy.get("#eventType").type("{enter}{enter}");
-  //       cy.get("#certifier").type("Achin Kumar{enter}{enter}");
-  //       cy.get('input[type="file"]').selectFile('cypress/fixtures/sample_1.csv', { force: true })
-  //       cy.get('textarea').eq(0).type("summary");
-  //       cy.get('.ant-picker-input').type("04/05/2023{enter}");
-  //       cy.get("button").contains("Add Event").should("be.visible");
-  //       cy.get("button").contains("Add Event").click();
-  //       cy.contains("Event created successfully", {timeout: 20000}).should("be.visible");
-  //     });
-    
-  //   });
-  // });
+    cy.request({
+      method: "GET",
+      url: "/api/v1/inventory",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
+      inventoryList.get("#0").get(".anticon-more").should("exist");
+      inventoryList.get("#0").get(".anticon-more").eq(0).click();
+      inventoryList.get("#0").get("#sideMenu").contains("Add Event").should("be.visible");
+      inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
+      cy.get(".ant-modal-content").should("exist");
+      cy.contains("Add Event").should("be.visible");
+      cy.wait(30000);
+      cy.get("#eventType").type("{enter}{enter}");
+      cy.get("#certifier").type("Achin Kumar{enter}{enter}");
+      cy.get('textarea').eq(0).type("summary");
+      cy.get('.ant-picker-input').type("04/05/2023{enter}");
+      cy.get("button").contains("Add Event").should("be.visible");
+      cy.get("button").contains("Add Event").click();
+      cy.contains("Event created successfully", { timeout: 20000 }).should("be.visible");
+
+    });
+  });
 
   it("it should render events list of an inventory", () => {
     cy.get("#Inventory", { timeout: 20000 }).should("exist");
@@ -303,7 +293,7 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      
+
       const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
       inventoryList.get("#0").get(".anticon-more").should("exist");
       inventoryList.get("#0").get(".anticon-more").eq(0).click();
