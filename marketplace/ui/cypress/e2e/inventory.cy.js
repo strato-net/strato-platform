@@ -4,14 +4,11 @@ describe("Renders Inventory Page", () => {
   beforeEach(function () {
     cy.visit('/')
     cy.get("#Login").click();
-    cy.login(Cypress.env("teEmail"), Cypress.env("tePassword"))
-
-    cy.wait(30000);
+    cy.login()
   });
 
-  // Success
   it("it should render empty inventory list page", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
@@ -19,7 +16,6 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(15000);
       if (body.data.length == 0) {
         cy.contains("No inventory found").should("be.visible");
         cy.contains("Start adding your inventory").should("be.visible");
@@ -28,25 +24,19 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-  // ERROR: 400 while creating new product
   it("it should create an inventory", () => {
-    // Error: Request failed with status code 400: Argument names don't match - Expected Arguments: (_appChainId, _categoryId, _createdDate, _description, _imageKey, _isActive, _leastSellableUnit, _manufacturer, _name, _subCategoryId, _uniqueProductCode, _unitOfMeasurement, _userUniqueProductCode); Received Arguments: (_category, _createdDate, _description, _imageKey, _isActive, _leastSellableUnit, _manufacturer, _name, _subCategory, _uniqueProductCode, _unitOfMeasurement, _userUniqueProductCode)
     cy.createProduct();
-    cy.wait(10000);
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
-    cy.wait(20000);
     cy.url().should("include", "/inventories");
-    cy.get("button").contains("Add Inventory").should("exist");
+    cy.get("button", { timeout: 20000 }).contains("Add Inventory").should("exist");
     cy.get("button").contains("Add Inventory").click();
-    cy.wait(2000);
-    cy.get(".ant-modal-content").should("exist").and("be.visible");
+    cy.get(".ant-modal-content", { timeout: 20000 }).should("exist").and("be.visible");
     cy.contains("Add Inventory").should("be.visible");
-    cy.wait(18000);
-    cy.get("#category").type("Art{enter}");
+    cy.get("#category", { timeout: 20000 }).type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
@@ -54,16 +44,40 @@ describe("Renders Inventory Page", () => {
     cy.get(".ant-upload").contains("Upload CSV").should("exist")
     cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
     cy.wait(10000);
-    cy.get("#product").should("be.enabled").type("{enter}{enter}");
+    cy.get("#product", { timeout: 20000 }).should("be.enabled").type("{enter}{enter}");
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
-    cy.contains("Inventory created successfully", {timeout: 25000}).should("be.visible");
+    cy.contains("Inventory created successfully", {timeout: 30000}).should("be.visible");
+  });
+
+  it("it should create an inventory without serial number", () => {
+    cy.createProduct();
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("button", { timeout: 20000 }).contains("Add Inventory").should("exist");
+    cy.get("button").contains("Add Inventory").click();
+    cy.get(".ant-modal-content", { timeout: 20000 }).should("exist").and("be.visible");
+    cy.contains("Add Inventory").should("be.visible");
+    cy.get("#category", { timeout: 20000 }).type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Quantity"]').type("1");
+    cy.get('input[placeholder="Enter Price"]').type("1000");
+    cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+    cy.get(".ant-upload").contains("Upload CSV").should("exist")
+    cy.wait(10000);
+    cy.get("#product", { timeout: 20000 }).should("be.enabled").type("{enter}{enter}");
+    cy.get("button").contains("Create Inventory").should("be.visible");
+    cy.get("button").contains("Create Inventory").click();
+    cy.contains("Inventory created successfully", {timeout: 30000}).should("be.visible");
   });
 
 
-  // Success
   it("it should render inventory list page", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
@@ -71,10 +85,9 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(15000);
       if (body.data.length !== 0) {
         const details = body.data[0]
-        const inventoryList = cy.get("#inventory-list").children();
+        const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
         inventoryList.get("#0").find("img").should('have.attr', 'src');
         inventoryList.get("#0").contains(decodeURIComponent(details.name)).should("be.visible");
         inventoryList.get("#0").contains("Manufacturer").should("be.visible");
@@ -108,9 +121,8 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-  // Edit inventory -> 422 UNPROCESSIBLE entity - 401 Unauthorized 
   it("it should edit an inventory", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
 
@@ -119,8 +131,7 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(10000);
-      const inventoryList = cy.get("#inventory-list").children();
+      const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
       console.log(inventoryList)
       inventoryList.get("#0").get(".anticon-more").should("exist");
       inventoryList.get("#0").get(".anticon-more").eq(0).click();
@@ -128,8 +139,8 @@ describe("Renders Inventory Page", () => {
       inventoryList.get("#0").get("#sideMenu").contains("Edit").click();
       cy.get(".ant-modal-content").should("exist");
       cy.contains("Edit Inventory").should("be.visible");
-      cy.wait(10000);
-      cy.get("#category").should("be.disabled");
+      
+      cy.get("#category", { timeout: 20000 }).should("be.disabled");
       cy.get("#subCategory").should("be.disabled");
       cy.get("#product").should("be.disabled");
       cy.get('input[name="quantity"]').should("be.disabled");
@@ -141,14 +152,13 @@ describe("Renders Inventory Page", () => {
       cy.get('[value="false"]').check();
       cy.get("button").contains("Update Inventory").click();
       cy.contains("Inventory has been updated", {timeout: 30000}).should("be.visible");
-      cy.wait(10000)
-      cy.get("#inventory-list").children().first().contains("Unpublished").should("be.visible");
+      
+      cy.get("#inventory-list", { timeout: 10000 }).children().first().contains("Unpublished").should("be.visible");
     });
   });
 
-  // Success
   it("it should preview an inventory", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 30000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
@@ -157,14 +167,12 @@ describe("Renders Inventory Page", () => {
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
       let inventory = body.data[0];
-      cy.wait(15000);
-      cy.get("#inventory-list").children().get("#0").get("button").contains("Preview").should("exist");
-      cy.get("#inventory-list").children().get("#0").get("button").contains("Preview").click();
-      cy.wait(20000);
 
+      cy.get("#inventory-list", { timeout: 30000 }).children().get("#0").get("button").contains("Preview").should("exist");
+      cy.get("#inventory-list").children().get("#0").get("button").contains("Preview").click();
+      
       cy.url().should("include", "/inventories")
-      cy.wait(20000);
-      cy.get("nav").contains("Home").should("exist");
+      cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
       cy.get("nav").contains(decodeURIComponent(inventory.name)).should("exist");
       cy.get("div").find("img").should('have.attr', 'src');
       cy.get("#addToCart").should("exist").and("be.disabled");
@@ -200,9 +208,8 @@ describe("Renders Inventory Page", () => {
       }).then(({ status, body }) => {
         expect(status).to.eq(200);
         if (body.data.length > 0) {
-          cy.get("td").eq(5).click();
-          cy.wait(13000);
-          cy.get(".ownership").contains("Ownership History").should("be.visible");
+          cy.get(`#Ownership-Item-Number-${body.data[0].itemNumber}`).click();
+          cy.get(".ownership", { timeout: 13000 }).contains("Ownership History").should("be.visible");
           cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
           cy.get(".ownership").should("exist");
           cy.get(".ownership").contains("SELLER").should("exist");
@@ -211,9 +218,8 @@ describe("Renders Inventory Page", () => {
         }
 
         if (body.data.length > 1) {
-          cy.get("td").eq(7).click();
-          cy.wait(13000);
-          cy.get(".ownership").contains("Ownership History").should("be.visible");
+          cy.get(`#Item-Number-${body.data[0].itemNumber}`).click();
+          cy.get(".ownership", { timeout: 13000 }).contains("Ownership History").should("be.visible");
           cy.get("#ownership-serial").contains("SERIAL NUMBER").should("be.visible");
           cy.get(".ownership").should("exist");
           cy.get(".ownership").contains("SELLER").should("exist");
@@ -232,9 +238,9 @@ describe("Renders Inventory Page", () => {
       }).then(({ status, body }) => {
         expect(status).to.eq(200);
         if (body.data.length > 0) {
-          cy.get("td").eq(17).click();
-          cy.wait(13000);
-          cy.get(".transformation").contains("Transformation").should("be.visible");
+          cy.get(`#Transformation-Item-Number-${body.data[0].itemNumber}`).click();
+          
+          cy.get(".transformation", { timeout: 13000 }).contains("Transformation").should("be.visible");
           cy.get(".transformation").contains("SERIAL NUMBER").should("be.visible");
           cy.get("#trans-serial").should("exist");
           cy.get(".transformation").contains("RAW MATERIALS").should("exist")
@@ -244,9 +250,8 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-  // Error: http://localhost/api/v1/eventType Argument mismatched through website as well
   it("it should add event to an inventory", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
 
@@ -255,8 +260,7 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(15000);
-      const inventoryList = cy.get("#inventory-list").children();
+      const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
       inventoryList.get("#0").get(".anticon-more").should("exist");
       inventoryList.get("#0").get(".anticon-more").eq(0).click();
       cy.request({
@@ -271,22 +275,21 @@ describe("Renders Inventory Page", () => {
         inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
         cy.get(".ant-modal-content").should("exist");
         cy.contains("Add Event").should("be.visible");
-        cy.wait(20000);
-        cy.get("#eventType").type("{enter}{enter}");
-        cy.get("#certifier").type("Achin Kumar{enter}{enter}");
+        cy.wait(10000);
         cy.get('textarea').eq(0).type("summary");
         cy.get('.ant-picker-input').type("04/05/2023{enter}");
+        cy.get("#eventType").type("{enter}{enter}");
+        cy.get("#certifier").type("Achin Kumar{enter}{enter}");
         cy.get("button").contains("Add Event").should("be.visible");
         cy.get("button").contains("Add Event").click();
-        cy.contains("Event created successfully", {timeout: 25000}).should("be.visible");
+        cy.contains("Event created successfully", {timeout: 20000}).should("be.visible");
       });
     
     });
   });
 
-  // Success
   it("it should render events list of an inventory", () => {
-    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory", { timeout: 20000 }).should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
 
@@ -295,14 +298,14 @@ describe("Renders Inventory Page", () => {
       url: "/api/v1/inventory",
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(15000);
-      const inventoryList = cy.get("#inventory-list").children();
+      // cy.wait(15000);
+      const inventoryList = cy.get("#inventory-list", { timeout: 20000 }).children();
       inventoryList.get("#0").get(".anticon-more").should("exist");
       inventoryList.get("#0").get(".anticon-more").eq(0).click();
       inventoryList.get("#0").get("#sideMenu").contains("View Event").should("be.visible");
       inventoryList.get("#0").get("#sideMenu").contains("View Event").click();
-      cy.wait(15000);
-      cy.get("nav").contains("Home").should("exist");
+      // cy.wait(15000);
+      cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
       cy.get("nav").contains("Inventory").should("exist");
       cy.get("nav").contains("Events").should("exist");
       cy.get("th").contains("NAME").should("be.visible");

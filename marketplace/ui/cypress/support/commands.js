@@ -1,5 +1,5 @@
 import "cypress-file-upload";
-import {productData, inventoryData} from '../fixtures/data.js'
+import { productData, inventoryData } from '../fixtures/data.js'
 
 
 // ***********************************************
@@ -34,17 +34,17 @@ Cypress.on(
 
 
 Cypress.on('uncaught:exception', (err) => {
-    /* returning false here prevents Cypress from failing the test */
-    if (err.message.includes("ResizeObserver loop limit exceeded")) {
-        return false
-    }
+  /* returning false here prevents Cypress from failing the test */
+  if (err.message.includes("ResizeObserver loop limit exceeded")) {
+    return false
+  }
 })
 
 Cypress.Commands.add("login", (username, password) => {
-  let un = username ? username :  Cypress.env("email");
-  let pwd = password ? password :  Cypress.env("password")
+  let un = username ? username : Cypress.env("email");
+  let pwd = password ? password : Cypress.env("password")
 
-  cy.origin(Cypress.env("login_url"), {args: {un, pwd}}, ({un, pwd}) => {
+  cy.origin(Cypress.env("login_url"), { args: { un, pwd } }, ({ un, pwd }) => {
     cy.get("input[name=username]", { timeout: 10000 }).type(
       un
     );
@@ -76,11 +76,10 @@ Cypress.Commands.add("loginAsCertifier", () => {
 });
 
 Cypress.Commands.add("createProduct", () => {
-  cy.get("#Products").should("exist");
+  cy.get("#Products", { timeout: 20000 }).should("exist");
   cy.get("#Products").click();
   cy.url().should("include", "/products");
-  cy.wait(20000);
-  cy.get("#add-product-button").should("exist");
+  cy.get("#add-product-button", { timeout: 20000 }).should("exist");
   cy.get("#add-product-button").click();
   cy.get("#modal-title").contains("Add Product");
   cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${Math.floor(Math.random() * 100)}`);
@@ -96,8 +95,33 @@ Cypress.Commands.add("createProduct", () => {
   cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
   cy.get("#create-product-button").should("exist");
   cy.get("#create-product-button").click();
-  cy.contains("Product created successfully", {timeout: 25000}).should("be.visible");
+  cy.contains("Product created successfully", { timeout: 25000 }).should("be.visible");
 });
+
+Cypress.Commands.add("createInventory", () => {
+  cy.get("#Inventory", { timeout: 20000 }).should("exist");
+  cy.get("#Inventory").click();
+  cy.url().should("include", "/inventories");
+  cy.get("#Inventory").should("exist");
+  cy.get("#Inventory").click();
+  cy.url().should("include", "/inventories");
+  cy.get("button", { timeout: 20000 }).contains("Add Inventory").should("exist");
+  cy.get("button").contains("Add Inventory").click();
+  cy.get(".ant-modal-content", { timeout: 20000 }).should("exist").and("be.visible");
+  cy.contains("Add Inventory").should("be.visible");
+  cy.get("#category", { timeout: 20000 }).type("Art{enter}");
+  cy.get("#subCategory").type("Art{enter}");
+  cy.get('input[placeholder="Enter Quantity"]').type("1");
+  cy.get('input[placeholder="Enter Price"]').type("1000");
+  cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+  cy.get(".ant-upload").contains("Upload CSV").should("exist")
+  cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
+  cy.wait(10000);
+  cy.get("#product", { timeout: 20000 }).should("be.enabled").type("{enter}{enter}");
+  cy.get("button").contains("Create Inventory").should("be.visible");
+  cy.get("button").contains("Create Inventory").click();
+  cy.contains("Inventory created successfully", { timeout: 30000 }).should("be.visible");
+})
 
 Cypress.Commands.add("checkCategory", () => {
   cy.request({

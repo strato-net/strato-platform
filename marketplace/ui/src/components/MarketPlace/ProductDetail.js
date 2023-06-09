@@ -309,7 +309,7 @@ const ProductDetails = ({ user, users }) => {
         };
       },
       render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
+        <Button type="link" className="text-primary text-[17px]" id={`Ownership-Item-Number-${serialNumber}`}>
           {serialNumber}
         </Button>
       ),
@@ -440,9 +440,7 @@ const ProductDetails = ({ user, users }) => {
         <Button
           type="link"
           className="text-primary text-[17px]"
-          onClick={() => {
-
-          }}
+          id={`Transformation-Item-Number-${text}`}
         >
           {text}
         </Button>
