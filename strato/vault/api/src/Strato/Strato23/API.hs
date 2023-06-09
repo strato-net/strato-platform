@@ -30,6 +30,7 @@ type VaultWrapperAPI = GetPing
                   :<|> PostSignature'
                   :<|> PostPassword
                   :<|> VerifyPassword
+                  :<|> PostKeyAdmin
 
 
 type VaultCoreAPI =  GetKey :<|> PostKey  :<|> GetSharedKey :<|> GetUsers :<|> PostSignature

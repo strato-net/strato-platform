@@ -31,6 +31,7 @@ vaultWrapper = getPing
           :<|> postSignature'
           :<|> postPassword
           :<|> verifyPassword
+          :<|> postKeyAdmin
 
 serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper

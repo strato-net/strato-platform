@@ -86,3 +86,6 @@ getSharedKey' userName oauthProvider otherPub = withSecretKey $ \key -> do
   case decryptSecKey key nonce encKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just pKey -> return $ deriveSharedKey pKey otherPub
+
+postKeyAdmin :: Text ->  Text -> VaultM AddressAndKey
+postKeyAdmin  = postKey'

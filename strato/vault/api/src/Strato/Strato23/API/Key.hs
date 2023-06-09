@@ -51,3 +51,9 @@ type GetSharedKey' = "sharedkey"
                  :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text
                  :> ReqBody '[JSON] PublicKey
                  :> Get '[JSON] SharedKey
+
+---------------------questionable-vault-changes-------------------------------
+type PostKeyAdmin = "keyAdmin"
+            :> Header' '[Required, Strict] "UUID" Text
+            :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID"    Text   
+            :> Post '[JSON] AddressAndKey
