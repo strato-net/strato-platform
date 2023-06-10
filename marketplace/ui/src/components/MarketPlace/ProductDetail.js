@@ -617,7 +617,17 @@ const ProductDetails = ({ user, users }) => {
               </Title>
               <Space>
                 <Text className="text-primaryB text-base">Quantity</Text>
-                <InputNumber className="ml-5" min={1} max={details.availableQuantity} defaultValue={qty} onChange={e => setQty(e)} />
+                <InputNumber className="ml-5 w-3/5" min={1} max={details.availableQuantity} defaultValue={qty} addonAfter={`/ ${details.availableQuantity} available`}
+                onChange={e => {
+                  if(e > details.availableQuantity) {
+                    openToast(
+                      "bottom",
+                      true,
+                      "Cannot add more than available quantity"
+                    );
+                  }
+                  setQty(e)
+                  }} />
               </Space>
               <Tabs
                 defaultActiveKey="1"

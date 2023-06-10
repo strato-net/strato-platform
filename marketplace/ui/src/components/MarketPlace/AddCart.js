@@ -211,21 +211,14 @@ const Checkout = ({ user }) => {
           }
         });
         return (
-          <InputNumber min={1} max={product?.availableQuantity} defaultValue={qty} onChange={e => {
+          <InputNumber className="ml-5 w-4/5" min={1} max={product?.availableQuantity} defaultValue={qty} addonAfter={`/ ${product?.availableQuantity}`} onChange={e => {
             let items = [...cartList];
             cartList.forEach((element, index) => {
               if (element.product.address === product.address) {
                 if (e <= product?.availableQuantity) {
                   items[index].qty = e;
                   actions.addItemToCart(marketplaceDispatch, items);
-                } else {
-                  openToast(
-                    "bottom",
-                    true,
-                    "Cannot add more than available quantity"
-                  );
-                  return;
-                }
+                } 
               }
             });
           }} />

@@ -91,8 +91,6 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
-  console.log(product)
-
   return (
     <div>
       {contextHolder}
@@ -140,7 +138,7 @@ const CategoryProductCard = ({ product, category }) => {
             </Title>
             <div className="flex items-center my-2" id="prod-quantity">
             <Text className="text-primaryB text-base">Quantity</Text>
-            <InputNumber className="ml-5" min={1} max={product.availableQuantity} defaultValue={qty} onChange={e => setQty(e)} />
+            <InputNumber className="ml-5 w-3/5" min={1} max={product.availableQuantity} defaultValue={qty} addonAfter={`/ ${product.availableQuantity} available`} onChange={e => setQty(e)} />
           </div>
           {/* <div className="flex items-center my-2" id="prod-quantity">
               <div
