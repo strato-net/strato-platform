@@ -115,8 +115,7 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      if (category !== "") {
+    if (category !== "" && hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
@@ -128,9 +127,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMinPrice,
           debouncedMaxPrice
         );
-      }
     } else {
-      if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
@@ -141,8 +138,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMaxQty,
           debouncedMinPrice,
           debouncedMaxPrice
-        );
-      }
+          );
     }
   }, [
     marketplaceDispatch,
@@ -155,6 +151,8 @@ const CategoryProductList = ({ user }) => {
     debouncedMinPrice,
     debouncedMaxPrice,
     category,
+    hasChecked,
+    isAuthenticated,
   ]);
 
   //============================Manufacturers/Brands=============================//
