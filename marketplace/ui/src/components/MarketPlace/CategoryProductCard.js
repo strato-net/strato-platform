@@ -137,7 +137,7 @@ const CategoryProductCard = ({ product, category }) => {
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
                 onClick={() =>
-                  navigate(`${naviroute.replace(":address", product.address)}` , { state: { isCalledFromInventory: false } })
+                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
                 }
               >
                 {decodeURIComponent(product.name)}&nbsp;
