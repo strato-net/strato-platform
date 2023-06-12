@@ -50,15 +50,13 @@ import { useAuthenticateState } from "../../contexts/authentication";
 
 const ProductDetails = ({ user, users }) => {
   const { state } = useLocation();
+  
   let isCalledFromInventory = window.location.href.includes("inventories");
   let cpLink = true;
   if (state !== null && state !== undefined) {
     cpLink = false;
   }
-  console.log("isCalledFromInventory: ", isCalledFromInventory);
-  console.log("state: ", state);
-  console.log('cpLink:', cpLink);
-  console.log('user:', user);
+  
   const [eventList, setEventList] = useState([])
   const [eventDetailList, setEventDetailList] = useState([])
   const [Id, setId] = useState(undefined);
