@@ -25,8 +25,6 @@ import { useAuthenticateDispatch } from "../../contexts/authentication";
 const { Header } = Layout;
 
 const HeaderComponent = ({ user, loginUrl }) => {
-  // console.log("HeaderComponent user", user);
-  // window.localStorage.setItem("userOrg", JSON.stringify(user.organization));
   const navigate = useNavigate();
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
