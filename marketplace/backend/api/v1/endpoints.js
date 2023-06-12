@@ -113,7 +113,6 @@ export const Image = {
   prefix: '/image',
   upload: '/',
   update: '/:fileKey',
-  delete: '/delete/:fileKey',
 }
 
 export const Marketplace = {

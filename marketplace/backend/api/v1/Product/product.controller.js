@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
+import { getSignedUrlFromS3, deleteFileFromS3} from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -88,8 +88,20 @@ class ProductController {
 
       ProductController.validateUpdateProductArgs(body)
 
-      const result = await dapp.updateProduct(body, options)
+      let result
+      if (req.body.updates.oldImageKey) {
 
+        result = await dapp.updateProduct(body, options)
+        const fileKey = req.body.updates.oldImageKey
+
+        const isDeleted = await deleteFileFromS3(fileKey, req.app.get(constants.s3ParamName))
+        if (!isDeleted) {
+          rest.response.status400(res, "Image is failed to delete")
+        }
+
+      } else {
+        result = await dapp.updateProduct(body, options)
+      }
       rest.response.status200(res, result)
       return next()
     } catch (e) {
@@ -171,7 +183,8 @@ class ProductController {
         description: Joi.string(),
         imageKey: Joi.string(),
         isActive: Joi.boolean(),
-        userUniqueProductCode: Joi.string().allow("")
+        userUniqueProductCode: Joi.string().allow(""),
+        oldImageKey: Joi.string().optional()
       }).required()
     });
 

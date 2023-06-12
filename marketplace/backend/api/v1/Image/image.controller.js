@@ -72,25 +72,6 @@ class ImageController {
     }
   }
 
-  static async deleteImage(req, res, next) {
-
-    if(!req.params.fileKey){
-      rest.response.status400(res, "Missing file key");
-    }
-    try {
-      const fileKey=req.params.fileKey; 
-
-      const isDeleted=await deleteFileFromS3(fileKey,req.app.get(constants.s3ParamName))
-      if(!isDeleted){
-        rest.response.status400(res,"Image is failed to delete")
-      }      
-      
-      rest.response.status200(res, true);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
 }
 
 export default ImageController

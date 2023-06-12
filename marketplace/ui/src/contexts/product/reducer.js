@@ -120,22 +120,6 @@ const reducer = (state, action) => {
         error: action.error,
         isupdateImageSubmitting: false,
       };
-    case actionDescriptors.deleteImage:
-      return {
-        ...state,
-        isdeletedImageSubmitting: true,
-      };
-    case actionDescriptors.deleteImageSuccessful:
-      return {
-        ...state,
-        deletedImg: action.payload,
-      };
-    case actionDescriptors.deleteImageFailed:
-      return {
-        ...state,
-        error: action.error,
-        isdeletedImageSubmitting: false,
-      };
     case actionDescriptors.updateProduct:
       return {
         ...state,
