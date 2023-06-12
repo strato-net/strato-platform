@@ -521,14 +521,14 @@ processTheMessages env sqlEnv conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  fkeys_and_mapNames <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
     case cc' of
       Right cc -> do
               $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
 
 
-              deferredForeignKeys_and_mapNames <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+              deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
                 let n = labelToText nameString
                     a' = if a /= ""
                            then a
@@ -545,8 +545,6 @@ processTheMessages env sqlEnv conn g messages = do
                     listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
                     listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
                     mapNames = map fst listOfMappingsWithRecords
-                    newMapNames = map (\x -> (T.pack (_contractName c), labelToText x)) mapNames
-                $logInfoLS "newMapNamesDAVID0: " $ T.pack $ show newMapNames
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
@@ -565,22 +563,17 @@ processTheMessages env sqlEnv conn g messages = do
 
                 outputData conn . createEventTables g $ contractToEventTables nameParts c
 
-                return [(deferredForeignKeys, newMapNames)]
+                return deferredForeignKeys
 
-              let deferredForeignKeys = concat $ map fst deferredForeignKeys_and_mapNames
-              let mapNames            = concat $ map snd deferredForeignKeys_and_mapNames
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
-              $logInfoLS "mapNamesDAVID1: " $ T.pack $ show mapNames
-              pure $ (Right deferredForeignKeys, Right mapNames) 
+              pure $ Right deferredForeignKeys
 
       Left cc -> do
         $logInfoS "processTheMessages" $ T.pack cc
-        pure $ (Left cc, Left []) 
+        pure $ (Left cc) 
 
-  let fkeys = rights $ map fst fkeys_and_mapNames
-  let bigMapNames = concat $ rights $ map snd fkeys_and_mapNames --1st iteration [balances] 2nd iteration []
-  $logInfoLS "bigMapNamesDAVID2: " $ T.pack $ show bigMapNames
+  let fkeys = rights $ fkeys'
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -612,10 +605,6 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          $logInfoS "bigMapNames Map names areDAVID3: " . T.pack $ show bigMapNames ++ " contract: " ++ show (contractName indexContract)
-          -- let filteredMapNames = filter (\(x, _) -> x == (contractName indexContract)) bigMapNames
-          --     filteredMapNames' = map snd filteredMapNames
-          -- $logInfoS "Filtered Map names are: " . T.pack $ show filteredMapNames ++ " contract: " ++ show (contractName indexContract)
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logInfoS "Globals Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all procsesed mappings
