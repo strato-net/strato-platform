@@ -12,6 +12,7 @@ import {
   Col,
   Spin,
   notification,
+  InputNumber
 } from "antd";
 import { EyeOutlined, MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -75,11 +76,11 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if(user) {
-    if (Id !== undefined) {
-      eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+    if (user) {
+      if (Id !== undefined) {
+        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+      }
     }
-  }
   }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
@@ -135,7 +136,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if(user)  {
+      if (user) {
         itemsActions.fetchSerialNumbers(itemDispatch, Id);
       }
     }
@@ -156,21 +157,6 @@ const ProductDetails = ({ user, users }) => {
     }
   }, [categorys, details]);
 
-  const subtract = () => {
-    if (qty !== 1) {
-      let value = qty - 1;
-      setQty(value);
-    }
-  };
-
-  const add = () => {
-    if (qty < details.availableQuantity) {
-      let value = qty + 1;
-      setQty(value);
-    } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
-    }
-  };
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -647,22 +633,20 @@ const ProductDetails = ({ user, users }) => {
               <Title level={4} className="!mt-0">
                 $ {details.pricePerUnit}
               </Title>
-              <Text className="text-primaryB text-base">Quantity</Text>
-              <div className="flex items-center my-2" id="quantity">
-                <div
-                  onClick={subtract}
-                  className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <MinusOutlined className="text-xs text-secondryD" />
-                </div>
-                <div className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center">
-                  {qty}
-                </div>
-                <div
-                  onClick={add}
-                  className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <PlusOutlined className="text-xs text-secondryC" />
-                </div>
-              </div>
+              <Space>
+                <Text className="text-primaryB text-base">Quantity</Text>
+                <InputNumber className="ml-5 w-3/5" min={1} max={details.availableQuantity} defaultValue={qty} addonAfter={`/ ${details.availableQuantity} available`}
+                onChange={e => {
+                  if(e > details.availableQuantity) {
+                    openToast(
+                      "bottom",
+                      true,
+                      "Cannot add more than available quantity"
+                    );
+                  }
+                  setQty(e)
+                  }} />
+              </Space>
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}
@@ -726,7 +710,7 @@ const ProductDetails = ({ user, users }) => {
                       />
                     ),
                   },
-                ]}
+                  ]}
               />
             </div>
           </div>
