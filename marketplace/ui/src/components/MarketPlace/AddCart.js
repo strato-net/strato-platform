@@ -15,7 +15,7 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo} from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
@@ -51,15 +51,15 @@ const Checkout = ({ user }) => {
     return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
   };
 
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
-
+  const storedData = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+  }, []);
+  
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, cartList);
-
-
-
+    actions.fetchCartItems(marketplaceDispatch, storedData);
+  }, [marketplaceDispatch, storedData]);
+  
+  useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerOrganization;

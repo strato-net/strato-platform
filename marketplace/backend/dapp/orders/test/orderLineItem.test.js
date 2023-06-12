@@ -25,6 +25,7 @@ describe('OrderLineItem', function() {
     let newOptions;
 
     const factoryArgs = (user) => ({ ...(factory.getOrderLineItemArgs(util.uid()))});
+    const factoryArgsWithNoSN = () => ({ ...(factory.getOrderLineItemArgsWithNoSN(util.uid()))});
 
     before(async () => {
         assert.isDefined(
@@ -75,7 +76,7 @@ describe('OrderLineItem', function() {
 
     });
 
-    it('should upload OrderLineItem smart contract', async () => {
+    it('should upload OrderLineItem smart contract (With Serial Number)', async () => {
         const args=factoryArgs(globalAdmin)
         contract=await orderLineItemJs.uploadContract(globalAdmin,args,newOptions);
         const state=await contract.get({address:contract.address})
@@ -86,5 +87,18 @@ describe('OrderLineItem', function() {
             R.map(v => '' + v, state),
             R.map(v => '' + v, args));
         });
+
+    it('should upload OrderLineItem smart contract (Without Serial Number)', async () => {
+        const args=factoryArgsWithNoSN()
+        contract=await orderLineItemJs.uploadContract(globalAdmin,args,newOptions);
+        const state=await contract.get({address:contract.address})
+    
+    
+        assert.deepInclude(
+            // Convert the Category data into strings as the args are in strings
+            R.map(v => '' + v, state),
+            R.map(v => '' + v, args));
+        });
+    
 
 });

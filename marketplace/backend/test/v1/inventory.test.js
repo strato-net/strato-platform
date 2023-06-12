@@ -8,7 +8,7 @@ import RestStatus from 'http-status-codes';
 
 
 import { productArgs } from './factories/product'
-import { inventoryArgs, newInventoryArgs, updateInventoryArgs } from './factories/inventory'
+import { inventoryArgs, inventoryArgsWithNoSN, newInventoryArgs, updateInventoryArgs } from './factories/inventory'
 import { Product, Inventory } from '../../api/v1/endpoints'
 
 
@@ -68,6 +68,41 @@ describe('Inventory End-To-End Tests', function () {
     // create inventory
     const createInventoryArgs = {
       ...inventoryArgs(productAddress, util.uid()),
+    }
+
+    const createInventoryResponse = await post(
+      Inventory.prefix,
+      Inventory.create,
+      createInventoryArgs,
+      admin.token,
+    )
+
+    assert.equal(createInventoryResponse.status, 200, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
+    assert.isDefined(createInventoryResponse.body.data, 'body.data should be defined')
+  })
+
+  it('Create an Inventory (Without Serial Number)', async () => {
+    // create product
+    const createProductArgs = {
+      ...productArgs(util.uid()),
+    }
+
+    const createProductResponse = await post(
+      Product.prefix,
+      Product.create,
+      createProductArgs,
+      admin.token
+    )
+
+    assert.equal(createProductResponse.status, 200, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined');
+
+    const productAddress = createProductResponse.body.data[1]
+
+    // create inventory
+    const createInventoryArgs = {
+      ...inventoryArgsWithNoSN(productAddress, util.uid()),
     }
 
     const createInventoryResponse = await post(

@@ -29,6 +29,7 @@ describe('Product Manager', function () {
     const getfactoryArgs = () => ({ ...(factory.getProductArgs(util.uid())) });
     const updatefactoryArgs = (address) => ({ ...(factory.updateProductArgs(address, util.uid())) });
     const inventoryFactoryArgs = () => ({ ...(factory.getInventoryArgs(util.uid())) });
+    const inventoryFactoryArgsWithNoSN = () => ({ ...(factory.getInventoryArgsWithNoSN(util.uid())) });
     const updateinventoryFactoryArgs = (address, inventoryAddress) => ({ ...(factory.updateInventoryArgs(address, inventoryAddress, util.uid())) });
     const updateInventoriesQuantitiesFactoryArgs = (inventoryAddress, quantity) => ({ ...(factory.updateInventoriesQuantitiesArgs(inventoryAddress, quantity)) })
 
@@ -158,7 +159,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
         // Check if Inventory was created
@@ -187,7 +188,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
         // Check if Inventory was created
@@ -229,6 +230,48 @@ describe('Product Manager', function () {
         assert.deepInclude(R.map(v => '' + v, productData4), R.map(v => '' + v, { ...args4.productArgs }));
     });
 
+    it('Should create inventory for a product (with and without serial numbers)', async () => {
+        // create the product
+        const args = getfactoryArgs(tradingEntity);
+        const [status, productAddress] = await contract.createProduct({ ...args.productArgs });
+
+        let productData = await contract.getProduct({ address: productAddress }, newOptions);
+
+        assert.deepInclude(
+            // Convert the Product data into strings as the args are in strings
+            R.map(v => '' + v, productData),
+            R.map(v => '' + v, { ...args.productArgs }));
+
+
+        // create multiple inventories of product
+        const inventoryArgs1 = inventoryFactoryArgs();
+        const inventoryArgs2 = inventoryFactoryArgs();
+        const inventoryArgs3 = inventoryFactoryArgsWithNoSN();
+        const inventoryArgs4 = inventoryFactoryArgsWithNoSN();
+
+        const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1 });
+        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2 });
+        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3 });
+        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4 });
+
+        const inventoryData1 = await contract.getInventory({ address: inventory1 }, newOptions);
+        const inventoryData2 = await contract.getInventory({ address: inventory2 }, newOptions);
+        const inventoryData3 = await contract.getInventory({ address: inventory3 }, newOptions);
+        const inventoryData4 = await contract.getInventory({ address: inventory4 }, newOptions);
+
+        // Serial numbers are not stored in these contracts so we will remove them from the args
+        delete inventoryArgs1.serialNumbers
+        delete inventoryArgs2.serialNumbers
+        delete inventoryArgs3.serialNumbers
+        delete inventoryArgs4.serialNumbers
+
+        // Our logic shouldn't mix up inventories
+        assert.deepInclude(R.map(v => '' + v, inventoryData1), R.map(v => '' + v, inventoryArgs1));
+        assert.deepInclude(R.map(v => '' + v, inventoryData2), R.map(v => '' + v, inventoryArgs2));
+        assert.deepInclude(R.map(v => '' + v, inventoryData3), R.map(v => '' + v, inventoryArgs3));
+        assert.deepInclude(R.map(v => '' + v, inventoryData4), R.map(v => '' + v, inventoryArgs4));
+    })
+
     it('create inventory for a product (multiple) ', async () => {
         // create the product
         const args = getfactoryArgs(tradingEntity);
@@ -248,10 +291,10 @@ describe('Product Manager', function () {
         const inventoryArgs3 = inventoryFactoryArgs();
         const inventoryArgs4 = inventoryFactoryArgs();
 
-        const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1, serialNumbers: ['1', '2', '3'] });
-        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2, serialNumbers: ['4', '5', '6'] });
-        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3, serialNumbers: ['7', '8', '9'] });
-        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4, serialNumbers: ['10', '11', '12'] });
+        const [status1, inventory1] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs1 });
+        const [status2, inventory2] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs2 });
+        const [status3, inventory3] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs3 });
+        const [status4, inventory4] = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs4 });
 
         const inventoryData1 = await contract.getInventory({ address: inventory1 }, newOptions);
         const inventoryData2 = await contract.getInventory({ address: inventory2 }, newOptions);
@@ -285,7 +328,7 @@ describe('Product Manager', function () {
 
         // Create the inventory
         const inventoryArgs = inventoryFactoryArgs();
-        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs, serialNumbers: ['1', '2', '3'] })
+        const inventoryResponse = await contract.createInventory({ productAddress: productAddress, ...inventoryArgs })
         assert.equal(inventoryResponse[0], RestStatus.OK);
 
 
