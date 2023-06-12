@@ -87,5 +87,13 @@ getSharedKey' userName oauthProvider otherPub = withSecretKey $ \key -> do
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just pKey -> return $ deriveSharedKey pKey otherPub
 
+-- Same as postKey' but return's address/key if user already exists
 postKeyAdmin :: Text ->  Text -> VaultM AddressAndKey
-postKeyAdmin  = postKey'
+postKeyAdmin userName oauthProvider = withSecretKey $ \key -> do
+  keyStore@KeyStore{..} <- newKeyStore key
+  created <- vaultModify $ postUserKeyQuery' userName oauthProvider keyStore
+  if not created
+    then getKey' userName oauthProvider Nothing
+    else case decryptSecKey key keystoreAcctNonce keystoreAcctEncSecKey of
+      Nothing -> vaultWrapperError IncorrectPasswordError
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
