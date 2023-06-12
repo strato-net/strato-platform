@@ -325,9 +325,9 @@ processedContractToProcessedMappingRows pc mapNames = do
   $logInfoS "processedContractToProcessedMappingRows contractData" . T.pack $ show (contractData pc) ++ show (contractName pc)
   $logInfoS "processedContractToProcessedMappingRows valueMappingsMap" . T.pack $ show valueMappingsMap ++ show (contractName pc)
   $logInfoS "processedContractToProcessedMappingRows mapNames" . T.pack $ show mapNames ++ show (contractName pc)
-  -- let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-  -- $logInfoS "processedContractToProcessedMappingRows onlyRecord" . T.pack $ show onlyRecord ++ show (contractName pc)
-  let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) (Map.toList valueMappingsMap)
+  let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
+  $logInfoS "processedContractToProcessedMappingRows onlyRecord" . T.pack $ show onlyRecord ++ show (contractName pc)
+  let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
   --valueMappingsMap | fromList [("balances",ValueMapping (fromList [(ValueAccount 652165fa57978a9d9df9ee892378dba2af907f46,SimpleValue (ValueInt {intSigned = True, intSize = Nothing, intVal = 2}))]))]"SimpleContract2"
   
   -- ValueMapping Map SimpleValue Value
