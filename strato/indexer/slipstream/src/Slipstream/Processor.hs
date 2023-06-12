@@ -37,7 +37,7 @@ import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.IORef
--- import qualified Data.Set as S
+import qualified Data.Set as S
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
