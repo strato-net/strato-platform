@@ -521,9 +521,9 @@ processTheMessages env sqlEnv conn g messages = do
 
       Left cc -> do
         $logInfoS "processTheMessages" $ T.pack cc
-        pure $ (Left cc) 
+        pure $ Left cc -- Either String String
 
-  let fkeys = rights $ fkeys'
+  let fkeys = rights fkeys'
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -533,7 +533,7 @@ processTheMessages env sqlEnv conn g messages = do
       $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
-      case actionStorage row of --1st iteration skipped | 2nd iteration[]
+      case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
         Action.SolidVMDiff{} -> do
           void . runMaybeT $ do
@@ -555,7 +555,7 @@ processTheMessages env sqlEnv conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all procsesed mappings
+          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all mapping rows to insert
           $logDebugLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
