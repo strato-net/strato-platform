@@ -298,7 +298,7 @@ readPreviousSolidVMState :: MonadIO m =>
                             IORef Globals -> Account -> m [(Text, Value)]
 readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
-rowToInsert :: (MonadIO m, MonadLogger m) =>
+rowToInsert :: MonadIO m =>
                IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
@@ -306,67 +306,18 @@ rowToInsert gref abiid row cont oldState = do
                     Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
                     Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAccount row) newState
-  $logInfoS "rowToInsert" . T.pack $ show (contractData (processedContract abiid (Map.fromList $ newState) row)) ++ show (contractName (processedContract abiid (Map.fromList $ newState) row))
-  
   return $ processedContract abiid (Map.fromList $ newState) row
 
--- getMappingTableNames :: MonadIO m => IORef Globals
---                  -> Text -> Text ->Text
---                  -> m [Text]
--- getMappingTableNames globalsIORef o a n = do
---   let mapNames = getMappingTables globalsIORef o a n
---   return $ concat mapNames
-
-processedContractToProcessedMappingRows :: (MonadIO m, MonadLogger m) => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
+processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
 processedContractToProcessedMappingRows pc mapNames = do
-  -- if null mapNames then return $ []
-  -- else do
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
-  $logInfoS "processedContractToProcessedMappingRows contractData" . T.pack $ show (contractData pc) ++ show (contractName pc)
-  $logInfoS "processedContractToProcessedMappingRows valueMappingsMap" . T.pack $ show valueMappingsMap ++ show (contractName pc)
-  $logInfoS "processedContractToProcessedMappingRows mapNames" . T.pack $ show mapNames ++ show (contractName pc)
   let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-  $logInfoS "processedContractToProcessedMappingRows onlyRecord" . T.pack $ show onlyRecord ++ show (contractName pc)
   let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
-  --valueMappingsMap | fromList [("balances",ValueMapping (fromList [(ValueAccount 652165fa57978a9d9df9ee892378dba2af907f46,SimpleValue (ValueInt {intSigned = True, intSize = Nothing, intVal = 2}))]))]"SimpleContract2"
-  
-  -- ValueMapping Map SimpleValue Value
   if null valueMappingsMap then return $ []
   else do
     let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName pc (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
-    $logInfoS "processedContractToProcessedMappingRows result " . T.pack $ show result ++ show (contractName pc)
     return $ result
       
-    
-      
-      
-      
-      
-      
-      
-      
-      
-      
-    --   onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-    --     recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord 
-    --     flattenedMap =  Map.foldrWithKey flattenOuterMap [] (Map.fromList recordVMs) 
-    --       where
-    --         flattenOuterMap :: Text -> Map.Map SimpleValue Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-    --         flattenOuterMap mapName innerMap flatList = flatList ++ Map.foldrWithKey (flattenInnerMap mapName) [] innerMap
-
-    --         flattenInnerMap :: Text -> SimpleValue -> Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-    --         flattenInnerMap mapName key value flatList = (mapName, key, value) : flatList
-    --     result = convertToPMapping flattenedMap 
-    --       where 
-    --         convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMappingRow]
-    --         convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMappingRow mapName pc (SimpleValue key) value ) flatMap
-    
-    -- $logInfoS "processedContractToProcessedMappingRows onlyRecord" . T.pack $ show onlyRecord ++ show (contractName pc)
-    -- $logInfoS "processedContractToProcessedMappingRows recordVMs" . T.pack $ show recordVMs ++ show (contractName pc)
-    -- $logInfoS "processedContractToProcessedMappingRows flattenedMap" . T.pack $ show flattenedMap ++ show (contractName pc)
-    -- $logInfoS "processedContractToProcessedMappingRows result " . T.pack $ show result ++ show (contractName pc)
-
-    -- return $ result
 rowToHistories :: (MonadIO m) =>
                   IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
@@ -552,7 +503,6 @@ processTheMessages env sqlEnv conn g messages = do
                 let nameParts = (o, a', n)
 
                 --Create mapping tables
-
                 forM_ mapNames $ \m -> do 
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
@@ -584,9 +534,7 @@ processTheMessages env sqlEnv conn g messages = do
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of --1st iteration skipped | 2nd iteration[]
-        Action.EVMDiff{} -> do
-          $logInfoLS "DAVID EVM DIff was here " $ T.pack $ "HI"
-          evmInsertsF g row actions acct
+        Action.EVMDiff{} -> evmInsertsF g row actions acct
         Action.SolidVMDiff{} -> do
           void . runMaybeT $ do
               src <- lookupT "src" $ actionMetadata row
@@ -606,9 +554,9 @@ processTheMessages env sqlEnv conn g messages = do
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          $logInfoS "Globals Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all procsesed mappings
-          $logInfoLS "Mapping inserts are: " $ T.pack $ show pMappings
+          $logDebugLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs pMappings
