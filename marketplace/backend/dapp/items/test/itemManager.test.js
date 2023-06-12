@@ -29,6 +29,7 @@ describe('Item Manager', function () {
     let permissionManagerContract;
 
     const getfactoryArgs = () => ({ ...(itemManagerFactory.getItemArgs(util.uid())) });
+    const getfactoryArgsNoSerialNumber = () => ({ ...(itemManagerFactory.getItemArgsNoSerialNumber(util.uid())) });
     const eventFactoryArgs = (itemsAddress, certifierAddress) => ({ ...(itemManagerFactory.getEventArgs(itemsAddress, certifierAddress, util.uid())) });
     const updatefactoryArgs = (address) => ({ ...(itemManagerFactory.updateItemArgs(address, util.uid())) });
     const certifyEventFactoryArgs = (eventAddress) => ({ ...(itemManagerFactory.certifyEventArgs(eventAddress, util.uid())) });
@@ -231,16 +232,53 @@ describe('Item Manager', function () {
 
     });
 
-    it('ItemManager: Create item', async () => {
+    it('ItemManager: Create items', async () => {
         // Create Item via itemManager
         const args = getfactoryArgs()
         const [restStatus, itemAddresses,] = await contract.addItem(args.itemArgs);
 
         const itemAddressArr = itemAddresses.split(",");
+        const items = await contract.getItems({ address: itemAddressArr }, newOptions);
+
+        const totalItems = args.itemArgs.itemObject.length;
+        assert.equal(totalItems, items.length)
 
         // Check if Raw Materials were created
         const rawMaterials = await contract.getRawMaterials({}, newOptions)
-        // assert.equal(rawMaterials.length, args.itemArgs.itemObject.length)
+
+        const itemSerialNumbers = items.map(item => item.serialNumber)
+        let rawMaterialsCreated = []
+
+        itemSerialNumbers.forEach(serialNumber => {
+            rawMaterials.filter(rawMaterial => {
+                if (rawMaterial.rawMaterialSerialNumber.includes(serialNumber)) {
+                    rawMaterialsCreated.push(rawMaterial)
+                }
+            })
+        })
+        
+        assert.equal(rawMaterialsCreated.length, args.itemArgs.itemObject.length)
+        rawMaterialsCreated.forEach(rawMaterial => {
+            assert.isDefined(rawMaterial.rawMaterialProductId)
+            assert.isDefined(rawMaterial.rawMaterialSerialNumber)
+            assert.isDefined(rawMaterial.rawMaterialProductName)
+        })
+    });
+
+    it('ItemManager: Create items with no serialNumber', async () => {
+        // Create Item via itemManager
+        const args = getfactoryArgsNoSerialNumber()
+        const [restStatus, itemAddresses,] = await contract.addItem(args.itemArgs);
+        
+        const itemAddressArr = itemAddresses.split(",");
+        const items = await contract.getItems({ address: itemAddressArr }, newOptions);
+
+        const totalItems = args.itemArgs.itemObject.length;
+        assert.equal(totalItems, items.length)
+
+        items.forEach(item => {
+            assert.equal(item.serialNumber, '')
+        })
     });
 
     it('ItemManager: get item ownership history', async () => {
