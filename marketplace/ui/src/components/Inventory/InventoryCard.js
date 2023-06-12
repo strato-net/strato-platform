@@ -52,7 +52,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address)}`);
+    navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
   }
 
   return (

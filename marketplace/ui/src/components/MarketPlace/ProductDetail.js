@@ -49,14 +49,17 @@ import { useAuthenticateState } from "../../contexts/authentication";
 
 
 const ProductDetails = ({ user, users }) => {
-  const { state } = useLocation();
-  
-  let isCalledFromInventory = window.location.href.includes("inventories");
-  let cpLink = true;
-  if (state !== null && state !== undefined) {
-    cpLink = false;
+  const { state, pathname } = useLocation();
+
+  let isCalledFromInventory = false;
+
+  if (state !== null && state!== undefined) { 
+    isCalledFromInventory = state.isCalledFromInventory
+  } 
+  else if (pathname.includes("inventories") ) {
+    isCalledFromInventory = true
   }
-  
+
   const [eventList, setEventList] = useState([])
   const [eventDetailList, setEventDetailList] = useState([])
   const [Id, setId] = useState(undefined);
@@ -201,6 +204,15 @@ const ProductDetails = ({ user, users }) => {
     }
     setEventDetailList(temp);
   }, [eventDetails])
+
+  const ownerSameAsUser = () => { 
+    
+    if(user && user.organization === inventoryDetails?.ownerOrganization)  {
+      return true;
+    }
+
+    return false;
+  }
 
   const addItemToCart = () => {
     let found = false;
@@ -571,7 +583,7 @@ const ProductDetails = ({ user, users }) => {
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
               </div>
               <Row className="justify-center my-7">
-                {isCalledFromInventory ? <Button
+                {ownerSameAsUser() ? <Button
                   className="group w-1/3 h-9 border border-primary"
                   disabled={true}
                   id="addToCart"
@@ -609,7 +621,7 @@ const ProductDetails = ({ user, users }) => {
                       navigate("/checkout");
                     }
                   }}
-                  disabled={isCalledFromInventory}
+                  disabled={ownerSameAsUser() }
                   id="buyNow"
                 >
                   Buy Now
@@ -654,7 +666,7 @@ const ProductDetails = ({ user, users }) => {
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}
-                items={!user || cpLink ?
+                items={!user ?
                   [{
                     label: `Description`,
                     key: "1",
