@@ -138,23 +138,8 @@ const CategoryProductCard = ({ product, category }) => {
             </Title>
             <div className="flex items-center my-2" id="prod-quantity">
             <Text className="text-primaryB text-base">Quantity</Text>
-            <InputNumber className="ml-5 w-3/5" min={1} max={product.availableQuantity} defaultValue={qty} addonAfter={`/ ${product.availableQuantity} available`} onChange={e => setQty(e)} />
+            <InputNumber className="ml-5 w-40" min={1} max={product.availableQuantity} defaultValue={qty} addonAfter={`/ ${product.availableQuantity} available`} onChange={e => setQty(e)} />
           </div>
-          {/* <div className="flex items-center my-2" id="prod-quantity">
-              <div
-                onClick={subtract}
-                className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                <MinusOutlined className="text-xs text-secondryD" />
-              </div>
-              <div className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center">
-                {qty}
-              </div>
-              <div
-                onClick={add}
-                className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                <PlusOutlined className="text-xs text-secondryC" />
-              </div>
-            </div> */}
           <Button
             className="group w-40 h-9 border border-primary hover:bg-primary"
             onClick={() => {
