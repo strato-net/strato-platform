@@ -72,7 +72,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =
+unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _ _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
