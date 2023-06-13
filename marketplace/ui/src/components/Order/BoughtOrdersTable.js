@@ -163,7 +163,7 @@ const BoughtOrdersTable = ({ user }) => {
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
     setTotal(total);
-  }, [data]);
+  }, [data, page]);
 
   return (
     <div>

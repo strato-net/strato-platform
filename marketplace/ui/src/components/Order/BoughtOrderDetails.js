@@ -83,18 +83,18 @@ const BoughtOrderDetails = ({ user, users }) => {
   }, [routeMatch]);
 
   useEffect(() => {
+    const getData = async () => {
+      const data = await actions.fetchOrderDetails(dispatch, Id);
+      if (data != null) {
+        getPaymentStatus(data.paymentSessionId);
+      }
+    };
+    
     if (Id !== undefined) {
       getData();
       // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
   }, [Id, dispatch]);
-
-  const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null) {
-      getPaymentStatus(data.paymentSessionId);
-    }
-  }
 
   const getPaymentStatus = async (paymentSessionId) => {
     if (paymentSessionId !== "") {
