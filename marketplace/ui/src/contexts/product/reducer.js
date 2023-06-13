@@ -120,7 +120,6 @@ const reducer = (state, action) => {
         error: action.error,
         isupdateImageSubmitting: false,
       };
-
     case actionDescriptors.updateProduct:
       return {
         ...state,

@@ -247,7 +247,7 @@ const actions = {
         type: actionDescriptors.updateProductFailed,
         error: body.error,
       });
-      actions.setMessage(dispatch, body.error);
+      actions.setMessage(dispatch, "Error while updating Product");
       return false;
     } catch (err) {
       dispatch({
@@ -394,7 +394,7 @@ const actions = {
       actions.setMessage(dispatch, "Error while updating Image");
     }
   },
-
+  
   fetchProductsForFilter: async (dispatch, categorys, subCategorys) => {
     dispatch({ type: actionDescriptors.fetchProductsForFilter });
 

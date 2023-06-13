@@ -20,6 +20,8 @@ const ProductsProvider = ({ children }) => {
     productDeleteObject: null,
     uploadedImg : null,
     isuploadImageSubmitting: false,
+    deletedImg: null,
+    isdeletedImageSubmitting: false,
     isupdateImageSubmitting: false,
     updatedImg: null,
     productUpdateObject: null,

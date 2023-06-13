@@ -98,27 +98,43 @@ const UpdateProductModal = ({
       formData.append("fileUpload", formik.values.image);
 
       imageData = await actions.updateImage(dispatch, formData, productToUpdate.imageKey);
-      setIsImgChanged(false);
+
     } else {
       imageData = {
         imageKey: productToUpdate.imageKey,
       };
     }
+    let body = {};
 
     if (imageData) {
-      const body = {
-        productAddress: productToUpdate.address,
-        updates: {
-          description: encodeURIComponent(values.description),
-          imageKey: imageData.imageKey,
-          isActive: values.active,
-          userUniqueProductCode: values.userUniqueProductCode
-        },
-      };
+      // If the image is changed we send the old image to be deleted.
+      if (isImgChanged) {
 
+        body = {
+          productAddress: productToUpdate.address,
+          updates: {
+            description: encodeURIComponent(values.description),
+            imageKey: imageData.imageKey,
+            isActive: values.active,
+            userUniqueProductCode: values.userUniqueProductCode,
+            oldImageKey: productToUpdate.imageKey,
+          },
+        }
+      } else {
+        body = {
+          productAddress: productToUpdate.address,
+          updates: {
+            description: encodeURIComponent(values.description),
+            imageKey: imageData.imageKey,
+            isActive: values.active,
+            userUniqueProductCode: values.userUniqueProductCode,
+          },
+        }
+      }
       let isDone = await actions.updateProduct(dispatch, body);
 
       if (isDone) {
+        setIsImgChanged(false);
         actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
         handleCancel();
       }

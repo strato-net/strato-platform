@@ -24,8 +24,4 @@ router.put(
   ImageController.updateImage
 );
 
-
-
-
-
 export default router;
