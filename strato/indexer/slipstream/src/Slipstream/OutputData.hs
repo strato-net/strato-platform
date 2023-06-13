@@ -636,7 +636,7 @@ createMappingTableQuery (o, a, n, m) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
                "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "m_contractname text", "m_mapname text","key text", "value text"]
-        , ",\n  PRIMARY KEY (key));"
+        , ",\n  PRIMARY KEY (m_address, key));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -749,7 +749,7 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (key) DO UPDATE SET
+  ON CONFLICT (m_address, key) DO UPDATE SET
     m_record_id = excluded.m_record_id,
     m_address = excluded.m_address,
     "m_chainId" = excluded."m_chainId",
