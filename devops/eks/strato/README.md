@@ -14,15 +14,27 @@ kubectl delete service nginx-service
 
 # Create New Deployment
 **Note:**
-Replace image *REPO_URL and VERSION* in eks-strato-deployment.tpl.yaml file and rename this file as *eks-strato-deployment.yaml*
+Replace below place holders with valid values:
+* *REPO_URL*
+* *VERSION*
+* *REPLACE_WITH_OAUTH_CLIENT_ID*
+* *REPLACE_WITH_OAUTH_CLIENT_SECRET*
+* *REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID*
+* *REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY*
+* *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
+* *REPLACE_WITH_STRIPE_SECRET_KEY*
 Replace volume id place holders
-* *prometheus-data-volume-id* is *vol-0334b826317434504*
-* *kafka-data-volume-id* is *vol-0334b826317434504*
-* *redis-data-volume-id* is *vol-0fd90c145c88224d2*
-* *zookeeper-data-volume-id* is *vol-09a78def133bc911c*
-* *strato-data-volume-id* is *vol-01c298651694dcfce*
-* *postgres-data-volume-id* is *vol-0a4ac71b70905f806*
+* *marketplace-data-volumeid* as *vol-0ef503037141c02ab*
+* *postgres-data-volume-id* as *vol-0a4ac71b70905f806*
+* *prometheus-data-volume-id* as *vol-07828d4a4e9adf731*
+* *kafka-data-volume-id* as *vol-0334b826317434504*
+* *redis-data-volume-id* as *vol-0fd90c145c88224d2*
+* *strato-data-volume-id* as *vol-01c298651694dcfce*
+* *zookeeper-data-volume-id* as *vol-09a78def133bc911c*
+
+Rename the template file
 cp eks-strato-deployment.tpl.yaml eks-strato-deployment.yaml
+# Create deployment Service
 kubectl apply -f eks-strato-deployment.yaml
 
 # Create nginx Service

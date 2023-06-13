@@ -21,10 +21,12 @@ spec:
       - image: <REPO_URL>smd:<VERSION>
         name: smd
         env:
-        - name: NODE_NAME
-          value: "localhost"
         - name: NODE_HOST
           value: "localhost"
+        - name: NODE_NAME
+          value: "localhost"
+        - name: ssl
+          value: "false"
       - image: <REPO_URL>apex:<VERSION>
         name: apex
         env:
@@ -43,7 +45,78 @@ spec:
         - name: STRATO_HOSTNAME
           value: "localhost"
         - name: STRATO_PORT_API
+          value: ""
         - name: STRATO_PORT_VAULT_PROXY
+          value: ""
+      - image: <REPO_URL>marketplace-backend:<VERSION>
+        name: marketplace-backend
+        env:
+        - name: EXT_STORAGE_S3_BUCKET
+          value: "mercata-testnet2"
+        - name: EXT_STORAGE_S3_ACCESS_KEY_ID
+          value: "<REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID>"
+        - name: EXT_STORAGE_S3_SECRET_ACCESS_KEY
+          value: "<REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY>"
+        - name: GLOBAL_ADMIN_NAME
+          value: "user1"
+        - name: GLOBAL_ADMIN_PASSWORD
+          value: "1234"
+        - name: MP_IS_BOOTNODE
+          value: "true"
+        - name: MP_DAPP_ADDRESS
+          value: "ec4deef60caaa5209790539abbb0f45e3d691c63"
+        - name: MP_API_DEBUG
+          value: "false"
+        - name: MP_DELAY_DEPLOYMENT
+          value: "true"
+        - name: MP_SERVER_HOST
+          value: "localhost"
+        - name: MP_SERVER_SSL
+          value: "false"
+        - name: NODE_LABEL
+          value: ""
+        - name: ORG_NAME
+          value: "BlockApps"
+        - name: ORG_DEPLOY_FILE_NAME
+          value: "org.deploy.yaml"
+        - name: OAUTH_APP_TOKEN_COOKIE_NAME
+          value: "stratomp_session"
+        - name: OAUTH_OPENID_DISCOVERY_URL
+          value: "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+        - name: OAUTH_CLIENT_ID
+          value: "<REPLACE_WITH_OAUTH_CLIENT_ID>"
+        - name: OAUTH_CLIENT_SECRET
+          value: "<REPLACE_WITH_OAUTH_CLIENT_SECRET>"
+        - name: OAUTH_VAULT_PROXY_ALT_CLIENT_ID
+          value: ""
+        - name: OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET
+          value: ""
+        - name: OAUTH_SCOPE
+          value: "email openid"
+        - name: OAUTH_SERVICE_OAUTH_FLOW
+          value: "client-credential"
+        - name: OAUTH_TOKEN_FIELD
+          value: "access_token"
+        - name: OAUTH_TOKEN_USERNAME_PROPERTY
+          value: "email"
+        - name: OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW
+          value: "sub"
+        - name: STRIPE_PUBLISHABLE_KEY
+          value: "<REPLACE_WITH_STRIPE_PUBLISHABLE_KEY>"
+        - name: STRIPE_SECRET_KEY
+          value: "<REPLACE_WITH_STRIPE_SECRET_KEY>"
+        - name: STRATO_NODE_PROTOCOL
+          value: ""
+        - name: STRATO_NODE_HOST
+          value: ""
+        volumeMounts:
+          - mountPath: /config
+            name: marketplace-data
+      - image: <REPO_URL>marketplace-ui:<VERSION>
+        name: marketplace-ui
+        env:
+        - name: NODE_ENV
+          value: "production"
       - image: redis:3.2
         name: redis
         command: ["redis-server"]
@@ -58,23 +131,91 @@ spec:
           - containerPort: 30303
             protocol: UDP
         env:
+        - name: accountNonceLimit
+          value: ""
+        - name: addBootnodes
+          value: ""
+        - name: appFetchLimit
+          value: ""
+        - name: averageTxsPerBlock
+          value: ""
         - name: blockstanbul
           value: "true"
+        - name: blockstanbulBlockPeriodMs
+          value: ""
+        - name: blockstanbulRoundPeriodS
+          value: ""
+        - name: blockTime
+          value: ""
+        - name: bootnode
+          value: ""
+        - name: brokenRefundReenable
+          value: ""
+        - name: cacheTransactionResults
+          value: ""
+        - name: certInfo
+          value: ""
+        - name: connectionTimeout
+          value: ""
+        - name: debugFail
+          value: ""
+        - name: debugPort
+          value: ""
+        - name: debugWSPort
+          value: ""
+        - name: evmDebugMode
+          value: ""
+        - name: evmTraceMode
+          value: ""
+        - name: faucetEnabled
+          value: ""
+        - name: gasLimit
+          value: ""
         - name: gasOn
           value: "false"
         - name: generateKey
           value: "true"
         - name: genesis
-          value: "gettingStarted"
+          value: ""
+        - name: indexEVM
+          value: "false"
         - name: kafkaHost
           value: "localhost"
         - name: kafkaPort
           value: "9092"
+        - name: lazyBlocks
+          value: ""
+        - name: maxConn
+          value: ""
+        - name: maxReturnedHeaders
+          value: ""
+        - name: maxTxsPerBlock
+          value: ""
+        - name: minBlockDifficulty
+          value: ""
         - name: mineBlocks
-          value: "false"
+          value: "true"
+        - name: miningAlgorithm
+          value: ""
+        - name: miningThreads
+          value: ""
         - name: network
-          value: "blockappsnet"
+          value: "mercata-hydrogen"
         - name: networkID
+          value: ""
+        - name: numMinPeers
+          value: ""
+        - name: OAUTH_DISCOVERY_URL
+          value: "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+        - name: OAUTH_CLIENT_ID
+          value: "<REPLACE_WITH_OAUTH_CLIENT_ID>"
+        - name: OAUTH_CLIENT_SECRET
+          value: "<REPLACE_WITH_OAUTH_CLIENT_SECRET>"
+        - name: OAUTH_VAULT_PROXY_ALT_CLIENT_ID
+          value: ""
+        - name: OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET
+          value: ""
+        - name: OAUTH_RESERVE_SECONDS
           value: ""
         - name: postgres_host
           value: "localhost"
@@ -86,24 +227,62 @@ spec:
           value: "cirrus"
         - name: postgres_user
           value: "postgres"
+        - name: PROCESS_MONITORING
+          value: ""
         - name: redisHost
           value: "localhost"
         - name: redisPort
           value: "6379"
+        - name: redisBDBNumber
+          value: ""
+        - name: requireCerts
+          value: "true"
+        - name: seqDebugMode
+          value: ""
+        - name: seqEventsBatchSize
+          value: ""
+        - name: seqEventsCostHeuristic
+          value: ""
+        - name: seqMaxEventsPerIter
+          value: ""
+        - name: seqMaxUsPerIter
+          value: ""
+        - name: seqRTSOPTs
+          value: ""
+        - name: SLIPSTREAM_DEBUG
+          value: ""
+        - name: SLIPSTREAM_OPTIONAL
+          value: ""
         - name: splitinit
           value: "true"
         - name: stratoHost
           value: "localhost:3000"
+        - name: svmTrace
+          value: ""
+        - name: sqlDiff
+          value: ""
+        - name: svmDev
+          value: ""
+        - name: txSizeLimit
+          value: ""
+        - name: useSyncMode
+          value: ""
         - name: VAULT_URL
+          value: "https://vault.blockapps.net:8093/"
+        - name: VAULT_PROXY_DEBUG
+          value: ""
+        - name: validatorBehavior
+          value: "true"
+        - name: vmDebug
+          value: ""
+        - name: vmRunnerRTSOPTs
+          value: ""
+        - name: wireMessageCacheSize
+          value: ""
+        - name: wsDebug
           value: ""
         - name: zkHost
           value: "localhost"
-        - name: indexEVM
-          value: "false"
-        - name: USE_OLD_STRATO_API
-          value : "true"
-        - name: validatorBehavior
-          value: "true"
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
@@ -131,8 +310,8 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
+        #- name: PGDATA
+        #  value: /var/lib/postgresql/data/pgdata
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
@@ -145,44 +324,71 @@ spec:
         - name: APEX_HOST
           value: "localhost:3009"
         - name: blockstanbul
-          value: "true"
+          value: ""
+        - name: blockTime
+          value: ""
+        - name: debugPort
+          value: ""
+        - name: debugWSPort
+          value: ""
         - name: DOCS_HOST
           value: "localhost:8080"
-        - name: OAUTH_CLIENT_ID
-          value: "dev"
-        - name: OAUTH_CLIENT_SECRET
-          value: "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f"
-        - name: OAUTH_DISCOVERY_URL
-          value: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
-        - name: OAUTH_JWT_USER_ID_CLAIM
+        - name: MARKETPLACE_BACKEND_HOST
           value: ""
+        - name: MARKETPLACE_UI_HOST
+          value: ""
+        - name: OAUTH_CLIENT_ID
+          value: "<REPLACE_WITH_OAUTH_CLIENT_ID>"
+        - name: OAUTH_CLIENT_SECRET
+          value: "<REPLACE_WITH_OAUTH_CLIENT_SECRET>"
+        - name: OAUTH_DISCOVERY_URL
+          value: "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
         - name: OAUTH_SCOPE
           value: ""
         - name: POSTGREST_HOST
           value: "localhost:3001"
         - name: PROMETHEUS_HOST
           value: "localhost:9090"
+        - name: SERVE_LOGS
+          value: ""
+        - name: SMD_DEV_MODE
+          value: ""
+        - name: SMD_DEV_MODE_HOST_IP
+          value: ""
         - name: SMD_HOST
           value: "localhost:3002"
+        - name: ssl
+          value: "false"
+        - name: sslCertFileType
+          value: ""
+        - name: STATS_ENABLED
+          value: ""
         - name: STRATO_HOSTNAME
           value: "localhost"
         - name: STRATO_PORT_API
-          value: "3000"
+          value: ""
         - name: STRATO_PORT_API2
-          value: "3001"
-        - name: STRATO_PORT_LOGS
-          value: "7065"
+          value: ""
         - name: STRATO_PORT_BLOCKSTANBUL_VOTE
-          value: "8050"
-        - name: VAULT_WRAPPER_HOST
-          value: "localhost:8000"
+          value: ""
+        - name: STRATO_PORT_LOGS
+          value: ""
+        - name: STRATO_PORT_VAULT_PROXY
+          value: ""
+        - name: vmDebug
+          value: ""
+      - image: swaggerapi/swagger-ui:v3.22.1
+        name:  docs
+        env:
+        - name: API_URL
+          value: "/strato-api/eth/v1.2/swagger.json"
       - image: zookeeper:3.4.14
         name: zookeeper
         volumeMounts:
           - mountPath: /data
             name: zookeeper-data
         env:
-        - name: ZOO_DATA_LOG_DIR:
+        - name: ZOO_DATA_LOG_DIR
           value: "/data"
       - image: wurstmeister/kafka:1.1.0
         name: kafka
@@ -199,8 +405,6 @@ spec:
           value: "false"
         - name: KAFKA_LOG_DIRS
           value: "/kafka/kafka-logs"
-        - name: KAFKA_LOG_RETENTION_HOURS
-          value: "2147483647"
         - name: KAFKA_OFFSET_METADATA_MAX_BYTES
           value: "1048576"
         - name: KAFKA_OFFSETS_RETENTION_MINUTES
@@ -220,29 +424,15 @@ spec:
         volumeMounts:
           - mountPath: /prometheus
             name: prometheus-data
-      - image: <REPO_URL>vault-wrapper:<VERSION>
-        name: vault-wrapper
-        env:
-        - name: keyStoreCacheTimeout
-          value: "60"
-        - name: postgres_host
-          value: "localhost"
-        - name: postgres_password
-          value: "api"
-        - name: postgres_port
-          value: "5432"
-        - name: postgres_user
-          value: "postgres"
-        - name: postgres_vault_wrapper_db
-          value: "oauth"
-        - name: VAULTWRAPPER_DEBUG
-          value: "true"
-      - image: swaggerapi/swagger-ui:v3.22.1
-        name:  docs
-        env:
-        - name: API_URL
-          value: "/strato-api/eth/v1.2/swagger.json"
       volumes:
+        - name: marketplace-data
+          awsElasticBlockStore:
+            volumeID: <marketplace-data-volume-id>
+            fsType: ext4
+        - name: postgres-data
+          awsElasticBlockStore:
+            volumeID: <postgres-data-volume-id>
+            fsType: ext4
         - name: prometheus-data
           awsElasticBlockStore:
             volumeID: <prometheus-data-volume-id>
@@ -255,15 +445,11 @@ spec:
           awsElasticBlockStore:
             volumeID: <redis-data-volume-id>
             fsType: ext4
-        - name: zookeeper-data
-          awsElasticBlockStore:
-            volumeID: <zookeeper-data-volume-id>
-            fsType: ext4
         - name: strato-data
           awsElasticBlockStore:
             volumeID: <strato-data-volume-id>
             fsType: ext4
-        - name: postgres-data
+        - name: zookeeper-data
           awsElasticBlockStore:
-            volumeID: <postgres-data-volume-id>
+            volumeID: <zookeeper-data-volume-id>
             fsType: ext4
