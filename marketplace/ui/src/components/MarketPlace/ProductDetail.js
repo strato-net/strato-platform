@@ -127,7 +127,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
-  }, [routeMatch, routeMatch1]);
+  }, [routeMatch, routeMatch1, isCalledFromInventory]);
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
