@@ -79,7 +79,7 @@ const CategoryProductList = ({ user }) => {
     if (param !== ":category") newCategory.push(param);
     setCategory(param);
     setSelectedCategories(newCategory);
-  }, []);
+  }, [routeMatch?.params?.category]);
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
