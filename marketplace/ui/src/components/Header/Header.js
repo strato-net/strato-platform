@@ -79,9 +79,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    // if (pathName.includes("/marketplace")) {
-    //   setSelectedTab("0");
-    // } else 
+    
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
@@ -94,7 +92,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     else{
       setSelectedTab("0");
     }
-  }, [window.location.pathname]);
+  }, []);
 
   const items = user ? [
     {
@@ -193,9 +191,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
             loginUrl ? <a href={loginUrl} className="text-base text-white"> Login / Register </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
+              <button onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
                 {initials}
-              </a>
+              </button>
             </Dropdown>
         }
       </Space>
