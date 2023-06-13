@@ -23,6 +23,8 @@ describe('Anonymous User End-To-End Tests', function () {
     assert.equal(category.status, 200, 'should be 200');
     assert.isDefined(category.body, 'body should be defined');
     assert.isDefined(category.body.data, 'body should be defined');
+    // Number of Categories {Art, Carbon, Real Estate}
+    assert.equal(category.body.data.length, 3, 'should be 3');
   })
 
   it('Get top 3 selling products', async () => {
@@ -64,6 +66,7 @@ describe('Anonymous User End-To-End Tests', function () {
     assert.equal(subCategory.status, 200, 'should be 200');
     assert.isDefined(subCategory.body, 'body should be defined');
     assert.isDefined(subCategory.body.data, 'body should be defined');
+    assert.isAtLeast(subCategory.body.data.length, 1, 'should have atleast one sub-category');
 
     const subCategory2 = await get(
         SubCategory.prefix,
@@ -74,6 +77,7 @@ describe('Anonymous User End-To-End Tests', function () {
       assert.equal(subCategory2.status, 200, 'should be 200');
       assert.isDefined(subCategory2.body, 'body should be defined');
       assert.isDefined(subCategory2.body.data, 'body should be defined');
+      assert.isAtLeast(subCategory2.body.data.length, 1, 'should have atleast one sub-category');
 
       const subCategory3 = await get(
         SubCategory.prefix,
@@ -84,6 +88,7 @@ describe('Anonymous User End-To-End Tests', function () {
       assert.equal(subCategory3.status, 200, 'should be 200');
       assert.isDefined(subCategory3.body, 'body should be defined');
       assert.isDefined(subCategory3.body.data, 'body should be defined');  
+      assert.isAtLeast(subCategory3.body.data.length, 1, 'should have atleast one sub-category');
     })
 
   it('Unauthorized Access', async () => {
