@@ -32,7 +32,7 @@ const Event = ({ user }) => {
   const { tab } = state;
 
   const [currentTab, setCurrentTab] = useState("");
-  const [limit, setLimit] = useState(10);
+  const [limit] = useState(10);
   const [isCertifyEventModalOpen, toggleCertifyEventModal] = useState(false);
   const [api, contextHolder] = notification.useNotification();
 
@@ -58,7 +58,6 @@ const Event = ({ user }) => {
   // const [certifyEventPage, setCertifyEventPage] = useState(1);
   // const [certifyEventTotal, setCertifyEventTotal] = useState(10);
   const [selectedObj, setSelectedObj] = useState([]);
-  const [batchIds, setBatchIds] = useState([]);
 
 
   const {

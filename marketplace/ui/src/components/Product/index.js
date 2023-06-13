@@ -20,7 +20,6 @@ import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 //sub-categories
 import {
-  useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
 import { Images } from "../../images";
@@ -47,7 +46,6 @@ const Product = () => {
   const categoryDispatch = useCategoryDispatch();
 
   //Sub-categories
-  const subCategoryDispatch = useSubCategoryDispatch();
 
   const { categorys, iscategorysLoading } = useCategoryState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();

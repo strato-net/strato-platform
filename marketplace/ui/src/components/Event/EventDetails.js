@@ -56,68 +56,68 @@ const EventDetails = ({ user, users }) => {
       }
     });
   }
-  const columns = [
-    {
-      title: "Date",
-      dataIndex: "block_timestamp",
-    },
-    {
-      title: "Sender",
-      dataIndex: "sender",
-    },
-    {
-      title: "eventTypeId",
-      dataIndex: "eventTypeId",
-    },
-    {
-      title: "itemSerialNumber",
-      dataIndex: "itemSerialNumber",
-    },
-    {
-      title: "itemNFTAddress",
-      dataIndex: "itemNFTAddress",
-    },
-    {
-      title: "date",
-      dataIndex: "date",
-    },
-    {
-      title: "inventoryId",
-      dataIndex: "inventoryId",
-    },
-    {
-      title: "productId",
-      dataIndex: "productId",
-    },
-    {
-      title: "summary",
-      dataIndex: "summary",
-    },
-    {
-      title: "certifiedBy",
-      dataIndex: "certifiedBy",
-    },
-    {
-      title: "certifiedDate",
-      dataIndex: "certifiedDate",
-    },
-    {
-      title: "createdAt",
-      dataIndex: "createdAt",
-    },
-    {
-      title: "Organization",
-      dataIndex: "ownerOrganization",
-    },
-    {
-      title: "Organizational Unit",
-      dataIndex: "ownerOrganizationalUnit",
-    },
-    {
-      title: "Common Name",
-      dataIndex: "ownerCommonName",
-    },
-  ];
+  // const columns = [
+  //   {
+  //     title: "Date",
+  //     dataIndex: "block_timestamp",
+  //   },
+  //   {
+  //     title: "Sender",
+  //     dataIndex: "sender",
+  //   },
+  //   {
+  //     title: "eventTypeId",
+  //     dataIndex: "eventTypeId",
+  //   },
+  //   {
+  //     title: "itemSerialNumber",
+  //     dataIndex: "itemSerialNumber",
+  //   },
+  //   {
+  //     title: "itemNFTAddress",
+  //     dataIndex: "itemNFTAddress",
+  //   },
+  //   {
+  //     title: "date",
+  //     dataIndex: "date",
+  //   },
+  //   {
+  //     title: "inventoryId",
+  //     dataIndex: "inventoryId",
+  //   },
+  //   {
+  //     title: "productId",
+  //     dataIndex: "productId",
+  //   },
+  //   {
+  //     title: "summary",
+  //     dataIndex: "summary",
+  //   },
+  //   {
+  //     title: "certifiedBy",
+  //     dataIndex: "certifiedBy",
+  //   },
+  //   {
+  //     title: "certifiedDate",
+  //     dataIndex: "certifiedDate",
+  //   },
+  //   {
+  //     title: "createdAt",
+  //     dataIndex: "createdAt",
+  //   },
+  //   {
+  //     title: "Organization",
+  //     dataIndex: "ownerOrganization",
+  //   },
+  //   {
+  //     title: "Organizational Unit",
+  //     dataIndex: "ownerOrganizationalUnit",
+  //   },
+  //   {
+  //     title: "Common Name",
+  //     dataIndex: "ownerCommonName",
+  //   },
+  // ];
   if (Id !== undefined && !iseventDetailsLoading && details !== null) {
     if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";

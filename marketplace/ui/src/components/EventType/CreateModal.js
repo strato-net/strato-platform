@@ -2,11 +2,9 @@ import React, { useState } from "react";
 import {
   Form,
   Input,
-  Modal,
-  Select } 
+  Modal } 
 from "antd";
 
-const { Option } = Select;
 
 const CreateModal = ({
   isCreateModalOpen,

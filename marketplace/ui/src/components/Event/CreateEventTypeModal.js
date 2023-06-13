@@ -7,7 +7,6 @@ import {
   Input,
   Modal,
   Divider,
-  Select,
   Spin
 } from "antd";
 import { useFormik } from "formik";
@@ -21,7 +20,6 @@ const EventSchema = () => {
   });
 };
 
-const { Option } = Select;
 const { Text } = Typography;
 const { TextArea } = Input;
 

@@ -21,7 +21,6 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import {
-  useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
 import { actions as productActions } from "../../contexts/product/actions";
@@ -41,7 +40,6 @@ const CreateInventoryModal = ({
 }) => {
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
   const productDispatch = useProductDispatch();
   const { readString } = usePapaParse();
   const [api, contextHolder] = notification.useNotification();
