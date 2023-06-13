@@ -76,10 +76,10 @@ const EventsList = () => {
 
   useEffect(() => {
     let temp = [];
-    temp = events.map(elem => {
+    temp = events.map((elem, index) => {
       return {
         ...elem,
-        key: elem.address,
+        key: `${elem.address}-${index}`,
         name: elem['eventTypename'],
         description: elem['eventTypeDescription'],
         date: epochToDate(elem['date']),
