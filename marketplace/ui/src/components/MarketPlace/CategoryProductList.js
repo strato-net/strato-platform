@@ -160,7 +160,7 @@ const CategoryProductList = ({ user }) => {
       var uniqueBrands =
         marketplaceList.map((p) => p.manufacturer)
           .filter(
-            (manufacturer, index, arr) => arr.indexOf(manufacturer) === index
+            (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
           );
       setBrands(uniqueBrands);
     }
