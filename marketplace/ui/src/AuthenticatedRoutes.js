@@ -25,7 +25,7 @@ import EventType from "./components/EventType";
 import EventTypeDetails from "./components/EventType/EventTypeDetails";
 import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
-import EventDetails from "./components/Event/EventDetails";
+// import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
@@ -413,7 +413,13 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/*
+      Want to confirm before deleting. This looks like its a part of the Certifier flow. 
+      I think we can delete this as its not accessable in the current flow 
+      This would include deleting the event audit routes and the event audit context 
+      */}
+
+      {/* <Route
         exact
         path={routes.EventDetail.url}
         element={
@@ -423,7 +429,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.EventSerialNumberList.url}

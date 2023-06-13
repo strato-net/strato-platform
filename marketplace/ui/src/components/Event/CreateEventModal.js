@@ -173,7 +173,7 @@ const CreateEventModal = ({
     }
   }, [
     productDispatch,
-    formik.values.subCategory,
+    formik.values,
   ]);
 
   useEffect(() => {

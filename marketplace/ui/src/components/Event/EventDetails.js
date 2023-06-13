@@ -35,19 +35,19 @@ const EventDetails = ({ user, users }) => {
   useEffect(() => {
     setId(routeMatch?.params?.id);
     setChainId(query.get("chainId"));
-  }, [routeMatch]);
+  }, [routeMatch, query]);
 
   useEffect(() => {
     if (Id !== undefined && chainId !== undefined) {
       actions.fetchEventDetails(dispatch, Id, chainId);
       actions.fetchEventAudit(dispatch, Id, chainId);
     }
-  }, [Id, dispatch]);
+  }, [Id, dispatch, chainId]);
 
   const details = eventDetails;
   const audits = eventsAudit;
   if (audits && audits.length) {
-    audits.map((val) => {
+    audits.forEach((val) => {
       if (users && users.length) {
         const sender = users.find(
           (data) => val["transaction_sender"] === data.userAdress
