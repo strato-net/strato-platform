@@ -352,6 +352,7 @@ describe('Product End-To-End Tests', function () {
       ...productArgs(util.uid()),
     }
 
+    // Product will be created by one user. All updates will be done by another user of the same organization
     const createProductResponse = await post(
       Product.prefix,
       Product.create,
@@ -374,7 +375,7 @@ describe('Product End-To-End Tests', function () {
       Product.prefix,
       Product.update,
       updateArgs,
-      sameOrgUser.token,
+      admin.token,
     )
 
     assert.equal(updateProduct.status, 200, 'should be 200');
@@ -385,7 +386,7 @@ describe('Product End-To-End Tests', function () {
       Product.prefix,
       Product.get.replace(':address', productAddress),
       {},
-      sameOrgUser.token,
+      admin.token,
     )
 
     assert.equal(getProduct.status, 200, 'should be 200');
