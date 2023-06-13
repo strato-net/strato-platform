@@ -29,13 +29,13 @@ const EventSerialNumberList = ({ user }) => {
             return { key: index + 1, serialNumber: s };
         });
         setDataList(tempList);
-    }, []);
+    }, [serialNumbers]);
 
     return (
         <div className="mx-14">
             <div className="flex justify-between items-center mt-14">
                 <Breadcrumb className="mb-6">
-                    <Breadcrumb.Item href="javascript:;">
+                    <Breadcrumb.Item href="#">
                         <ClickableCell
                             href={user?.roles?.includes("Certifier") && user?.roles.length === 1 ?
                                 routes.Certifier.url : routes.Marketplace.url}
@@ -43,10 +43,10 @@ const EventSerialNumberList = ({ user }) => {
                             Home
                         </ClickableCell>
                     </Breadcrumb.Item>
-                    {tab === "Inventory" && <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+                    {tab === "Inventory" && <Breadcrumb.Item className="cursor-pointer" href="#">
                         <ClickableCell href={routes.Inventories.url}>Inventory</ClickableCell>
                     </Breadcrumb.Item>}
-                    <Breadcrumb.Item href="javascript:;">
+                    <Breadcrumb.Item href="#">
                         <div
                             onClick={() => {
                                 if (user?.roles.includes("Certifier") && user?.roles.length === 1)
@@ -59,7 +59,7 @@ const EventSerialNumberList = ({ user }) => {
                             Events
                         </div>
                     </Breadcrumb.Item>
-                    <Breadcrumb.Item href="javascript:;">
+                    <Breadcrumb.Item href="#">
                         <div
                             onClick={() => {
                                 if (user?.roles.includes("Certifier") && user?.roles.length === 1)

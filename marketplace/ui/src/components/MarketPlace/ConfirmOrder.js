@@ -386,13 +386,13 @@ const ConfirmOrder = () => {
       ) : (
         <div className="pb-20">
           <Breadcrumb>
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item href="#">
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item
-              href="javascript:;"
+              href="#"
             >
               <ClickableCell href={routes.Checkout.url}>
                 Checkout

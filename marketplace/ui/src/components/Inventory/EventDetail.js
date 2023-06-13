@@ -117,13 +117,13 @@ const InventoryEventDetails = () => {
       <div>
       <div className="flex justify-between">
         <Breadcrumb>
-          <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+          <Breadcrumb.Item className="cursor-pointer" href="#">
             <ClickableCell href={routes.Marketplace.url}>Home</ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+          <Breadcrumb.Item className="cursor-pointer" href="#">
             <ClickableCell href={routes.Inventories.url}>Inventory</ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item className="cursor-pointer" href="javascript:;">
+          <Breadcrumb.Item className="cursor-pointer" href="#">
             <ClickableCell href={routes.EventList.url.replace(":id",inventoryId)}>Events</ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item className="text-primary">
