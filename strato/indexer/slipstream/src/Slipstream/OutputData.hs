@@ -288,7 +288,7 @@ tableNameToText (MappingTableName o a c m ) =
                  else if T.null a
                    then o <> tableSeparator <> c <> tableSeparator
                    else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
-  in prefix <> m
+  in "mapping@" <> prefix <> m
 tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
