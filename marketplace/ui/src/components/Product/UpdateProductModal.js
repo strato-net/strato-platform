@@ -27,7 +27,7 @@ const UpdateProductModal = ({
   const dispatch = useProductDispatch();
 
   //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { issubCategorysLoading } = useSubCategoryState();
 
   const {
     isproductUpdating,

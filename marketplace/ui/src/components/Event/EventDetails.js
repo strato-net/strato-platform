@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { PageHeader } from "@ant-design/pro-layout";
-import { Card, Table, Typography, Breadcrumb, Input } from "antd";
+import { Table, Typography, Breadcrumb, Input } from "antd";
 import { useMatch, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/event/actions";
-import DataTableComponent from "../DataTableComponent";
 import { useEventDispatch, useEventState } from "../../contexts/event";
 import routes from "../../helpers/routes";
 import {SearchOutlined} from '@ant-design/icons';
@@ -24,8 +22,7 @@ const EventDetails = ({ user, users }) => {
   const {
     eventDetails,
     iseventDetailsLoading,
-    eventsAudit,
-    iseventAuditLoading,
+    eventsAudit
   } = useEventState();
 
   const routeMatch = useMatch({
@@ -122,7 +119,7 @@ const EventDetails = ({ user, users }) => {
     },
   ];
   if (Id !== undefined && !iseventDetailsLoading && details !== null) {
-    if (details["ownerOrganizationalUnit"] == "") {
+    if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }
   }

@@ -24,7 +24,6 @@ import {
   useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
@@ -49,7 +48,7 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
 
   //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { issubCategorysLoading } = useSubCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
 

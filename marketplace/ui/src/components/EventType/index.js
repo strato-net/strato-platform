@@ -1,4 +1,4 @@
-import { Card, Button, notification, Input, Space,  } from 'antd';
+import { Button, notification, Input, Space } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { PageHeader } from '@ant-design/pro-layout'
 import React, { useEffect, useState, useRef } from "react";
@@ -13,7 +13,6 @@ import { actions } from "../../contexts/eventType/actions";
 import { useEventTypeDispatch, useEventTypeState } from "../../contexts/eventType";
 import TransferOwnershipModal from "./TransferOwnershipModal";
 import useDebounce from "../UseDebounce";
-import { getStringDate } from '../../helpers/utils';
 
 const EventType = () => {
   const [queryValue, setQueryValue] = useState('');

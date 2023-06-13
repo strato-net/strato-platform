@@ -22,9 +22,7 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 //subcategories
 import {
   useSubCategoryDispatch,
-  useSubCategoryState,
 } from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 //product
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";

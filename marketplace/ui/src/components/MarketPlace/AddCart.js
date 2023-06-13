@@ -20,7 +20,6 @@ import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
@@ -116,22 +115,6 @@ const Checkout = ({ user }) => {
     });
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
-
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
 
   const openToastOrder = (placement) => {
     if (success) {

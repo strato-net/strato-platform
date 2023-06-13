@@ -1,4 +1,4 @@
-import { Typography, Pagination } from "antd";
+import { Typography } from "antd";
 import routes from "../../helpers/routes";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
