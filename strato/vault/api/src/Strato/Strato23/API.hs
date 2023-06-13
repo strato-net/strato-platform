@@ -30,7 +30,7 @@ type VaultWrapperAPI = GetPing
                   :<|> PostSignature'
                   :<|> PostPassword
                   :<|> VerifyPassword
-                  :<|> PostKeyAdmin
+                  :<|> PostKeyAdmin -- this endpoint is temporary and private
 
 
 type VaultCoreAPI =  GetKey :<|> PostKey  :<|> GetSharedKey :<|> GetUsers :<|> PostSignature

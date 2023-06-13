@@ -87,7 +87,14 @@ getSharedKey' userName oauthProvider otherPub = withSecretKey $ \key -> do
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just pKey -> return $ deriveSharedKey pKey otherPub
 
--- Same as postKey' but return's address/key if user already exists
+-- Normally a key is created in vault when a user logs in for the first time (app
+-- is responsible for calling the POST key). This endpoint circumvents that and
+-- is to be used ONLY by the cert registration script to create keys in vault
+-- before users log in for the first time (to improve user flow). The behavior 
+-- is exactly as postKey' but return's address/key if user already exists (which is 
+-- is purely an optimization so that if a user's key already does exist, the cert 
+-- registration script can create the cert right away instead of waiting for the 
+-- next run of the script)
 postKeyAdmin :: Text ->  Text -> VaultM AddressAndKey
 postKeyAdmin userName oauthProvider = withSecretKey $ \key -> do
   keyStore@KeyStore{..} <- newKeyStore key
