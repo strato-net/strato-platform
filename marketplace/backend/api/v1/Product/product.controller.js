@@ -88,20 +88,18 @@ class ProductController {
 
       ProductController.validateUpdateProductArgs(body)
 
-      let result
+      // If the old image key is present, delete the old image from S3. Keys are sent from UpdateProductModal.js
       if (req.body.updates.oldImageKey) {
 
-        result = await dapp.updateProduct(body, options)
         const fileKey = req.body.updates.oldImageKey
 
         const isDeleted = await deleteFileFromS3(fileKey, req.app.get(constants.s3ParamName))
         if (!isDeleted) {
           rest.response.status400(res, "Image is failed to delete")
         }
+      } 
 
-      } else {
-        result = await dapp.updateProduct(body, options)
-      }
+      const result = await dapp.updateProduct(body, options)
       rest.response.status200(res, result)
       return next()
     } catch (e) {

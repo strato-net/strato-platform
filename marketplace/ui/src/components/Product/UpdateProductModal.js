@@ -98,7 +98,7 @@ const UpdateProductModal = ({
       formData.append("fileUpload", formik.values.image);
 
       imageData = await actions.updateImage(dispatch, formData, productToUpdate.imageKey);
-      setIsImgChanged(false);
+
     } else {
       imageData = {
         imageKey: productToUpdate.imageKey,
@@ -131,10 +131,10 @@ const UpdateProductModal = ({
           },
         }
       }
-
       let isDone = await actions.updateProduct(dispatch, body);
 
       if (isDone) {
+        setIsImgChanged(false);
         actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
         handleCancel();
       }
