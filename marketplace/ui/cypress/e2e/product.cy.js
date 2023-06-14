@@ -6,7 +6,7 @@ describe("Renders Products Page", () => {
 
     cy.checkCategory();
 
-    cy.get("#Products", { timeout: 20000 }).should("exist");
+    cy.get("#Products").should("exist");
     cy.get("#Products").click();
     cy.url().should("include", "/products");
   });
@@ -28,7 +28,7 @@ describe("Renders Products Page", () => {
   it("it should add a product", () => {
     cy.url().should("include", "/products");
 
-    cy.get("#add-product-button", { timeout: 20000 }).should("exist");
+    cy.get("#add-product-button").should("exist");
     cy.get("#add-product-button").click();
     cy.get("#modal-title").contains("Add Product");
 
@@ -46,7 +46,7 @@ describe("Renders Products Page", () => {
     cy.get("#create-product-button").should("exist");
     cy.get("#create-product-button").click();
 
-    cy.contains("Product created successfully", { timeout: 20000 }).should("be.visible");
+    cy.contains("Product created successfully").should("be.visible");
   });
 
   it("it should delete a product", () => {
@@ -71,7 +71,7 @@ describe("Renders Products Page", () => {
         cy.get("#delete-product-yes").should("exist");
         cy.get("#delete-product-yes").click();
 
-        cy.contains("Product has been deleted", { timeout: 20000 }).should("be.visible");
+        cy.contains("Product has been deleted").should("be.visible");
       }
     });
   });
@@ -100,7 +100,7 @@ describe("Renders Products Page", () => {
         cy.get("#update-product-button").should("exist");
         cy.get("#update-product-button").click();
 
-        cy.contains("Product has been updated", { timeout: 20000 }).should("be.visible");
+        cy.contains("Product has been updated").should("be.visible");
       }
     });
   });

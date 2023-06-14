@@ -35,22 +35,22 @@ describe("Renders Marketplace Page - No Authentication", () => {
     cy.visit('/')
     cy.url().should("contain", "marketplace");
     cy.wait(20000)
-    cy.get("#viewMore", { timeout: 20000 }).should("be.enabled").click();
+    cy.get("#viewMore").should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
-    cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
-    cy.contains("Filters", { timeout: 20000 }).should("exist");
-    cy.contains("Categories", { timeout: 20000 }).should("exist");
-    cy.contains("Price", { timeout: 20000 }).should("exist");
-    cy.contains("Quantity", { timeout: 20000 }).should("exist");
-    cy.contains("Sub-Category", { timeout: 20000 }).should("exist");
-    cy.contains("Products found", { timeout: 20000 }).should("be.visible");
-    cy.get("#product-list", { timeout: 20000 }).should("exist");
+    cy.get("nav").contains("Home").should("exist");
+    cy.contains("Filters").should("exist");
+    cy.contains("Categories").should("exist");
+    cy.contains("Price").should("exist");
+    cy.contains("Quantity").should("exist");
+    cy.contains("Sub-Category").should("exist");
+    cy.contains("Products found").should("be.visible");
+    cy.get("#product-list").should("exist");
     cy.request({
       method: "GET",
       url: "/api/v1/marketplace?range[]=quantity,0,1000000&range[]=pricePerUnit,0,100000000"
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.get("#product-list", { timeout: 20000 }).children().should("have.length", body.data.length);
+      cy.get("#product-list").children().should("have.length", body.data.length);
     });
   });
 
@@ -65,10 +65,10 @@ describe("Renders Marketplace Page - No Authentication", () => {
 
       if (body.data.length !== 0) {
         let inventory = body.data[0];
-        cy.get("#topSelling", { timeout: 20000 }).children().first().click();
+        cy.get("#topSelling").children().first().click();
 
         cy.url().should("include", "/marketplace/productList/")
-        cy.get("nav", { timeout: 20000 }).contains("Home").should("exist");
+        cy.get("nav").contains("Home").should("exist");
         cy.get("nav").contains(decodeURIComponent(inventory.name)).should("exist");
         cy.get("div").find("img").should('have.attr', 'src');
         cy.get("button").contains("Add To Cart").should("exist");
