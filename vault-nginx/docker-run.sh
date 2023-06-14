@@ -2,6 +2,7 @@
 
 set -e
 
+ADMIN_ACCESS_CIDR_BLOCK=${ADMIN_ACCESS_CIDR_BLOCK:-NULL}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
 INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL:-NULL}
@@ -50,6 +51,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # Replacing HOST NAME PLACEHOLDERS
   sed -i 's/__VAULT_WRAPPER_HOST__/'"$VAULT_WRAPPER_HOST"'/g' /tmp/nginx.conf
+
+  if [[ ${ADMIN_ACCESS_CIDR_BLOCK} = NULL ]] ; then
+    sed -i '/#TEMPLATE_MARK_ADMIN_ACCESS_CIDR/d' /tmp/nginx.conf
+  else
+    sed -i 's|__ADMIN_ACCESS_CIDR_BLOCK__|'"${ADMIN_ACCESS_CIDR_BLOCK}"'|g' /tmp/nginx.conf
+  fi
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
