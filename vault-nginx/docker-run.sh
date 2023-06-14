@@ -55,7 +55,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [[ ${ADMIN_ACCESS_CIDR_BLOCK} = NULL ]] ; then
     sed -i '/#TEMPLATE_MARK_ADMIN_ACCESS_CIDR/d' /tmp/nginx.conf
   else
-    sed -i 's/__ADMIN_ACCESS_CIDR_BLOCK__/'"${ADMIN_ACCESS_CIDR_BLOCK}"'/g' /tmp/nginx.conf
+    sed -i 's|__ADMIN_ACCESS_CIDR_BLOCK__|'"${ADMIN_ACCESS_CIDR_BLOCK}"'|g' /tmp/nginx.conf
   fi
 
   ########
