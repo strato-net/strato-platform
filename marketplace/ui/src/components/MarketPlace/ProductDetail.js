@@ -12,7 +12,7 @@ import {
   Col,
   Spin,
   notification,
-  InputNumber
+  InputNumber,
 } from "antd";
 import { EyeOutlined, MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -157,6 +157,21 @@ const ProductDetails = ({ user, users }) => {
     }
   }, [categorys, details]);
 
+  const subtract = () => {
+    if (qty !== 1) {
+      let value = qty - 1;
+      setQty(value);
+    }
+  };
+
+  const add = () => {
+    if (qty < details.availableQuantity) {
+      let value = qty + 1;
+      setQty(value);
+    } else {
+      openToast("bottom", true, "Cannot add more than available quantity");
+    }
+  };
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -634,18 +649,32 @@ const ProductDetails = ({ user, users }) => {
                 $ {details.pricePerUnit}
               </Title>
               <Space>
-                <Text className="text-primaryB text-base">Quantity</Text>
-                <InputNumber className="ml-5 w-3/5" min={1} max={details.availableQuantity} defaultValue={qty} addonAfter={`/ ${details.availableQuantity} available`}
+              <Text className="text-primaryB text-base">Quantity</Text>
+              <div className="flex items-center my-2 ml-5" id="quantity">
+                <div
+                  onClick={subtract}
+                  className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                  <MinusOutlined className="text-xs text-secondryD" />
+                </div>
+                <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
                 onChange={e => {
-                  if(e > details.availableQuantity) {
+                  if (e < details.availableQuantity) {
+                    setQty(e)
+                  } else {
                     openToast(
                       "bottom",
                       true,
                       "Cannot add more than available quantity"
-                    );
+                      );
+                      setQty(details.availableQuantity)
                   }
-                  setQty(e)
-                  }} />
+                }} />                
+                <div
+                  onClick={add}
+                  className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                  <PlusOutlined className="text-xs text-secondryC" />
+                </div>
+              </div>
               </Space>
               <Tabs
                 defaultActiveKey="1"
