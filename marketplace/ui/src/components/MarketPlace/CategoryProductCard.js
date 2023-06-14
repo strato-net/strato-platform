@@ -188,7 +188,7 @@ const CategoryProductCard = ({ product, category }) => {
                 } else {
                   addItemToCart();
                 }
-              }}            >
+              }}>
               <div className="text-primary group-hover:text-white">Add To Cart</div>
             </Button>
             <Button
