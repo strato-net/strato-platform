@@ -179,19 +179,6 @@ const CategoryProductCard = ({ product, category }) => {
                   <PlusOutlined className="text-xs text-secondryC" />
                 </div>
               </div>
-              {/* <InputNumber className="ml-5 w-20" min={1} defaultValue={qty} controls={false}
-                onChange={e => {
-                  if (e > product.availableQuantity) {
-                    openToast(
-                      "bottom",
-                      true,
-                      "Cannot add more than available quantity"
-                    );
-                    setQty(product.availableQuantity)
-                  } else {
-                    setQty(e)
-                  }
-                }} /> */}
             </div>
             <Button
               className="group w-40 h-9 border border-primary hover:bg-primary"
