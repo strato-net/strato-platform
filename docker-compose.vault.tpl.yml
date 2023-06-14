@@ -60,6 +60,7 @@ services:
     ports:
     - ${HTTP_PORT:-8090}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-8093}:443 #TAG_REMOVE_WHEN_NO_SSL
+    - 8443:8443
     volumes:
     - ./ssl:/tmp/ssl:ro
     - idpconfig:/config
