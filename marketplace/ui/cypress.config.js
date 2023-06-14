@@ -26,6 +26,7 @@ module.exports = defineConfig({
     runMode: 5,
   },
   pageLoadTimeout: 60000,
+  defaultCommandTimeout: 60000,
   e2e: {
     baseUrl: "http://localhost",
     experimentalSessionAndOrigin: true,
