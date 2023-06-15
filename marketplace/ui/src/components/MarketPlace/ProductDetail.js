@@ -14,7 +14,7 @@ import {
   notification,
   InputNumber,
 } from "antd";
-import { EyeOutlined } from "@ant-design/icons";
+import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
