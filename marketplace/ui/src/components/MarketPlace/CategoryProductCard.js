@@ -6,6 +6,7 @@ import {
   notification,
   InputNumber,
 } from "antd";
+import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";

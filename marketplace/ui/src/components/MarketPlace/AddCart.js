@@ -6,6 +6,7 @@ import {
   Image,
   InputNumber
 } from "antd";
+import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
@@ -115,6 +116,22 @@ const Checkout = ({ user }) => {
     });
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
+
+  const openToast = (placement, isError, msg) => {
+    if (isError) {
+      api.error({
+        message: msg,
+        placement,
+        key: 1,
+      });
+    } else {
+      api.success({
+        message: msg,
+        placement,
+        key: 1,
+      });
+    }
+  };
 
   const openToastOrder = (placement) => {
     if (success) {
