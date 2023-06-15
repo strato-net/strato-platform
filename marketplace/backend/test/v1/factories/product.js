@@ -27,6 +27,19 @@ export const updateProductArgs = (address, uid) => {
       userUniqueProductCode: `userUniqueProductCode_${uid}`
     }
   }
+  return args 
+}
 
+export const updateImageProductArgs = (address, uid) => {
+  const args = {
+    productAddress: address,
+    updates: {
+      description: `description_${uid}`,
+      imageKey: `newImage_seeds.jpg`,
+      isActive: false,
+      userUniqueProductCode: `userUniqueProductCode_${uid}`,
+      oldImageKey: `1673855860544_seeds.jpg`,
+    }
+  }
   return args
 }
