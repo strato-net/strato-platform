@@ -2,7 +2,6 @@ import {
   Breadcrumb,
   Collapse,
   Divider,
-  Slider,
   Typography,
   Checkbox,
   Spin,
@@ -54,7 +53,7 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   let currentCategory;
 
   let { hasChecked, isAuthenticated } = useAuthenticateState();

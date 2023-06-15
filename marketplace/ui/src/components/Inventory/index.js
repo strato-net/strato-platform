@@ -48,7 +48,7 @@ const Inventory = ({ user }) => {
   //Categories
   const categoryDispatch = useCategoryDispatch();
   
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
   useInventoryState();
 

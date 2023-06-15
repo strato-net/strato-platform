@@ -1,4 +1,4 @@
-import { Card, Button, notification, Input, Space,  } from 'antd';
+import { Button, notification, Input, Space } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { PageHeader } from '@ant-design/pro-layout'
 import React, { useEffect, useState, useRef } from "react";
@@ -13,12 +13,11 @@ import { actions } from "../../contexts/eventType/actions";
 import { useEventTypeDispatch, useEventTypeState } from "../../contexts/eventType";
 import TransferOwnershipModal from "./TransferOwnershipModal";
 import useDebounce from "../UseDebounce";
-import { getStringDate } from '../../helpers/utils';
 
 const EventType = () => {
-  const [queryValue, setQueryValue] = useState('');
-  const [limit, setLimit] = useState(10);
-  const [offset, setOffset] = useState(0);
+  const [queryValue] = useState('');
+  const [limit] = useState(10);
+  const [offset] = useState(0);
   const [selectedObj, setSelectedObj] = useState([]);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [isTransferOwnershipModalOpen, toggleTransferOwnershipModal] = useState(false);
@@ -72,8 +71,8 @@ const EventType = () => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
 
-  const [searchText, setSearchText] = useState('');
-  const [searchedColumn, setSearchedColumn] = useState('');
+  const [, setSearchText] = useState('');
+  const [, setSearchedColumn] = useState('');
   const searchInput = useRef(null);
   const handleSearch = (selectedKeys, confirm, dataIndex) => {
     confirm();

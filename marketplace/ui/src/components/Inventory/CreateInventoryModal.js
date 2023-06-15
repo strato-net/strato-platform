@@ -21,10 +21,8 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import {
-  useSubCategoryDispatch,
   useSubCategoryState,
 } from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
@@ -42,14 +40,13 @@ const CreateInventoryModal = ({
 }) => {
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
   const productDispatch = useProductDispatch();
   const { readString } = usePapaParse();
   const [api, contextHolder] = notification.useNotification();
   const [uploadErr, setUploadErr] = useState("");
 
   //Sub-categories
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { issubCategorysLoading } = useSubCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
 

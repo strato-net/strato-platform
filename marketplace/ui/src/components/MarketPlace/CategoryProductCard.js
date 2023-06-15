@@ -14,7 +14,6 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
