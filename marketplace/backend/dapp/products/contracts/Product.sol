@@ -76,7 +76,9 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
     ,   string _userUniqueProductCode
     ,   uint _scheme
     ) returns (uint) {
-      if (tx.origin != owner) { return RestStatus.FORBIDDEN; }
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
 
       if (_scheme == 0) {
         return RestStatus.OK;

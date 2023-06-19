@@ -12,8 +12,9 @@ import {
   Col,
   Spin,
   notification,
+  InputNumber,
 } from "antd";
-import { EyeOutlined, MinusOutlined, PlusOutlined } from "@ant-design/icons";
+import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -49,8 +50,17 @@ import { useAuthenticateState } from "../../contexts/authentication";
 
 
 const ProductDetails = ({ user, users }) => {
-  const { state } = useLocation();
-  const { isCalledFromInventory } = state;
+  const { state, pathname } = useLocation();
+
+  let isCalledFromInventory = false;
+
+  if (state !== null && state!== undefined) { 
+    isCalledFromInventory = state.isCalledFromInventory
+  } 
+  else if (pathname.includes("inventories") ) {
+    isCalledFromInventory = true
+  }
+
   const [eventList, setEventList] = useState([])
   const [eventDetailList, setEventDetailList] = useState([])
   const [Id, setId] = useState(undefined);
@@ -66,11 +76,11 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if(user) {
-    if (Id !== undefined) {
-      eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+    if (user) {
+      if (Id !== undefined) {
+        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+      }
     }
-  }
   }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
@@ -126,7 +136,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if(user)  {
+      if (user) {
         itemsActions.fetchSerialNumbers(itemDispatch, Id);
       }
     }
@@ -195,6 +205,15 @@ const ProductDetails = ({ user, users }) => {
     }
     setEventDetailList(temp);
   }, [eventDetails])
+
+  const ownerSameAsUser = () => { 
+    
+    if(user && user.organization === inventoryDetails?.ownerOrganization)  {
+      return true;
+    }
+
+    return false;
+  }
 
   const addItemToCart = () => {
     let found = false;
@@ -563,7 +582,7 @@ const ProductDetails = ({ user, users }) => {
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
               </div>
               <Row className="justify-center my-7">
-                {isCalledFromInventory ? <Button
+                {ownerSameAsUser() ? <Button
                   className="group w-1/3 h-9 border border-primary"
                   disabled={true}
                   id="addToCart"
@@ -601,7 +620,7 @@ const ProductDetails = ({ user, users }) => {
                       navigate("/checkout");
                     }
                   }}
-                  disabled={isCalledFromInventory}
+                  disabled={ownerSameAsUser() }
                   id="buyNow"
                 >
                   Buy Now
@@ -627,22 +646,34 @@ const ProductDetails = ({ user, users }) => {
               <Title level={4} className="!mt-0">
                 $ {details.pricePerUnit}
               </Title>
+              <Space>
               <Text className="text-primaryB text-base">Quantity</Text>
-              <div className="flex items-center my-2" id="quantity">
+              <div className="flex items-center my-2 ml-5" id="quantity">
                 <div
                   onClick={subtract}
                   className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
                   <MinusOutlined className="text-xs text-secondryD" />
                 </div>
-                <div className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center">
-                  {qty}
-                </div>
+                <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                onChange={e => {
+                  if (e < details.availableQuantity) {
+                    setQty(e)
+                  } else {
+                    openToast(
+                      "bottom",
+                      true,
+                      "Cannot add more than available quantity"
+                      );
+                      setQty(details.availableQuantity)
+                  }
+                }} />                
                 <div
                   onClick={add}
                   className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
                   <PlusOutlined className="text-xs text-secondryC" />
                 </div>
               </div>
+              </Space>
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}
@@ -706,7 +737,7 @@ const ProductDetails = ({ user, users }) => {
                       />
                     ),
                   },
-                ]}
+                  ]}
               />
             </div>
           </div>

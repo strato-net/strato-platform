@@ -2,7 +2,6 @@ import {
   Breadcrumb,
   Collapse,
   Divider,
-  Slider,
   Typography,
   Checkbox,
   Spin,
@@ -54,7 +53,7 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   let currentCategory;
 
   let { hasChecked, isAuthenticated } = useAuthenticateState();
@@ -115,8 +114,7 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      if (category !== "") {
+    if (category !== "" && hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
@@ -128,9 +126,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMinPrice,
           debouncedMaxPrice
         );
-      }
     } else {
-      if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
@@ -141,8 +137,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMaxQty,
           debouncedMinPrice,
           debouncedMaxPrice
-        );
-      }
+          );
     }
   }, [
     marketplaceDispatch,
@@ -155,6 +150,8 @@ const CategoryProductList = ({ user }) => {
     debouncedMinPrice,
     debouncedMaxPrice,
     category,
+    hasChecked,
+    isAuthenticated,
   ]);
 
   //============================Manufacturers/Brands=============================//

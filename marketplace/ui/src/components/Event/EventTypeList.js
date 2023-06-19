@@ -1,4 +1,4 @@
-import { Pagination, Table, Typography } from "antd";
+import { Pagination, Typography } from "antd";
 import React, { useEffect, useState } from "react";
 import { useEventTypeState } from "../../contexts/eventType";
 

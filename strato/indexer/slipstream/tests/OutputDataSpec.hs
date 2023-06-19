@@ -29,6 +29,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+-- import Slipstream.Processor
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
@@ -58,7 +59,6 @@ createInserts globalsIORef contracts = do
     createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
-
 
 
 spec :: Spec
@@ -626,7 +626,6 @@ spec = do
       PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
 
 
-
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
@@ -634,7 +633,8 @@ createDummyContract v =
         _varIsPublic=True,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False
+        _isImmutable = False,
+        _isRecord = True
         }
   in
     Contract{
