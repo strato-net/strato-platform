@@ -104,4 +104,34 @@ describe("Renders Products Page", () => {
       }
     });
   });
+
+  it("it should edit and change a product picture", () => {
+    cy.createProduct();
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/product",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      if (body.data.length != 0) {
+        cy.get("#product")
+          .first()
+          .within(() => {
+            cy.get(".anticon svg").should("exist");
+            cy.get(".anticon svg").click();
+          });
+        cy.get("#edit-button").should("exist");
+        cy.get("#edit-button").click();
+        cy.get("#modal-title").contains("Edit Product");
+        cy.get("input[type=file]").attachFile("straw.jpg");
+        cy.get('textarea[placeholder="Enter Description"]').type(
+          " Editing this description"
+        );
+        cy.get("#update-product-button").should("exist");
+        cy.get("#update-product-button").click();
+
+        cy.contains("Product has been updated").should("be.visible");
+      }
+    });
+  });
 });
