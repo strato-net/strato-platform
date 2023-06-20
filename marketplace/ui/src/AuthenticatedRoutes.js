@@ -1,10 +1,7 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import routes from "./helpers/routes";
-import Category from "./components/Category";
 import CategoryProductList from "./components/MarketPlace/CategoryProductList";
 import { CategorysProvider } from "./contexts/category";
-import SubCategory from "./components/SubCategory";
-import SubCategoryDetails from "./components/SubCategory/SubCategoryDetails";
 import { SubCategorysProvider } from "./contexts/subCategory";
 import MarketPlace from "./components/MarketPlace";
 import Product from "./components/Product";
@@ -34,7 +31,6 @@ import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
-import { MarketplaceProvider } from "./contexts/marketplace";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/AddCart";

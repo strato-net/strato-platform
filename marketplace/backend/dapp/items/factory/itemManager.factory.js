@@ -24,6 +24,28 @@ const factory = {
         };
         return args;
     },
+    getItemArgsNoSerialNumber(uid) {
+        const args = {
+            itemArgs: {
+                productId:  '0000000000000000000000000000000000000000',
+                uniqueProductCode: parseInt(util.iuid()),
+                inventoryId:  '0000000000000000000000000000000000000000',
+                itemObject: [...new Array(5)].map((d, i) => {
+                    return {
+                        serialNumber: '',
+                        itemNumber: parseInt(util.iuid() + i),
+                        rawMaterialProductName: [],
+                        rawMaterialSerialNumber: [],
+                        rawMaterialProductId: []
+                    }
+                }),
+                status: 2,
+                comment: `comment_${uid}`,
+                createdDate: new Date().getTime()
+            }
+        };
+        return args;
+    },
     updateItemArgs(address, uid) {
         const args = {
             itemsAddress: address,

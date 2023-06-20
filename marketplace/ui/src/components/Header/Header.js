@@ -12,7 +12,7 @@ import {
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
@@ -39,8 +39,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
 
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
-  const [roleIndex, setRoleIndex] = useState()
-  const [pathName, setPathName] = useState("/");
+  const [roleIndex, setRoleIndex] = useState();
 
 
   const navItems = [
@@ -62,9 +61,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
     },
   ];
 
-  const demoMenuItems=[
-    { label: 'Marketplace', key: '0' },
-  ];
+  // const demoMenuItems=[
+  //   { label: 'Marketplace', key: '0' },
+  // ];
 
   const navUrls = [
     routes.Marketplace.url,

@@ -9,6 +9,7 @@ module Slipstream.Globals
   (
     setTableCreated,
     getTableColumns,
+    getMappingTables,
     isTableCreated,
     setContractState,
     xabiToText,
@@ -67,6 +68,18 @@ isTableCreated :: MonadIO m => IORef Globals -> TableName -> m Bool
 isTableCreated globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
   return $ tableName `M.member` createdTables
+
+getMappingTables :: MonadIO m => IORef Globals -> Text -> Text -> Text -> m ([Text])
+getMappingTables globalsIORef org app contract = do
+  Globals{..} <- readIORef globalsIORef
+  let mappingTables = M.filterWithKey isMappingTableName (createdTables)
+                        where
+                          isMappingTableName :: TableName -> TableColumns -> Bool
+                          isMappingTableName (MappingTableName o a n _) _ = 
+                            o == org && a == app && n == contract
+                          isMappingTableName _ _ = False
+  let mapNames = map mtMappingName (M.keys mappingTables)
+  return mapNames
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do

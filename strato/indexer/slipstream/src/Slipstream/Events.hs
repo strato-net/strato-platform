@@ -41,8 +41,8 @@ data ProcessedMappingRow = ProcessedMappingRow
   , m_codehash          :: CodePtr
   , m_organization      :: Text
   , m_application       :: Text
-  , m_contractName      :: Text
-  , m_mapName           :: Text
+  , m_contractname      :: Text
+  , m_mapname           :: Text
   , m_chain             :: Text
   , m_blockHash         :: Keccak256
   , m_blockTimestamp    :: UTCTime

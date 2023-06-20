@@ -7084,7 +7084,7 @@ contract qq {
   }
 }   |]) `shouldThrow` anyTooMuchGasError
 
-  fit "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
+  it "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
     runBS [r|
 contract qq {
   string x;

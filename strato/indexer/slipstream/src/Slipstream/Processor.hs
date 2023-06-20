@@ -83,6 +83,7 @@ import SelectAccessible                         ()
 
 import Slipstream.Data.Action
 import Slipstream.Events
+import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -310,21 +311,13 @@ rowToInsert gref abiid row cont oldState = do
 processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
 processedContractToProcessedMappingRows pc mapNames = do
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
-      onlyRecord = Map.toList(Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-      recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord 
-      flattenedMap =  Map.foldrWithKey flattenOuterMap [] (Map.fromList recordVMs) 
-        where
-          flattenOuterMap :: Text -> Map.Map SimpleValue Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-          flattenOuterMap mapName innerMap flatList = flatList ++ Map.foldrWithKey (flattenInnerMap mapName) [] innerMap
-
-          flattenInnerMap :: Text -> SimpleValue -> Value -> [(Text, SimpleValue, Value)] -> [(Text, SimpleValue, Value)]
-          flattenInnerMap mapName key value flatList = (mapName, key, value) : flatList
-      result = convertToPMapping flattenedMap 
-        where 
-          convertToPMapping :: [(Text, SimpleValue, Value)] -> [ProcessedMappingRow]
-          convertToPMapping flatMap = fmap (\(mapName, key , value ) -> processedMappingRow mapName pc (SimpleValue key) value ) flatMap
-  return $ result
-
+  let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
+  let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
+  if null valueMappingsMap then return $ []
+  else do
+    let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName pc (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
+    return $ result
+      
 rowToHistories :: (MonadIO m) =>
                   IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
@@ -374,8 +367,8 @@ processedMappingRow mapping ProcessedContract{..} k v =
   , m_codehash          =  codehash 
   , m_organization      =  organization 
   , m_application       =  application 
-  , m_contractName      =  contractName 
-  , m_mapName           =  mapping
+  , m_contractname      =  contractName 
+  , m_mapname           =  mapping
   , m_chain             =  chain 
   , m_blockHash         =  blockHash 
   , m_blockTimestamp    =  blockTimestamp 
@@ -479,14 +472,14 @@ processTheMessages env sqlEnv conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  fkeys_and_mapNames <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
     case cc' of
       Right cc -> do
               $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
 
 
-              deferredForeignKeys_and_mapNames <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+              deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
                 let n = labelToText nameString
                     a' = if a /= ""
                            then a
@@ -510,7 +503,6 @@ processTheMessages env sqlEnv conn g messages = do
                 let nameParts = (o, a', n)
 
                 --Create mapping tables
-
                 forM_ mapNames $ \m -> do 
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
@@ -521,21 +513,17 @@ processTheMessages env sqlEnv conn g messages = do
 
                 outputData conn . createEventTables g $ contractToEventTables nameParts c
 
-                return [(deferredForeignKeys, mapNames)]
+                return deferredForeignKeys
 
-              let deferredForeignKeys = concat $ map fst deferredForeignKeys_and_mapNames
-              let mapNames            = concat $ map snd deferredForeignKeys_and_mapNames
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
-
-              pure $ (Right deferredForeignKeys, Right mapNames) 
+              pure $ Right deferredForeignKeys
 
       Left cc -> do
         $logInfoS "processTheMessages" $ T.pack cc
-        pure $ (Left cc, Left []) 
+        pure $ Left cc -- Either String String
 
-  let fkeys = rights $ map fst fkeys_and_mapNames
-  let bigMapNames = map T.pack $ concat $ rights $ map snd fkeys_and_mapNames
+  let fkeys = rights fkeys'
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -565,7 +553,10 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          pMappings <- processedContractToProcessedMappingRows indexContract bigMapNames --get all procsesed mappings
+          mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all mapping rows to insert
+          $logDebugLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs pMappings
@@ -581,8 +572,8 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
-    unless (null ins) $ outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless (null ins || (length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    outputData conn . insertHistoryTable $ concatMap historyInserts ins
+    unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -599,4 +590,5 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+
 

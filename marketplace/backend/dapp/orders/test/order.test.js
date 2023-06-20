@@ -96,7 +96,7 @@ describe('Order', function () {
 
     describe('Buyer Org',()=>{
 
-        it('createOrder (Private chain)', async () => {
+        it('createOrder', async () => {
             const args = factoryArgs(globalAdmin);
             const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
             const orderData = await order.get();
@@ -108,7 +108,7 @@ describe('Order', function () {
                 R.map(v => '' + v, args));
         });
     
-        it('createOrder (Private chain, multiple)', async () => {
+        it('createOrder (multiple)', async () => {
             const args1 = factoryArgs(globalAdmin);
             const args2 = factoryArgs(globalAdmin);
             const args3 = factoryArgs(globalAdmin);

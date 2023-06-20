@@ -11,6 +11,15 @@ const factory = {
         };
         return args;
     },
+
+    getOrderLineItemArgsWithNoSN(uid) {
+        const args = {
+            orderLineId: constants.zeroAddress,
+            itemId: `itemId_${uid}`,
+            createdDate: new Date().getTime(),
+        };
+        return args;
+    },
 };
 
 export default factory;

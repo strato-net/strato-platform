@@ -8,7 +8,6 @@ import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import {
-  useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
 
@@ -24,22 +23,26 @@ const ProcessingOrder = () => {
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(undefined);
   const orderDispatch = useOrderDispatch();
-  const { cartList } = useMarketplaceState();
+  // const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, seterror] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
 
 
-  useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, cartList);
-  }, [marketplaceDispatch, cartList]);
+  const storedData = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+  }, []);
+  
+  // useEffect(() => {
+  //   actions.fetchCartItems(marketplaceDispatch, cartList);
+  // }, [marketplaceDispatch, cartList]);
 
   const routeMatch = useMatch({
     path: routes.ProcessingOrder.url,
     strict: true,
   });
-
+  
   const query = useQuery();
 
   useEffect(() => {
@@ -100,7 +103,7 @@ const ProcessingOrder = () => {
         orderItemAddress.push(c.inventoryId);
       });
       let updatedCart = [];
-      cartList.forEach(cart => {
+      storedData.forEach(cart => {
         if (!orderItemAddress.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
