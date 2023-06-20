@@ -82,7 +82,7 @@ solidityContract = do
   let allFunctions = Map.fromListWith (parseOverloads pragmaVersion') [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations ]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
-  let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
+  let using = [(n, [u]) | (n, UsingDeclaration u) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -101,7 +101,7 @@ solidityContract = do
              , _xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , _xabiEvents = Map.fromList events
              , _xabiKind = kind
-             , _xabiUsing = Map.fromList using
+             , _xabiUsing = Map.fromListWith (++) using
              , _xabiContext = a
            },
         map (Text.pack . fst) baseConstrs
@@ -285,16 +285,17 @@ enumDeclaration = do
 
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
-  ~(a, (usingContract', rest)) <- withPosition $ do
+  ~(a, (usingContract', usingType')) <- withPosition $ do
     reserved "using"
     usingContract' <- identifier
-    rest <- many1 (noneOf ";")
+    reserved "for"
+    usingType' <- many1 $ noneOf ";"
     semi
-    pure (usingContract', rest)
+    pure (usingContract', usingType')
   return
     (
-      usingContract',
-      UsingDeclaration (Xabi.Using rest a)
+      usingType',
+      UsingDeclaration (Xabi.Using usingContract' usingType' a)
     )
 
 {- Variables -}

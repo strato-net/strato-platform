@@ -1359,3 +1359,18 @@ contract A {
   int endofunctor2   = type(A).delegatecall("garbage()");
 }
 |] in length anns `shouldBe` 1
+    
+    fit "Can typecheck `using` expressions" $
+      let anns = runTypechecker [r|
+contract SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract A {
+  using SafeMath for uint;
+  function useUsing(uint _x) returns (uint) {
+    return _x.add(1);
+  }
+}
+|] in anns `shouldBe` []

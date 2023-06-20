@@ -48,6 +48,7 @@ xabiToContract contractName' parents' userDefinedTypes xabi = do
   _events = Xabi._xabiEvents xabi,
   _functions = Xabi._xabiFuncs xabi,
   _modifiers = Xabi._xabiModifiers xabi,
+  _usings = Xabi._xabiUsing xabi,
   _constructor = constr,
   _contractContext = Xabi._xabiContext xabi
   }
