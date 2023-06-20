@@ -104,6 +104,21 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
       };
+    case actionDescriptors.deleteAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.deleteAddressSuccessful:
+      console.log("here5");
+      return {
+        ...state,
+        userAddresses: action.payload,
+      };
+    case actionDescriptors.deleteAddressFailed:
+      return {
+        ...state,
+        error: action.error,
+      };
     case actionDescriptors.deleteCartItem:
       return {
         ...state,

@@ -25,6 +25,9 @@ const actionDescriptors = {
   addItemToConfirmOrder: "add_item_to_confirm_order",
   addItemToConfirmOrderSuccessful: "add_item_to_confirm_order_successful",
   addItemToConfirmOrderFailed: "add_item_to_confirm_order_failed",
+  deleteAddress: "delete_address",
+  deleteAddressSuccessful: "delete_address_successful",
+  deleteAddressFailed: "delete_address_failed",
   fetchConfirmOrderItems: "fetch_confirm_order_items",
   fetchConfirmOrderItemsSuccessful: "fetch_confirm_order_items_successful",
   fetchConfirmOrderItemsFailed: "fetch_confirm_order_items_failed",
@@ -127,6 +130,24 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.addItemToConfirmOrderFailed,
+        error: undefined,
+      });
+    }
+  },
+  
+  deleteAddress: (dispatch, addyList) => {
+    console.log("here2");
+    dispatch({ type: actionDescriptors.deleteAddress });
+    try {
+      console.log("here3");
+      dispatch({
+        type: actionDescriptors.deleteAddressSuccessful,
+        payload: addyList,
+      });
+    } catch (err) {
+      console.log("here4");
+      dispatch({
+        type: actionDescriptors.deleteAddressFailed,
         error: undefined,
       });
     }

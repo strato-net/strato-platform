@@ -589,9 +589,26 @@ const ConfirmOrder = () => {
                           <div key={index}>
                             <Card className={index !== selectedAddress ? "w-96 cursor-pointer" : "w-96 border border-primary cursor-pointer"} onClick={() => { setSelectedAddress(index) }}>
                               <AddressComponent userAddress={add} />
+                              <div           
+                              onClick={() => {
+                                let addy = [...userAddresses];
+                                addy.splice(
+                                  index,
+                                  1
+                                );
+                                console.log(userAddresses);
+                                console.log(addy);
+                                console.log("here1");
+                                actions.deleteAddress(marketplaceDispatch, addy);
+                                console.log("here1");
+                              }}
+                              className="hover:text-error cursor-pointer text-xl" >
+                                Delete Address
+                              </div>
                             </Card>
                           </div>
                         )
+                        
                       }
                     </div>
                     :
