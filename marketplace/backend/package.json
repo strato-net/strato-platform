@@ -31,6 +31,7 @@
     "test:api:event": "yarn mocha-babel test/v1/event.test.js -b",
     "test:api:image": "yarn mocha-babel test/v1/image.test.js -b",
     "test:api:marketplace": "yarn mocha-babel test/v1/marketplace.test.js -b",
+    "test:api:paymentUrl": "yarn mocha-babel test/v1/paymentUrlGeneration.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"
