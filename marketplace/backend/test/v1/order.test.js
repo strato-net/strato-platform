@@ -28,6 +28,7 @@ describe('Order End-To-End Tests', function () {
     let globalAdminToken
     let sellerToken
     try {
+      // Seller and buyer tokens musst be of different orgs.
       globalAdminToken = await oauthHelper.getUserToken(
         `${process.env.TEST_BUYER_ORG}`,
         `${process.env.TEST_BUYER_PASSWORD}`,
@@ -68,7 +69,6 @@ describe('Order End-To-End Tests', function () {
   })
 
   it('Create an Order Pay Later', async () => {
-    // In this case the seller must have gone through the connect stripe flow
     const createProductArgs = {
       ...productArgs(util.uid()),
     }
@@ -115,6 +115,7 @@ describe('Order End-To-End Tests', function () {
   })
 
   it('Create an Order Pay Now', async () => {
+    // In this case the seller must have gone through the connect stripe flow
     const createProductArgs = {
       ...productArgs(util.uid()),
     }
@@ -148,7 +149,7 @@ describe('Order End-To-End Tests', function () {
     // An array of inventory addresses created by the seller
     const inventories=[inventoryAddress]
 
-    // Create a user address if one does not exist already
+    // Create a user address for the buyer's shipping information
     const buyerAddressArgs = factory.getUserAddressArgs(util.uid())
     const createUserAddressResponse = await post(
       Order.prefix,
@@ -199,7 +200,6 @@ describe('Order End-To-End Tests', function () {
     // get
     const getOrderResponse = await get(
       Order.prefix,
-      // Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
       Order.get.replace(':address',orderAddress),
       {},
       globalAdmin.token,
