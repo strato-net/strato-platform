@@ -40,7 +40,7 @@ spec:
           value: "5432"
         - name: postgres_user
           value: "postgres"
-        - name: prometheusHost
+        - name: PROMETHEUS_HOST
           value: "localhost:9090"
         - name: STRATO_HOSTNAME
           value: "localhost"
@@ -310,8 +310,8 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: "api"
-        #- name: PGDATA
-        #  value: /var/lib/postgresql/data/pgdata
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
@@ -378,7 +378,7 @@ spec:
         - name: vmDebug
           value: ""
       - image: swaggerapi/swagger-ui:v3.22.1
-        name:  docs
+        name: docs
         env:
         - name: API_URL
           value: "/strato-api/eth/v1.2/swagger.json"
@@ -424,6 +424,8 @@ spec:
         volumeMounts:
           - mountPath: /prometheus
             name: prometheus-data
+        securityContext:
+          runAsUser: 0
       volumes:
         - name: marketplace-data
           awsElasticBlockStore:

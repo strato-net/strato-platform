@@ -1,6 +1,7 @@
 {
   "name": "APEX",
   "private": true,
+  "proxy": "http://localhost:3009",
   "scripts": {
     "start:prod": "export NODE_ENV=production; npm run db-create && npm run db-migrate && npm-run-all --parallel start:prod:www start:node-health start:stall-check start:db-cleaner",
     "start:prod:www": "NODE_ENV=production; PORT=3009 NODE_HOST=${NODE_HOST} node ./bin/www",

@@ -24,13 +24,13 @@ Replace below place holders with valid values:
 * *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
 * *REPLACE_WITH_STRIPE_SECRET_KEY*
 Replace volume id place holders
-* *marketplace-data-volumeid* as *vol-0ef503037141c02ab*
-* *postgres-data-volume-id* as *vol-0a4ac71b70905f806*
-* *prometheus-data-volume-id* as *vol-07828d4a4e9adf731*
-* *kafka-data-volume-id* as *vol-0334b826317434504*
-* *redis-data-volume-id* as *vol-0fd90c145c88224d2*
-* *strato-data-volume-id* as *vol-01c298651694dcfce*
-* *zookeeper-data-volume-id* as *vol-09a78def133bc911c*
+* *marketplace-data-volume-id* as *vol-0ef503037141c02ab*
+* *postgres-data-volume-id* as *vol-037f74c7f097c61b4*
+* *prometheus-data-volume-id* as *vol-02ac7e785a808ab41*
+* *kafka-data-volume-id* as *vol-0769ca939a4119e2d*
+* *redis-data-volume-id* as *vol-0ec8159b057dd90a8*
+* *strato-data-volume-id* as *vol-0c8d868eb6fca1bf9*
+* *zookeeper-data-volume-id* as *vol-0fc7742072223559a*
 
 Rename the template file
 cp eks-strato-deployment.tpl.yaml eks-strato-deployment.yaml
