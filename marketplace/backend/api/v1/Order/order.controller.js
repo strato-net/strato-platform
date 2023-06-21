@@ -100,8 +100,8 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-
-      OrderController.validateCreateOrderArgs(body)
+      console.log("body payment======", body)
+      OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(body, options, accessToken)
       rest.response.status200(res, result)
@@ -184,6 +184,7 @@ class OrderController {
         inventoryId: Joi.string().required(),
         quantity: Joi.number().required()
       })).required(),
+      shippingAddress: Joi.string().required(),
       orderTotal: Joi.number().required()
     }).required();
 
