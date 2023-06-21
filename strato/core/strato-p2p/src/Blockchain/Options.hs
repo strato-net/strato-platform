@@ -40,5 +40,10 @@ computeNetworkID =
       if flags_testnet
       then 0
       else 1
-    (network, -1) -> toInteger (fromInteger . bytes2Integer $ map c2w network :: Int)
-    (_, _) -> toInteger (fromInteger flags_networkID :: Int)
+    (network, -1) -> newtorkToID network
+    (_, networkID) -> networkID -- providing a networkID will ignore network name
+
+    where newtorkToID :: String -> Integer
+          newtorkToID network = case network of 
+            "mercata-hydrogen" -> 7596898649924658542 -- mercata-hydrogen networkID was manually changed
+            n -> bytes2Integer $ map c2w n
