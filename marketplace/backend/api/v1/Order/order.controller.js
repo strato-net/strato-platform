@@ -101,7 +101,7 @@ class OrderController {
     try {
       const { dapp, body, accessToken } = req
 
-      OrderController.validateCreateOrderArgs(body)
+      OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(body, options, accessToken)
       rest.response.status200(res, result)
@@ -181,16 +181,17 @@ class OrderController {
     const paymentSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
-        inventoryId: Joi.string().required(),
-        quantity: Joi.number().required()
-      })).required(),
-      orderTotal: Joi.number().required()
+            inventoryId: Joi.string().required(),
+            quantity: Joi.number().required()
+          })).required(),
+      orderTotal: Joi.number().required(),
+      shippingAddress: Joi.string().required()
     }).required();
 
     const validation = paymentSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Order Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Payment Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
