@@ -54,8 +54,8 @@ describe('Payment Tests', function () {
     let buyerToken
     try {
       buyerToken = await oauthHelper.getUserToken(
-        `${process.env.GLOBAL_ADMIN_NAME}`,
-        `${process.env.GLOBAL_ADMIN_PASSWORD}`,
+        `${process.env.TEST_BUYER_ORG}`,
+        `${process.env.TEST_BUYER_PASSWORD}`,
       )
     } catch (e) {
       console.error(
