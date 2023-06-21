@@ -61,7 +61,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -576,8 +575,6 @@ sendOutEvent (OutAction act) =
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
-  void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
@@ -592,6 +589,7 @@ sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
       ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent _ = return ()
 
 -- sendOutEvents :: VmOutEventBatch -> ContextM ()
 -- sendOutEvents OutBatch{..} = do
