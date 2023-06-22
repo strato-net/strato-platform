@@ -6,6 +6,7 @@ module Blockchain.Data.BlockHeader (
   BlockHeader(..),
   headerHash,
   blockToBlockHeader,
+  blockDataToBlockHeader,
   blockToBody,
   extraData2TxsLen,
   txsLen2ExtraData,

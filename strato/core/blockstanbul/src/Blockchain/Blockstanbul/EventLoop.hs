@@ -389,6 +389,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         recordProposal
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
+    SnapshotReceived snapshot -> do
+      $logInfoS "blockstanbul" . T.pack $ "Snapshot received, sending out to populate MPT(s)"
+      yieldL $ OSnapshot snapshot
 
 
 loopback :: EOutEvent -> Maybe InEvent
@@ -454,6 +457,7 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    ForcedConfigChange{} -> inc "forced_config_change"
    ValidatorBehaviorChange{} -> inc "validator_behavior_change"
    ValidatorChange{} -> inc "validator_change"
+   SnapshotReceived{} -> inc "snapshot_received"
    
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
@@ -470,3 +474,4 @@ recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCoun
     GapFound{} -> inc "gap_found"
     LeadFound{} -> inc "lead_found"
     NewCheckpoint{} -> inc "new_checkpoint"
+    OSnapshot{} -> inc "snapshot_to_use"
