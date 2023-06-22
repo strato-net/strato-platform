@@ -63,6 +63,8 @@ import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.RedisBlockDB
+import           Blockchain.Strato.RedisBlockDB.Models 
 import           Blockchain.TimerSource
 import           Blockchain.Strato.Model.Util
 import           Blockchain.Watchdog
@@ -192,26 +194,78 @@ handleMsgClientConduit myId peer = do
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch 
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-                -- we set to 0 cause we dont necessarily know the number yet
-                lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-                yield . Right $ GetChainDetails []
-                handleGetChainDetails peer S.empty
-                lift stampActionTimestamp
+                hss <- lift $ Mod.access (Mod.Proxy @HasSnapshot)
+                -- (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+                -- TODO change this to the above line, this is a temp fix, this should NEVER go into develop... unless Dustin says so
+                mRedisBlockInfo  <- (runStratoRedisIO getBestBlockInfo)
+                let lastBlockNumber = case mRedisBlockInfo of Nothing -> 0; Just (RedisBestBlock _ lbb _) -> lbb;
+
+                case (flags_snapSyncMode, unHasSnapshot hss, lastBlockNumber > 0) of
+                  (True, True, True) -> do
+                    -- Snap Sync: Already has snapshot, dont need it again, sync only the latest blocks
+                    $logDebugS "handleMsgClientConduit" $ T.pack $ "Already have snapshot, continue to sync normally..."
+                    lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
+                  (True, False, False) -> do
+                    -- Snap Sync: Get Snapshot
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "Asking for snapshot from" ++ (show $ pPeerIp peer)
+                    yield . Right $ GetSnapshot
+                  (True, False, True) -> do
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "This is not suppose to happen."
+                  (True, True, False) -> do
+                    -- Snap Sync: Still processing snapshot
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "Snap syncing in progress..."
+                  (False, _, _) -> do
+                    -- Default Sync
+                    -- we set to 0 cause we dont necessarily know the number yet
+                    lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-                -- we set to 0 cause we dont necessarily know the number yet
-                lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-                yield . Right $ GetChainDetails []
-                handleGetChainDetails peer S.empty
-                lift stampActionTimestamp
+                hss <- lift $ Mod.access (Mod.Proxy @HasSnapshot)
+                -- (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+                -- TODO change this to the above line, this is a temp fix, this should NEVER go into develop... unless Dustin says so
+                mRedisBlockInfo  <- (runStratoRedisIO getBestBlockInfo)
+                let lastBlockNumber = case mRedisBlockInfo of Nothing -> 0; Just (RedisBestBlock _ lbb _) -> lbb;
+
+                case (flags_snapSyncMode, unHasSnapshot hss, lastBlockNumber > 0) of
+                  (True, True, True) -> do
+                    -- Snap Sync: Already has snapshot, dont need it again, sync only the latest blocks
+                    $logDebugS "handleMsgClientConduit" $ T.pack $ "Already have snapshot, continue to sync normally..."
+                    lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
+                  (True, False, False) -> do
+                    -- Snap Sync: Get Snapshot
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "Asking for snapshot from" ++ (show $ pPeerIp peer)
+                    yield . Right $ GetSnapshot
+                  (True, False, True) -> do
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "This is not suppose to happen."
+                  (True, True, False) -> do
+                    -- Snap Sync: Still processing snapshot
+                    $logInfoS "handleMsgClientConduit" $ T.pack $ "Snap syncing in progress..."
+                  (False, _, _) -> do
+                    -- Default Sync
+                    -- we set to 0 cause we dont necessarily know the number yet
+                    lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
