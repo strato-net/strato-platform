@@ -73,6 +73,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
+import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
@@ -589,7 +590,7 @@ sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
       ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
-sendOutEvent _ = return ()
+sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 
 -- sendOutEvents :: VmOutEventBatch -> ContextM ()
 -- sendOutEvents OutBatch{..} = do
