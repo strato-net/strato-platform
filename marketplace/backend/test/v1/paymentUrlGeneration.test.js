@@ -80,9 +80,17 @@ describe('Payment Tests', function () {
 
   })
 
-  
+//////////////////////////////////////  
+//** Payment URL Generation Test **//
+////////////////////////////////////
 
-
+/*////////////////////////////////*
+ Flow: 
+1. Seller creates Inventory
+2. Buyer will have the shipping address created
+3. Buyer clicks Pay Now, which invokes the `orders/payment` api endpoint to generate stripe checkout URL before creating order
+4. Order Creation and Retrieval
+/////////////////////////////////*/
 
 it('Get Payment URL', async () => {
   // create inventory and post it as a seller
@@ -117,21 +125,68 @@ it('Get Payment URL', async () => {
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
 
     const inventories=[inventoryAddress]
-    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
+
+      //*   shippingAddress  *//
+      
+    //create Shipping Address for a user (buyer)
+    const buyerAddressArgs = factory.getUserAddressArgs(util.uid())
+    const shipAddress = await post(
+      Order.prefix,
+      Order.userAddress,
+      buyerAddressArgs,
+      buyer.token,
+    )
+
+    assert.equal(shipAddress.status, 200, 'should be 200');
+    assert.isDefined(shipAddress.body, 'body should be defined');
+    assert.isDefined(shipAddress.body.data, 'body should be defined');
+
+    const [,userAddress]=shipAddress.body.data
+
+    //fetch Shipping Address for a user
+    const getShipAddress = await get(
+      Order.prefix,
+      Order.getAllUserAddress.replace(':address',userAddress),
+      {},
+      buyer.token,
+    )
+    
+    assert.equal(getShipAddress.status, 200, 'should be 200');
+    assert.isDefined(getShipAddress.body, 'body should be defined');
+    assert.isDefined(getShipAddress.body.data, 'body should be defined');
+
+    const buyerAddress = getShipAddress.body.data.filter(address=>address.address === userAddress)
+    assert.deepInclude(buyerAddress[0],buyerAddressArgs, 'should include the buyer address args')
+    
+    // pay now as a buyer
+    const payOrder = await post(
+      Order.prefix,
+      Order.payment,
+      factory.getCreatePaymentArgs(util.uid(),buyerOrganization,inventories,userAddress),
+      buyer.token,
+    )
+    
+    assert.equal(payOrder.status, 200, 'should be 200');
+    assert.isDefined(payOrder.body, 'body should be defined');
+    assert.isDefined(payOrder.body.data, 'body should be defined');
+    assert.equal(payOrder.body.data.url.substr(0,34),factory.paymentUrlDomain,'should have a stripe url generated')
+
     //buyer creates order
+
+    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
+
     const createOrderResponse = await post(
       Order.prefix,
       Order.create,
       createOrderArgs,
       buyer.token
     )
-
     const orderAddress = createOrderResponse.body.data[0][1]
 
     assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createOrderResponse.body, 'body should be defined')
 
-    // get inventoryID & other data
+    // get
     const getOrderResponse = await get(
       Order.prefix,
       Order.get.replace(':address',orderAddress),
@@ -142,64 +197,5 @@ it('Get Payment URL', async () => {
     assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(getOrderResponse.body, 'body should be defined');
 
-
-        //*   Fetch shippingAddress  *//
-
-    //create Shipping Address for a user
-    const shipAddress = await post(
-      Order.prefix,
-      Order.userAddress,
-      {
-        shippingName: "Testing Address",
-        shippingZipcode:'12345',
-        shippingState: 'NY',
-        shippingCity: 'Brooklyn',
-        shippingAddressLine1: '315 Meserole St, Ste B4',
-        shippingAddressLine2: "",
-        billingName: 'Tester',
-        billingZipcode:'12345',
-        billingState: 'NY',
-        billingCity: 'Brooklyn',
-        billingAddressLine1: '315 Meserole St, Ste B4',
-        billingAddressLine2: ""
-      },
-      buyer.token,
-    )
-
-    assert.equal(shipAddress.status, 200, 'should be 200');
-    assert.isDefined(shipAddress.body, 'body should be defined');
-    assert.isDefined(shipAddress.body.data, 'body should be defined');
-
-        //fetch Shipping Address for a user
-        const getShipAddress = await get(
-          Order.prefix,
-          Order.getAllUserAddress,
-          {},
-          buyer.token,
-        )
-        
-        assert.equal(getShipAddress.status, 200, 'should be 200');
-        assert.isDefined(getShipAddress.body, 'body should be defined');
-        assert.isDefined(getShipAddress.body.data, 'body should be defined');
-
-    
-    // pay now as a buyer
-    const payOrder = await post(
-      Order.prefix,
-      Order.payment,
-      {
-      "buyerOrganization":buyerOrganization,
-      "orderList":[ JSON.parse(`{"inventoryId":"${getOrderResponse.body.data.orderLines[0].inventoryId}","quantity":${getOrderResponse.body.data.orderLines[0].quantity}}`)],
-      "orderTotal" : (getOrderResponse.body.data.orderLines[0].amount) + getOrderResponse.body.data.orderLines[0].tax + getOrderResponse.body.data.orderLines[0].shippingCharges,
-      "shippingAddress": getShipAddress.body.data[0].address
-      },
-      buyer.token,
-    )
-    
-    assert.equal(payOrder.status, 200, 'should be 200');
-    assert.isDefined(payOrder.body, 'body should be defined');
-    assert.isDefined(payOrder.body.data, 'body should be defined');
 })
-
-
 })
