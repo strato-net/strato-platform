@@ -1,10 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 module Blockchain.Database.MerklePatricia.ForEach where
 
 import           Control.Monad
 import           Control.Monad.Change.Alter
+import qualified Data.ByteString           as B       (empty)
 import           Data.NibbleString (NibbleString)
 import qualified Data.NibbleString                            as N
 
@@ -30,10 +32,42 @@ forEach_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Left ref} partialK
 forEach_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Right val} partialKey f =
   f (partialKey `N.append` s) val
 
-
-
 forEach_NodeRef :: (StateRoot `Alters` NodeData) m
                 => NodeRef -> NibbleString -> (Key -> Val -> m ()) -> m ()
 forEach_NodeRef ref partialKey f = do
   nodeData <- getNodeData ref
   forEach_NodeData nodeData partialKey f
+
+-----------------------------
+-- Below code is related to SnapSync
+getAllLeafKeyVals :: (StateRoot `Alters` NodeData) m => StateRoot -> m [(Key, Val)]
+get_all_leafs_and_keys sr = forEach_NodeRef_Get_NodeData (PtrRef sr) N.empty
+
+forEach_NodeRef_Get_NodeData :: (StateRoot `Alters` NodeData) m
+                              => NodeRef 
+                              -> NibbleString
+                              -> m [(Key, Val)]
+forEach_NodeRef_Get_NodeData ref partialKey = do
+  nodeData <- getNodeData ref
+  forEach_NodeData_Get_KeyVal nodeData partialKey
+
+forEach_NodeData_Get_KeyVal :: (StateRoot `Alters` NodeData) m
+                            => NodeData 
+                            ->  NibbleString 
+                            ->  m [(Key, Val)]
+
+forEach_NodeData_Get_KeyVal EmptyNodeData _ = return []
+
+forEach_NodeData_Get_KeyVal (FullNodeData cs Nothing) partialKey = 
+  (concat <$>) $ mapM (\(ref, n) -> forEach_NodeRef_Get_NodeData ref (partialKey `N.append` N.singleton n)) $ (zip cs [0..]) 
+
+forEach_NodeData_Get_KeyVal (FullNodeData cs (Just val)) partialKey = 
+  let right = (concat <$> ) $ mapM (\(ref, n) -> forEach_NodeRef_Get_NodeData ref (partialKey `N.append` N.singleton n)) $ (zip cs [0..]) 
+      left  =  [((Key partialKey) , val)]
+  in fmap (left ++) right
+
+forEach_NodeData_Get_KeyVal ShortcutNodeData{nextNibbleString = s, nextVal = Left ref} partialKey =
+  forEach_NodeRef_Get_NodeData ref (partialKey `N.append` s)
+
+forEach_NodeData_Get_KeyVal ShortcutNodeData{nextNibbleString = s, nextVal = Right val} partialKey = 
+  return $ [((Key (partialKey `N.append` s)) , val)]

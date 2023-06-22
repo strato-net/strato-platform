@@ -29,7 +29,7 @@ module Blockchain.Database.MerklePatricia (
   Key, Val, StateDB(..), StateRoot(..), NodeData(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
-  initializeBlank, blankStateRoot
+  initializeBlank, blankStateRoot, putKeyValSnapSync
   ) where
 
 import           Control.Monad.Change.Alter
@@ -109,3 +109,12 @@ initializeBlank :: (StateRoot `Alters` NodeData) m
 initializeBlank =
     let bytes = rlpSerialize $ rlpEncode EmptyNodeData
     in insert Proxy (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData
+
+-- For snap sync only
+-- Since the post image of the key is used
+putKeyValSnapSync :: (StateRoot `Alters` NodeData) m
+          => StateRoot -- ^ The object containing the current stateRoot.
+          -> Key -- ^ Key of the data to be inserted.
+          -> Val -- ^ Value of the new data
+          -> m StateRoot -- ^ The object containing the stateRoot to the data after the insert.
+putKeyValSnapSync sr = unsafePutKeyVal sr 
