@@ -198,6 +198,7 @@ newtype RemainingBlockHeaders = RemainingBlockHeaders { unRemainingBlockHeaders 
 newtype MaxReturnedHeaders = MaxReturnedHeaders { unMaxReturnedHeaders :: Int }
 newtype ConnectionTimeout = ConnectionTimeout { unConnectionTimeout :: Int }
 newtype PeerAddress = PeerAddress { unPeerAddress :: Maybe ChainMemberParsedSet }
+newtype HasSnapshot = HasSnapshot { unHasSnapshot :: Bool }
 
 withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) -> PeerAddress -> PeerAddress
 withPeerAddress f = PeerAddress . f . unPeerAddress
@@ -214,7 +215,6 @@ data Context = Context
 
 makeLenses ''Context
 
-newtype HasSnapshot = HasSnapshot { unHasSnapshot :: Bool }
 newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 

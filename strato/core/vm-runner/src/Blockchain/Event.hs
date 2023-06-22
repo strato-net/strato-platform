@@ -20,6 +20,7 @@ module Blockchain.Event
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
+import           Blockchain.Data.Snapshot
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
@@ -43,10 +44,11 @@ data VmInEventBatch = InBatch
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
   , privateTxs         :: [OutputTx]
+  , snapshot           :: [Snapshot]
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] 0 [] 0 False []
+newInBatch = InBatch [] [] 0 [] 0 False [] []
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -56,6 +58,7 @@ insertInBatch e b = case e of
   VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
   VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
+  VmSnapSync snapshot' -> b { snapshot = snapshot' : snapshot b }
 
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock

@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
-module           Blockchain.Data.Snapshot ( Snapshot(..), AddressState''(..) ) where
+module           Blockchain.Data.Snapshot ( Snapshot(..), AddressState''(..), emptySnapshot ) where
 
 import           Control.DeepSeq
 import           Data.Binary
@@ -38,7 +38,7 @@ data Snapshot = Snapshot {
     blockHeaders          :: [BlockHeader],
     fromStateroot         :: StateRoot,
     fromBlockNumber       :: Integer,
-    stateDBLeaves         :: [(Key, Val)],
+    stateDBLeaves         :: [(B.ByteString, Val)],
     addressStateLeaves    :: [(Account, AddressState'')]
 } deriving (Eq, Show, Generic, NFData)
 
@@ -46,13 +46,23 @@ deriving instance Data Snapshot
 
 deriving instance Data AddressState''
 
+emptySnapshot :: Snapshot
+emptySnapshot = 
+    Snapshot {
+        blockHeaders = [],
+        fromStateroot = StateRoot B.empty,
+        fromBlockNumber = 0,
+        stateDBLeaves = [],
+        addressStateLeaves = []
+    }
+
 instance Arbitrary Snapshot where
     arbitrary = oneof [ return $ Snapshot {
                     blockHeaders = [],
                     fromStateroot = StateRoot B.empty,
                     fromBlockNumber = 0,
-                    mptKeyValue = [],
-                    address_state_ref = []
+                    stateDBLeaves = [],
+                    addressStateLeaves = []
                 }]
 
 instance Binary Snapshot where
@@ -64,9 +74,9 @@ instance RLPSerializable Snapshot where
         blockHeaders = bh,
         fromStateroot = sr,
         fromBlockNumber = bn,
-        mptKeyValue = snapImage,
-        address_state_ref = asr
-    } = RLPArray [(RLPArray $ rlpEncode <$> bh), rlpEncode sr, rlpEncode bn, (RLPArray $ rlpEncode <$> snapImage), (RLPArray $ rlpEncode <$> asr)]
+        stateDBLeaves = sdbl,
+        addressStateLeaves = asl
+    } = RLPArray [(RLPArray $ rlpEncode <$> bh), rlpEncode sr, rlpEncode bn, (RLPArray $ rlpEncode <$> sdbl), (RLPArray $ rlpEncode <$> asl)]
 
     rlpDecode (RLPArray [RLPArray a, b, c, RLPArray d, RLPArray e]) = 
         Snapshot (rlpDecode <$> a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)  (rlpDecode <$> e)

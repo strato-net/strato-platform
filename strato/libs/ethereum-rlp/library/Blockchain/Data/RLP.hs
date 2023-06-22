@@ -27,6 +27,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
+import           Data.Data
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
@@ -45,6 +46,7 @@ import           Blockchain.Data.Util
 data RLPObject = RLPScalar Word8 | RLPString B.ByteString | RLPArray [RLPObject] deriving (Show, Eq, Ord, Generic)
 
 instance NFData RLPObject
+deriving instance Data RLPObject
 
 -- | Converts objects to and from 'RLPObject's.
 class RLPSerializable a where

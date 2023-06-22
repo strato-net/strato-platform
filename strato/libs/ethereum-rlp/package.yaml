@@ -46,6 +46,7 @@ default-extensions:
 dependencies:
   - base
   - bytestring
+  - binary
 
 library:
   source-dirs: library/

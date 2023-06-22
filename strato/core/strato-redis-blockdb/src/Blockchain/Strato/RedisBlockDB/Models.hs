@@ -21,6 +21,7 @@ import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Snapshot      as SS
 import qualified Blockchain.Data.Transaction   as TXD
 import           Blockchain.Data.TransactionDef (formatChainId)
 import           Blockchain.Strato.Model.Address
@@ -134,6 +135,10 @@ instance RedisDBValuable RedisChainTxsInBlocks where
 
 instance RedisDBKeyable IPAddress where
     toKey = S8.pack . showIP
+
+instance RedisDBValuable SS.Snapshot where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBValuable RedisOrgNameChains where
     toValue   = rlpSerialize . rlpEncode
@@ -255,6 +260,6 @@ displayForNamespace ns input = case ns of
     X509Certificates     -> format (fromValue input :: Address)
     ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
     ParsedSetToX509 ->  format input
-    SnapShot -> readSHA
+    Snapshot -> readSHA
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)

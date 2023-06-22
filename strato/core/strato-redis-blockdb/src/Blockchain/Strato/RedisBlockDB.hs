@@ -47,23 +47,18 @@ module Blockchain.Strato.RedisBlockDB
     ) where
 
 import           BlockApps.X509.Certificate
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.RLP
-import           Blockchain.Database.MerklePatricia.NodeData
+import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Partitioner                (partitionWith)
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember   as CM
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
 import           Control.Arrow                         ((&&&), (***), second)
@@ -71,16 +66,12 @@ import           Control.Concurrent                    (threadDelay)
 import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
-import qualified Data.Bifunctor                        as BF (first, second)
 import qualified Data.ByteString.Char8                 as S8
-import qualified Data.ByteString.Base16                as B16
-import           Data.Either                           (fromRight, isRight)
 import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
-import           Data.NibbleString                     (NibbleString(..))
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
@@ -131,7 +122,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             X509Certificates     -> "x509:"
             ParsedSetWhitePage    -> "potu:"
             ParsedSetToX509      -> "psx509:"
-            SnapShot             -> "snapshot:"
+            Snapshot             -> "snapshot:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -1108,16 +1099,16 @@ runStratoRedisIO r = liftIO $ do
 --         Just c  -> return . Just $ (orgName &&& orgUnit) c
 
 -- snap sync
-insertSnapShot :: Snapshot
+insertSnapShot :: SS.Snapshot
                -> Redis (Either Reply Status)
-insertSnapShot stateRoot blockNumber stateKeyVals addressStates = do
-        res <- multiExec $ set (inNamespace SnapShot $ S8.pack "snapshot") (toValue snapshot)
+insertSnapShot snapshot = do
+        res <- multiExec $ set (inNamespace Snapshot $ S8.pack "snapshot") (toValue snapshot)
         case res of
             TxSuccess _ -> pure $ Right Ok
             _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertSnapshot - Aborted")
 
-getSnapShot ::  Redis (Maybe (Snapshot))
-getSnapShot = getInNamespace SnapShot (S8.pack "snapshot") >>= \case
+getSnapShot ::  Redis (Maybe (SS.Snapshot))
+getSnapShot = getInNamespace Snapshot (S8.pack "snapshot") >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing
     Right (Just (snapshot)) ->  return . Just $ fromValue snapshot 

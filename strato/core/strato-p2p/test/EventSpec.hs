@@ -224,6 +224,10 @@ instance MonadIO m => Mod.Modifiable HasSnapshot (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible HasSnapshot (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @HasSnapshot)
 
+instance MonadIO m => Mod.Modifiable (Maybe Integer) (MonadTest m) where
+  get _ = error "not used"
+  put _ = error "not used"
+
 instance MonadIO m => Mod.Accessible RedisConnection (MonadTest m) where
   access _ = liftIO $ error "should not be called"
 
@@ -1164,6 +1168,7 @@ newSequencerContext bc = do
       , _blockstanbulContext = Just bc
       , _loopTimeout         = error "MonadTest: Evaluating loopTimeout" -- loopCh
       , _latestRoundNumber   = latestRound
+      , _snapSyncFromBlock   = Nothing
       }
 
 -- testContext is useful for testing because it doesn't require

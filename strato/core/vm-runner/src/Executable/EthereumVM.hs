@@ -1,13 +1,14 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE DerivingStrategies  #-}
+{-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE DerivingStrategies   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeOperators        #-}
 
 module Executable.EthereumVM (
   ethereumVM,
@@ -75,7 +76,10 @@ import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import           Blockchain.Data.ExecResults
+import qualified Blockchain.Data.Snapshot              as SS
+import           Blockchain.Database.MerklePatricia.ForEach
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
+import qualified Blockchain.DB.AddressStateDB          as AS
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
@@ -88,6 +92,9 @@ import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Gas           (Gas (..))
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
+import           Blockchain.Strato.Model.Util          (byteString2NibbleString)
+import qualified Blockchain.Strato.RedisBlockDB        as Redis
+import           Blockchain.Strato.StateDiff
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Stream.Action              (Action)
 import qualified Blockchain.Stream.Action              as Action
@@ -155,6 +162,9 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
+
+  when (True && length snapshot > 0) $ lift $ do --TODO add logic so this can only happen once and cannot 
+    doSnapSync (last snapshot)
 
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
@@ -540,6 +550,8 @@ logEventSummaries events = do
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmPrivateTx _) = "PrivateTx"
 
+    getNames (VmSnapSync _)  = "SnapSync"
+
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
     numberIt i x = show i ++ " " ++ x ++ "s"
@@ -580,7 +592,11 @@ sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
   void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
+sendOutEvent (OutStateDiff diff) =
+  (lift $ commitSqlDiffs diff) >> 
+    if ((((blockNumber diff) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots)
+      then lift $ (makeSnapShot (stateRoot diff) (blockNumber diff))
+      else lift $ return (); 
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
 sendOutEvent (OutTXR tr) = yield tr
@@ -745,3 +761,39 @@ getUnprocessedKafkaEvents offset = do
 
         !ret' = eventLimit . countLimit $ ret
     return ret'
+
+-- snap sync
+doSnapSync :: VMBase m => SS.Snapshot -> m ()
+doSnapSync SS.Snapshot{..} = do
+  context_state <- Mod.get (Mod.Proxy @ContextState)
+  let !possibleBestBlockInfo = _bestBlockInfo context_state
+  let formattedStateKeyVals :: [(MP.Key, MP.Val)] = map (\(ns, b) -> (byteString2NibbleString ns, b)) stateDBLeaves
+  let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
+  _ <- mapM (\(a, b) -> AS.putAddressState a b) formattedAddressLeaves
+
+  let !mCurStateRoot = case possibleBestBlockInfo of 
+          (ContextBestBlockInfo _ blockData _ _ _) -> Just $ blockDataStateRoot blockData
+          _   -> Nothing
+
+  case mCurStateRoot of
+    Just curStateRoot -> do
+      let uncurryFunc sr (k, v) = MP.putKeyValSnapSync sr k v
+      (weNeedToCheckIfComesOutTheSame) <- foldlM uncurryFunc curStateRoot formattedStateKeyVals
+
+      if weNeedToCheckIfComesOutTheSame == fromStateroot
+        then $logInfoS "doSnapSync" $ T.pack $ "Stateroot is the same, proceeding..."
+        else $logInfoS "doSnapSync" $ T.pack $ "Stateroot is not the same :("
+
+      _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
+
+      return ()
+
+    Nothing -> return ()
+
+makeSnapShot :: VMBase m =>  MP.StateRoot -> Integer -> m ()
+makeSnapShot s blockNumber = do
+  $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
+  address_states <- AS.getAllAddressStates Nothing
+  let formattedAddressLeaves :: [(Account, SS.AddressState'')] =  map (\(acc, AddressState a b c d e) -> (acc, SS.AddressState'' a b c d e)) address_states
+  leaves_and_keys <-  getAllLeafKeyVals s
+  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber leaves_and_keys formattedAddressLeaves

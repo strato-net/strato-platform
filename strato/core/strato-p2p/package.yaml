@@ -39,6 +39,7 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - blockapps-datadefs
+    - blockapps-mpdbs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
@@ -67,6 +68,7 @@ library:
     - lens
     - lifted-async
     - lifted-base
+    - merkle-patricia-db
     - milena
     - milena-tools
     - monad-alter

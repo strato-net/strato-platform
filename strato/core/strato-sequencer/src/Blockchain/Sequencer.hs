@@ -38,6 +38,7 @@ import           Text.Printf
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.StateMachine      (BlockstanbulContext(..))
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -53,9 +54,10 @@ import           Blockchain.Sequencer.Monad
 import qualified Blockchain.Data.Block                     as BDB
 import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChains)
 import qualified Blockchain.Data.DataDefs                  as BDB
+import qualified Blockchain.Data.RLP                       as RL
+import qualified Blockchain.Data.Snapshot                  as SS
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
-import qualified Blockchain.Data.RLP                       as RL
 
 import           Blockchain.Partitioner
 import           Blockchain.Strato.Model.Class             as BDB
@@ -655,17 +657,17 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETSnapshot -> do
       record "inevent_type_snapshot" "Snapshot"
       let snapshots = [a | IESnapshot a <- events]
-      let snapshotBlockNum = fromBlockNumber $ last snapshots
+      let snapshotBlockNum = SS.fromBlockNumber $ last snapshots
       let snapCheckpoint = Just snapshotBlockNum
       Mod.put (Mod.Proxy @(Maybe Integer)) snapCheckpoint
       mBlockstanbulCntxt <- getBlockstanbulContext
       case mBlockstanbulCntxt of
         Just bsc -> do
           let v = _view bsc
-          let newV = v{_sequence=(( fromInteger snapshotBlockNum) - 1 )}
-          putBlockstanbulContext bsc{_view=newV}
+          let newV = v{_sequence = (( fromInteger snapshotBlockNum) - 1 )}
+          putBlockstanbulContext bsc{_view = newV}
         Nothing -> return ()
-      yieldMany $ map (ToVm . VmSnapSync) snapshot
+      yieldMany $ map (ToVm . VmSnapSync) snapshots
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
