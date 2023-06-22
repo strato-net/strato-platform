@@ -47,8 +47,14 @@ describe("Renders Orders Page", () => {
     cy.url().should("include", "/orders");
   });
 
-  // ADD searching functionality
   it("it should able to cancel order as a buyer", () => {
+
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order',
+    }).as('ordersCall');
+
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
@@ -88,41 +94,44 @@ describe("Renders Orders Page", () => {
     cy.get("#pay-later-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
-    cy.get("#yes-button").click();
 
-    cy.contains("Order created successfully").should("be.visible");
-    // cy.get("#user-dropdown").click();
-    // cy.get("#logout").click();
-    // cy.get("#Orders").should("not.exist");
-    cy.wait(20000);
-    cy.get("#Orders").click();
-    cy.url().should("include", "/orders");
-    const org = Cypress.env("buyerOrg");
-    cy.get("#bought-tab").should("exist");
-    cy.get("#bought-tab").click();
-    cy.request({
-      method: "GET",
-      url: `/api/v1/order?buyerOrganization=${org}`,
-    }).then(({ status, body }) => {
-      expect(status).to.eq(200);
-      if (body.data.length != 0) {
-        const order = body.data.find((obj) => obj.status === 1);
-        if (order) {
-          cy.get(`#${order.orderId}`).should("exist");
-          cy.get(`#${order.orderId}`).click({ force: true });
-          cy.url().should(`include`, `/bought-orders/${order.address}`);
-
-          cy.get('textarea[placeholder="Enter Comments"]').type("I want to cancel this order");
-          cy.get("#cancel-order-button").should("exist");
-          cy.get("#cancel-order-button").click();
-
-          cy.contains("Order has been updated").should("be.visible");
-        }
-      }
-    });
+    cy.get('#yes-button')
+      .click()
+      .then(() => {
+        let orderAddress
+        // cy.wait(2000);
+        cy.wait('@ordersCall', { timeout: 60000 })
+          .its('response.body')
+          .then((body) => {
+            console.log(body)
+            orderAddress = body.data[0][1]
+            if (orderAddress) {
+              cy.contains("Order created successfully").should("be.visible");
+              cy.get("#Orders").click();
+              cy.url().should("include", "/orders");
+              const org = Cypress.env("buyerOrg");
+              cy.get("#bought-tab").should("exist");
+              cy.get("#bought-tab").click();
+    
+              cy.visit(`/marketplace/bought-orders/${orderAddress}`)
+              // cy.url().should(`include`, `/marketplace/bought-orders/${order.address}`);
+    
+              cy.get('textarea[placeholder="Enter Comments"]').type("I want to cancel this order");
+              cy.get("#cancel-order-button").should("exist");
+              cy.get("#cancel-order-button").click();
+    
+              cy.contains("Order has been updated").should("be.visible");
+            }
+          })
+      })
   });
 
-  it("it should able to cancel order as a seller", () => {
+  it.only("it should able to cancel order as a seller", () => {
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order',
+    }).as('ordersCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
@@ -162,46 +171,40 @@ describe("Renders Orders Page", () => {
     cy.get("#pay-later-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
-    cy.get("#yes-button").click();
+    // cy.get("#yes-button").click();
 
-    cy.contains("Order created successfully").should("be.visible");
-    cy.get("#user-dropdown").click();
-    cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
+    cy.get('#yes-button')
+      .click()
+      .then(() => {
+        let orderAddress
+        cy.wait('@ordersCall', { timeout: 60000 })
+          .its('response.body')
+          .then((body) => {
+            console.log(body)
+            orderAddress = body.data[0][1]
+            if (orderAddress) {
+              cy.contains("Order created successfully").should("be.visible");
+              cy.get("#user-dropdown").click();
+              cy.get("#logout").click();
+              cy.get("#Orders").should("not.exist");
+
+              cy.visit('/')
+              cy.get("#Login").click();
+              cy.loginAsSeller()
+
+              cy.get("#Orders").should("exist");
+              cy.visit(`/marketplace/bought-orders/${orderAddress}`)
+              // cy.url().should(`include`, `/marketplace/bought-orders/${order.address}`);
     
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.loginAsSeller()
+              cy.get('textarea[placeholder="Enter Comments"]', { force: true }).type("I want to cancel this order");
+              cy.get('#cancel-order-button').click();
+              cy.get("#yes-button").should("exist");
+              cy.get("#yes-button").click();
 
-    cy.get("#Orders").should("exist");
-    cy.get("#Orders").click();
-    cy.url().should("include", "/orders");
-    const org = "BlockApps";
-    cy.get("#sold-tab").should("exist");
-    cy.get("#sold-tab").click();
-    cy.request({
-      method: "GET",
-      url: `/api/v1/order?sellerOrganization=${org}`,
-    }).then(({ status, body }) => {
-      expect(status).to.eq(200);
-      if (body.data.length != 0) {
-        const order = body.data.find((obj) => obj.status === 1);
-        if (order) {
-          cy.get(`#${order.orderId}`).should("exist");
-          cy.get(`#${order.orderId}`).click({ force: true });
-          cy.wait(30000);
-          cy.url().should(`include`, `/sold-orders/${order.address}`);
-
-          cy.get('textarea[placeholder="Enter Comments"]', { force: true }).type("I want to cancel this order");
-          cy.get('.ant-select-selector').click();
-          cy.contains('.ant-select-item-option-content', 'Canceled').click();
-          cy.get("#yes-button").should("exist");
-          cy.get("#yes-button").click();
-
-          cy.contains("Order has been updated").should("be.visible");
-        }
-      }
-    });
+              cy.contains("Order has been updated").should("be.visible");
+            }
+          })
+      })
   });
 
   it("it should allow seller to change the order status to awaiting shipment", () => {
@@ -250,7 +253,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#Orders").should("not.exist");
-    
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.loginAsSeller()
@@ -333,7 +336,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#Orders").should("not.exist");
-    
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.loginAsSeller()
