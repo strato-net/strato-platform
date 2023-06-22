@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Blockchain.Data.BlockHeader (
   BlockHeader(..),
@@ -9,12 +12,15 @@ module Blockchain.Data.BlockHeader (
   createBlockFromHeaderAndBody
   ) where
 
+import           Control.DeepSeq
 import           Control.Monad
 import qualified Data.ByteString                    as B
+import           Data.Data
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
 import           Data.Bits (shiftL, shiftR)
+import           GHC.Generics
 import           Numeric
 
 import           Blockchain.Data.Block
@@ -49,7 +55,7 @@ data BlockHeader =
     extraData        :: B.ByteString,
     mixHash          :: Keccak256,
     nonce            :: Word64
-    } deriving (Eq, Read, Show)
+    } deriving (Eq, Read, Show, Generic, NFData, Data)
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =

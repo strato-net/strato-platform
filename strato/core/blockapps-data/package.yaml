@@ -18,6 +18,7 @@ library:
   dependencies:
   - QuickCheck
   - aeson
+  - ansi-wl-pprint
   - base-unicode-symbols
   - base16-bytestring
   - binary
