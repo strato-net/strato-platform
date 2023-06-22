@@ -27,6 +27,7 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey       ()
 import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Snapshot     as SS 
 import           Blockchain.Data.Transaction
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.ExtendedWord
@@ -193,6 +194,9 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
 
+  GetSnapshot |
+  SnapshotResponse SS.Snapshot |
+
   Blockstanbul PBFT.WireMessage |
 
   -- private chains
@@ -252,6 +256,12 @@ instance Format Message where
       formatUncles []     = "No uncles"
       formatUncles uncles = "\nUncles:" ++ tab' ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
+
+  format (GetSnapshot) =
+    CL.blue "GetSnapshot\n" ++ "Snapshot GET request"
+
+  format (SnapshotResponse snapshot) =
+    CL.blue "SnapshotResponse\n" ++ "Snapshot\n " ++ (show snapshot)
 
   format (Blockstanbul msg) = CL.blue "Blockstanbul\n" ++ "  msg: " ++ PBFT.shortFormat msg
 
@@ -332,6 +342,18 @@ obj2WireMessage 0x1d (RLPArray chDetPairs) =
 obj2WireMessage 0x1e (RLPArray trHashes) =
   GetTransactions $ rlpDecode <$> trHashes
 
+-- snap sync
+obj2WireMessage 0x1f (RLPArray []) =
+  GetSnapshot
+obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray state_keyvals, RLPArray address_state_keyvals]) = 
+  SnapshotResponse SS.Snapshot {
+      blockHeaders = rlpDecode <$> bh,
+      fromStateroot = rlpDecode stateroot,
+      fromBlockNumber = rlpDecode bestblock, 
+      stateDBLeaves =  rlpDecode <$> state_keyvals,
+      addressStateLeaves =  rlpDecode <$> address_state_keyvals
+    }
+
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
 -- Convert Message into RLPObject and corresponding message code
@@ -391,6 +413,18 @@ wireMessage2Obj (ChainDetails chpairs) =
 
 wireMessage2Obj (GetTransactions trhashes) =
   (0x1e, RLPArray $ rlpEncode <$> trhashes)
+
+-- snap sync
+wireMessage2Obj (GetSnapshot) =
+  (0x1f, RLPArray [])
+
+wireMessage2Obj (SnapshotResponse SS.Snapshot { blockHeaders = sh, fromStateroot = sr, fromBlockNumber = bn, stateDBLeaves = sdbl, addressStateLeaves = asl }) =
+  (0x21, RLPArray [
+    RLPArray $ rlpEncode <$> sh, 
+    rlpEncode sr, 
+    rlpEncode bn, 
+    RLPArray $ rlpEncode <$> sdbl,
+    RLPArray $ rlpEncode <$> asl])
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
 

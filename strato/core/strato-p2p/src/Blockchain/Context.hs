@@ -48,6 +48,8 @@ module Blockchain.Context
     , TrueOrgNameChains(..)
     , FalseOrgNameChains(..)
     , ChainInfo(..)
+    , SnapshotNodes(..)
+    , HasSnapshot(..)
     , PeerRunner
     , initConfig
     , initContext
@@ -93,6 +95,7 @@ import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Ranged
+import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
@@ -174,16 +177,18 @@ newtype Outbound a = Outbound { unOutbound :: a }
 newtype IsValidator = IsValidator { unIsValidator :: Bool }
 
 data Config = Config
-  { configSQLDB              :: SQLDB
-  , configRedisBlockDB       :: RBDB.RedisConnection
-  , configConnectionTimeout  :: ConnectionTimeout
-  , configMaxReturnedHeaders :: MaxReturnedHeaders
-  , configVaultClient        :: ClientEnv
-  , configContext            :: IORef Context
+  { configSQLDB                    :: SQLDB
+  , configRedisBlockDB             :: RBDB.RedisConnection
+  , configConnectionTimeout        :: ConnectionTimeout
+  , configMaxReturnedHeaders       :: MaxReturnedHeaders
+  , configVaultClient              :: ClientEnv
+  , configContext                  :: IORef Context
   , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
-  , configPubKey             :: PublicKey
+  , configPubKey                   :: PublicKey
+  , configTrustedSnapshotNodes     :: SnapshotNodes
   }
 
+newtype SnapshotNodes = SnapshotNodes { unSnapshotNodes :: Set.Set T.Text }
 newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
 
 emptyActionTimestamp :: ActionTimestamp
@@ -204,10 +209,12 @@ data Context = Context
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  , hasSnapshot           :: HasSnapshot
   }
 
 makeLenses ''Context
 
+newtype HasSnapshot = HasSnapshot { unHasSnapshot :: Bool }
 newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
@@ -251,6 +258,16 @@ instance RunsServer ContextM (LoggingT IO) where
 
 instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
+
+instance MonadIO m => Mod.Accessible SnapshotNodes (ReaderT Config m) where
+  access _ = asks configTrustedSnapshotNodes
+
+instance MonadIO m => Mod.Modifiable HasSnapshot (ReaderT Config m) where
+  get _   = hasSnapshot <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{hasSnapshot = k},()))
+
+instance MonadIO m => Mod.Accessible HasSnapshot (ReaderT Config m) where
+  access _ = Mod.get (Proxy @HasSnapshot)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
@@ -556,6 +573,7 @@ type MonadP2P m = ( MonadIO m
                        , [BlockData]
                        , RemainingBlockHeaders
                        , PeerAddress
+                       , HasSnapshot
                        ] m
                   , All '[Mod.Accessible]
                       '[ MaxReturnedHeaders
@@ -565,6 +583,7 @@ type MonadP2P m = ( MonadIO m
                        , AvailablePeers
                        , BondedPeers
                        , PublicKey
+                       , SnapshotNodes
                        ] m
                   , All '[Mod.Modifiable]
                       '[ BestBlock
@@ -654,6 +673,7 @@ initConfig wireMessagesRef maxHeaders = do
     , configContext = initState
     , configBlockstanbulWireMessages = wireMessagesRef
     , configPubKey = nodePubKey
+    , configTrustedSnapshotNodes = SnapshotNodes $ Set.fromList [T.pack "3.95.216.65"]
     }
 
 initContext :: Context
@@ -664,6 +684,7 @@ initContext = Context
   , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
+  , hasSnapshot = HasSnapshot False
   }
 
 
