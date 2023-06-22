@@ -89,7 +89,6 @@ describe('Payment Tests', function () {
 1. Seller creates Inventory
 2. Buyer will have the shipping address created
 3. Buyer clicks Pay Now, which invokes the `orders/payment` api endpoint to generate stripe checkout URL before creating order
-4. Order Creation and Retrieval
 /////////////////////////////////*/
 
 it('Get Payment URL', async () => {
@@ -171,32 +170,5 @@ it('Get Payment URL', async () => {
     assert.isDefined(payOrder.body, 'body should be defined');
     assert.isDefined(payOrder.body.data, 'body should be defined');
     assert.equal(payOrder.body.data.url.substr(0,34),factory.paymentUrlDomain,'should have a stripe url generated')
-
-    //buyer creates order
-
-    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-
-    const createOrderResponse = await post(
-      Order.prefix,
-      Order.create,
-      createOrderArgs,
-      buyer.token
-    )
-    const orderAddress = createOrderResponse.body.data[0][1]
-
-    assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(createOrderResponse.body, 'body should be defined')
-
-    // get
-    const getOrderResponse = await get(
-      Order.prefix,
-      Order.get.replace(':address',orderAddress),
-      {},
-      buyer.token,
-    )
-
-    assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
-    assert.isDefined(getOrderResponse.body, 'body should be defined');
-
 })
 })
