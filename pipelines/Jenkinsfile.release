@@ -36,7 +36,9 @@ pipeline {
         sh "git worktree add strato-worktree ${env.GIT_TAG}"
         dir ('strato-worktree') {
           sh 'git worktree list'
-          sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
+          sh 'docker rm -f $(docker ps -aq) || true'
+          sh 'docker system prune -f || true'
+          sh 'docker volume prune -fa || true'
           sh 'docker ps'
         }
       }

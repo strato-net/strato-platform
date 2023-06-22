@@ -8,7 +8,9 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+          docker rm -f $(docker ps -aq) || true
+          docker system prune -f || true
+          docker volume prune -fa || true
           docker ps
           docker rmi -f $(docker images -aq) || true
           docker images -a

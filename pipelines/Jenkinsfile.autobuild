@@ -16,7 +16,9 @@ pipeline {
           }
         }
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+          docker rm -f $(docker ps -aq) || true
+          docker system prune -f || true
+          docker volume prune -fa || true
         '''
       }
     }

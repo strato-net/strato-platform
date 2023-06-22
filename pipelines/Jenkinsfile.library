@@ -1,7 +1,8 @@
 def cleanNode(wipeVault = null) {
   // Cleanup STRATO and volumes
   sh 'sudo docker rm -f $(sudo docker ps -aq) || true'
-  sh 'sudo docker system prune -f --volumes || true'
+  sh 'sudo docker system prune -f || true'
+  sh 'sudo docker volume prune -fa || true'
 }
 
 def deployStrato(nodeData) {
