@@ -793,7 +793,7 @@ doSnapSync SS.Snapshot{..} = do
 makeSnapShot :: VMBase m =>  MP.StateRoot -> Integer -> m ()
 makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
-  address_states <- AS.getAllAddressStates Nothing
+  address_states <- AS.getAllAddressStateLeaves Nothing
   let formattedAddressLeaves :: [(Account, SS.AddressState'')] =  map (\(acc, AddressState a b c d e) -> (acc, SS.AddressState'' a b c d e)) address_states
   leaves_and_keys <-  getAllLeafKeyVals s
   void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber leaves_and_keys formattedAddressLeaves

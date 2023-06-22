@@ -19,6 +19,8 @@ module Blockchain.DB.AddressStateDB (
   getAddressStateMaybe,
   getAllAddressStates,
   getAllAddressStatesFromStateRoot,
+  getAllAddressStateLeaves,
+  getAllAddressStateLeavesFromStateRoot,
   putAddressState,
   deleteAddressState,
   addressStateExists,
@@ -31,6 +33,7 @@ module Blockchain.DB.AddressStateDB (
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
+import qualified Blockchain.Database.MerklePatricia.ForEach  as FE
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
@@ -79,6 +82,19 @@ getAllAddressStatesFromStateRoot chainId sr = do
     convert (k, v) = do
       k' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k))) $ getAddressFromHash k
       return ((Account k' chainId), rlpDecode . rlpDeserialize . rlpDecode $ v)
+
+getAllAddressStateLeaves :: (HasHashDB m, HasStateDB m) => Maybe Word256 -> m [(Account, AddressState)]
+getAllAddressStateLeaves chainId = getAllAddressStateLeavesFromStateRoot chainId =<< getStateRoot chainId
+
+getAllAddressStateLeavesFromStateRoot :: (HasHashDB m, HasStateDB m) => Maybe Word256 -> MP.StateRoot -> m [(Account, AddressState)]
+getAllAddressStateLeavesFromStateRoot chainId sr = do
+  mapM convert =<< FE.getAllLeafKeyVals sr
+  where
+    convert :: (HasHashDB m) => (B.ByteString, MP.Val) -> m (Account, AddressState)
+    convert (k, v) = do
+      let k' = byteString2NibbleString k
+      k'' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k'))) $ getAddressFromHash k'
+      return ((Account k'' chainId), rlpDecode . rlpDeserialize . rlpDecode $ v)
 
 getAddressFromHash::(HasHashDB m)=>N.NibbleString -> m (Maybe Address)
 getAddressFromHash =
