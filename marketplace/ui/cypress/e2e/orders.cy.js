@@ -126,6 +126,7 @@ describe("Renders Orders Page", () => {
       })
   });
 
+  // Seller organization is not available
   it.only("it should able to cancel order as a seller", () => {
     cy.intercept({
       method: 'POST',
@@ -193,13 +194,14 @@ describe("Renders Orders Page", () => {
               cy.loginAsSeller()
 
               cy.get("#Orders").should("exist");
-              cy.visit(`/marketplace/bought-orders/${orderAddress}`)
-              // cy.url().should(`include`, `/marketplace/bought-orders/${order.address}`);
+              cy.visit(`/marketplace/sold-orders/${orderAddress}`)
     
-              cy.get('textarea[placeholder="Enter Comments"]', { force: true }).type("I want to cancel this order");
-              cy.get('#cancel-order-button').click();
-              cy.get("#yes-button").should("exist");
-              cy.get("#yes-button").click();
+              cy.get('textarea[placeholder="Enter Comments"]').type("I want to close this order");
+              cy.get('.ant-picker-input').click();
+              cy.get('.ant-picker-date-panel')
+                .contains('.ant-picker-cell', dayjs().date()).click();
+              cy.get("#save-button").should("exist");
+              cy.get("#save-button").click();
 
               cy.contains("Order has been updated").should("be.visible");
             }
