@@ -197,12 +197,12 @@ describe("Renders Orders Page", () => {
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
     
               cy.get('textarea[placeholder="Enter Comments"]').type("I want to close this order");
-              cy.get('.ant-picker-input').click();
-              cy.get('.ant-picker-date-panel')
-                .contains('.ant-picker-cell', dayjs().date()).click();
-              cy.get("#save-button").should("exist");
-              cy.get("#save-button").click();
-
+              // cy.get('.ant-select-selector').click().select("Canceled")
+              cy.get('.ant-select-selector').click();
+              cy.contains('.ant-select-item-option-content', 'Canceled').click();
+              cy.get("#yes-button").should("exist");
+              cy.get("#yes-button").click();
+    
               cy.contains("Order has been updated").should("be.visible");
             }
           })
