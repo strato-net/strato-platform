@@ -22,6 +22,7 @@ import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Json
 import           Blockchain.Data.RLP
+import           Blockchain.Data.Snapshot
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
 
@@ -69,6 +70,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
                  | IEDeleteDepBlock Keccak256
+                 | IESnapshot Snapshot
                  deriving (Eq, Show, GHCG.Generic)
 
 
@@ -84,6 +86,7 @@ data IngestEventType = IETTransaction
                      | IETForcedConfigChange
                      | IETValidatorBehavior
                      | IETDeleteDepBlock
+                     | IETSnapshot
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -100,6 +103,7 @@ iEventType = \case
   IEForcedConfigChange{} -> IETForcedConfigChange
   IEValidatorBehavior{}  -> IETValidatorBehavior
   IEDeleteDepBlock{}     -> IETDeleteDepBlock
+  IESnapshot{}           -> IETSnapshot
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -114,6 +118,7 @@ instance Format IngestEvent where
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
   format (IEDeleteDepBlock o) = show o
+  format (IESnapshot o) = show o
 
 type Timestamp = Microtime
 
@@ -176,6 +181,7 @@ data VmEvent =
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
   | VmPrivateTx OutputTx
+  | VmSnapSync Snapshot
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where
