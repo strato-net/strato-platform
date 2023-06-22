@@ -53,7 +53,48 @@ describe("Renders Orders Page", () => {
     cy.get("#Login").click();
     cy.login()
 
-    cy.get("#Orders").should("exist");
+    cy.get("#Art").click();
+    cy.get("#Marketplace").should("exist");
+    cy.get("#Marketplace").click();
+    cy.url().should("include", "/marketplace");
+
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+
+    cy.get("#buy-now-button").should("exist");
+    cy.get("#buy-now-button").click();
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-later-button").should("exist");
+    cy.get("#pay-later-button").click();
+    cy.get("#modal-title").contains("Confirm Order");
+    cy.get("#yes-button").should("exist");
+    cy.get("#yes-button").click();
+
+    cy.contains("Order created successfully").should("be.visible");
+    // cy.get("#user-dropdown").click();
+    // cy.get("#logout").click();
+    // cy.get("#Orders").should("not.exist");
+    cy.wait(20000);
     cy.get("#Orders").click();
     cy.url().should("include", "/orders");
     const org = Cypress.env("buyerOrg");
@@ -82,6 +123,52 @@ describe("Renders Orders Page", () => {
   });
 
   it("it should able to cancel order as a seller", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
+    cy.get("#Art").click();
+    cy.get("#Marketplace").should("exist");
+    cy.get("#Marketplace").click();
+    cy.url().should("include", "/marketplace");
+
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+
+    cy.get("#buy-now-button").should("exist");
+    cy.get("#buy-now-button").click();
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-later-button").should("exist");
+    cy.get("#pay-later-button").click();
+    cy.get("#modal-title").contains("Confirm Order");
+    cy.get("#yes-button").should("exist");
+    cy.get("#yes-button").click();
+
+    cy.contains("Order created successfully").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    
     cy.visit('/')
     cy.get("#Login").click();
     cy.loginAsSeller()
@@ -120,6 +207,52 @@ describe("Renders Orders Page", () => {
   it("it should allow seller to change the order status to awaiting shipment", () => {
     cy.visit('/')
     cy.get("#Login").click();
+    cy.login()
+
+    cy.get("#Art").click();
+    cy.get("#Marketplace").should("exist");
+    cy.get("#Marketplace").click();
+    cy.url().should("include", "/marketplace");
+
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+
+    cy.get("#buy-now-button").should("exist");
+    cy.get("#buy-now-button").click();
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-later-button").should("exist");
+    cy.get("#pay-later-button").click();
+    cy.get("#modal-title").contains("Confirm Order");
+    cy.get("#yes-button").should("exist");
+    cy.get("#yes-button").click();
+
+    cy.contains("Order created successfully").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    
+    cy.visit('/')
+    cy.get("#Login").click();
     cy.loginAsSeller()
 
     cy.get("#Orders").should("exist");
@@ -155,6 +288,52 @@ describe("Renders Orders Page", () => {
   });
 
   it("it should allow seller to change the order status to closed", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
+    cy.get("#Art").click();
+    cy.get("#Marketplace").should("exist");
+    cy.get("#Marketplace").click();
+    cy.url().should("include", "/marketplace");
+
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+
+    cy.get("#buy-now-button").should("exist");
+    cy.get("#buy-now-button").click();
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-later-button").should("exist");
+    cy.get("#pay-later-button").click();
+    cy.get("#modal-title").contains("Confirm Order");
+    cy.get("#yes-button").should("exist");
+    cy.get("#yes-button").click();
+
+    cy.contains("Order created successfully").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    
     cy.visit('/')
     cy.get("#Login").click();
     cy.loginAsSeller()
