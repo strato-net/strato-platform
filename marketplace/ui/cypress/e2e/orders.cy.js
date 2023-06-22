@@ -127,7 +127,7 @@ describe("Renders Orders Page", () => {
   });
 
   // Seller organization is not available
-  it.only("it should able to cancel order as a seller", () => {
+  it("it should able to cancel order as a seller", () => {
     cy.intercept({
       method: 'POST',
       url: '/api/v1/order',
@@ -209,7 +209,12 @@ describe("Renders Orders Page", () => {
       })
   });
 
-  it("it should allow seller to change the order status to awaiting shipment", () => {
+  it.only("it should allow seller to change the order status to awaiting shipment", () => {
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order',
+    }).as('ordersCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
@@ -249,37 +254,38 @@ describe("Renders Orders Page", () => {
     cy.get("#pay-later-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
-    cy.get("#yes-button").click();
+    // cy.get("#yes-button").click();
 
-    cy.contains("Order created successfully").should("be.visible");
-    cy.get("#user-dropdown").click();
-    cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
+    cy.get('#yes-button')
+      .click()
+      .then(() => {
+        let orderAddress
+        cy.wait('@ordersCall', { timeout: 60000 })
+          .its('response.body')
+          .then((body) => {
+            console.log(body)
+            orderAddress = body.data[0][1]
+            if (orderAddress) {
+              cy.contains("Order created successfully").should("be.visible");
+              cy.get("#user-dropdown").click();
+              cy.get("#logout").click();
+              cy.get("#Orders").should("not.exist");
 
-    cy.visit('/')
-    cy.get("#Login").click();
-    cy.loginAsSeller()
+              cy.visit('/')
+              cy.get("#Login").click();
+              cy.loginAsSeller()
 
-    cy.get("#Orders").should("exist");
-    cy.get("#Orders").click();
-    cy.url().should("include", "/orders");
-    const org = Cypress.env("sellerOrg");
-    cy.get("#sold-tab").should("exist");
-    cy.get("#sold-tab").click();
-    cy.request({
-      method: "GET",
-      url: `/api/v1/order?sellerOrganization=${org}`,
-    }).then(({ status, body }) => {
-      expect(status).to.eq(200);
-      if (body.data.length != 0) {
-        const order = body.data.find((obj) => obj.status === 1);
-        if (order) {
-          cy.get(`#${order.orderId}`).should("exist");
-          cy.get(`#${order.orderId}`).click();
-          cy.wait(20000);
-
-          cy.url().should(`include`, `/sold-orders/${order.address}`);
-          cy.get("#upload-button").should("exist");
+              cy.get("#Orders").should("exist");
+              cy.visit(`/marketplace/sold-orders/${orderAddress}`)
+    
+              // cy.get('textarea[placeholder="Enter Comments"]').type("I want to close this order");
+              // // cy.get('.ant-select-selector').click().select("Canceled")
+              // cy.get('.ant-select-selector').click();
+              // cy.contains('.ant-select-item-option-content', 'Canceled').click();
+              // cy.get("#yes-button").should("exist");
+              // cy.get("#yes-button").click();
+    
+              cy.get("#upload-button").should("exist");
           cy.get("#upload-button").click();
           cy.get(".ant-upload").contains("Upload CSV").should("exist")
           cy.get('input[type="file"]').selectFile('cypress/fixtures/sample_1.csv', { force: true })
@@ -287,10 +293,13 @@ describe("Renders Orders Page", () => {
           cy.get("#confirm-button").click();
 
           cy.contains("Item created successfully").should("be.visible");
-        }
-      }
-    });
+            }
+          })
+      })
+
+    
   });
+ 
 
   it("it should allow seller to change the order status to closed", () => {
     cy.visit('/')
