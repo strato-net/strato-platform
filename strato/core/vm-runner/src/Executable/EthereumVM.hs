@@ -94,7 +94,6 @@ import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.Model.Util          (byteString2NibbleString)
 import qualified Blockchain.Strato.RedisBlockDB        as Redis
-import           Blockchain.Strato.StateDiff
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Stream.Action              (Action)
 import qualified Blockchain.Stream.Action              as Action
@@ -588,15 +587,14 @@ sendOutEvent (OutAction act) =
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
-  void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
+sendOutEvent (OutBlock o) = do
+  let blockData = obBlockData o
+  if ((((blockDataNumber blockData) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots)
+      then lift $ (makeSnapShot (blockDataStateRoot blockData) (blockDataNumber blockData))
+      else loopTimeit "produceUnminedBlocksM" $ void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) =
-  (lift $ commitSqlDiffs diff) >> 
-    if ((((blockNumber diff) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots)
-      then lift $ (makeSnapShot (stateRoot diff) (blockNumber diff))
-      else lift $ return (); 
+sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
 sendOutEvent (OutTXR tr) = yield tr
