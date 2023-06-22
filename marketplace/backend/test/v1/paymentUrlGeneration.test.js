@@ -159,10 +159,11 @@ it('Get Payment URL', async () => {
     assert.deepInclude(buyerAddress[0],buyerAddressArgs, 'should include the buyer address args')
     
     // pay now as a buyer
+    const payOrderArgs = factory.getCreatePaymentArgs(util.uid(),buyerOrganization,inventories,userAddress)
     const payOrder = await post(
       Order.prefix,
       Order.payment,
-      factory.getCreatePaymentArgs(util.uid(),buyerOrganization,inventories,userAddress),
+      payOrderArgs,
       buyer.token,
     )
     
