@@ -95,7 +95,7 @@ describe('Order End-To-End Tests', function () {
       createInventoryArgs,
       seller.token,
     )
-    const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
+    const [,inventoryAddress]=createInventoryResponse.body.data
  
     assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
@@ -141,7 +141,7 @@ describe('Order End-To-End Tests', function () {
       createInventoryArgs,
       seller.token,
     )
-    const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
+    const [,inventoryAddress]=createInventoryResponse.body.data
  
     assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
@@ -237,7 +237,7 @@ describe('Order End-To-End Tests', function () {
       seller.token,
     )
 
-    const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
+    const [,inventoryAddress]=createInventoryResponse.body.data
 
     assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
     assert.isDefined(createInventoryResponse.body, 'body should be defined')
