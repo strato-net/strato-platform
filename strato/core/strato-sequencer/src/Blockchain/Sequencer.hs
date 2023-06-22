@@ -129,6 +129,7 @@ type MonadSequencer m =
   , (Keccak256 `A.Alters` DependentBlockEntry) m
   , (Keccak256 `A.Alters` ()) m
   , HasVault m
+  , Mod.Modifiable (Maybe Integer) m
   )
 
 sequencer :: SequencerM ()
@@ -304,6 +305,7 @@ blockstanbulSend' msg = do
          GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
          LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
          NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
+         OSnapshot sn                  -> ((VmSnapSync sn) : vms                   , p2ps, ctxs)
          _                             -> (vms,  p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([],[], [])
 
@@ -438,6 +440,7 @@ runBlockWithConsensus :: ( MonadLogger m
                          , MonadBlockstanbul m
                          , HasFullPrivacy m
                          , (Keccak256 `A.Alters` DependentBlockEntry) m
+                         , Mod.Modifiable (Maybe Integer) m
                          )
                       => SequencedBlock
                       -> ConduitT a SeqEvent m ()
@@ -453,6 +456,7 @@ runBlockWithConsensus sb = do
 expandBlock :: ( MonadLogger m
                , MonadMonitor m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
+               , Mod.Modifiable (Maybe Integer) m
                )
             => SequencedBlock
             -> m [OutputBlock]
@@ -478,6 +482,7 @@ runConsensus :: ( MonadLogger m
                 , MonadMonitor m
                 , MonadBlockstanbul m
                 , (Keccak256 `A.Alters` DependentBlockEntry) m
+                , Mod.Modifiable (Maybe Integer) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
@@ -526,6 +531,7 @@ transformBlocks :: ( MonadLogger m
                    , MonadBlockstanbul m
                    , HasFullPrivacy m
                    , (Keccak256 `A.Alters` DependentBlockEntry) m
+                   , Mod.Modifiable (Maybe Integer) m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
@@ -593,6 +599,7 @@ splitEvents :: ( MonadLogger m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
+               , Mod.Modifiable (Maybe Integer) m
                )
             => [IngestEvent]
             -> ConduitT a SeqEvent m () -- splitWith iEventType es) --> (IET, [IE]) ()IET, IE)
@@ -645,6 +652,20 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETDeleteDepBlock  -> do
       record "inevent_type_delete_dep_block" "DeleteDepBlock"
       traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
+    IETSnapshot -> do
+      record "inevent_type_snapshot" "Snapshot"
+      let snapshots = [a | IESnapshot a <- events]
+      let snapshotBlockNum = fromBlockNumber $ last snapshots
+      let snapCheckpoint = Just snapshotBlockNum
+      Mod.put (Mod.Proxy @(Maybe Integer)) snapCheckpoint
+      mBlockstanbulCntxt <- getBlockstanbulContext
+      case mBlockstanbulCntxt of
+        Just bsc -> do
+          let v = _view bsc
+          let newV = v{_sequence=(( fromInteger snapshotBlockNum) - 1 )}
+          putBlockstanbulContext bsc{_view=newV}
+        Nothing -> return ()
+      yieldMany $ map (ToVm . VmSnapSync) snapshot
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

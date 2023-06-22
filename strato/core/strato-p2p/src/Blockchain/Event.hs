@@ -22,9 +22,10 @@ import           Control.Arrow                         ((&&&), second)
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
-import qualified Control.Monad.Change.Modify           as Mod (get, put)
+import qualified Control.Monad.Change.Modify           as Mod (get, put, access)
 import           Control.Monad.IO.Class
 import           Control.Monad.State
+import qualified Data.Bifunctor                        as BF (first, second)
 import           Data.Conduit
 import           Data.Default                          (def)
 import           Data.Foldable                         (for_)
@@ -58,6 +59,8 @@ import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
+import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef        (formatChainId)
 import qualified Blockchain.Data.TXOrigin              as Origin
@@ -66,13 +69,18 @@ import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Address       (Address)
+import           Blockchain.Strato.Model.Account       (Account(..))
+import           Blockchain.Strato.Model.Address       (Address(..))
+import           Blockchain.Strato.Model.CodePtr       (CodePtr(..))
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.StateRoot     (StateRoot(..), unboxStateRoot)
+import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot, getSnapAddressState)
 import           Blockchain.Verification
+import qualified Blockchain.VMOptions                  as VM
 
 import           Blockchain.Sequencer.Event
 
@@ -372,6 +380,38 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
             throwIO PeerDisconnected
+
+    MsgEvt (GetSnapshot) -> do
+      case VM.flags_createSnapshots of
+        True -> do
+          $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Received a snapshot request from " ++ peerString peer
+
+          redisSnapshot :: (Maybe (StateRoot, (Integer, [ (Key, Val)])))<- runStratoRedisIO $ getSnapShot
+          let (state_root, (blockNumber, keyVals)) = (fromMaybe ("Failed to attain snapshot from redis", (0, [])) redisSnapshot)
+          headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger blockNumber) [(0 :: Integer)..]
+
+          mAddressStates <- runStratoRedisIO getRedisAddressState 
+          let addressStates :: [((Account, AddressState))] = (fromMaybe [] mAddressStates)
+
+          yieldR . SnapshotResponse $ SS.Snapshot (fmap (blockDataToBlockHeader . unCanonical . snd) headers) state_root blockNumber keyVals addressStates
+        False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
+
+    MsgEvt (SnapshotResponse snapshot) -> do
+      trustedSnapshotNodes <- lift $ unSnapshotNodes <$> Mod.access (Proxy @SnapshotNodes)
+      case S.member (pPeerIp peer) trustedSnapshotNodes of
+        True -> do
+          $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Garrett Received snapshot from " ++ peerString peer ++ "\n" ++ show snapshot
+          yieldL . ToUnseq $ IESnapshot snapshot
+          let blockDataLs  = fmap headerToBlockData $ SS.blockHeaders snapshot
+          let stateRootsLs = map (\(BlockData _ _ _ sr _ _ _ _ _ _ _ _ _ _ _) -> unsafeCreateKeccak256FromByteString $ unboxStateRoot sr) blockDataLs
+          _ <- liftIO $ runStratoRedisIO $ insertHeaders $ M.fromList (zip stateRootsLs blockDataLs) 
+          syncFetch Forward (1 + SS.fromBlockNumber snapshot)
+          lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
+          where
+            headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+              BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+        False ->
+          $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Disregarding snapshot from " ++ peerString peer ++ " because it's sus."
 
     NewSeqEvent oe -> case oe of
       P2pBlock b  -> do

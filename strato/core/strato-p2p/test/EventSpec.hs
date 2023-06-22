@@ -55,7 +55,7 @@ import           BlockApps.X509.Certificate            as X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
-import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
+import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders, hasSnapshot)
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction  as U
 import           Blockchain.Data.ArbitraryInstances()
@@ -150,6 +150,7 @@ data P2PContext = P2PContext
   , _peerAddr              :: PeerAddress
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
   , _unseqSink             :: TQueue [SeqLoopEvent]
+  , _hasSnapshot           :: HasSnapshot
   }
 makeLenses ''P2PContext
 
@@ -160,6 +161,7 @@ instance Default P2PContext where
                    (PeerAddress Nothing)
                    S.empty
                    (error "P2PContext: uninitialized unseqSink")
+                   (HasSnapshot False)
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -208,6 +210,19 @@ instance Mod.Accessible PublicKey (MonadTest m) where
 
 instance Mod.Accessible PublicKey (MonadP2PTest m) where
   access _ = error "pubkey"
+
+instance Mod.Accessible SnapshotNodes (MonadTest m) where
+  access _ = error "snapshot nodes"
+
+instance Mod.Accessible SnapshotNodes (MonadP2PTest m) where
+  access _ = error "snapshot nodes"
+
+instance MonadIO m => Mod.Modifiable HasSnapshot (MonadP2PTest m) where
+  get _ = use hasSnapshot
+  put _ = assign hasSnapshot
+
+instance MonadIO m => Mod.Accessible HasSnapshot (MonadP2PTest m) where
+  access _ = Mod.get (Mod.Proxy @HasSnapshot)
 
 instance MonadIO m => Mod.Accessible RedisConnection (MonadTest m) where
   access _ = liftIO $ error "should not be called"

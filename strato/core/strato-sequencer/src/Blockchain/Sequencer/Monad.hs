@@ -140,6 +140,7 @@ data SequencerContext = SequencerContext
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
+  , _snapSyncFromBlock   :: Maybe Integer
   }
 makeLenses ''SequencerContext
 
@@ -288,6 +289,13 @@ genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
 genericDeleteSequencer registry p k = do
   modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
+
+instance Mod.Accessible (Maybe Integer) SequencerM where
+  access _ = use snapSyncFromBlock
+
+instance Mod.Modifiable (Maybe Integer) SequencerM where
+  get = Mod.access
+  put _ = modify' . (.~) snapSyncFromBlock
 
 instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
   lookup = genericLookupSequencer blockHashRegistry
@@ -483,6 +491,7 @@ runSequencerM c mbc m = do
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
+            , _snapSyncFromBlock   = Nothing
             }
     return $ fst a
 

@@ -4,11 +4,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import           Control.Monad                (join)
 import           Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify  as Mod
 import           Control.Monad.IO.Class
 import           Data.Binary
 
@@ -94,7 +96,7 @@ readyToEmit b = do
     Just (ChildFailedConsensus _ existingDeps) | not (b `elem` existingDeps) -> return True
     _ -> return False
 
-enqueueIfParentNotEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
+enqueueIfParentNotEmitted :: ((Keccak256 `Alters` DependentBlockEntry) m, Mod.Modifiable (Maybe Integer) m) => SequencedBlock -> m EmissionReadiness
 enqueueIfParentNotEmitted b = existingParent b >>= \case
   Just (Emitted totalDifficulty') ->
       return $ ReadyToEmit totalDifficulty'
@@ -106,8 +108,13 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
   Just (ChildFailedConsensus totalDifficulty' _) ->
       return $ ReadyToEmit totalDifficulty'
   Nothing -> do
-    insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
-    return NotReadyToEmit
+    let blocknum = blockDataNumber $ sbBlockData b
+    sc <- Mod.get (Mod.Proxy @(Maybe Integer))
+    case sc of
+      Just n | blocknum == n -> return (ReadyToEmit 1)
+      _ -> do
+        insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
+        return NotReadyToEmit
 
 insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
 insertEmitted b = existingParent b >>= \case

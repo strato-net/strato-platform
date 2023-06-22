@@ -87,6 +87,8 @@ recordMessage' msgVect msg = do
                 GetChainDetails _ -> "get_chain_details"
                 ChainDetails _ -> "chain_details"
                 GetTransactions _ -> "get_transactions"
+                GetSnapshot -> "get_snapshot"
+                SnapshotResponse _ -> "snapshot_response" 
   liftIO $ withLabel msgVect label incCounter
 
 gossipDecisions :: Vector Text Counter

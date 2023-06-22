@@ -48,6 +48,7 @@ data BlockDBNamespace = Headers
                       | X509Certificates
                       | ParsedSetWhitePage
                       | ParsedSetToX509
+                      | Snapshot
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -254,5 +255,6 @@ displayForNamespace ns input = case ns of
     X509Certificates     -> format (fromValue input :: Address)
     ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
     ParsedSetToX509 ->  format input
+    SnapShot -> readSHA
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
