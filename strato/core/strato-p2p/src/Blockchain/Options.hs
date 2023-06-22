@@ -29,6 +29,7 @@ defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward trans
                                       \ originating on this node."
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
 defineFlag "useNodeCerts" (False :: Bool) "Use new node certificate checking protocol"
+defineFlag "snapSyncMode" (False :: Bool) "Whether to use snap sync mode or not"
 
 defineEQFlag "participationMode" [| Full :: ParticipationMode |] "PARTICIPATIONMODE"
   "Whether to send all mesages to peers (Full), no messages to peers (None), or everything except PBFT (NoConsensus)"
