@@ -2,13 +2,16 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TupleSections         #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Main where
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatricia.ForEach
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
@@ -16,11 +19,15 @@ import           Blockchain.Strato.Model.Util
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import           Data.ByteString.Char8                          (ByteString)
+import qualified Data.Bifunctor                                 as BF (first)                                   
 import qualified Data.NibbleString                              as N
 import qualified Database.LevelDB                               as LD
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit                       (fromHUnitTest)
 import           Test.HUnit
+import           Test.QuickCheck
+import           Test.QuickCheck.Monadic                        (assert, monadicIO, run)
 
 bigTest :: [(Key,String)]
 bigTest=
@@ -121,6 +128,33 @@ putSingleKV k v= unsafePutKeyValMem blank k v
 getSingleKV :: (Monad m) => MPMem -> Key -> m [(Key,Val)]
 getSingleKV db key' = unsafeGetKeyValsMem db key'
 
+--To ensure scraping MPT leaves and keys, then
+--the recreation of another MPT with those leaves and keys
+--will produce the same stateroot
+testMPTScrapeCheck :: [[(Key, ByteString)]] -> Property
+testMPTScrapeCheck data_set = monadicIO $  do
+  case data_set of 
+      [] -> Test.QuickCheck.Monadic.assert  True
+      _  -> do
+                let make_initial_MPT_and_scrape data' = runResourceT $ do
+                      db <- LD.open "/tmp/testDB3" LD.defaultOptions{LD.createIfMissing=True}
+                      flip runReaderT db $ do 
+                          initializeBlank
+                          sr' <- addAllKVs emptyTriePtr data'
+                          leaf_keys <- fmap (map (BF.first N.EvenNibbleString))   $ getAllLeafKeyVals sr'
+                          return (sr', leaf_keys)
+                sr_lks <- run $  mapM  (make_initial_MPT_and_scrape) data_set
+                let (srs, ls_lks) = unzip sr_lks
+                let make_new_MPT lks = runResourceT $ do
+                        db <- LD.open "/tmp/testDB4" LD.defaultOptions{LD.createIfMissing=True}
+                        flip runReaderT db $ do
+                          initializeBlank
+                          let properly_formed_lk :: [(N.NibbleString, ByteString)] = map (\(k, v) -> (k,) . rlpDecode . rlpDeserialize . rlpDecode $ v)  lks
+                          addAllKVs emptyTriePtr  properly_formed_lk
+                sr2s <- run $ mapM  (make_new_MPT) ls_lks
+                Test.QuickCheck.Monadic.assert $ srs == sr2s
+          
+
 spec :: Spec
 spec = do
   describe "the old merkle-patricia test suite" $ do
@@ -129,6 +163,9 @@ spec = do
                                  TestLabel " get . putn = id" testGetPutRepeatedII,
                                  TestLabel " single insert" testSingleInsert,
                                  TestLabel " multiple insert" testMultipleInserts]
+  describe "the old with a new twist merkle-patricia test suite" $ do
+    it "can reproduce the MPT" $ quickCheck testMPTScrapeCheck
+
 
 main :: IO ()
 main = hspec spec
