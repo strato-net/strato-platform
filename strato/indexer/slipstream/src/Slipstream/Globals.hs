@@ -30,8 +30,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
 import qualified Data.Map.Strict              as M
---import           Data.Set                    (Set)
-import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8)
@@ -46,7 +44,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => M.Map TableName TableColumns  -> Handle -> m (IORef Globals)
-newGlobals createdTabl = newIORef . Globals createdTabl Set.empty (LRU.newLRU (Just 1024))
+newGlobals createdTabl = newIORef . Globals createdTabl (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -60,14 +58,14 @@ xabiToText = T.replace "\'" "\'\'"
            . JSON.encode
 
 setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
-setTableCreated globalsIORef tableName tableColumns = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdTables=M.insert tableName tableColumns createdTables}
+setTableCreated globalsIORef _ _ = do
+  globals <- readIORef globalsIORef
+  updateGlobals globalsIORef globals--{createdTables=M.insert tableName tableColumns createdTables}
 
 isTableCreated :: MonadIO m => IORef Globals -> TableName -> m Bool
-isTableCreated globalsIORef tableName = do
-  Globals{..} <- readIORef globalsIORef
-  return $ tableName `M.member` createdTables
+isTableCreated globalsIORef _ = do
+  _ <- readIORef globalsIORef
+  return False -- $ tableName `M.member` createdTables
 
 getMappingTables :: MonadIO m => IORef Globals -> Text -> Text -> Text -> m ([Text])
 getMappingTables globalsIORef org app contract = do
@@ -96,7 +94,7 @@ getContractState globalsIORef account = do
       return jv
     (newCache, Nothing) -> do
       recordCacheMiss
-      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle account)
+      mvs <- eitherToMaybe <$> liftIO (readStorage coldStorageHandle account)
       forM_ mvs $ \vs ->
         let newCache' = LRU.insert account vs newCache
         in writeIORef globalsIORef g{contractStates = newCache' }
@@ -106,7 +104,7 @@ setContractState :: MonadIO m => IORef Globals -> Account -> [(Text,Value)] -> m
 setContractState gref account values = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
-  asyncWriteToStorage csHandle account values
+  asyncWriteToStorage coldStorageHandle account values
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
@@ -114,4 +112,4 @@ forceGlobalEval gref = liftIO $ modifyIORef' gref force
 flushPendingWrites :: MonadIO m => IORef Globals -> m ()
 flushPendingWrites gref = do
   Globals{..} <- readIORef gref
-  syncStorage csHandle
+  syncStorage coldStorageHandle
