@@ -762,7 +762,9 @@ doSnapSync SS.Snapshot{..} = do
   let !possibleBestBlockInfo = _bestBlockInfo context_state
   let formattedStateKeyVals :: [(MP.Key, MP.Val)] = map (\(ns, b) -> (byteString2NibbleString ns, b)) stateDBLeaves
   let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
-  _ <- mapM (\(a, b) -> AS.putAddressState a b) formattedAddressLeaves
+  _ <- mapM (\(a, b) -> AS.putAddressState  a b) formattedAddressLeaves
+  _ <- mapM (\(a, b) -> Mem.putAddressState a b) formattedAddressLeaves
+  Mem.flushMemAddressStateDB
 
   let !mCurStateRoot = case possibleBestBlockInfo of 
           (ContextBestBlockInfo _ blockData _ _ _) -> Just $ blockDataStateRoot blockData
