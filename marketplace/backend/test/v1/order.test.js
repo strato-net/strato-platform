@@ -7,7 +7,12 @@ import certificateJs from '/dapp/certificates/certificate'
 import { get, post } from '/helpers/rest'
 import RestStatus from 'http-status-codes';
 import factory from './factories/order'
-import { Order } from '../../api/v1/endpoints'
+
+import { Product, Inventory, Order } from '../../api/v1/endpoints'
+import { productArgs } from './factories/product'
+import { inventoryArgs } from './factories/inventory'
+
+
 
 
 const loadEnv = dotenv.config()
@@ -23,6 +28,7 @@ describe('Order End-To-End Tests', function () {
     let globalAdminToken
     let sellerToken
     try {
+      // Seller and buyer tokens musst be of different orgs.
       globalAdminToken = await oauthHelper.getUserToken(
         `${process.env.TEST_BUYER_ORG}`,
         `${process.env.TEST_BUYER_PASSWORD}`,
@@ -62,113 +68,65 @@ describe('Order End-To-End Tests', function () {
     buyerOrganization = buyerCert.organization;
   })
 
-  // it('Create an Order', async () => {
-  //   const createProductArgs = {
-  //     ...productArgs(util.uid()),
-  //   }
+  it('Get an Order', async () => {
+    const createProductArgs = {
+      ...productArgs(util.uid()),
+    }
 
-  //   const createProductResponse = await post(
-  //     Product.prefix,
-  //     Product.create,
-  //     createProductArgs,
-  //     seller.token,
-  //   )
-  //   const [,productAddress]=createProductResponse.body.data;
-    
-  //   assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createProductResponse.body, 'body should be defined')
-    
-  //   const createInventoryArgs={
-  //     ...inventoryArgs(productAddress, util.uid()),
-  //   }
+    const createProductResponse = await post(
+      Product.prefix,
+      Product.create,
+      createProductArgs,
+      seller.token,
+    )
+    const [,productAddress]=createProductResponse.body.data;
 
-  //   const createInventoryResponse=await post(
-  //     Inventory.prefix,
-  //     Inventory.create,
-  //     createInventoryArgs,
-  //     seller.token,
-  //   )
-  //   const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
- 
-  //   assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createInventoryResponse.body, 'body should be defined')
+    assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined')
 
-  //   const inventories=[inventoryAddress]
-  //   const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-    
-  //   const createOrderResponse = await post(
-  //     Order.prefix,
-  //     Order.create,
-  //     createOrderArgs,
-  //     globalAdmin.token
-  //   )
+    const createInventoryArgs={
+      ...inventoryArgs(productAddress, util.uid()),
+    }
 
-  //   assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createOrderResponse.body, 'body should be defined')
-  // })
+    const createInventoryResponse=await post(
+      Inventory.prefix,
+      Inventory.create,
+      createInventoryArgs,
+      seller.token,
+    )
 
-  // it('Get an Order', async () => {
-  //   const createProductArgs = {
-  //     ...productArgs(util.uid()),
-  //   }
+    const [,inventoryAddress]=createInventoryResponse.body.data
 
-  //   const createProductResponse = await post(
-  //     Product.prefix,
-  //     Product.create,
-  //     createProductArgs,
-  //     seller.token,
-  //   )
-  //   const [,productAddress]=createProductResponse.body.data;
-    
-  //   assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createProductResponse.body, 'body should be defined')
-    
-  //   const createInventoryArgs={
-  //     ...inventoryArgs(productAddress, util.uid()),
-  //   }
+    assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
 
-  //   const createInventoryResponse=await post(
-  //     Inventory.prefix,
-  //     Inventory.create,
-  //     createInventoryArgs,
-  //     seller.token,
-  //   )
-  //   const [,inventoryAddress,serialNumbers]=createInventoryResponse.body.data
- 
-  //   assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createInventoryResponse.body, 'body should be defined')
+    const inventories=[inventoryAddress]
+    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
 
-  //   const inventories=[inventoryAddress]
-  //   const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-    
-  //   const createOrderResponse = await post(
-  //     Order.prefix,
-  //     Order.create,
-  //     createOrderArgs,
-  //     globalAdmin.token
-  //   )
+    const createOrderResponse = await post(
+      Order.prefix,
+      Order.create,
+      createOrderArgs,
+      globalAdmin.token
+    )
 
-  //   const orderAddress = createOrderResponse.body.data[0][1]
-  //   // const orderAddress = createOrderResponse.body.data[0].address
-  //   // const orderChainId = createOrderResponse.body.data[0].chainIds[0]
+    const orderAddress = createOrderResponse.body.data[0][1]
 
-  //   assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(createOrderResponse.body, 'body should be defined')
-  //   console.log("createOrderResponse", orderAddress);
+    assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createOrderResponse.body, 'body should be defined')
 
-  //   // get
-  //   const getOrderResponse = await get(
-  //     Order.prefix,
-  //     // Order.get.replace(':address',orderAddress).replace(':chainId', orderChainId),
-  //     Order.get.replace(':address',orderAddress),
-  //     {},
-  //     globalAdmin.token,
-  //   )
+    // get
+    const getOrderResponse = await get(
+      Order.prefix,
+      Order.get.replace(':address',orderAddress),
+      {},
+      globalAdmin.token,
+    )
 
-  //   assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
-  //   assert.isDefined(getOrderResponse.body, 'body should be defined');
+    assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(getOrderResponse.body, 'body should be defined');
+  })
 
-  // })
 
   it('Get all Order', async () => {
     // get

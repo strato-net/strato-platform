@@ -100,7 +100,6 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-
       OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(body, options, accessToken)
