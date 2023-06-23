@@ -247,7 +247,6 @@ addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
     lift $ P.incCounter vmBlocksMined
     lift $ P.incCounter vmBlocksProcessed
 
-    $logInfoS "DEBUG" $ T.pack $ show ((blockDataNumber bd) `mod` flags_snapshotInterval)
     when ((((blockDataNumber bd) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots) $
         lift $ (makeSnapShot (blockDataStateRoot bd) (blockDataNumber bd))
 
