@@ -68,6 +68,52 @@ describe('Order End-To-End Tests', function () {
     buyerOrganization = buyerCert.organization;
   })
 
+  it('Create an Order Pay Later', async () => {
+    const createProductArgs = {
+      ...productArgs(util.uid()),
+    }
+
+
+    const createProductResponse = await post(
+      Product.prefix,
+      Product.create,
+      createProductArgs,
+      seller.token,
+    )
+    const [,productAddress]=createProductResponse.body.data;
+    
+    assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined')
+    
+    const createInventoryArgs={
+      ...inventoryArgs(productAddress, util.uid()),
+    }
+
+    const createInventoryResponse=await post(
+      Inventory.prefix,
+      Inventory.create,
+      createInventoryArgs,
+      seller.token,
+    )
+    const [,inventoryAddress]=createInventoryResponse.body.data
+ 
+    assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
+
+    const inventories=[inventoryAddress]
+    const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
+    
+    const createOrderResponse = await post(
+      Order.prefix,
+      Order.create,
+      createOrderArgs,
+      globalAdmin.token
+    )
+
+    assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createOrderResponse.body, 'body should be defined')
+  })
+
   it('Get an Order', async () => {
     const createProductArgs = {
       ...productArgs(util.uid()),

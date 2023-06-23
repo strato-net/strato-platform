@@ -90,7 +90,6 @@ describe('Payment Tests', function () {
 2. Buyer will have the shipping address created
 3. Buyer clicks Pay Now, which invokes the `orders/payment` api endpoint to generate stripe checkout URL before creating order
 4. Creation of order & retrieval with Pay Now 
-5. Creation of order & retrieval with Pay Later
 /////////////////////////////////*/
 
 it('Get Payment URL', async () => {
@@ -174,7 +173,7 @@ it('Get Payment URL', async () => {
     assert.equal(payOrder.body.data.url.substr(0,34),factory.paymentUrlDomain,'should have a stripe url generated')
 })
 
-////////////////////////////// Order Tests ////////////////////////////////////////
+////////////////////////////// Order Tests with Pay Now ////////////////////////////////////////
 
 it('Create an Order Pay Now', async () => {
   // In this case the seller must have gone through the connect stripe flow
@@ -271,51 +270,4 @@ it('Create an Order Pay Now', async () => {
   assert.isDefined(getOrderResponse.body, 'body should be defined');
 
 })
-
-it('Create an Order Pay Later', async () => {
-  const createProductArgs = {
-    ...productArgs(util.uid()),
-  }
-
-
-  const createProductResponse = await post(
-    Product.prefix,
-    Product.create,
-    createProductArgs,
-    seller.token,
-  )
-  const [,productAddress]=createProductResponse.body.data;
-  
-  assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createProductResponse.body, 'body should be defined')
-  
-  const createInventoryArgs={
-    ...inventoryArgs(productAddress, util.uid()),
-  }
-
-  const createInventoryResponse=await post(
-    Inventory.prefix,
-    Inventory.create,
-    createInventoryArgs,
-    seller.token,
-  )
-  const [,inventoryAddress]=createInventoryResponse.body.data
-
-  assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createInventoryResponse.body, 'body should be defined')
-
-  const inventories=[inventoryAddress]
-  const createOrderArgs=factory.getCreateOrderArgs(util.uid(),buyerOrganization,inventories)
-  
-  const createOrderResponse = await post(
-    Order.prefix,
-    Order.create,
-    createOrderArgs,
-    buyer.token
-  )
-
-  assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createOrderResponse.body, 'body should be defined')
-})
-
 })
