@@ -5,6 +5,7 @@
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -59,10 +60,12 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
+import qualified Blockchain.Data.Snapshot                as SS
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
 import           Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia      as MP
+import           Blockchain.Database.MerklePatricia.ForEach
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
 import           Blockchain.DB.ChainDB
@@ -95,6 +98,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.RedisBlockDB          as Redis
 import qualified Blockchain.Strato.StateDiff             as SD
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
@@ -242,6 +246,11 @@ addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
 
     lift $ P.incCounter vmBlocksMined
     lift $ P.incCounter vmBlocksProcessed
+
+    $logInfoS "DEBUG" $ T.pack $ show ((blockDataNumber bd) `mod` flags_snapshotInterval)
+    when ((((blockDataNumber bd) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots) $
+        lift $ (makeSnapShot (blockDataStateRoot bd) (blockDataNumber bd))
+
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
@@ -755,3 +764,11 @@ completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
   multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src, "to", format dst]
   runConduit $ SD.stateDiff Nothing num hsh src dst
             .| mapM_C (yield . OutStateDiff)
+
+makeSnapShot :: VMBase m =>  MP.StateRoot -> Integer -> m ()
+makeSnapShot s blockNumber = do
+  $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
+  address_states <- NoCache.getAllAddressStateLeaves Nothing
+  let formattedAddressLeaves :: [(Account, SS.AddressState'')] =  map (\(acc, AddressState a b c d e) -> (acc, SS.AddressState'' a b c d e)) address_states
+  leaves_and_keys <-  getAllLeafKeyVals s
+  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber leaves_and_keys formattedAddressLeaves

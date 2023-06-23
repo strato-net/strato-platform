@@ -60,8 +60,8 @@ defineFlag "requireCerts" (True::Bool) "Flag to enable the requirement of a cert
 defineFlag "txSizeLimit" (150000::Integer) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000::Integer) "The maximum number of transactions a single account can make"
 defineFlag "gasLimit" (1000000::Integer) "The maximum amount of gas a transaction can use"
-defineFlag "createSnapshots" (False :: Bool) "Whether to create snapshots or not"
-defineFlag "snapshotInterval" (500 :: Integer) "The block intervals at which we create snapshots. \
+defineFlag "createSnapshots" (True :: Bool) "Whether to create snapshots or not"
+defineFlag "snapshotInterval" (100 :: Integer) "The block intervals at which we create snapshots. \
                                               \ Keep this relatively large as it is an expensive operation."
 
 defineFlag "network" (""::String) "Choose a network to join"

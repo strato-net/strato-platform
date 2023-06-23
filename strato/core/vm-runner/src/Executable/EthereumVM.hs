@@ -77,7 +77,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.Snapshot              as SS
-import           Blockchain.Database.MerklePatricia.ForEach
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
 import qualified Blockchain.DB.AddressStateDB          as AS
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
@@ -587,11 +586,7 @@ sendOutEvent (OutAction act) =
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = do
-  let blockData = obBlockData o
-  if ((((blockDataNumber blockData) `mod` flags_snapshotInterval) == 0) && flags_createSnapshots)
-      then lift $ (makeSnapShot (blockDataStateRoot blockData) (blockDataNumber blockData))
-      else loopTimeit "produceUnminedBlocksM" $ void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
+sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $ void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
@@ -787,11 +782,3 @@ doSnapSync SS.Snapshot{..} = do
       return ()
 
     Nothing -> return ()
-
-makeSnapShot :: VMBase m =>  MP.StateRoot -> Integer -> m ()
-makeSnapShot s blockNumber = do
-  $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
-  address_states <- AS.getAllAddressStateLeaves Nothing
-  let formattedAddressLeaves :: [(Account, SS.AddressState'')] =  map (\(acc, AddressState a b c d e) -> (acc, SS.AddressState'' a b c d e)) address_states
-  leaves_and_keys <-  getAllLeafKeyVals s
-  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber leaves_and_keys formattedAddressLeaves
