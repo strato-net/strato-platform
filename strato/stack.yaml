@@ -17,7 +17,6 @@ packages:
 - core/miner-ethash
 - core/privacy
 - core/seqevents
-- core/strato-adit
 - core/strato-conf
 - core/strato-genesis
 - core/strato-init
