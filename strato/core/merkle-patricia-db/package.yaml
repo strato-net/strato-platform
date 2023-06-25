@@ -38,13 +38,11 @@ tests:
     main:        MerklePatriciaSpec.hs
     ghc-options: -dynamic
     dependencies:
-      - bytestring
       - HUnit
       - hspec
       - hspec-contrib
       - merkle-patricia-db
       - strato-model
-      - QuickCheck
 
 benchmarks:
   mpbench:

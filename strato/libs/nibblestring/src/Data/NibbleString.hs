@@ -34,7 +34,6 @@ import Prelude hiding (head, tail, length, take, drop, null)
 import qualified Prelude
 
 import Data.Bits
-import Data.ByteString.Arbitrary (fastRandBs)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -43,8 +42,6 @@ import Data.String
 import Data.Word
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), empty)
-import Test.QuickCheck.Instances    ()
-import Test.QuickCheck              hiding ((.&.))
 
 -- | Nibbles are stored as the low four bits of a Word8.
 --
@@ -195,5 +192,3 @@ take n (OddNibbleString c s) | odd n = OddNibbleString c (B.take ((n-1) `shiftR`
 --Slow /O(n)/ stuff
 take n s = pack $ L.take n $ unpack s
 
-instance Arbitrary NibbleString where
-    arbitrary = EvenNibbleString <$> fastRandBs 32

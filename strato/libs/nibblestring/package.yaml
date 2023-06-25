@@ -8,6 +8,3 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - bytestring
-    - bytestring-arbitrary
-    - QuickCheck
-    - quickcheck-instances
