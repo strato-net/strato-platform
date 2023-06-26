@@ -65,7 +65,6 @@ import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
 import           Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia      as MP
-import           Blockchain.Database.MerklePatricia.ForEach
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
 import           Blockchain.DB.ChainDB
@@ -769,8 +768,8 @@ makeSnapShot :: VMBase m => MP.StateRoot -> Integer -> m ()
 makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
   address_states <- NoCache.getAllAddressStates Nothing
-  let formattedAddressLeaves :: FullStorage m => m [(Account, SS.AddressState'')] = map (\(acc, AddressState a b c d e) -> do
-        storageForAcc <- getAllStorageKeyVals'' acc
-        (acc, SS.AddressState'' a b c storageForAcc d e)) address_states
-  -- leaves_and_keys <-  getAllLeafKeyVals s
-  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedAddressLeaves
+  let onlyAccounts = map (\(x, _) -> x) address_states
+  storageKeyVals <- mapM (getAllStorageKeyVals') onlyAccounts
+  let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, v)) kv) storageKeyVals
+  let formattedLeaves = zipWith (\(acc1, (AddressState a b c d e)) (storageStuff) -> (acc1, SS.AddressState'' a b c storageStuff d e)) address_states formattedStorage
+  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedLeaves

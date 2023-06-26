@@ -5,22 +5,20 @@
 module Blockchain.DB.StorageDB (
   HasStorageDB,
   HasMemStorageDB,
+  toVal,
   putStorageKeyVal',
   getStorageKeyVal',
   getAllStorageKeyVals',
-  getAllStorageKeyVals'',
   flushMemStorageTxDBToBlockDB,
   flushMemStorageDB
   ) where
 
 import           Control.Monad.Change.Alter                  (Alters)
-import           Data.Bifunctor                              (first, second)
-import qualified Data.ByteString as B
+import           Data.Bifunctor                              (second)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
-import qualified Blockchain.Data.Snapshot                    as SS
 import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -28,7 +26,6 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Util
 
 -- A thin layer around raw storage db for clients who expect to work on
 -- keys and values of Word256
@@ -61,9 +58,6 @@ getStorageKeyVal' acct key = fromVal <$> getRawStorageKeyVal' (toKey acct key)
 
 getAllStorageKeyVals' :: FullStorage m => Account -> m [(MP.Key, Word256)]
 getAllStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
-
-getAllStorageKeyVals'' :: FullStorage m => Account -> m [(B.ByteString, Word256)]
-getAllStorageKeyVals'' acct = map (\(k, v) -> (nibbleString2ByteString k, fromVal v)) <$> getAllRawStorageKeyVals' acct
 
 flushMemStorageTxDBToBlockDB :: FullStorage m => m ()
 flushMemStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB

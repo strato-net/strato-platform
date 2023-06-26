@@ -76,10 +76,12 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
+import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
--- import qualified Blockchain.DB.AddressStateDB          as AS
+import qualified Blockchain.DB.AddressStateDB          as AS
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
+import           Blockchain.DB.RawStorageDB            (putRawStorageKeyValDB)
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
@@ -758,29 +760,25 @@ getUnprocessedKafkaEvents offset = do
 -- snap sync
 doSnapSync :: VMBase m => SS.Snapshot -> m ()
 doSnapSync SS.Snapshot{..} = do
-  context_state <- Mod.get (Mod.Proxy @ContextState)
-  let !possibleBestBlockInfo = _bestBlockInfo context_state
-  let formattedStateKeyVals :: [(MP.Key, MP.Val)] = map (\(ns, b) -> (byteString2NibbleString ns, b)) stateDBLeaves
-  -- let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
+  _ <- traverse insertAndCheckStateRoot addressStateLeaves
 
-  let !mCurStateRoot = case possibleBestBlockInfo of 
-          (ContextBestBlockInfo _ blockData _ _ _) -> Just $ blockDataStateRoot blockData
-          _   -> Nothing
+  _ <- traverse (putBlockHeaderInChainDB) blockHeaders
+  
+  _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
 
-  case mCurStateRoot of
-    Just curStateRoot -> do
-      let uncurryFunc sr (k, v) = MP.putKeyValSnapSync sr k v
-      (weNeedToCheckIfComesOutTheSame) <- foldlM uncurryFunc curStateRoot formattedStateKeyVals
+  return ()
 
-      if weNeedToCheckIfComesOutTheSame == fromStateroot
-        then $logInfoS "doSnapSync" $ T.pack $ "Stateroot is the same, proceeding..."
-        else $logInfoS "doSnapSync" $ T.pack $ "Stateroot is not the same :("
-
-      _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
-
-      return ()
-
-    Nothing -> return ()
+insertAndCheckStateRoot :: VMBase m => (Account, SS.AddressState'') -> m ()
+insertAndCheckStateRoot (acct, addrState@SS.AddressState''{..}) = do
+  _ <- AS.putAddressState acct $ formatAddressState addrState
+  test <- AS.addressStateExists acct
+  _ <- traverse (\(k, v) -> putRawStorageKeyValDB MP.emptyTriePtr ((byteString2NibbleString k), (rlpEncode $ toVal v))) addressStateStorageKeyVals
+  test2 <- getAllStorageKeyVals' acct
+  case (test, test2) of
+    (True, [_]) -> pure $ ()
+    _ -> error "SOMETHING WENT WRONG"
+  where
+    formatAddressState (SS.AddressState'' a b c _ e f) = AddressState a b c e f
 
 -- not running with a current block hash, all of the snapshot data is not gonna work
 -- write this stateroot to the blockhash

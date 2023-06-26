@@ -345,12 +345,11 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
 -- snap sync
 obj2WireMessage 0x1f (RLPArray []) =
   GetSnapshot
-obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray state_keyvals, RLPArray address_state_keyvals]) = 
+obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray address_state_keyvals]) = 
   SnapshotResponse SS.Snapshot {
       blockHeaders = rlpDecode <$> bh,
       fromStateroot = rlpDecode stateroot,
-      fromBlockNumber = rlpDecode bestblock, 
-      stateDBLeaves =  rlpDecode <$> state_keyvals,
+      fromBlockNumber = rlpDecode bestblock,
       addressStateLeaves =  rlpDecode <$> address_state_keyvals
     }
 
@@ -418,13 +417,13 @@ wireMessage2Obj (GetTransactions trhashes) =
 wireMessage2Obj (GetSnapshot) =
   (0x1f, RLPArray [])
 
-wireMessage2Obj (SnapshotResponse SS.Snapshot { blockHeaders = sh, fromStateroot = sr, fromBlockNumber = bn, stateDBLeaves = sdbl, addressStateLeaves = asl }) =
+wireMessage2Obj (SnapshotResponse SS.Snapshot { blockHeaders = sh, fromStateroot = sr, fromBlockNumber = bn, addressStateLeaves = asl }) =
   (0x21, RLPArray [
     RLPArray $ rlpEncode <$> sh, 
     rlpEncode sr, 
-    rlpEncode bn, 
-    RLPArray $ rlpEncode <$> sdbl,
-    RLPArray $ rlpEncode <$> asl])
+    rlpEncode bn,
+    RLPArray $ rlpEncode <$> asl
+  ])
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
 
