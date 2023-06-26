@@ -284,6 +284,82 @@ describe("Renders Marketplace Page", () => {
     });
   });
 
+  it.only("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
+    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+
+    cy.get("#Products").should("exist");
+    cy.get("#Products").click();
+    cy.url().should("include", "/products");
+    cy.get("#add-product-button").should("exist");
+    cy.get("#add-product-button").click();
+    cy.get("#modal-title").contains("Add Product");
+    cy.get('input[placeholder="Enter Name"]').type(productName);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
+    cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
+    cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
+    cy.get('textarea[placeholder="Enter Description"]').type(
+      "This is a description"
+    );
+    cy.get("input[type=file]").attachFile("cottonSeeds.jpg");
+    cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
+    cy.get("#create-product-button").should("exist");
+    cy.get("#create-product-button").click();
+    cy.contains("Product created successfully").should("be.visible");
+
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("button").contains("Add Inventory").should("exist");
+    cy.get("button").contains("Add Inventory").click();
+    cy.get(".ant-modal-content").should("exist").and("be.visible");
+    cy.contains("Add Inventory").should("be.visible");
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Quantity"]').type("1");
+    cy.get('input[placeholder="Enter Price"]').type("1000");
+    cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+    cy.get(".ant-upload").contains("Upload CSV").should("exist")
+    cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
+    cy.get("#product").should("be.enabled");
+    cy.get('[value="false"]').check();
+    cy.wait(5000);
+    cy.get("#product").type("{enter}{enter}");
+    cy.get("button").contains("Create Inventory").should("be.visible");
+    cy.get("button").contains("Create Inventory").click();
+    cy.contains("Inventory created successfully").should("be.visible");
+    cy.get("#inventory-list").children().first().contains("Unpublished").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+
+    cy.get("#Login").click();
+    cy.loginAsSeller();
+    cy.get("#Marketplace").should("exist");
+    cy.url().should("contain", "marketplace");
+    cy.get("#viewMore").should("be.enabled").click();
+    cy.url().should("contain", "/marketplace/category");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/category",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      if (body.data.length !== 0) {
+        let category = body.data[0];
+        cy.get('[type="checkbox"]').check(category.name);
+        cy.get('#product-list').should('exist')
+        cy.contains(productName).should("not.exist");
+      }
+    });
+
+  });
+
+
   // it("it should render product detail page", () => {
   //   cy.login();
   //   cy.wait(30000);
