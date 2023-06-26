@@ -30,7 +30,8 @@ class StripeService {
                     cart: JSON.stringify(cartData)
                 },
                 payment_intent_data: {
-                    application_fee_amount: 0,
+                    /* 3% of OrderTotal in Cents */
+                    application_fee_amount: (0.03 * cartData.orderTotal * 100),
                     /* To be used in case of destination charge */
                     // transfer_data: {
                     //     destination: CONNECTED_ACCOUNT_ID

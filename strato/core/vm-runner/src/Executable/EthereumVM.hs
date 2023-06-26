@@ -62,7 +62,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -75,6 +74,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
+import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
@@ -601,6 +601,7 @@ sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
       ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 
 -- sendOutEvents :: VmOutEventBatch -> ContextM ()
 -- sendOutEvents OutBatch{..} = do
@@ -762,7 +763,9 @@ doSnapSync SS.Snapshot{..} = do
   let !possibleBestBlockInfo = _bestBlockInfo context_state
   let formattedStateKeyVals :: [(MP.Key, MP.Val)] = map (\(ns, b) -> (byteString2NibbleString ns, b)) stateDBLeaves
   let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
-  _ <- mapM (\(a, b) -> AS.putAddressState a b) formattedAddressLeaves
+  _ <- mapM (\(a, b) -> AS.putAddressState  a b) formattedAddressLeaves
+  _ <- mapM (\(a, b) -> Mem.putAddressState a b) formattedAddressLeaves
+  Mem.flushMemAddressStateDB
 
   let !mCurStateRoot = case possibleBestBlockInfo of 
           (ContextBestBlockInfo _ blockData _ _ _) -> Just $ blockDataStateRoot blockData

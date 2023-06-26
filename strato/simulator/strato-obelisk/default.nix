@@ -43,7 +43,6 @@ project ./. ({ ... }: {
     seqevents = ../../core/seqevents;
     solid-vm = ../../VM/SolidVM/solid-vm;
     solid-vm-model = ../../VM/SolidVM/solid-vm-model;
-    strato-adit = ../../core/strato-adit;
     strato-conf = ../../core/strato-conf;
     strato-index = ../../indexer/strato-index;
     strato-model = ../../core/strato-model;

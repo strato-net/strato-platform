@@ -77,7 +77,6 @@ library:
     - resourcet
     - seqevents
     - solid-vm-model
-    - strato-adit
     - strato-redis-blockdb
     - text
     - time
