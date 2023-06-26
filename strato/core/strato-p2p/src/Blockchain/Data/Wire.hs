@@ -350,7 +350,7 @@ obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray addr
       blockHeaders = rlpDecode <$> bh,
       fromStateroot = rlpDecode stateroot,
       fromBlockNumber = rlpDecode bestblock,
-      addressStateLeaves =  rlpDecode <$> address_state_keyvals
+      addressStateLeaves = rlpDecode <$> address_state_keyvals
     }
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))

@@ -177,6 +177,7 @@ instance RLPSerializable Integer where
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray [x])  = - rlpDecode x
+  rlpDecode (RLPArray []) = error "this shit empty"
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array of wrong size"
 
 instance {-# OVERLAPPING #-} RLPSerializable String where
