@@ -92,7 +92,7 @@ describe('Payment Tests', function () {
 4. Creation of order & retrieval with Pay Now 
 /////////////////////////////////*/
 
-it('Get Payment URL', async () => {
+it('Payment URL Generation & Creation Of Order Tests', async () => {
   // create inventory and post it as a seller
     const createProductArgs = {
       ...productArgs(util.uid()),
@@ -171,103 +171,35 @@ it('Get Payment URL', async () => {
     assert.isDefined(payOrder.body, 'body should be defined');
     assert.isDefined(payOrder.body.data, 'body should be defined');
     assert.equal(payOrder.body.data.url.substr(0,34),factory.paymentUrlDomain,'should have a stripe url generated')
-})
+    
+    ////////////////////////////// Order Tests with Pay Now ////////////////////////////////////////
 
-////////////////////////////// Order Tests with Pay Now ////////////////////////////////////////
+    //Create an Order With Pay Now
 
-it('Create an Order Pay Now', async () => {
-  // In this case the seller must have gone through the connect stripe flow
-  const createProductArgs = {
-    ...productArgs(util.uid()),
-  }
-
-  const createProductResponse = await post(
-    Product.prefix,
-    Product.create,
-    createProductArgs,
-    seller.token,
-  )
-  const [,productAddress]=createProductResponse.body.data;
+    const createOrderArgs=factory.getCreateOrderArgs(util.uid(), buyerOrganization, inventories)
   
-  assert.equal(createProductResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createProductResponse.body, 'body should be defined')
+    const createOrderResponse = await post(
+      Order.prefix,
+      Order.create,
+      createOrderArgs,
+      buyer.token
+    )
   
-  const createInventoryArgs={
-    ...inventoryArgs(productAddress, util.uid()),
-  }
-
-  const createInventoryResponse=await post(
-    Inventory.prefix,
-    Inventory.create,
-    createInventoryArgs,
-    seller.token,
-  )
-  const [,inventoryAddress]=createInventoryResponse.body.data
-
-  assert.equal(createInventoryResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createInventoryResponse.body, 'body should be defined')
-
-  // An array of inventory addresses created by the seller
-  const inventories=[inventoryAddress]
-
-  // Create a user address for the buyer's shipping information
-  const buyerAddressArgs = factory.getUserAddressArgs(util.uid())
-  const createUserAddressResponse = await post(
-    Order.prefix,
-    Order.userAddress,
-    buyerAddressArgs,
-    buyer.token
-  )
-
-  const [,userAddress]=createUserAddressResponse.body.data
-
-  const getBuyerAddressResponse = await get(
-    Order.prefix,
-    Order.getAllUserAddress.replace(':address',userAddress),
-    {},
-    buyer.token
-  )
-
-  const buyerAddress = getBuyerAddressResponse.body.data.filter(address=>address.address === userAddress)
-
-  assert.deepInclude(buyerAddress[0], buyerAddressArgs, 'should include the buyer address args')
+    const orderAddress = createOrderResponse.body.data[0][1]
   
-  // The pay now functionality opens this endpoint to make a payment before posting the order
-  const createPaymentArgs = factory.getCreatePaymentArgs(util.uid(),buyerOrganization, inventories, userAddress)
-
-  const createPaymentSession = await post(
-    Order.prefix,
-    Order.payment,
-    createPaymentArgs,
-    buyer.token
-  )
-
-  assert.equal(createPaymentSession.status, RestStatus.OK, 'should be 200');
-
-  const createOrderArgs=factory.getCreateOrderArgs(util.uid(), buyerOrganization, inventories)
+    assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(createOrderResponse.body, 'body should be defined')
   
-  const createOrderResponse = await post(
-    Order.prefix,
-    Order.create,
-    createOrderArgs,
-    buyer.token
-  )
-
-  const orderAddress = createOrderResponse.body.data[0][1]
-
-  assert.equal(createOrderResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(createOrderResponse.body, 'body should be defined')
-
-  // get
-  const getOrderResponse = await get(
-    Order.prefix,
-    Order.get.replace(':address',orderAddress),
-    {},
-    buyer.token,
-  )
-
-  assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
-  assert.isDefined(getOrderResponse.body, 'body should be defined');
-
+    // get
+    const getOrderResponse = await get(
+      Order.prefix,
+      Order.get.replace(':address',orderAddress),
+      {},
+      buyer.token,
+    )
+  
+    assert.equal(getOrderResponse.status, RestStatus.OK, 'should be 200');
+    assert.isDefined(getOrderResponse.body, 'body should be defined');
+  
 })
 })
