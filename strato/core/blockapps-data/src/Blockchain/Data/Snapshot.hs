@@ -38,7 +38,6 @@ data Snapshot = Snapshot {
     blockHeaders          :: [BlockHeader],
     fromStateroot         :: StateRoot,
     fromBlockNumber       :: Integer,
-    stateDBLeaves         :: [(B.ByteString, Val)],
     addressStateLeaves    :: [(Account, AddressState'')]
 } deriving (Eq, Show, Generic, NFData)
 
@@ -52,7 +51,6 @@ emptySnapshot =
         blockHeaders = [],
         fromStateroot = StateRoot B.empty,
         fromBlockNumber = 0,
-        stateDBLeaves = [],
         addressStateLeaves = []
     }
 
@@ -61,7 +59,6 @@ instance Arbitrary Snapshot where
                     blockHeaders = [],
                     fromStateroot = StateRoot B.empty,
                     fromBlockNumber = 0,
-                    stateDBLeaves = [],
                     addressStateLeaves = []
                 }]
 
@@ -74,12 +71,11 @@ instance RLPSerializable Snapshot where
         blockHeaders = bh,
         fromStateroot = sr,
         fromBlockNumber = bn,
-        stateDBLeaves = sdbl,
         addressStateLeaves = asl
-    } = RLPArray [(RLPArray $ rlpEncode <$> bh), rlpEncode sr, rlpEncode bn, (RLPArray $ rlpEncode <$> sdbl), (RLPArray $ rlpEncode <$> asl)]
+    } = RLPArray [(RLPArray $ rlpEncode <$> bh), rlpEncode sr, rlpEncode bn, (RLPArray $ rlpEncode <$> asl)]
 
-    rlpDecode (RLPArray [RLPArray a, b, c, RLPArray d, RLPArray e]) = 
-        Snapshot (rlpDecode <$> a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)  (rlpDecode <$> e)
+    rlpDecode (RLPArray [RLPArray a, b, c, RLPArray d]) = 
+        Snapshot (rlpDecode <$> a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)
 
     rlpDecode (RLPArray arr) = error ("rlpDecode for Snapshot called on object with wrong amount of data, length arr = " ++ show arr)
     rlpDecode x = error ("rlpDecode for Snapshot... something went massively wrong: " ++ show x)
@@ -93,6 +89,7 @@ data AddressState'' =
     AddressState''{ addressStateNonce           :: Integer,
                     addressStateBalance         :: Integer,
                     addressStateContractRoot    :: StateRoot,
+                    addressStateStorageKeyVals  :: [(B.ByteString, Word256)],
                     addressStateCodeHash        :: CodePtr,
                     addressStateChainId         :: Maybe Word256
     } deriving (Eq, Generic, Read, Show)
@@ -105,6 +102,7 @@ instance Format AddressState'' where
         tab'("\nnonce: " ++ showHex (addressStateNonce a) "" ++
             "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
             "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
+            "\nstorageKeyVals: " ++ format (addressStateStorageKeyVals a) ++  
             "\ncodeHash: " ++ format (addressStateCodeHash a) ++
             "\nchainId: " ++ (show $ fmap (flip showHex "") (addressStateChainId a)))
 
@@ -115,22 +113,25 @@ instance RLPSerializable AddressState'' where
             rlpEncode $ toInteger $ addressStateNonce a,
             rlpEncode $ toInteger $ addressStateBalance a,
             rlpEncode $ addressStateContractRoot a,
+            RLPArray $ rlpEncode <$> addressStateStorageKeyVals a,
             rlpEncode $ addressStateCodeHash a
         ] ++ (maybeToList . fmap rlpEncode $ addressStateChainId a)
 
-    rlpDecode (RLPArray [n, b, cr, ch, cid]) =
+    rlpDecode (RLPArray [n, b, cr, kv, ch, cid]) =
         AddressState'' {
             addressStateNonce = fromInteger $ rlpDecode n,
             addressStateBalance = fromInteger $ rlpDecode b,
             addressStateContractRoot = rlpDecode cr,
+            addressStateStorageKeyVals = rlpDecode kv,
             addressStateCodeHash = rlpDecode ch,
             addressStateChainId = Just $ rlpDecode cid
         }
-    rlpDecode (RLPArray [n, b, cr, ch]) =
+    rlpDecode (RLPArray [n, b, cr, kv, ch]) =
         AddressState'' {
             addressStateNonce = fromInteger $ rlpDecode n,
             addressStateBalance = fromInteger $ rlpDecode b,
             addressStateContractRoot = rlpDecode cr,
+            addressStateStorageKeyVals = rlpDecode kv,
             addressStateCodeHash = rlpDecode ch,
             addressStateChainId = Nothing
         }

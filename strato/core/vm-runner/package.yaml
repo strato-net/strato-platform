@@ -43,6 +43,7 @@ library:
   - milena-tools
   - monad-alter
   - mtl
+  - nibblestring
   - prometheus-client
   - seqevents
   - solid-vm

@@ -78,7 +78,7 @@ import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
-import qualified Blockchain.DB.AddressStateDB          as AS
+-- import qualified Blockchain.DB.AddressStateDB          as AS
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
@@ -586,7 +586,6 @@ sendOutEvent (OutAction act) =
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $ void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
@@ -762,10 +761,7 @@ doSnapSync SS.Snapshot{..} = do
   context_state <- Mod.get (Mod.Proxy @ContextState)
   let !possibleBestBlockInfo = _bestBlockInfo context_state
   let formattedStateKeyVals :: [(MP.Key, MP.Val)] = map (\(ns, b) -> (byteString2NibbleString ns, b)) stateDBLeaves
-  let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
-  _ <- mapM (\(a, b) -> AS.putAddressState  a b) formattedAddressLeaves
-  _ <- mapM (\(a, b) -> Mem.putAddressState a b) formattedAddressLeaves
-  Mem.flushMemAddressStateDB
+  -- let formattedAddressLeaves =  map (\(acc,  SS.AddressState'' a b c d e) -> (acc,  AddressState a b c d e)) addressStateLeaves
 
   let !mCurStateRoot = case possibleBestBlockInfo of 
           (ContextBestBlockInfo _ blockData _ _ _) -> Just $ blockDataStateRoot blockData
@@ -785,3 +781,11 @@ doSnapSync SS.Snapshot{..} = do
       return ()
 
     Nothing -> return ()
+
+-- not running with a current block hash, all of the snapshot data is not gonna work
+-- write this stateroot to the blockhash
+-- address state, 
+-- putBlockHeaderInChainDB
+-- stateDB and storageDB connected but two different tries
+-- traverse storage for each addresss state contract root -> put address state -> putBlockHeaderInChainDB
+

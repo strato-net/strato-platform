@@ -157,7 +157,7 @@ instance Format InEvent where
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) =  "ValidatorBehaviorChange " ++ format theBool
   format (ValidatorChange val theBool) =  "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
-  format (SnapshotReceived (Snapshot _ _ bn _ _)) = "Snapshot from block " ++ (show bn)  --TODO improve, ie add block number and more helpful info
+  format (SnapshotReceived (Snapshot _ _ bn _)) = "Snapshot from block " ++ (show bn)  --TODO improve, ie add block number and more helpful info
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block

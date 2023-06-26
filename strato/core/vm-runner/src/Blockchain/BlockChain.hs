@@ -98,6 +98,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import qualified Blockchain.Strato.RedisBlockDB          as Redis
 import qualified Blockchain.Strato.StateDiff             as SD
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
@@ -764,10 +765,12 @@ completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
   runConduit $ SD.stateDiff Nothing num hsh src dst
             .| mapM_C (yield . OutStateDiff)
 
-makeSnapShot :: VMBase m =>  MP.StateRoot -> Integer -> m ()
+makeSnapShot :: VMBase m => MP.StateRoot -> Integer -> m ()
 makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
-  address_states <- NoCache.getAllAddressStateLeaves Nothing
-  let formattedAddressLeaves :: [(Account, SS.AddressState'')] =  map (\(acc, AddressState a b c d e) -> (acc, SS.AddressState'' a b c d e)) address_states
-  leaves_and_keys <-  getAllLeafKeyVals s
-  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber leaves_and_keys formattedAddressLeaves
+  address_states <- NoCache.getAllAddressStates Nothing
+  let formattedAddressLeaves :: FullStorage m => m [(Account, SS.AddressState'')] = map (\(acc, AddressState a b c d e) -> do
+        storageForAcc <- getAllStorageKeyVals'' acc
+        (acc, SS.AddressState'' a b c storageForAcc d e)) address_states
+  -- leaves_and_keys <-  getAllLeafKeyVals s
+  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedAddressLeaves
