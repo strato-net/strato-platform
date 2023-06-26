@@ -254,35 +254,37 @@ describe("Renders Inventory Page", () => {
     });
   });
 
-  // Serial Number is required
-  // it.skip("it should add event to an inventory", () => {
-  //   cy.get("#Inventory").should("exist");
-  //   cy.get("#Inventory").click();
-  //   cy.url().should("include", "/inventories");
+  it("it should add event to an inventory", () => {
+    cy.createProduct();
+    cy.createInventory();
+    
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
 
-  //   cy.request({
-  //     method: "GET",
-  //     url: "/api/v1/inventory",
-  //   }).then(({ status, body }) => {
-  //     expect(status).to.eq(200);
-  //     const inventoryList = cy.get("#inventory-list").children();
-  //     inventoryList.get("#0").get(".anticon-more").should("exist");
-  //     inventoryList.get("#0").get(".anticon-more").eq(0).click();
-  //     inventoryList.get("#0").get("#sideMenu").contains("Add Event").should("be.visible");
-  //     inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
-  //     cy.get(".ant-modal-content").should("exist");
-  //     cy.contains("Add Event").should("be.visible");
-  //     cy.wait(30000);
-  //     cy.get("#eventType").type("{enter}{enter}");
-  //     cy.get("#certifier").type("Achin Kumar{enter}{enter}");
-  //     cy.get('textarea').eq(0).type("summary");
-  //     cy.get('.ant-picker-input').type("04/05/2023{enter}");
-  //     cy.get("button").contains("Add Event").should("be.visible");
-  //     cy.get("button").contains("Add Event").click();
-  //     cy.contains("Event created successfully").should("be.visible");
+    cy.request({
+      method: "GET",
+      url: "/api/v1/inventory",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      const inventoryList = cy.get("#inventory-list").children();
+      inventoryList.get("#0").get(".anticon-more").should("exist");
+      inventoryList.get("#0").get(".anticon-more").eq(0).click();
+      inventoryList.get("#0").get("#sideMenu").contains("Add Event").should("be.visible");
+      inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
+      cy.get(".ant-modal-content").should("exist");
+      cy.contains("Add Event").should("be.visible");
+      cy.wait(30000);
+      cy.get("#eventType").type("{enter}{enter}");
+      cy.get("#certifier").type("Achin Kumar{enter}{enter}");
+      cy.get('textarea').eq(0).type("summary");
+      cy.get('.ant-picker-input').type("04/05/2023{enter}");
+      cy.get("button").contains("Add Event").should("be.visible");
+      cy.get("button").contains("Add Event").click();
+      cy.contains("Event created successfully").should("be.visible");
 
-  //   });
-  // });
+    });
+  });
 
   it("it should render events list of an inventory", () => {
     cy.get("#Inventory").should("exist");
