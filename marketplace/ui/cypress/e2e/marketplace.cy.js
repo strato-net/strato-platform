@@ -284,7 +284,7 @@ describe("Renders Marketplace Page", () => {
     });
   });
 
-  it.only("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
+  it("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
     const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
 
     cy.get("#Products").should("exist");
