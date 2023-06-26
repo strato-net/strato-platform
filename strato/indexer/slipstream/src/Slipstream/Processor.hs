@@ -297,21 +297,35 @@ readPreviousSolidVMState :: MonadIO m =>
                             IORef Globals -> Account -> m [(Text, Value)]
 readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
-rowToInsert :: MonadIO m =>
+rowToInsert :: (MonadIO m, MonadLogger m) =>
                IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
                     Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
                     Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
+  $logInfoS "Nallapu00" $ T.pack $ show (newState)
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
-processedContractToProcessedMappingRows pc mapNames row abiid = do
-  let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
+rowToMappings :: (MonadIO m, MonadLogger m) => AggregateAction -> OLD.Contract -> [(Text, Value)]
+            -> m (Map.Map Text Value)
+rowToMappings row cont oldState = do
+  let newState = case actionStorage row of
+                    Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp oldState
+                    Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState--REMOVE 
+  $logInfoS "Nallapu000" $ T.pack $ show (newState)
+  return $ (Map.fromList $ newState)
+
+
+processedContractToProcessedMappingRows :: (MonadIO m, MonadLogger m) => Map.Map Text Value -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
+processedContractToProcessedMappingRows state mapNames row abiid = do
+  $logInfoS "Nallapu0" $ T.pack $ show (row)
+  let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (state)
+  $logInfoS "Nallapu" $ T.pack $ show state
   let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
   let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
+  $logInfoS "Nallapu2" $ T.pack $ show recordVMs
   if null valueMappingsMap then return $ []
   else do
     let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName row abiid (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
@@ -552,12 +566,12 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          stateDiff <- rowToMappings row cont oldState
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) row abiid--get all mapping rows to insert
-          $logDebugLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
+          pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
           pure . Right $ BatchedInserts indexContract hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"

@@ -588,7 +588,7 @@ insertMappingTable :: OutputM m
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = do
   let newMaps = nubBy ((==) `on` mapDataKey) maps
-  $logInfoS "insertMappingTable" $ T.pack $ show maps
+  $logInfoS "insertMappingTable" $ T.pack $ show newMaps
   yieldMany $ insertMappingTableQuery newMaps
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
