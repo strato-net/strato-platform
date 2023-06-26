@@ -20,7 +20,6 @@
 module Slipstream.Processor
   ( processTheMessages
   , parseActions
-  , processedContractToProcessedMappingRows  -- For testing
   ) where
 
 import Prelude hiding (lookup)
@@ -308,14 +307,14 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> m [ProcessedMappingRow]
-processedContractToProcessedMappingRows pc mapNames = do
+processedContractToProcessedMappingRows :: MonadIO m => ProcessedContract -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
+processedContractToProcessedMappingRows pc mapNames row abiid = do
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (contractData pc)
   let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
   let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
   if null valueMappingsMap then return $ []
   else do
-    let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName pc (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
+    let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName row abiid (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
     return $ result
       
 rowToHistories :: (MonadIO m) =>
@@ -360,23 +359,23 @@ contractToEventTables (org, app, name) c =
           eventFields = map fst $ _eventLogs fields
         }
 
-processedMappingRow ::  Text -> ProcessedContract -> Value -> Value-> ProcessedMappingRow
-processedMappingRow mapping ProcessedContract{..} k v =
+processedMappingRow ::  Text -> AggregateAction -> ABIID -> Value -> Value-> ProcessedMappingRow
+processedMappingRow mapping AggregateAction{..} ABIID{..} k v =
    ProcessedMappingRow {
-    m_address           =  address 
-  , m_codehash          =  codehash 
-  , m_organization      =  organization 
-  , m_application       =  application 
-  , m_contractname      =  contractName 
-  , m_mapname           =  mapping
-  , m_chain             =  chain 
-  , m_blockHash         =  blockHash 
-  , m_blockTimestamp    =  blockTimestamp 
-  , m_blockNumber       =  blockNumber 
-  , m_transactionHash   =  transactionHash 
-  , m_transactionSender =  transactionSender 
-  , m_mapDataKey        = k 
-  , m_mapDataValue      = v
+    address           =  actionAccount ^. accountAddress 
+  , codehash          =  actionCodeHash 
+  , organization      =  actionOrganization 
+  , application       =  actionApplication 
+  , contractname      =  aiName 
+  , mapname           =  mapping
+  , chain             =  aiChain 
+  , blockHash         =  actionBlockHash 
+  , blockTimestamp    =  actionBlockTimestamp 
+  , blockNumber       =  actionBlockNumber 
+  , transactionHash   =  actionTxHash 
+  , transactionSender =  actionTxSender ^. accountAddress 
+  , mapDataKey        =  k
+  , mapDataValue      =  v
    }
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
@@ -555,7 +554,7 @@ processTheMessages env sqlEnv conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) --get all mapping rows to insert
+          pMappings <- processedContractToProcessedMappingRows indexContract (mapNames) row abiid--get all mapping rows to insert
           $logDebugLS "Mapping inserts are: " $ T.pack $ show pMappings
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
@@ -567,7 +566,7 @@ processTheMessages env sqlEnv conn g messages = do
   let insertsByCodeHash = map snd
                         -- SolidVM contracts can have the same codehash and be different:
                         -- the codehash is just a sourcehash.
-                        . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
+                        . partitionWith (SE.codehash . indexInsert &&& SE.contractName . indexInsert)
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
