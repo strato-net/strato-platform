@@ -4,11 +4,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Slipstream.Globals
   (
     setTableCreated,
     getTableColumns,
+    tableNameToText,
     getMappingTables,
     isTableCreated,
     setContractState,
@@ -26,13 +29,17 @@ import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Cache.LRU              as LRU
+import qualified Data.ByteString.Lazy         as BL
+import qualified Data.Cache.LRU               as LRU
 import           Data.Either.Extra
 import qualified Data.Map.Strict              as M
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import           Data.Text.Encoding          (decodeUtf8)
+import           Data.Maybe                   (mapMaybe, isJust)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
+import           Database.PostgreSQL.Typed    (pgQuery, PGConnection)
+import           Database.PostgreSQL.Typed.Types
+
 import           UnliftIO.IORef
 
 import           BlockApps.Solidity.Value
@@ -43,14 +50,47 @@ import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
-newGlobals :: MonadIO m => M.Map TableName TableColumns  -> Handle -> m (IORef Globals)
-newGlobals createdTabl = newIORef . Globals createdTabl (LRU.newLRU (Just 1024))
+newGlobals :: MonadIO m => Handle -> PGConnection -> m (IORef Globals)
+newGlobals h pgc = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) h pgc
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
+tableSeparator :: Text
+tableSeparator = "-"
+
+tableNameToText :: TableName -> Text
+tableNameToText (IndexTableName o a c) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+  in prefix <> c
+tableNameToText (MappingTableName o a c m ) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator <> c <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
+  in "mapping@" <> prefix <> m
+tableNameToText (HistoryTableName o a c) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+  in "history@" <> prefix <> c
+tableNameToText (EventTableName o a c e) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = c <> "." <> e
+  in prefix <> contractAndEvent
 
 xabiToText :: Xabi -> Text
 xabiToText = T.replace "\'" "\'\'"
@@ -58,22 +98,28 @@ xabiToText = T.replace "\'" "\'\'"
            . JSON.encode
 
 setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
-setTableCreated globalsIORef _ _ = do
-  globals <- readIORef globalsIORef
-  updateGlobals globalsIORef globals--{createdTables=M.insert tableName tableColumns createdTables}
+setTableCreated globalsIORef tableName tableColumns = do
+  globals@Globals{..} <- readIORef globalsIORef
+  updateGlobals globalsIORef globals{createdTables=M.insert tableName tableColumns createdTables}
 
 isTableCreated :: MonadIO m => IORef Globals -> TableName -> m Bool
-isTableCreated globalsIORef _ = do
-  _ <- readIORef globalsIORef
-  return False -- $ tableName `M.member` createdTables
+isTableCreated globalsIORef tableName = do
+  Globals{..} <- readIORef globalsIORef
+  if tableName `M.member` createdTables
+    then return True
+    -- if table not in map, query cirrus to check if it's made
+    -- (getTableColumns does query and updates map when appropriate)
+    else isJust <$> getTableColumns globalsIORef tableName
 
+
+-- todo: update this so will scrape for all mapping tables as needed or find better solution
 getMappingTables :: MonadIO m => IORef Globals -> Text -> Text -> Text -> m ([Text])
 getMappingTables globalsIORef org app contract = do
   Globals{..} <- readIORef globalsIORef
   let mappingTables = M.filterWithKey isMappingTableName (createdTables)
                         where
                           isMappingTableName :: TableName -> TableColumns -> Bool
-                          isMappingTableName (MappingTableName o a n _) _ = 
+                          isMappingTableName (MappingTableName o a n _) _ =
                             o == org && a == app && n == contract
                           isMappingTableName _ _ = False
   let mapNames = map mtMappingName (M.keys mappingTables)
@@ -82,7 +128,18 @@ getMappingTables globalsIORef org app contract = do
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
-  return $ M.lookup tableName createdTables
+  let columns = M.lookup tableName createdTables
+  if isJust columns
+    then return columns
+    else do -- not in map, so check in cirrus
+      let queryFor t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> t <> "\';"
+      results :: [PGValues] <- liftIO $ pgQuery cirrusConn $ queryFor $ tableNameToText tableName
+      if null results
+        then return Nothing
+        else do
+          let tableColumns = mapMaybe (\case [PGTextValue bs] -> Just $ decodeUtf8 bs; _ -> Nothing) results
+          setTableCreated globalsIORef tableName tableColumns
+          return $ Just tableColumns
 
 getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
 getContractState globalsIORef account = do

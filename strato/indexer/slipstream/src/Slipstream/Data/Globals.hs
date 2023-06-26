@@ -16,6 +16,7 @@ import qualified Data.Text           as T
 import           GHC.Generics
 import           Text.Regex.Posix
 
+import           Database.PostgreSQL.Typed (PGConnection)
 
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
@@ -28,10 +29,13 @@ instance NFData (LRU key val) where
 instance NFData (TableName) where
   rnf = (`seq` ())
 
+instance NFData PGConnection where 
+  rnf = const ()
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
                        , coldStorageHandle :: Handle
+                       , cirrusConn :: PGConnection
                        } deriving (Generic, NFData)
 
 data TableName = 

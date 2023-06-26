@@ -27,6 +27,7 @@ import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
+import Database.PostgreSQL.Typed     (pgConnect, defaultPGDatabase)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 -- import Slipstream.Processor
@@ -63,6 +64,7 @@ createInserts globalsIORef contracts = do
 
 spec :: Spec
 spec = do
+  fakePGConnection <- liftIO $ pgConnect defaultPGDatabase
 
   it "should be able to process array sentinels" $ do
     valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
@@ -91,7 +93,7 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals M.empty fakeHandle
+      g <- newGlobals fakeHandle fakePGConnection
       [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
@@ -155,7 +157,7 @@ spec = do
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals M.empty fakeHandle
+      g <- newGlobals fakeHandle fakePGConnection
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g input .| sinkList
@@ -256,7 +258,7 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals M.empty fakeHandle
+      g <- newGlobals fakeHandle fakePGConnection
       [vehicleCreate, _, _, _, vehicleInsert, _] <-
           runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate `shouldBe`
@@ -342,7 +344,7 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals M.empty fakeHandle
+    g <- newGlobals fakeHandle fakePGConnection
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
@@ -470,7 +472,7 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals M.empty fakeHandle
+    g <- newGlobals fakeHandle fakePGConnection
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
@@ -521,7 +523,7 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals M.empty fakeHandle
+    g <- newGlobals fakeHandle fakePGConnection
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
