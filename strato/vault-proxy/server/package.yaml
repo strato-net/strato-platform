@@ -55,7 +55,6 @@ library:
     - monad-alter
     - monad-control
     - mtl
-    - opaleye
     - product-profunctors
     - profunctors
     - req

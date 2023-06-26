@@ -15,6 +15,7 @@ dependencies:
   - bytestring
   - containers
   - common-log
+  - evm-solidity
   - hflags
   - kafka-monad
   - raw-strings-qq
@@ -30,7 +31,6 @@ library:
   dependencies: 
     - aeson
     - binary
-    - bloc-sql-monad
     - bloc2
     - blockapps-data
     - blockapps-datadefs
@@ -39,11 +39,9 @@ library:
     - classy-prelude
     - conduit
     - containers
-    - core-api-monad
     - core-api2
     - cross-monitoring
     - deepseq
-    - evm-solidity
     - extra
     - format
     - lens
@@ -75,7 +73,6 @@ executables:
     main: Main.hs
     dependencies:
       - base
-      - bloc-sql-monad
       - bloc2
       - blockapps-init
       - cache
@@ -102,7 +99,6 @@ tests:
       - classy-prelude
       - conduit
       - containers
-      - evm-solidity
       - hflags
       - hspec
       - hspec-expectations-lifted

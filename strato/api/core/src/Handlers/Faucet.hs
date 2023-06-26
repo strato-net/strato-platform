@@ -13,10 +13,10 @@
 
 module Handlers.Faucet
   ( API
-  , postFaucetClient
-  , postFaucetMultipartClient
-  , postDataFaucetClient
   , server
+  , postFaucet
+  , postFaucetMultipart
+  , postDataFaucet
   ) where
 
 import           Control.Monad
@@ -24,7 +24,6 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Lazy                  as LBS
 import           Data.Conduit
 import           Data.Maybe
 import           Data.Text                             (Text)
@@ -32,7 +31,6 @@ import qualified Data.Text                             as T
 import qualified Database.Esqueleto.Legacy             as E
 import           Numeric
 import           Servant
-import           Servant.Client
 import           Servant.Multipart
 import           Servant.Multipart.Client              ()
 import           System.IO.Unsafe
@@ -71,22 +69,24 @@ type API =
   "dataFaucet" :> QueryParam "size" Int
                :> QueryParam "count" Int
                :> Get '[JSON] [Keccak256]
-               
-postFaucetClient :: Address -> ClientM [Keccak256]
-postFaucetMultipartClient :: (LBS.ByteString, MultipartData Mem) -> ClientM [Keccak256]
-postDataFaucetClient :: Maybe Int -> Maybe Int -> ClientM [Keccak256]
-postFaucetClient
-  :<|> postFaucetMultipartClient
-  :<|> postDataFaucetClient = client (Proxy @API)
 
 server :: (MonadLogger m, HasSQL m) => ServerT API m
-server  =
-  postFaucetC
-  :<|> postFaucetMultipartC
-  :<|> postDataFaucetC
-  where postFaucetC a = runConduit $ postFaucet a `fuseUpstream` emitKafkaTransactions
-        postFaucetMultipartC a = runConduit $ postFaucetMultipart a `fuseUpstream` emitKafkaTransactions
-        postDataFaucetC a b = runConduit $ postDataFaucet a b `fuseUpstream` emitKafkaTransactions
+server  = postFaucet
+     :<|> postFaucetMultipart
+     :<|> postDataFaucet
+
+postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+           => Address -> m [Keccak256]
+postFaucet a = runConduit $ postFaucetC a `fuseUpstream` emitKafkaTransactions
+
+postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+                    => MultipartData Mem -> m [Keccak256]
+postFaucetMultipart a = runConduit $ postFaucetMultipartC a `fuseUpstream` emitKafkaTransactions
+
+
+postDataFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m) 
+               => Maybe Int -> Maybe Int -> m [Keccak256]
+postDataFaucet a b = runConduit $ postDataFaucetC a b `fuseUpstream` emitKafkaTransactions
 
 -----------------------------------------
 
@@ -98,9 +98,9 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-           => Address -> ConduitT a IngestEvent m [Keccak256]
-postFaucet target = do
+postFaucetC :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+            => Address -> ConduitT a IngestEvent m [Keccak256]
+postFaucetC target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lift . lookupNonce $ fromPrivateKey key
 
@@ -114,13 +114,13 @@ postFaucet target = do
       yield . IETx ts $ IngestTx API tx
       pure $ txHash tx
 
-postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-                    => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
-postFaucetMultipart multipartData = do
+postFaucetMultipartC :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+                     => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
+postFaucetMultipartC multipartData = do
   case lookupInput "address" multipartData of
     Right a ->
       case toAddr a of
-        Right address -> postFaucet address
+        Right address -> postFaucetC address
         Left e -> throwIO $ InvalidArgs e
     Left e -> throwIO $ MissingParameterError e
 
@@ -131,9 +131,9 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: (MonadIO m, Selectable Address Integer m) 
-               => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
-postDataFaucet mSize mCountOf = do
+postDataFaucetC :: (MonadIO m, Selectable Address Integer m) 
+                => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
+postDataFaucetC mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lift . lookupNonce $ fromPrivateKey key
   let size = fromMaybe 4096 mSize

@@ -35,7 +35,6 @@ import Bloc.Monad (BlocEnv(..))
 import BlockApps.Init
 import BlockApps.Logging
 
-import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 
@@ -133,6 +132,5 @@ main = do
     handle <- runReaderT initStorage workerConn
 
     gref <- join $ liftIO $ flip newGlobals handle <$> createdTables
-    sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
 
-    getAndProcessMessages env sqlEnv conn gref
+    getAndProcessMessages env conn gref

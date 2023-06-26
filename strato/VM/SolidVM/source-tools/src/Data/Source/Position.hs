@@ -21,6 +21,7 @@ import Control.DeepSeq (NFData)
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Data
+import Data.Default
 import GHC.Generics
 import Test.QuickCheck
 import Text.Parsec.Pos
@@ -51,6 +52,9 @@ instance FromJSON SourcePosition where
 
 instance Arbitrary SourcePosition where
   arbitrary = SourcePosition <$> arbitrary <*> arbitrary <*> arbitrary
+
+instance Default SourcePosition where
+  def = initialPosition ""
 
 initialPosition :: String -> SourcePosition
 initialPosition name = SourcePosition name 0 0

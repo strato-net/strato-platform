@@ -16,11 +16,12 @@ module Handlers.AccountInfo where
 
 import           Control.Monad.Change.Alter
 import           Control.Lens
--- import qualified Data.ByteString.Char8       as BC
 import           Data.List
 import           Data.Maybe
+import           Data.Source.Map
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
+import           Data.Text.Encoding          (decodeUtf8)
 import qualified Database.Esqueleto.Legacy          as E
 import           Numeric.Natural
 import           Servant
@@ -231,3 +232,19 @@ accountQueryParams = [ "address",
 -- toCode :: Text -> BC.ByteString
 -- toCode v = LabeledError.b16Decode "toCode" $ BC.pack $ (T.unpack v)
 
+type CodeAPI =
+  "code" :> Capture "codeHash" Keccak256
+         :> Get '[JSON] SourceMap
+
+codeServer :: (MonadIO m, Selectable Keccak256 SourceMap m) => ServerT CodeAPI m
+codeServer cHash = select (Proxy @SourceMap) cHash >>= \case
+  Nothing -> throwIO . CouldNotFind $ "Could not find code for code hash " <> T.pack (show cHash)
+  Just srcMap -> pure srcMap
+
+getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
+getCodeFromPostgres cHash =
+  let getSourceMap = deserializeSourceMap . decodeUtf8 . codeRefCode . E.entityVal
+   in fmap (listToMaybe . map getSourceMap) . sqlQuery . E.select $
+        E.from $ \(codeRef) -> do
+        E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
+        return codeRef

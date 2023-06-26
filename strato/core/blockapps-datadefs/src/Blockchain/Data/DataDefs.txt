@@ -66,6 +66,12 @@ AddressStateRef
     UniqueAddress address chainId
     deriving Eq Read Show
 
+CodeRef
+    codeHash Keccak256
+    code BS.ByteString
+    UniqueCodeHash codeHash
+    deriving Eq Read Show
+
 RawTransaction
     timestamp UTCTime
     fromAddress Address

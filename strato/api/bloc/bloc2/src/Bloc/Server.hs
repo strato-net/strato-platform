@@ -23,7 +23,6 @@ import           Bloc.Server.Transaction
 import           Bloc.Server.TransactionResult
 import           Bloc.Server.Users
 import           Bloc.Server.X509
-import           BlockApps.Solidity.Xabi
 
 import Control.Monad.Change.Alter
 import Control.Monad.Logger
@@ -33,20 +32,18 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Data.AddressStateDB
 
-import Control.Monad.Composable.BlocSQL
-import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 
+import SolidVM.Model.CodeCollection.Contract
+
 bloc :: ( MonadLogger m
-        , HasBlocSQL m
         , HasBlocEnv m
         , HasVault m
-        , HasCoreAPI m
         , HasSQL m
-        , Selectable Account ContractDetails m
+        , Selectable Account Contract m
         , Selectable Account AddressState m
-        , (Keccak256 `Alters` SourceMap) m
+        , (Keccak256 `Selectable` SourceMap) m
         )
      => ServerT BlocAPI m
 bloc = return gitInfo
