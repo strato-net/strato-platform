@@ -88,8 +88,8 @@ describe('Payment Tests', function () {
  Flow: 
 1. Seller creates Inventory
 2. Buyer will have the shipping address created
-3. Buyer clicks Pay Now, which invokes the `orders/payment` api endpoint to generate stripe checkout URL before creating order
-4. Creation of order & retrieval with Pay Now 
+3. Buyer will proceed with creating payment session
+4. Creation of order & retrieval
 /////////////////////////////////*/
 
 it('Payment URL Generation & Creation Of Order Tests', async () => {
@@ -158,7 +158,7 @@ it('Payment URL Generation & Creation Of Order Tests', async () => {
     const buyerAddress = getShipAddress.body.data.filter(address=>address.address === userAddress)
     assert.deepInclude(buyerAddress[0],buyerAddressArgs, 'should include the buyer address args')
     
-    // pay now as a buyer
+    // create payment session
     const payOrderArgs = factory.getCreatePaymentArgs(util.uid(),buyerOrganization,inventories,userAddress)
     const payOrder = await post(
       Order.prefix,
@@ -172,9 +172,9 @@ it('Payment URL Generation & Creation Of Order Tests', async () => {
     assert.isDefined(payOrder.body.data, 'body should be defined');
     assert.equal(payOrder.body.data.url.substr(0,34),factory.paymentUrlDomain,'should have a stripe url generated')
     
-    ////////////////////////////// Order Tests with Pay Now ////////////////////////////////////////
+    ////////////////////////////// Order Tests ////////////////////////////////////////
 
-    //Create an Order With Pay Now
+    //Create an Order
 
     const createOrderArgs=factory.getCreateOrderArgs(util.uid(), buyerOrganization, inventories)
   
