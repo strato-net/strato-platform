@@ -1,11 +1,9 @@
 describe("Renders Marketplace Page", () => {
-  beforeEach(() => {
+  it("it should render marketplace dashboard", () => {
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
-  })
 
-  it("it should render marketplace dashboard", () => {
     cy.url().should("include", "/marketplace");
     cy.contains("Explore New Products").should("exist");
     cy.get(".relative").find("img").should('have.attr', 'src').should("include", "hero");
@@ -37,6 +35,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render product list page", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
 
@@ -62,6 +64,9 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
 
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
@@ -130,6 +135,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render inventories based on filter selection", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
@@ -192,6 +201,10 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render product detail page", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.request({
       method: "GET",
       url: `/api/v1/marketplace/user/topselling?offset=0`,
@@ -285,6 +298,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
 
     cy.get("#Products").should("exist");
