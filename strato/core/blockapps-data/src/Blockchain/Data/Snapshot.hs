@@ -89,7 +89,7 @@ data AddressState'' =
     AddressState''{ addressStateNonce           :: Integer,
                     addressStateBalance         :: Integer,
                     addressStateContractRoot    :: StateRoot,
-                    addressStateStorageKeyVals  :: [(B.ByteString, Word256)],
+                    addressStateStorageKeyVals  :: [(B.ByteString, B.ByteString)],
                     addressStateCodeHash        :: CodePtr,
                     addressStateChainId         :: Maybe Word256
     } deriving (Eq, Generic, Read, Show)

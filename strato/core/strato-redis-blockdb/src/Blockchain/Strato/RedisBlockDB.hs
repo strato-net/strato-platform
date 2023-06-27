@@ -1115,7 +1115,7 @@ getSnapShot = getInNamespace Snapshot (S8.pack "snapshot") >>= \case
     Right Nothing -> return Nothing
     Right (Just (snapshot)) ->  return . Just $ fromValue snapshot 
 
-insertContractKeyVals :: [(B.ByteString, Word256)]
+insertContractKeyVals :: [(B.ByteString, B.ByteString)]
                       -> Account
                       -> Redis (Either Reply Status)
 insertContractKeyVals ls acct = do
@@ -1124,10 +1124,10 @@ insertContractKeyVals ls acct = do
         TxSuccess _ -> pure $ Right Ok
         _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertContractKeyVals - Aborted")
 
-getAllContractKeyVals :: [Account] -> Redis ([(Maybe [(B.ByteString, Word256)])])
+getAllContractKeyVals :: [Account] -> Redis ([(Maybe [(B.ByteString, B.ByteString)])])
 getAllContractKeyVals = mapM (getContractKeyVals)
 
-getContractKeyVals :: Account -> Redis (Maybe ([(B.ByteString, Word256)]))
+getContractKeyVals :: Account -> Redis (Maybe ([(B.ByteString, B.ByteString)]))
 getContractKeyVals acct = getInNamespace Snapshot acct >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing

@@ -772,7 +772,7 @@ insertAndCheckStateRoot :: VMBase m => (Account, SS.AddressState'') -> m ()
 insertAndCheckStateRoot (acct, addrState@SS.AddressState''{..}) = do
   _ <- AS.putAddressState acct $ formatAddressState addrState
   test <- AS.addressStateExists acct
-  _ <- traverse (\(k, v) -> putRawStorageKeyValDB MP.emptyTriePtr ((byteString2NibbleString k), (rlpEncode $ toVal v))) addressStateStorageKeyVals
+  _ <- traverse (\(k, v) -> putRawStorageKeyValDB MP.emptyTriePtr ((byteString2NibbleString k), (rlpEncode v))) addressStateStorageKeyVals
   test2 <- getAllStorageKeyVals' acct
   case (test, test2) of
     (True, [_]) -> pure $ ()
