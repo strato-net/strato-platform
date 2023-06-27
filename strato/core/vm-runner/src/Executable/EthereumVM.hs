@@ -61,7 +61,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -74,6 +73,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
+import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
@@ -576,8 +576,6 @@ sendOutEvent (OutAction act) =
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
-  void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
@@ -592,6 +590,7 @@ sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
       ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 
 -- sendOutEvents :: VmOutEventBatch -> ContextM ()
 -- sendOutEvents OutBatch{..} = do
