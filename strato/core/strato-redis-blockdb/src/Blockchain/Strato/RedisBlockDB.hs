@@ -43,7 +43,7 @@ module Blockchain.Strato.RedisBlockDB
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     , getSyncStatus, putSyncStatus, getSyncStatusNow
     , getVmGasCap, putVmGasCap
-    , getSnapShot, insertSnapShot
+    , getSnapShot, insertSnapShot, getContractKeyVals, insertContractKeyVals, getAllContractKeyVals
     ) where
 
 import           BlockApps.X509.Certificate
@@ -53,6 +53,7 @@ import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Partitioner                (partitionWith)
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember   as CM
 import           Blockchain.Strato.Model.Class
@@ -66,6 +67,7 @@ import           Control.Concurrent                    (threadDelay)
 import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
+import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
@@ -1102,13 +1104,31 @@ runStratoRedisIO r = liftIO $ do
 insertSnapShot :: SS.Snapshot
                -> Redis (Either Reply Status)
 insertSnapShot snapshot = do
-        res <- multiExec $ set (inNamespace Snapshot $ S8.pack "snapshot") (toValue snapshot)
-        case res of
-            TxSuccess _ -> pure $ Right Ok
-            _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertSnapshot - Aborted")
+    res <- multiExec $ set (inNamespace Snapshot $ S8.pack "snapshot") (toValue snapshot)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertSnapshot - Aborted")
 
 getSnapShot ::  Redis (Maybe (SS.Snapshot))
 getSnapShot = getInNamespace Snapshot (S8.pack "snapshot") >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing
     Right (Just (snapshot)) ->  return . Just $ fromValue snapshot 
+
+insertContractKeyVals :: [(B.ByteString, Word256)]
+                      -> Account
+                      -> Redis (Either Reply Status)
+insertContractKeyVals ls acct = do
+    res <- multiExec $ set (inNamespace Snapshot acct) (toValue ls)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertContractKeyVals - Aborted")
+
+getAllContractKeyVals :: [Account] -> Redis ([(Maybe [(B.ByteString, Word256)])])
+getAllContractKeyVals = mapM (getContractKeyVals)
+
+getContractKeyVals :: Account -> Redis (Maybe ([(B.ByteString, Word256)]))
+getContractKeyVals acct = getInNamespace Snapshot acct >>= \case
+    Left _        -> return Nothing
+    Right Nothing -> return Nothing
+    Right (Just (keyvals)) ->  return . Just $ fromValue keyvals 

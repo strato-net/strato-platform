@@ -64,6 +64,9 @@ instance RedisDBValuable Bool where
     toValue False = S8.empty
     fromValue = not . S8.null
 
+instance RedisDBKeyable Account where
+    toKey = toStrict . encode
+
 instance RedisDBValuable Account where
     toValue = toStrict . encode
     fromValue = decode . fromStrict

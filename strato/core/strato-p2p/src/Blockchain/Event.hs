@@ -74,7 +74,7 @@ import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.StateRoot     (unboxStateRoot)
-import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot)
+import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot, getAllContractKeyVals)
 import           Blockchain.Verification
 import qualified Blockchain.VMOptions                  as VM
 
@@ -383,12 +383,16 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Received a snapshot request from " ++ peerString peer
 
           redisSnapshot <- runStratoRedisIO $ getSnapShot
-          let theSnapshot = (fromMaybe (SS.emptySnapshot) redisSnapshot)
+          let theSnapshot = fromMaybe (SS.emptySnapshot) redisSnapshot
           case SS.fromBlockNumber theSnapshot of
             0 -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot from Redis failed."
             _ -> do
               headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ SS.fromBlockNumber theSnapshot) [(0 :: Integer)..]
-              yieldR . SnapshotResponse $ theSnapshot {SS.blockHeaders = (fmap (blockDataToBlockHeader . unCanonical . snd) headers)}
+              let onlyAccounts = map (\(x, _) -> x) $ SS.addressStateLeaves theSnapshot
+              allStorage <- runStratoRedisIO $ getAllContractKeyVals onlyAccounts
+              let newAddrStates = zipWith (\kv (acct, addrState) -> (acct, addrState{SS.addressStateStorageKeyVals = fromMaybe [] kv})) allStorage $ SS.addressStateLeaves theSnapshot
+              let theSnapshot' = theSnapshot{SS.addressStateLeaves = newAddrStates}
+              yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = (fmap (blockDataToBlockHeader . unCanonical . snd) headers)}
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 
     MsgEvt (SnapshotResponse snapshot) -> do

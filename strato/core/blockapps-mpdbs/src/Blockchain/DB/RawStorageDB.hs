@@ -23,6 +23,7 @@ module Blockchain.DB.RawStorageDB
   , flushMemRawStorageTxDBToBlockDB
   , flushMemRawStorageDB
   , putRawStorageKeyValDB
+  , getAllRawStorageKeyValsDB
   ) where
 
 import           Control.Arrow                               ((***))

@@ -769,7 +769,9 @@ makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
   address_states <- NoCache.getAllAddressStates Nothing
   let onlyAccounts = map (\(x, _) -> x) address_states
-  storageKeyVals <- mapM (getAllStorageKeyVals') onlyAccounts
-  let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, v)) kv) storageKeyVals
-  let formattedLeaves = zipWith (\(acc1, (AddressState a b c d e)) (storageStuff) -> (acc1, SS.AddressState'' a b c storageStuff d e)) address_states formattedStorage
+  storageKeyVals <- mapM (getAllRawStorageKeyValsDB) onlyAccounts
+  let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, fromVal v)) kv) storageKeyVals
+  let acctToContract = zip onlyAccounts formattedStorage
+  let !_ = map (\(acct, kv) -> Redis.insertContractKeyVals kv acct) acctToContract
+  let formattedLeaves = map (\(acc1, (AddressState a b c d e)) -> (acc1, SS.AddressState'' a b c [] d e)) address_states
   void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedLeaves

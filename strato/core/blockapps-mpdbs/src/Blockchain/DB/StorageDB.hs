@@ -6,6 +6,7 @@ module Blockchain.DB.StorageDB (
   HasStorageDB,
   HasMemStorageDB,
   toVal,
+  fromVal,
   putStorageKeyVal',
   getStorageKeyVal',
   getAllStorageKeyVals',
