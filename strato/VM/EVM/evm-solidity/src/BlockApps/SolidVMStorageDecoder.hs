@@ -66,7 +66,6 @@ decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf
 decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
 decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
-      isBasic (StoragePath [Field _]) = True
       isBasic (StoragePath [Field _, MapIndex _]) = True
       isBasic _= False
   pathValues <- mapM parseM $ M.toList hxs

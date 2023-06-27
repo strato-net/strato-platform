@@ -297,34 +297,29 @@ readPreviousSolidVMState :: MonadIO m =>
                             IORef Globals -> Account -> m [(Text, Value)]
 readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
-rowToInsert :: (MonadIO m, MonadLogger m) =>
+rowToInsert :: MonadIO m =>
                IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
                     Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
                     Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
-  $logInfoS "Nallapu00" $ T.pack $ show (newState)
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToMappings :: (MonadIO m, MonadLogger m) => AggregateAction -> m (Map.Map Text Value)
+rowToMappings :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToMappings row = do
   let newState = case actionStorage row of
                     Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp
                     _ -> [] 
-  $logInfoS "Nallapu000" $ T.pack $ show (newState)
   return $ (Map.fromList $ newState)
 
 
-processedContractToProcessedMappingRows :: (MonadIO m, MonadLogger m) => Map.Map Text Value -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
+processedContractToProcessedMappingRows :: MonadIO m => Map.Map Text Value -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
 processedContractToProcessedMappingRows state mapNames row abiid = do
-  $logInfoS "Nallapu0" $ T.pack $ show (row)
   let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (state)
-  $logInfoS "Nallapu" $ T.pack $ show state
-  let onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
-  let recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
-  $logInfoS "Nallapu2" $ T.pack $ show recordVMs
+      onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
+      recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
   if null valueMappingsMap then return $ []
   else do
     let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName row abiid (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)

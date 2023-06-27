@@ -44,7 +44,7 @@ import           Data.Maybe                      (catMaybes, listToMaybe, mapMay
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Time
-import           Data.List (nubBy)
+import           Data.List (nubBy, groupBy)
 import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
@@ -306,9 +306,10 @@ tableNameToText (MappingTableName o a c m ) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> tableSeparator <> c <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
-  in "mapping@" <> prefix <> m
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndMapping = c <> "." <> m
+  in "mapping@" <> prefix <> contractAndMapping
 tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
@@ -589,7 +590,9 @@ insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = do
   let newMaps = nubBy ((==) `on` mapDataKey) maps
   $logInfoS "insertMappingTable" $ T.pack $ show newMaps
-  yieldMany $ insertMappingTableQuery newMaps
+  let grouped = (groupBy ((==) `on` mapname) newMaps)
+      results  = concat $ map insertMappingTableQuery grouped
+  yieldMany $ results
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [E.ProcessedContract] -> m ()
