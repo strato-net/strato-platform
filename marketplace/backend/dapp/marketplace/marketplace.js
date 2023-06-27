@@ -77,16 +77,19 @@ async function getAll(admin, args = {}, options) {
 
 async function getTopSellingProducts(admin, args = {}, options) {
     const { quantity, pricePerUnit, range = [], ...restArgs } = args
+    
+    const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, range, gteField: 'availableQuantity', gteValue: 1, sort: '-createdDate', offset: args.offset, limit: constants.TOP_SELLING_GET_LIMIT }, options);
+    const inventoryIds = inventory.map(inventory => inventory.productId)
 
     const products = await productJs.getAll(admin, {
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,
+        address: inventoryIds,
         ...restArgs
     }, options);
 
     const productIds = products.map(product => product.address);
-    const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, productId: productIds, range, gteField: 'availableQuantity', gteValue: 1, sort: '-createdDate', offset: args.offset, limit: constants.TOP_SELLING_GET_LIMIT }, options);
 
     let inventoriesWithProductInfo = inventory.filter(inventory => productIds.includes(inventory.productId)).map(inventory => ({
         ...products.find(product => product.address == inventory.productId), ...inventory
