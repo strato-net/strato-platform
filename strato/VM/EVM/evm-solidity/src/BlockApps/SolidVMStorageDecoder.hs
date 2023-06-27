@@ -63,26 +63,16 @@ decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf
   
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValuesForMapping hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
+decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _]) = True
       isBasic (StoragePath [Field _, MapIndex _]) = True
       isBasic _= False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
-  finalState <- bimap show HM.toList $ case prevState of
-    [] -> synthesize pathValues'
-    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
-  finalState' <- mapM (bimapM bsToText return) finalState
-  let diffState = computeStateDifference prevState finalState'
-  return diffState
-
-computeStateDifference :: [(T.Text, Value)] -> [(T.Text, Value)] -> [(T.Text, Value)]
-computeStateDifference prevState newState = filter isNewState newState
-  where isNewState (key, _) = not (key `elem` (map fst prevState))
-
-
+  finalState <- bimap show HM.toList $ synthesize pathValues'
+  mapM (bimapM bsToText return) finalState
 
 
 bsToText :: B.ByteString -> Either String T.Text

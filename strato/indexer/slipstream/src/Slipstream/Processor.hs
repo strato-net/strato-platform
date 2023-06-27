@@ -308,12 +308,11 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToMappings :: (MonadIO m, MonadLogger m) => AggregateAction -> OLD.Contract -> [(Text, Value)]
-            -> m (Map.Map Text Value)
-rowToMappings row cont oldState = do
+rowToMappings :: (MonadIO m, MonadLogger m) => AggregateAction -> m (Map.Map Text Value)
+rowToMappings row = do
   let newState = case actionStorage row of
-                    Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp oldState
-                    Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState--REMOVE 
+                    Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp
+                    _ -> [] 
   $logInfoS "Nallapu000" $ T.pack $ show (newState)
   return $ (Map.fromList $ newState)
 
@@ -566,7 +565,7 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          stateDiff <- rowToMappings row cont oldState
+          stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
