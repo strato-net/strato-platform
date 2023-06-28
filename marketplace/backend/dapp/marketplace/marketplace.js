@@ -64,7 +64,7 @@ async function getAll(admin, args = {}, options) {
     }, options);
 
     const productIds = products.map(product => product.address);
-    const batchSize = 200; // Set the desired batch size. Can adjust to optimize performance.
+    const batchSize = 200; // Set the desired batch size. Can adjust to optimize performance (max 374)
     const inventoryPromises = [];
 
     // Break up the productIds into batches, and get the inventory for each batch
@@ -102,30 +102,53 @@ async function getAll(admin, args = {}, options) {
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
-    const { quantity, pricePerUnit, range = [], ...restArgs } = args
-    
-    const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, range, gteField: 'availableQuantity', gteValue: 1, sort: '-createdDate', offset: args.offset, limit: constants.TOP_SELLING_GET_LIMIT }, options);
-    const inventoryIds = inventory.map(inventory => inventory.productId)
-
-    // We don't need to pass the offset here to the productJs.getAll function
-    delete restArgs.offset
+    const { quantity, pricePerUnit, range = [], ...restArgs } = args;
 
     const products = await productJs.getAll(admin, {
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,
-        address: inventoryIds,
         ...restArgs
     }, options);
-    
+
     const productIds = products.map(product => product.address);
+    const batchSize = 100; // Set the desired batch size
+    const inventoryPromises = [];
 
-    let inventoriesWithProductInfo = inventory.filter(inventory => productIds.includes(inventory.productId)).map(inventory => ({
-        ...products.find(product => product.address == inventory.productId), ...inventory
-    }));
+    for (let i = 0; i < productIds.length; i += batchSize) {
+        const batchProductIds = productIds.slice(i, i + batchSize);
 
-    return inventoriesWithProductInfo.map((inventory) => marshalOut(inventory))
+        const inventoryPromise = inventoryJs.getAll(admin, {
+            appChainId: args.appChainId,
+            status: inventoryStatus.PUBLISHED,
+            productId: batchProductIds,
+            range,
+            gteField: 'availableQuantity',
+            gteValue: 1,
+            sort: '-createdDate',
+            offset: args.offset,
+            limit: constants.TOP_SELLING_GET_LIMIT
+        }, options);
+
+        inventoryPromises.push(inventoryPromise);
+    }
+
+    const inventoryResults = await Promise.all(inventoryPromises);
+    const inventoriesWithProductInfo = [];
+
+    inventoryResults.forEach(inventory => {
+        inventory.forEach(item => {
+            const product = products.find(p => p.address === item.productId);
+            if (product) {
+                const inventoryWithProductInfo = { ...product, ...item };
+                inventoriesWithProductInfo.push(inventoryWithProductInfo);
+            }
+        });
+    });
+
+    return inventoriesWithProductInfo.map(inventory => marshalOut(inventory));
 }
+
 
 export default {
     getAll,
