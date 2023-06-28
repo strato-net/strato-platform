@@ -133,40 +133,6 @@ const reducer = (state, action) => {
         error: action.error,
         isOrderLineDetailsLoading: false,
       };
-    case actionDescriptors.transferOrderOwnership:
-      return {
-        ...state,
-        isOwnershiporderTransferring: true,
-      };
-    case actionDescriptors.transferOrderOwnershipSuccessful:
-      return {
-        ...state,
-        orderOwnership: action.payload,
-        isOwnershiporderTransferring: false,
-      };
-    case actionDescriptors.transferOrderOwnershipFailed:
-      return {
-        ...state,
-        error: action.error,
-        isOwnershiporderTransferring: false,
-      };
-    case actionDescriptors.updateOrder:
-      return {
-        ...state,
-        isorderUpdating: true,
-      };
-    case actionDescriptors.updateOrderSuccessful:
-      return {
-        ...state,
-        orderUpdateObject: action.payload,
-        isorderUpdating: false,
-      };
-    case actionDescriptors.updateOrderFailed:
-      return {
-        ...state,
-        error: action.error,
-        isorderUpdating: false,
-      };
     case actionDescriptors.updateBuyerDetails:
       return {
         ...state,
@@ -200,63 +166,6 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         issellerDetailsUpdating: false,
-      };
-    case actionDescriptors.fetchOrderAudit:
-      return {
-        ...state,
-        isordersAuditLoading: true,
-      };
-    case actionDescriptors.fetchOrderAuditSuccessful:
-      return {
-        ...state,
-        ordersAudit: action.payload,
-        isordersAuditLoading: false,
-      };
-    case actionDescriptors.fetchOrderAuditFailed:
-      return {
-        ...state,
-        error: action.error,
-        isordersAuditLoading: false,
-      };
-    case actionDescriptors.importAssetRequest:
-      return {
-        ...state,
-        isAssetImportInProgress: true,
-        assetsUploaded: 0,
-        assetsUploadedErrors: [],
-      };
-    case actionDescriptors.importAssetSuccess:
-      return {
-        ...state,
-        isAssetImportInProgress: false,
-        error: null,
-      };
-    case actionDescriptors.importAssetFailure:
-      return {
-        ...state,
-        error: action.error,
-        isAssetImportInProgress: false,
-        isImportAssetsModalOpen: true,
-      };
-    case actionDescriptors.updateAssetImportCount:
-      return {
-        ...state,
-        assetsUploaded: action.count,
-      };
-    case actionDescriptors.updateAssetUploadError:
-      return {
-        ...state,
-        assetsUploadedErrors: action.errors,
-      };
-    case actionDescriptors.openImportCSVModal:
-      return {
-        ...state,
-        isImportAssetsModalOpen: true,
-      };
-    case actionDescriptors.closeImportCSVModal:
-      return {
-        ...state,
-        isImportAssetsModalOpen: false,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
