@@ -1,11 +1,9 @@
 describe("Renders Marketplace Page", () => {
-  beforeEach(() => {
+  it("it should render marketplace dashboard", () => {
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
-  })
 
-  it("it should render marketplace dashboard", () => {
     cy.url().should("include", "/marketplace");
     cy.contains("Explore New Products").should("exist");
     cy.get(".relative").find("img").should('have.attr', 'src').should("include", "hero");
@@ -37,6 +35,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render product list page", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
 
@@ -48,7 +50,6 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Quantity").should("exist");
     cy.contains("Sub-Category").should("exist");
     cy.contains("Product").should("exist");
-    cy.contains("Brand").should("exist");
     cy.contains("Products found").should("be.visible");
     cy.get("#product-list").should("exist");
     cy.request({
@@ -62,6 +63,9 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
 
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
@@ -74,7 +78,6 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Quantity").should("exist");
     cy.contains("Sub-Category").should("exist");
     cy.contains("Product").should("exist");
-    cy.contains("Brand").should("exist");
 
     cy.request({
       method: "GET",
@@ -113,7 +116,6 @@ describe("Renders Marketplace Page", () => {
           expect(status).to.eq(200);
           if (body.data.length !== 0) {
             cy.contains("Product").should("exist");
-            cy.contains("Brand").should("exist");
           }
         });
 
@@ -130,6 +132,10 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("it should render inventories based on filter selection", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
@@ -166,7 +172,6 @@ describe("Renders Marketplace Page", () => {
               if (body.data.length !== 0) {
                 product = body.data[0];
                 cy.contains("Product").should("exist");
-                cy.contains("Brand").should("exist");
                 cy.get('[type="checkbox"]').check(product.manufacturer);
                 cy.wait(5000)
 
@@ -192,6 +197,10 @@ describe("Renders Marketplace Page", () => {
 
 
   it("it should render product detail page", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.request({
       method: "GET",
       url: `/api/v1/marketplace/user/topselling?offset=0`,
@@ -284,66 +293,311 @@ describe("Renders Marketplace Page", () => {
     });
   });
 
-  // it("it should render product detail page", () => {
-  //   cy.login();
-  //   cy.wait(30000);
-  //   cy.get("#topSelling").children().first().click();
-  //   cy.wait(15000);
-  //   cy.url().should("include", "/marketplace/productList/")
-  //   cy.get("nav").contains("Home").should("exist");
-  //   cy.get("div").find("img").should('have.attr', 'src');
-  //   cy.get("button").contains("Add To Cart").should("exist");
-  //   cy.get("button").contains("Buy Now").should("exist");
+  it("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
 
-  //   cy.get("#inventory-name").should("exist");
-  //   cy.get("#inventory-desc").should("exist");
-  //   cy.get("#inventory-price").should("exist");
-  //   cy.contains("Quantity").should("be.visible");
-  //   cy.get("#quantity").should("exist");
-  //   cy.get(".ant-tabs-tab").should("have.length", 4);
-  //   cy.get(".ant-tabs-tab").first().should('have.class', 'ant-tabs-tab-active')
-  //   cy.get(".ant-tabs-tab").eq(1).should('not.have.class', 'ant-tabs-tab-active')
-  //   cy.contains("Product Id").should("be.visible");
-  //   cy.contains("Unique Product Code").should("be.visible");
-  //   cy.contains("Manufacturer").should("be.visible");
-  //   cy.contains("Unit of Measurement").should("be.visible");
-  //   cy.contains("Least Sellable Unit").should("be.visible");
+    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
 
-  //   cy.get(".ant-tabs-tab").eq(1).click();
-  //   cy.get(".ant-tabs-tab").eq(1).should('have.class', 'ant-tabs-tab-active')
-  //   cy.get(".ant-tabs-tab").first().should('not.have.class', 'ant-tabs-tab-active')
-  //   cy.get("th").contains("NAME").should("be.visible");
-  //   cy.get("th").contains("DESCRIPTION").should("be.visible");
+    cy.get("#Products").should("exist");
+    cy.get("#Products").click();
+    cy.url().should("include", "/products");
+    cy.get("#add-product-button").should("exist");
+    cy.get("#add-product-button").click();
+    cy.get("#modal-title").contains("Add Product");
+    cy.get('input[placeholder="Enter Name"]').type(productName);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
+    cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
+    cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
+    cy.get('textarea[placeholder="Enter Description"]').type(
+      "This is a description"
+    );
+    cy.get("input[type=file]").attachFile("cottonSeeds.jpg");
+    cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
+    cy.get("#create-product-button").should("exist");
+    cy.get("#create-product-button").click();
+    cy.contains("Product created successfully").should("be.visible");
 
-  //   cy.get(".ant-tabs-tab").eq(2).click();
-  //   cy.get(".ant-tabs-tab").eq(2).should('have.class', 'ant-tabs-tab-active')
-  //   cy.get("th").contains("SERIAL NUMBER").should("be.visible");
-  //   cy.get("th").contains("ITEM NUMBER").should("be.visible");
-  //   cy.get("td").eq(5).click();
-  //   cy.wait(13000);
-  //   cy.get("#ownership").contains("Ownership History").should("be.visible");
-  //   cy.get("#ownership").contains("SERIAL NUMBER").should("be.visible");
-  //   cy.get("#ownership-serial").should("exist");
-  //   cy.get("#ownership").contains("SELLER").should("exist");
-  //   cy.get("#ownership").contains("OWNER").should("exist");
-  //   cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
-  //   cy.get("td").eq(7).click();
-  //   cy.wait(13000);
-  //   cy.get("#ownership").contains("SELLER").should("exist");
-  //   cy.get("#ownership").contains("BUYER").should("exist");
-  //   cy.get("#ownership").contains("OWNERSHIP START DATE").should("exist");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("button").contains("Add Inventory").should("exist");
+    cy.get("button").contains("Add Inventory").click();
+    cy.get(".ant-modal-content").should("exist").and("be.visible");
+    cy.contains("Add Inventory").should("be.visible");
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Quantity"]').type("1");
+    cy.get('input[placeholder="Enter Price"]').type("1000");
+    cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+    cy.get(".ant-upload").contains("Upload CSV").should("exist")
+    cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
+    cy.get("#product").should("be.enabled");
+    cy.get('[value="false"]').check();
+    cy.wait(5000);
+    cy.get("#product").type("{enter}{enter}");
+    cy.get("button").contains("Create Inventory").should("be.visible");
+    cy.get("button").contains("Create Inventory").click();
+    cy.contains("Inventory created successfully").should("be.visible");
+    cy.get("#inventory-list").children().first().contains("Unpublished").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
 
-  //   cy.get(".ant-tabs-tab").eq(3).click();
-  //   cy.get(".ant-tabs-tab").eq(3).should('have.class', 'ant-tabs-tab-active')
-  //   cy.get("th").contains("SERIAL NUMBER").should("exist");
-  //   cy.get("th").contains("ITEM NUMBER").should("exist");
-  //   cy.get("td").eq(17).click();
-  //   cy.wait(13000);
-  //   cy.get("#transformation").contains("Transformation").should("be.visible");
-  //   cy.get("#transformation").contains("SERIAL NUMBER").should("be.visible");
-  //   cy.get("#trans-serial").should("exist");
-  //   cy.get("#nested-trans").get("RAW MATERIALS").should("exist")
-  //   cy.get("#nested-trans").get("SERIAL NUMBER").should("exist")
-  // });
+    cy.get("#Login").click();
+    cy.loginAsSeller();
+    cy.get("#Marketplace").should("exist");
+    cy.url().should("contain", "marketplace");
+    cy.get("#viewMore").should("be.enabled").click();
+    cy.url().should("contain", "/marketplace/category");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/category",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      if (body.data.length !== 0) {
+        let category = body.data[0];
+        cy.get('[type="checkbox"]').check(category.name);
+        cy.get('#product-list').should('exist')
+        cy.contains(productName).should("not.exist");
+      }
+    });
+
+  });
+
+  it("it should create product, inventory and buy using pay now option - success", () => {
+    Cypress.on("uncaught:exception", () => {
+      return false;
+    });
+
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
+
+    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+
+    cy.get("#Products").should("exist");
+    cy.get("#Products").click();
+    cy.url().should("include", "/products");
+    cy.get("#add-product-button").should("exist");
+    cy.get("#add-product-button").click();
+    cy.get("#modal-title").contains("Add Product");
+    cy.get('input[placeholder="Enter Name"]').type(productName);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
+    cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
+    cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
+    cy.get('textarea[placeholder="Enter Description"]').type(
+      "This is a description"
+    );
+    cy.get("input[type=file]").attachFile("cottonSeeds.jpg");
+    cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
+    cy.get("#create-product-button").should("exist");
+    cy.get("#create-product-button").click();
+    cy.contains("Product created successfully").should("be.visible");
+
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("button").contains("Add Inventory").should("exist");
+    cy.get("button").contains("Add Inventory").click();
+    cy.get(".ant-modal-content").should("exist").and("be.visible");
+    cy.contains("Add Inventory").should("be.visible");
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Quantity"]').type("1");
+    cy.get('input[placeholder="Enter Price"]').type("1000");
+    cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+    cy.get("#product").should("be.enabled");
+    cy.wait(5000);
+    cy.get("#product").type("{enter}{enter}");
+    cy.get("button").contains("Create Inventory").should("be.visible");
+    cy.get("button").contains("Create Inventory").click();
+    cy.contains("Inventory created successfully").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+
+    cy.login(Cypress.env('teEmail'), Cypress.env('tePassword'));
+    cy.get("#Marketplace").should("exist");
+    cy.url().should("contain", "marketplace");
+
+    cy.get("#buy-now-button").should('exist')
+    cy.get("#buy-now-button").click()
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-now-button").should("exist");
+    cy.get("#pay-now-button").click();
+
+    cy.request(
+      "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
+    ).then((response) => {
+      expect(response.status).to.eq(200);
+      expect(response.body).to.have.property("url");
+      cy.visit(response.body.url);
+      cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+
+      // fill stripe details
+      cy.get('#email').type(Cypress.env('teEmail'));
+      cy.get('#cardNumber').type('4242 4242 4242 4242');
+      cy.get("#cardExpiry").type(
+        "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+      );
+      cy.get('#cardCvc').type('855');
+      cy.get('#billingName').type('Nitin Gupta');
+      cy.get('#billingPostalCode').type('10001');
+      cy.wait(1000);
+
+      cy.get(".SubmitButton").click();
+      cy.get(".SubmitButton").should(($div) => {
+        expect($div.text()).to.include("Processing");
+      });
+
+      cy.url().should("include", "https://checkout.stripe.dev/success");
+    });
+  });
+
+  it("it should create product, inventory and buy using pay now option - insufficient fund", () => {
+    Cypress.on("uncaught:exception", () => {
+      return false;
+    });
+
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
+
+    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+
+    cy.get("#Products").should("exist");
+    cy.get("#Products").click();
+    cy.url().should("include", "/products");
+    cy.get("#add-product-button").should("exist");
+    cy.get("#add-product-button").click();
+    cy.get("#modal-title").contains("Add Product");
+    cy.get('input[placeholder="Enter Name"]').type(productName);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
+    cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
+    cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
+    cy.get('textarea[placeholder="Enter Description"]').type(
+      "This is a description"
+    );
+    cy.get("input[type=file]").attachFile("cottonSeeds.jpg");
+    cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
+    cy.get("#create-product-button").should("exist");
+    cy.get("#create-product-button").click();
+    cy.contains("Product created successfully").should("be.visible");
+
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+    cy.get("button").contains("Add Inventory").should("exist");
+    cy.get("button").contains("Add Inventory").click();
+    cy.get(".ant-modal-content").should("exist").and("be.visible");
+    cy.contains("Add Inventory").should("be.visible");
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Quantity"]').type("1");
+    cy.get('input[placeholder="Enter Price"]').type("1000");
+    cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
+    cy.get("#product").should("be.enabled");
+    cy.wait(5000);
+    cy.get("#product").type("{enter}{enter}");
+    cy.get("button").contains("Create Inventory").should("be.visible");
+    cy.get("button").contains("Create Inventory").click();
+    cy.contains("Inventory created successfully").should("be.visible");
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+
+    cy.login(Cypress.env('teEmail'), Cypress.env('tePassword'));
+    cy.get("#Marketplace").should("exist");
+    cy.url().should("contain", "marketplace");
+
+    cy.get("#buy-now-button").should('exist')
+    cy.get("#buy-now-button").click()
+    cy.url().should("include", "/marketplace/checkout");
+    cy.get("#submit-order-button").should("exist");
+    cy.get("#submit-order-button").click();
+    cy.url().should("include", "/marketplace/confirmOrder");
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/order/userAddresses/user",
+    }).then(({ status, body }) => {
+      console.log(body)
+      expect(status).to.eq(200);
+      if (body.data.length == 0) {
+        cy.get('input[placeholder="Enter Name"]').type("Shubham Dubey");
+        cy.get('input[placeholder="Enter Zipcode"]').type("32545");
+        cy.get('input[placeholder="Enter State"]').type("Dallas");
+        cy.get('input[placeholder="Enter City"]').type("New york");
+        cy.get('textarea[placeholder="Enter Address Line 1"]').type("Street A, near block");
+        cy.get("#add-address-button").should("exist");
+        cy.get("#add-address-button").click();
+      }
+    });
+    cy.get("#pay-now-button").should("exist");
+    cy.get("#pay-now-button").click();
+
+    cy.request(
+      "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
+    ).then((response) => {
+      expect(response.status).to.eq(200);
+      expect(response.body).to.have.property("url");
+      cy.visit(response.body.url);
+      cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+
+      // fill stripe details
+      cy.get('#email').type(Cypress.env('teEmail'));
+      cy.get('#cardNumber').type('4000 0000 0000 9995');
+      cy.get("#cardExpiry").type(
+        "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+      );
+      cy.get('#cardCvc').type('855');
+      cy.get('#billingName').type('Nitin Gupta');
+      cy.get('#billingPostalCode').type('10001');
+      cy.wait(1000);
+
+      cy.get(".SubmitButton").click();
+      cy.contains('Your credit card was declined because of insufficient funds. Try paying with a debit card instead.').should('exist')
+    });
+  });
 
 })

@@ -255,7 +255,9 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should add event to an inventory", () => {
-    // Serial Number is required
+    cy.createProduct();
+    cy.createInventory();
+    
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
@@ -272,7 +274,6 @@ describe("Renders Inventory Page", () => {
       inventoryList.get("#0").get("#sideMenu").contains("Add Event").click();
       cy.get(".ant-modal-content").should("exist");
       cy.contains("Add Event").should("be.visible");
-      cy.wait(30000);
       cy.get("#eventType").type("{enter}{enter}");
       cy.get("#certifier").type("Achin Kumar{enter}{enter}");
       cy.get('textarea').eq(0).type("summary");

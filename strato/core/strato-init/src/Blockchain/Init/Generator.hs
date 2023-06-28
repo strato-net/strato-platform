@@ -52,7 +52,7 @@ mkAll genesisBlockName = do
   ethconf <- liftIO genEthConf
   addEvent $ EthConf ethconf
 
-  addEvent $ TopicList [(t, t) | t <- ["unminedblock", "statediff", "seq_vm_events", "seq_p2p_events"
+  addEvent $ TopicList [(t, t) | t <- ["statediff", "seq_vm_events", "seq_p2p_events"
                                       , "unseqevents", "jsonrpcresponse", "indexevents", "block", "vmevents"]]
     
   bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
