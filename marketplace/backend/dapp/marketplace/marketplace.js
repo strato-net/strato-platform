@@ -112,7 +112,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
     }, options);
 
     const productIds = products.map(product => product.address);
-    const batchSize = 100; // Set the desired batch size
+    const batchSize = 200; // Set the desired batch size
     const inventoryPromises = [];
 
     for (let i = 0; i < productIds.length; i += batchSize) {
