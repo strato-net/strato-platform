@@ -74,6 +74,7 @@ bloc = return gitInfo
   :<|> postBlocTransactionParallel
   :<|> postBlocTransactionRaw
   :<|> postBlocTransactionBody
+  :<|> postBlocTransactionUnsigned
   :<|> postBlocTransaction
 
 --serveBloc :: BlocEnv -> Server BlocAPI
