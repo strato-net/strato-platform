@@ -387,12 +387,14 @@ handleEvents peer = awaitForever $ \case
           case SS.fromBlockNumber theSnapshot of
             0 -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot from Redis failed."
             _ -> do
-              headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ SS.fromBlockNumber theSnapshot) [(0 :: Integer)..]
+              headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ SS.fromBlockNumber theSnapshot) [(1 :: Integer)..]
+              let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
+              $logInfoS "handleEvents/GetSnapshot/Debug" $ T.pack $ (show $ blockHeaderBlockNumber $ head formattedHeaders) ++ "  " ++ (show $ blockHeaderBlockNumber $ last formattedHeaders)
               let onlyAccounts = map (\(x, _) -> x) $ SS.addressStateLeaves theSnapshot
               allStorage <- runStratoRedisIO $ getAllContractKeyVals onlyAccounts
               let newAddrStates = zipWith (\kv (acct, addrState) -> (acct, addrState{SS.addressStateStorageKeyVals = fromMaybe [] kv})) allStorage $ SS.addressStateLeaves theSnapshot
               let theSnapshot' = theSnapshot{SS.addressStateLeaves = newAddrStates}
-              yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = (fmap (blockDataToBlockHeader . unCanonical . snd) headers)}
+              yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = formattedHeaders}
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 
     MsgEvt (SnapshotResponse snapshot) -> do
