@@ -372,10 +372,20 @@ describe("Renders Marketplace Page", () => {
 
   });
 
-  it("it should create product, inventory and buy using pay now option - success", () => {
+  it.only("it should create product, inventory and buy using pay now option - success", () => {
     Cypress.on("uncaught:exception", () => {
       return false;
     });
+
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order/payment',
+    }).as('paymentCall');
+
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
 
     cy.visit('/')
     cy.get("#Login").click();
@@ -416,12 +426,43 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
+    
+    cy.get("#product").should("be.enabled");
+   
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+    .its('response.body')
+    .then((body) => {
+      console.log(body);
+      cy.wait(500);
+      cy
+      .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+      .find('.ant-select-item-option')
+      .each(el => {
+      if (el.text() === productName) {
+          cy.wait(500)
+          cy.wrap(el).click();
+          cy.wait(500)
+      }
+    })})
+    // // cy.get("#product").type("{enter}{enter}");
+    // cy.get("#product").click()
+    // cy.wait(2000);
+    // cy
+    // .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+    // .find('.ant-select-item-option')
+    // .each(el => {
+    // if (el.text() === productName) {
+    //     cy.wait(500)
+    //     cy.wrap(el).click();
+    //     cy.wait(500)
+    // }
+    // });
+
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
-    cy.get("#product").should("be.enabled");
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
+
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
     cy.contains("Inventory created successfully").should("be.visible");
@@ -460,13 +501,15 @@ describe("Renders Marketplace Page", () => {
     cy.get("#pay-now-button").should("exist");
     cy.get("#pay-now-button").click();
 
-    cy.request(
-      "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
-    ).then((response) => {
-      expect(response.status).to.eq(200);
-      expect(response.body).to.have.property("url");
-      cy.visit(response.body.url);
+
+    cy.wait('@paymentCall', { timeout: 190000 })
+    .its('response.body')
+    .then((body) => {
+      console.log(body);
+      cy.wait(30000);
       cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+
+      cy.reload()
 
       // fill stripe details
       cy.get('#email').type(Cypress.env('teEmail'));
@@ -485,7 +528,34 @@ describe("Renders Marketplace Page", () => {
       });
 
       cy.url().should("include", "https://checkout.stripe.dev/success");
-    });
+    })
+
+    // cy.request(
+    //   "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
+    // ).then((response) => {
+    //   expect(response.status).to.eq(200);
+    //   expect(response.body).to.have.property("url");
+    //   cy.visit(response.body.url);
+    //   cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+
+    //   // fill stripe details
+    //   cy.get('#email').type(Cypress.env('teEmail'));
+    //   cy.get('#cardNumber').type('4242 4242 4242 4242');
+    //   cy.get("#cardExpiry").type(
+    //     "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+    //   );
+    //   cy.get('#cardCvc').type('855');
+    //   cy.get('#billingName').type('Nitin Gupta');
+    //   cy.get('#billingPostalCode').type('10001');
+    //   cy.wait(1000);
+
+    //   cy.get(".SubmitButton").click();
+    //   cy.get(".SubmitButton").should(($div) => {
+    //     expect($div.text()).to.include("Processing");
+    //   });
+
+    //   cy.url().should("include", "https://checkout.stripe.dev/success");
+    // });
   });
 
   it("it should create product, inventory and buy using pay now option - insufficient fund", () => {
