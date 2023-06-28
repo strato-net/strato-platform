@@ -24,6 +24,7 @@ module Blockchain.DB.RawStorageDB
   , flushMemRawStorageDB
   , putRawStorageKeyValDB
   , getAllRawStorageKeyValsDB
+  , putAllRawStorageKeyValForAddress
   ) where
 
 import           Control.Arrow                               ((***))
@@ -36,6 +37,7 @@ import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
+import qualified Data.Text                                   as T
 import           Data.Traversable                            (for)
 
 import           Blockchain.Strato.Model.Account
@@ -190,7 +192,7 @@ blankVal = rlpSerialize $ RLPString ""
 
 
 putAllRawStorageKeyValForAddress :: (MonadLogger m, FullRawStorage m) =>
-                                    Account -> [(ByteString, RawStorageValue)] -> m ()
+                                    Account -> [(ByteString, RawStorageValue)] -> m (MP.StateRoot)
 putAllRawStorageKeyValForAddress owner rawChanges = do
   let changes :: [(MP.Key, MP.Val)]
       changes = map (N.EvenNibbleString *** rlpEncode) rawChanges
@@ -211,6 +213,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
   sr'' <- deleteManyKeyVal sr' deleteKeys
 
   A.insert A.Proxy owner addressState{addressStateContractRoot=sr''}
+  pure $ sr''
 
 
 deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot

@@ -20,6 +20,7 @@ module Blockchain.VMContext
     ( CurrentBlockHash(..)
     , IsBlockstanbul(..)
     , withCurrentBlockHash
+    , withCurrentBlockHash'
     , VMBase
     , ContextDBs(..)
     , MemDBs(..)
@@ -267,6 +268,26 @@ withCurrentBlockHash bh f = do
   flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
+  pure a
+
+withCurrentBlockHash' :: ( MonadLogger m
+                        , Mod.Modifiable MemDBs m
+                        , Mod.Modifiable CurrentBlockHash m
+                        , HasMemAddressStateDB m
+                        , (Maybe Word256 `A.Alters` MP.StateRoot) m
+                        , (MP.StateRoot `A.Alters` MP.NodeData) m
+                        , (Account `A.Alters` AddressState) m
+                        , (N.NibbleString `A.Alters` N.NibbleString) m
+                        , HasMemRawStorageDB m
+                        , (RawStorageKey `A.Alters` RawStorageValue) m
+                        )
+                      => Keccak256 -> m a -> m a
+withCurrentBlockHash' bh f = do
+  Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+  a <- f
+  flushMemStorageDB
+  flushMemAddressStateDB
+  Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   pure a
 
 getStateDB :: ContextM DB.DB
