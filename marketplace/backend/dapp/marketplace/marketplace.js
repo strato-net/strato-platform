@@ -81,6 +81,9 @@ async function getTopSellingProducts(admin, args = {}, options) {
     const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, range, gteField: 'availableQuantity', gteValue: 1, sort: '-createdDate', offset: args.offset, limit: constants.TOP_SELLING_GET_LIMIT }, options);
     const inventoryIds = inventory.map(inventory => inventory.productId)
 
+    // We don't need to pass the offset here to the productJs.getAll function
+    delete restArgs.offset
+
     const products = await productJs.getAll(admin, {
         isActive: true,
         isDeleted: false,
@@ -88,7 +91,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
         address: inventoryIds,
         ...restArgs
     }, options);
-
+    
     const productIds = products.map(product => product.address);
 
     let inventoriesWithProductInfo = inventory.filter(inventory => productIds.includes(inventory.productId)).map(inventory => ({
