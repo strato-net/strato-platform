@@ -25,7 +25,34 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should create an inventory", () => {
-    cy.createProduct();
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
+    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+
+    cy.get("#Products").should("exist");
+    cy.get("#Products").click();
+    cy.url().should("include", "/products");
+    cy.get("#add-product-button").should("exist");
+    cy.get("#add-product-button").click();
+    cy.get("#modal-title").contains("Add Product");
+    cy.get('input[placeholder="Enter Name"]').type(productName);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
+    cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
+    cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
+    cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
+    cy.get('textarea[placeholder="Enter Description"]').type(
+      "This is a description"
+    );
+    cy.get("input[type=file]").attachFile("cottonSeeds.jpg");
+    cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
+    cy.get("#create-product-button").should("exist");
+    cy.get("#create-product-button").click();
+    cy.contains("Product created successfully").should("be.visible");
+
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
@@ -38,10 +65,25 @@ describe("Renders Inventory Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
-
+    
     cy.get("#product").should("be.enabled");
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
+   
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+    .its('response.body')
+    .then((body) => {
+      console.log(body);
+      cy.wait(500);
+      cy
+      .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+      .find('.ant-select-item-option')
+      .each(el => {
+      if (el.text() === productName) {
+          cy.wait(500)
+          cy.wrap(el).click();
+          cy.wait(500)
+      }
+    })})
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
