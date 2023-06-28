@@ -105,6 +105,18 @@ type PostBlocTransactionBody = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest  -- ^ SolidVM transaction
   :> Post '[JSON] [BlocTransactionBodyResult]    -- ^ Transaction results
 
+-- | PostBlocTransactionUnsigned should return a list of unsigned transaction hashes,
+-- along with the unsigned transaction data, without
+-- posting the transactions to the VM
+--
+-- This was made at the request of Stably for their API integration
+type PostBlocTransactionUnsigned = "transaction"
+  :> "unsigned"                                   -- ^ /transaction/unsigned
+  :> S.Header "X-USER-ACCESS-TOKEN" Text          -- ^ jwt
+  :> QueryParam "chainid" ChainId                 -- ^ shard ID (optional)
+  :> ReqBody '[JSON] PostBlocTransactionRequest   -- ^ SolidVM transaction
+  :> Post '[JSON] [BlocTransactionUnsignedResult] -- ^ Transaction results
+
 data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
   { postbloctransactionrawrequestAddress    :: Address
   , postbloctransactionrawrequestNonce      :: Nonce
