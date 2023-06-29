@@ -15,6 +15,7 @@ module Blockchain.Strato.StateDiff
     , stateDiff
     , eventualAccountState
     , incrementalAccountState
+    , lookupCode
     ) where
 
 import           BlockApps.Logging

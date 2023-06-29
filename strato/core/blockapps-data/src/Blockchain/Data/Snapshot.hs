@@ -90,6 +90,7 @@ data AddressState'' =
                     addressStateBalance         :: Integer,
                     addressStateContractRoot    :: StateRoot,
                     addressStateStorageKeyVals  :: [(B.ByteString, B.ByteString)],
+                    addressStateCode            :: B.ByteString,
                     addressStateCodeHash        :: CodePtr,
                     addressStateChainId         :: Maybe Word256
     } deriving (Eq, Generic, Read, Show)
@@ -103,6 +104,7 @@ instance Format AddressState'' where
             "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
             "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
             "\nstorageKeyVals: " ++ format (addressStateStorageKeyVals a) ++  
+            "\ncode: " ++ format (addressStateCode a) ++
             "\ncodeHash: " ++ format (addressStateCodeHash a) ++
             "\nchainId: " ++ (show $ fmap (flip showHex "") (addressStateChainId a)))
 
@@ -114,24 +116,27 @@ instance RLPSerializable AddressState'' where
             rlpEncode $ toInteger $ addressStateBalance a,
             rlpEncode $ addressStateContractRoot a,
             RLPArray $ rlpEncode <$> addressStateStorageKeyVals a,
+            rlpEncode $ addressStateCode a,
             rlpEncode $ addressStateCodeHash a
         ] ++ (maybeToList . fmap rlpEncode $ addressStateChainId a)
 
-    rlpDecode (RLPArray [n, b, cr, kv, ch, cid]) =
+    rlpDecode (RLPArray [n, b, cr, kv, c, ch, cid]) =
         AddressState'' {
             addressStateNonce = fromInteger $ rlpDecode n,
             addressStateBalance = fromInteger $ rlpDecode b,
             addressStateContractRoot = rlpDecode cr,
             addressStateStorageKeyVals = rlpDecode kv,
+            addressStateCode = rlpDecode c,
             addressStateCodeHash = rlpDecode ch,
             addressStateChainId = Just $ rlpDecode cid
         }
-    rlpDecode (RLPArray [n, b, cr, kv, ch]) =
+    rlpDecode (RLPArray [n, b, cr, kv, c, ch]) =
         AddressState'' {
             addressStateNonce = fromInteger $ rlpDecode n,
             addressStateBalance = fromInteger $ rlpDecode b,
             addressStateContractRoot = rlpDecode cr,
             addressStateStorageKeyVals = rlpDecode kv,
+            addressStateCode = rlpDecode c,
             addressStateCodeHash = rlpDecode ch,
             addressStateChainId = Nothing
         }

@@ -37,7 +37,6 @@ import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
-import qualified Data.Text                                   as T
 import           Data.Traversable                            (for)
 
 import           Blockchain.Strato.Model.Account

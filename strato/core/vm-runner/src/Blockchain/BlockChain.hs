@@ -768,10 +768,18 @@ makeSnapShot :: VMBase m => MP.StateRoot -> Integer -> m ()
 makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
   address_states <- NoCache.getAllAddressStates Nothing
-  let onlyAccounts = map (\(x, _) -> x) address_states
+  let (onlyAccounts, onlyStates) = unzip address_states
+
+  -- Storing snapshots of storage
   storageKeyVals <- mapM (getAllRawStorageKeyValsDB) onlyAccounts
   let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, v)) kv) storageKeyVals
   let acctToContract = zip onlyAccounts formattedStorage
   _ <- mapM (\(acct, kv) -> Redis.runStratoRedisIO $ Redis.insertContractKeyVals kv acct) acctToContract
-  let formattedLeaves = map (\(acc1, (AddressState a b c d e)) -> (acc1, SS.AddressState'' a b c [] d e)) address_states
+
+  -- Storing snapshots of code
+  allCode <- mapM (\(AddressState _ _ _ d _) -> SD.lookupCode d) onlyStates
+  let codePtrToCode = zipWith (\(AddressState _ _ _ d _) (_, code) -> (d, code)) onlyStates allCode
+  _ <- mapM (\(ptr, code) -> Redis.runStratoRedisIO $ Redis.insertCode ptr code) codePtrToCode
+
+  let formattedLeaves = map (\(acc1, (AddressState a b c d e)) -> (acc1, SS.AddressState'' a b c [] (B.empty) d e)) address_states
   void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedLeaves

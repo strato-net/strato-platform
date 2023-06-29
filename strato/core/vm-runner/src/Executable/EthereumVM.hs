@@ -76,12 +76,12 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
--- import           Blockchain.Data.RLP
+import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Snapshot              as SS
-import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
+import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..), addCode)
 import qualified Blockchain.DB.AddressStateDB          as AS
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
-import           Blockchain.DB.RawStorageDB            (putAllRawStorageKeyValForAddress) -- (putRawStorageKeyValDB , getAllRawStorageKeyValsDB)
+import           Blockchain.DB.RawStorageDB            (putRawStorageKeyValDB)
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
@@ -93,7 +93,7 @@ import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Gas           (Gas (..))
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
--- import           Blockchain.Strato.Model.Util          (byteString2NibbleString)
+import           Blockchain.Strato.Model.Util          (byteString2NibbleString)
 import qualified Blockchain.Strato.RedisBlockDB        as Redis
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Stream.Action              (Action)
@@ -760,23 +760,35 @@ getUnprocessedKafkaEvents offset = do
 -- snap sync
 doSnapSync :: VMBase m => SS.Snapshot -> m ()
 doSnapSync SS.Snapshot{..} = do
+  let bestBlockHash = blockHeaderHash $ last blockHeaders
+  _ <- traverse (putBlockHeaderInChainDB) blockHeaders
   withCurrentBlockHash' bestBlockHash $ do
     _ <- traverse insertAndCheckStateRoot addressStateLeaves
-    _ <- traverse (putBlockHeaderInChainDB) blockHeaders
     _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
     return ()
 
 insertAndCheckStateRoot :: VMBase m => (Account, SS.AddressState'') -> m ()
 insertAndCheckStateRoot (acct, addrState@SS.AddressState''{..}) = do
+
+  -- Insert address state
   _ <- AS.putAddressState acct $ formatAddressState addrState
   test <- AS.addressStateExists acct
-  -- let insertKeyVal sr (k, v) = putRawStorageKeyValDB sr ((byteString2NibbleString k), (rlpEncode v))
-  test2 <- putAllRawStorageKeyValForAddress acct addressStateStorageKeyVals
-  -- finalStateRoot <- foldrM (insertKeyVal) MP.emptyTriePtr addressStateStorageKeyVals
+
+  -- Insert code
+  let theCodeKind = case addressStateCodeHash of
+        (SolidVMCode _ _) -> SolidVM
+        _ -> EVM
+  _ <- addCode theCodeKind addressStateCode
+
+  -- Insert storage
+  let insertKeyVal sr (k, v) = putRawStorageKeyValDB sr ((byteString2NibbleString k), (rlpEncode v))
+  test2 <- foldlM (insertKeyVal) MP.emptyTriePtr addressStateStorageKeyVals
+
+  -- Test condition
   if (test == True && test2 == addressStateContractRoot) then $logInfoS "insertAndCheckStateRoot" $ T.pack $ "Account exists and stateroot matches"
-    else $logInfoS "insertAndCheckStateRoot" $ T.pack $ "Something went wrong " ++ show addressStateContractRoot ++ " does not match " ++ show test2
+    else $logInfoS "insertAndCheckStateRoot" $ T.pack $ "Something went wrong " ++ show addressStateContractRoot
   where
-    formatAddressState (SS.AddressState'' a b _ _ e f) = AddressState a b (MP.emptyTriePtr) e f
+    formatAddressState (SS.AddressState'' a b _ _ _ f g) = AddressState a b (MP.emptyTriePtr) f g
 
 -- not running with a current block hash, all of the snapshot data is not gonna work
 -- write this stateroot to the blockhash

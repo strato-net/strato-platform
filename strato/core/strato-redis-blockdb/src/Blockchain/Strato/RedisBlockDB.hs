@@ -44,6 +44,7 @@ module Blockchain.Strato.RedisBlockDB
     , getSyncStatus, putSyncStatus, getSyncStatusNow
     , getVmGasCap, putVmGasCap
     , getSnapShot, insertSnapShot, getContractKeyVals, insertContractKeyVals, getAllContractKeyVals
+    , getCode, insertCode
     ) where
 
 import           BlockApps.X509.Certificate
@@ -57,6 +58,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember   as CM
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -1132,3 +1134,17 @@ getContractKeyVals acct = getInNamespace Snapshot acct >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing
     Right (Just (keyvals)) ->  return . Just $ fromValue keyvals 
+
+insertCode :: CodePtr -> B.ByteString -> Redis (Either Reply Status)
+insertCode ptr code = do
+    res <- multiExec $ set (inNamespace Snapshot ptr) (toValue code)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertCode - Aborted")
+
+getCode :: CodePtr -> Redis (Maybe (B.ByteString))
+getCode ptr = do
+    getInNamespace Snapshot ptr >>= \case
+        Left _        -> return Nothing
+        Right Nothing -> return Nothing
+        Right (Just (code)) ->  return . Just $ fromValue code
