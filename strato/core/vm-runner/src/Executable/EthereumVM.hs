@@ -163,8 +163,8 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
-  when (True && length snapshot > 0) $ lift $ do --TODO add logic so this can only happen once and cannot 
-    doSnapSync (last snapshot)
+  when (snapshot) $ lift $ do --TODO add logic so this can only happen once and cannot 
+    doSnapSync
 
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
@@ -550,7 +550,7 @@ logEventSummaries events = do
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmPrivateTx _) = "PrivateTx"
 
-    getNames (VmSnapSync _)  = "SnapSync"
+    getNames (VmSnapSync)  = "SnapSync"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -758,8 +758,8 @@ getUnprocessedKafkaEvents offset = do
     return ret'
 
 -- snap sync
-doSnapSync :: VMBase m => SS.Snapshot -> m ()
-doSnapSync SS.Snapshot{..} = do
+doSnapSync :: VMBase m => m ()
+doSnapSync = do
   let bestBlockHash = blockHeaderHash $ last blockHeaders
   _ <- traverse (putBlockHeaderInChainDB) blockHeaders
   withCurrentBlockHash' bestBlockHash $ do
@@ -789,11 +789,4 @@ insertAndCheckStateRoot (acct, addrState@SS.AddressState''{..}) = do
     else $logInfoS "insertAndCheckStateRoot" $ T.pack $ "Something went wrong " ++ show addressStateContractRoot
   where
     formatAddressState (SS.AddressState'' a b _ _ _ f g) = AddressState a b (MP.emptyTriePtr) f g
-
--- not running with a current block hash, all of the snapshot data is not gonna work
--- write this stateroot to the blockhash
--- address state, 
--- putBlockHeaderInChainDB
--- stateDB and storageDB connected but two different tries
--- traverse storage for each addresss state contract root -> put address state -> putBlockHeaderInChainDB
 

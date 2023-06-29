@@ -389,9 +389,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         recordProposal
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
-    SnapshotReceived snapshot -> do
-      $logInfoS "blockstanbul" . T.pack $ "Snapshot received, sending out to populate MPT(s)"
-      yieldL $ OSnapshot snapshot
+    SnapshotReceived -> do
+      $logInfoS "blockstanbul" . T.pack $ "Snapshot received, proceeding to populate MPT(s)"
+      yieldL $ OSnapshot
 
 
 loopback :: EOutEvent -> Maybe InEvent

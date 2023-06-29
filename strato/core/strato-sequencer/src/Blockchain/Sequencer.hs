@@ -307,7 +307,7 @@ blockstanbulSend' msg = do
          GapFound h l p                -> (vms,  (P2pAskForBlocks (h+1) l p)       : p2ps, ctxs) 
          LeadFound h l p               -> (vms,  (P2pPushBlocks (l+1) h p)         : p2ps, ctxs)
          NewCheckpoint  ck             -> (vms,  p2ps, ck: ctxs)   
-         OSnapshot sn                  -> ((VmSnapSync sn) : vms                   , p2ps, ctxs)
+         OSnapshot                     -> ((VmSnapSync) : vms                      , p2ps, ctxs)
          _                             -> (vms,  p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([],[], [])
 
@@ -667,7 +667,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           let newV = v{_sequence = (( fromInteger snapshotBlockNum) - 1 )}
           putBlockstanbulContext bsc{_view = newV}
         Nothing -> return ()
-      yieldMany $ map (ToVm . VmSnapSync) snapshots
+      yield $ ToVm $ VmSnapSync
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

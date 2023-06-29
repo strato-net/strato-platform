@@ -128,7 +128,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Strato.RedisBlockDB.Models hiding(Canonical)
 import           Blockchain.Data.RLP
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VM.SolidException
@@ -246,6 +246,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Accessible (Maybe WorldBestBlock) m
                 , (A.Selectable (Address, T.Text) X509CertificateField) m
                 , (A.Selectable Address X509Certificate) m
+                , (A.Selectable Integer (Canonical BlockData)) m
                 )
 
 withCurrentBlockHash :: ( MonadLogger m
@@ -533,6 +534,9 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
     mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
+
+instance A.Selectable Integer (Canonical BlockData) ContextM where
+  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
 instance Mod.Modifiable GasCap ContextM where
   get _ = contextGets (GasCap . _vmGasCap)

@@ -194,8 +194,8 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
 
-  GetSnapshot |
-  SnapshotResponse SS.Snapshot |
+  GetSnapshot Integer |
+  SnapshotResponse SS.RedisSnapshot |
 
   Blockstanbul PBFT.WireMessage |
 
@@ -343,8 +343,8 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
   GetTransactions $ rlpDecode <$> trHashes
 
 -- snap sync
-obj2WireMessage 0x1f (RLPArray []) =
-  GetSnapshot
+obj2WireMessage 0x1f (RLPArray [partNum]) =
+  GetSnapshot $ rlpDecode partNum
 obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray address_state_keyvals]) = 
   SnapshotResponse SS.Snapshot {
       blockHeaders = rlpDecode <$> bh,
@@ -414,15 +414,14 @@ wireMessage2Obj (GetTransactions trhashes) =
   (0x1e, RLPArray $ rlpEncode <$> trhashes)
 
 -- snap sync
-wireMessage2Obj (GetSnapshot) =
-  (0x1f, RLPArray [])
+wireMessage2Obj (GetSnapshot partNum) =
+  (0x1f, RLPArray [rlpEncode partNum])
 
-wireMessage2Obj (SnapshotResponse SS.Snapshot { blockHeaders = sh, fromStateroot = sr, fromBlockNumber = bn, addressStateLeaves = asl }) =
+wireMessage2Obj (RedisSnapshot currNum totalNum snapshotChunk) =
   (0x21, RLPArray [
-    RLPArray $ rlpEncode <$> sh, 
-    rlpEncode sr, 
-    rlpEncode bn,
-    RLPArray $ rlpEncode <$> asl
+    rlpEncode currNum,
+    rlpEncode totalNum,
+    rlpEncode snapshotChunk
   ])
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x

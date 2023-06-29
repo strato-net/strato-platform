@@ -58,6 +58,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.ChainDB
@@ -85,7 +86,7 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
-                                                    ,lookupX509AddrFromCBHash
+                                                    , lookupX509AddrFromCBHash
                                                     )
 import           SolidVM.Model.Storable
 
@@ -346,6 +347,9 @@ instance Mod.Modifiable GasCap MemContextM where
 
 instance MonadMonitor (LoggingT IO) where
     doIO = liftIO
+
+instance A.Selectable Integer (Canonical BlockData) MemContextM where
+  select _ _ = error "Don't need this here :)"
 
 runMemContextM :: Maybe DebugSettings
                -> MemContextM a

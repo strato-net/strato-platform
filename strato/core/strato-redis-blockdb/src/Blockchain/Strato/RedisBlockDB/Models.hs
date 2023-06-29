@@ -26,7 +26,6 @@ import qualified Blockchain.Data.Transaction   as TXD
 import           Blockchain.Data.TransactionDef (formatChainId)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.ChainMember
@@ -140,12 +139,9 @@ instance RedisDBValuable RedisChainTxsInBlocks where
 instance RedisDBKeyable IPAddress where
     toKey = S8.pack . showIP
 
-instance RedisDBValuable SS.Snapshot where
+instance RedisDBValuable SS.RedisSnapshot where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBKeyable CodePtr where
-    toKey = rlpSerialize . rlpEncode
 
 instance RedisDBValuable RedisOrgNameChains where
     toValue   = rlpSerialize . rlpEncode

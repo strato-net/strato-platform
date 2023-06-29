@@ -30,7 +30,6 @@ import Blockchain.Data.RLP
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Snapshot
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
@@ -144,7 +143,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | ForcedConfigChange ForcedConfigChange
              | ValidatorBehaviorChange ForcedValidatorChange
              | ValidatorChange ChainMemberParsedSet Bool
-             | SnapshotReceived Snapshot
+             | SnapshotReceived
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -157,7 +156,7 @@ instance Format InEvent where
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) =  "ValidatorBehaviorChange " ++ format theBool
   format (ValidatorChange val theBool) =  "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
-  format (SnapshotReceived (Snapshot _ _ bn _)) = "Snapshot from block " ++ (show bn)  --TODO improve, ie add block number and more helpful info
+  format (SnapshotReceived) = "Snapshot received"  --TODO improve, ie add block number and more helpful info
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -170,7 +169,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
               | NewCheckpoint Checkpoint
-              | OSnapshot Snapshot
+              | OSnapshot
               deriving (Eq, Show, Generic)
 
 type EOutEvent = Either OutEvent OutEvent
@@ -187,7 +186,7 @@ instance Format OutEvent where
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
-  format (OSnapshot _) = "Snapshot found. Recreating state..."
+  format (OSnapshot) = "Snapshot found. Recreating state..."
 
 
 blkNum :: Block -> String
@@ -210,7 +209,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
     ValidatorChange val dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
-    SnapshotReceived _ -> CL.blue "SNAPSHOT_RECEIVED"
+    SnapshotReceived -> CL.blue "SNAPSHOT_RECEIVED"
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do
@@ -225,7 +224,7 @@ outShortLog loc eoev = do
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
-      OSnapshot _ -> prefix ++ CL.blue "OSNAPSHOT"
+      OSnapshot -> prefix ++ CL.blue "OSNAPSHOT"
 
 instance NFData OutEvent
 

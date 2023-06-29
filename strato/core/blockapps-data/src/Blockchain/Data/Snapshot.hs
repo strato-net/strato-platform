@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
-module           Blockchain.Data.Snapshot ( Snapshot(..), AddressState''(..), emptySnapshot ) where
+module           Blockchain.Data.Snapshot ( Snapshot(..), AddressState''(..), emptySnapshot, RedisSnapshot(..) ) where
 
 import           Control.DeepSeq
 import           Data.Binary
@@ -34,6 +34,27 @@ import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Text.Tools
 
+data RedisSnapshot = RedisSnapshot {
+    partNumber            :: Integer,
+    totalParts            :: Integer,
+    snapshotBytes         :: B.ByteString
+} deriving (Eq, Show, Generic, NFData)
+
+deriving instance Data RedisSnapshot
+
+instance RLPSerializable RedisSnapshot where
+    rlpEncode RedisSnapshot {
+        partNumber = pn,
+        totalParts = tp,
+        snapshotBytes = sb
+    } = RLPArray [rlpEncode pn, rlpEncode tp, rlpEncode sb]
+
+    rlpDecode (RLPArray [a, b, c]) = 
+        RedisSnapshot (rlpDecode a) (rlpDecode b) (rlpDecode c)
+
+    rlpDecode (RLPArray arr) = error ("rlpDecode for RedisSnapshot called on object with wrong amount of data, length arr = " ++ show arr)
+    rlpDecode x = error ("rlpDecode for RedisSnapshot... something went massively wrong: " ++ show x)
+
 data Snapshot = Snapshot {
     blockHeaders          :: [BlockHeader],
     fromStateroot         :: StateRoot,
@@ -42,8 +63,6 @@ data Snapshot = Snapshot {
 } deriving (Eq, Show, Generic, NFData)
 
 deriving instance Data Snapshot
-
-deriving instance Data AddressState''
 
 emptySnapshot :: Snapshot
 emptySnapshot = 
@@ -96,6 +115,8 @@ data AddressState'' =
     } deriving (Eq, Generic, Read, Show)
 
 instance NFData AddressState''
+
+deriving instance Data AddressState''
 
 instance Format AddressState'' where
     format a =

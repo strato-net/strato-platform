@@ -56,10 +56,13 @@ import           UnliftIO.IORef
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.Block
+import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
+import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Snapshot                as SS
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
@@ -768,18 +771,34 @@ makeSnapShot :: VMBase m => MP.StateRoot -> Integer -> m ()
 makeSnapShot s blockNumber = do
   $logInfoS "makeSnapShot" . T.pack $ "Making snapshot on block " ++ (show blockNumber)  
   address_states <- NoCache.getAllAddressStates Nothing
-  let (onlyAccounts, onlyStates) = unzip address_states
+  let formattedAddressStates = map (\(acct, addrState) -> (acct, formatAddressState addrState)) address_states
+  let (onlyAccounts, onlyStates) = unzip formattedAddressStates
 
-  -- Storing snapshots of storage
+  -- Get and format headers
+  headers <- fmap M.toList . A.selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ blockNumber) [(1 :: Integer)..]
+  let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
+
+  -- Get all contract storage
   storageKeyVals <- mapM (getAllRawStorageKeyValsDB) onlyAccounts
   let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, v)) kv) storageKeyVals
-  let acctToContract = zip onlyAccounts formattedStorage
-  _ <- mapM (\(acct, kv) -> Redis.runStratoRedisIO $ Redis.insertContractKeyVals kv acct) acctToContract
+  let addrStatesWithStorage = zipWith (\storage (acct, addrState) -> (acct, addrState{SS.addressStateStorageKeyVals = storage})) formattedStorage formattedAddressStates
 
-  -- Storing snapshots of code
-  allCode <- mapM (\(AddressState _ _ _ d _) -> SD.lookupCode d) onlyStates
-  let codePtrToCode = zipWith (\(AddressState _ _ _ d _) (_, code) -> (d, code)) onlyStates allCode
-  _ <- mapM (\(ptr, code) -> Redis.runStratoRedisIO $ Redis.insertCode ptr code) codePtrToCode
+  -- Get all code
+  allCode <- mapM (\(SS.AddressState'' _ _ _ _ _ d _) -> SD.lookupCode d) onlyStates
+  let addrStatesWithCode = zipWith (\(_, code) (acct, addrState) -> (acct, addrState{SS.addressStateCode = code})) allCode addrStatesWithStorage
 
-  let formattedLeaves = map (\(acc1, (AddressState a b c d e)) -> (acc1, SS.AddressState'' a b c [] (B.empty) d e)) address_states
-  void . Redis.runStratoRedisIO $ Redis.insertSnapShot $ SS.Snapshot [] s blockNumber formattedLeaves
+  let fullSnapshot = rlpSerialize . rlpEncode $ SS.Snapshot formattedHeaders s blockNumber addrStatesWithCode
+  let totalParts = ceiling (fromIntegral ((B.length fullSnapshot) `div` 33000000) :: Double)
+  
+  go 1 totalParts fullSnapshot
+
+  where
+    formatAddressState (AddressState a b c d e) = SS.AddressState'' a b c [] B.empty d e
+    go currNum totalNum bs = do
+      let (chunk, rest) = B.splitAt 33000000 bs -- 33554432 is the maximum size we can send so we send 33000000 :)
+      let redisSnapshot = SS.RedisSnapshot currNum totalNum chunk
+      void . Redis.runStratoRedisIO $ Redis.insertSnapShot currNum redisSnapshot
+      case currNum <= totalNum of
+        True -> go (currNum + 1) totalNum rest
+        False -> return ()
+

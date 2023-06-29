@@ -181,7 +181,7 @@ data VmEvent =
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
   | VmPrivateTx OutputTx
-  | VmSnapSync Snapshot
+  | VmSnapSync
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format VmEvent where

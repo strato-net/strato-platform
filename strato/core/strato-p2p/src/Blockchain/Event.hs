@@ -378,46 +378,35 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
             throwIO PeerDisconnected
 
-    MsgEvt (GetSnapshot) -> do
+    MsgEvt (GetSnapshot partNum) -> do
       case VM.flags_createSnapshots of
         True -> do
-          $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Received a snapshot request from " ++ peerString peer
-
-          redisSnapshot <- runStratoRedisIO $ getSnapShot
-          let theSnapshot = fromMaybe (SS.emptySnapshot) redisSnapshot
-          case SS.fromBlockNumber theSnapshot of
-            0 -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot from Redis failed."
-            _ -> do
-              headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ SS.fromBlockNumber theSnapshot) [(1 :: Integer)..]
-              let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
-              let (onlyAccounts, onlyStates) = unzip $ SS.addressStateLeaves theSnapshot
-
-              -- Handle contract storage
-              allStorage <- runStratoRedisIO $ getAllContractKeyVals onlyAccounts
-              let newAddrStates = zipWith (\kv (acct, addrState) -> (acct, addrState{SS.addressStateStorageKeyVals = fromMaybe [] kv})) allStorage $ SS.addressStateLeaves theSnapshot
-
-              -- Handle code
-              let onlyCodePtrs = map (\(SS.AddressState'' _ _ _ _ _ ch _) -> ch) onlyStates
-              allCode <- runStratoRedisIO $ getAllCode onlyCodePtrs
-              let addrStatesWithCode = zipWith (\code (acct, addrState) -> (acct, addrState{SS.addressStateCode = fromMaybe B.empty code})) allCode newAddrStates
-              let theSnapshot' = theSnapshot{SS.addressStateLeaves = addrStatesWithCode}
-              yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = formattedHeaders}
+          $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Received a snapshot part " ++ (show partNum) ++ " request from " ++ peerString peer
+          redisSnapshot <- runStratoRedisIO $ getSnapShot partNum
+          case redisSnapshot of
+            Nothing -> $logErrorS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot part " ++ (show partNum) ++ " from Redis failed."
+            Just snapshot -> yieldR . SnapshotResponse snapshot
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 
     MsgEvt (SnapshotResponse snapshot) -> do
       trustedSnapshotNodes <- lift $ unSnapshotNodes <$> Mod.access (Proxy @SnapshotNodes)
       case S.member (pPeerIp peer) trustedSnapshotNodes of
         True -> do
-          $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot from " ++ peerString peer ++ "\n" ++ show snapshot
-          yieldL . ToUnseq $ IESnapshot <$> [snapshot]
-          let blockDataLs  = fmap headerToBlockData $ SS.blockHeaders snapshot
-          let stateRootsLs = map (\(BlockData _ _ _ sr _ _ _ _ _ _ _ _ _ _ _) -> unsafeCreateKeccak256FromByteString $ unboxStateRoot sr) blockDataLs
-          _ <- liftIO $ runStratoRedisIO $ insertHeaders $ M.fromList (zip stateRootsLs blockDataLs) 
-          syncFetch Forward (1 + SS.fromBlockNumber snapshot)
-          lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
-          where
-            headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-              BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+          let partNum = partNumber snapshot
+          let totalNum = totalParts snapshot
+          $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot part " ++ (show partNum) ++ " from " ++ peerString peer ++ "\n" ++ show snapshot
+          _ <- runStratoRedisIO $ insertSnapShot partNum snapshot
+          case partNum < totalNum of
+            True -> yieldR . GetSnapshot $ partNum + 1
+            False -> yieldL . ToUnseq $ IESnapshot
+              -- let blockDataLs  = fmap headerToBlockData $ SS.blockHeaders snapshot
+              -- let stateRootsLs = map (\(BlockData _ _ _ sr _ _ _ _ _ _ _ _ _ _ _) -> unsafeCreateKeccak256FromByteString $ unboxStateRoot sr) blockDataLs
+              -- _ <- liftIO $ runStratoRedisIO $ insertHeaders $ M.fromList (zip stateRootsLs blockDataLs) 
+              -- syncFetch Forward (1 + SS.fromBlockNumber snapshot)
+              -- lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
+              -- where
+              --   headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+              --     BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
         False ->
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Disregarding snapshot from " ++ peerString peer ++ " because it's sus."
 

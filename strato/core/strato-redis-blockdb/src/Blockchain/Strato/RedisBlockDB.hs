@@ -43,8 +43,7 @@ module Blockchain.Strato.RedisBlockDB
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     , getSyncStatus, putSyncStatus, getSyncStatusNow
     , getVmGasCap, putVmGasCap
-    , getSnapShot, insertSnapShot, getContractKeyVals, insertContractKeyVals, getAllContractKeyVals
-    , getCode, getAllCode, insertCode
+    , getSnapShot, insertSnapShot
     ) where
 
 import           BlockApps.X509.Certificate
@@ -54,11 +53,9 @@ import qualified Blockchain.Data.Snapshot              as SS
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Partitioner                (partitionWith)
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember   as CM
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -69,7 +66,6 @@ import           Control.Concurrent                    (threadDelay)
 import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
-import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
@@ -1103,51 +1099,17 @@ runStratoRedisIO r = liftIO $ do
 --         Just c  -> return . Just $ (orgName &&& orgUnit) c
 
 -- snap sync
-insertSnapShot :: SS.Snapshot
+insertSnapShot :: Integer
+               -> SS.RedisSnapshot
                -> Redis (Either Reply Status)
-insertSnapShot snapshot = do
-    res <- multiExec $ set (inNamespace Snapshot $ S8.pack "snapshot") (toValue snapshot)
+insertSnapShot number snapshot = do
+    res <- multiExec $ set (inNamespace Snapshot $ S8.pack $ "snapshotPart" ++ (show number)) (toValue snapshot)
     case res of
         TxSuccess _ -> pure $ Right Ok
         _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertSnapshot - Aborted")
 
-getSnapShot ::  Redis (Maybe (SS.Snapshot))
-getSnapShot = getInNamespace Snapshot (S8.pack "snapshot") >>= \case
+getSnapShot :: Integer -> Redis (Maybe (SS.RedisSnapshot))
+getSnapShot number = (getInNamespace Snapshot $ S8.pack $ "snapshotPart" ++ (show number)) >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing
     Right (Just (snapshot)) ->  return . Just $ fromValue snapshot 
-
-insertContractKeyVals :: [(B.ByteString, B.ByteString)]
-                      -> Account
-                      -> Redis (Either Reply Status)
-insertContractKeyVals ls acct = do
-    res <- multiExec $ set (inNamespace Snapshot acct) (toValue ls)
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertContractKeyVals - Aborted")
-
-getAllContractKeyVals :: [Account] -> Redis ([(Maybe [(B.ByteString, B.ByteString)])])
-getAllContractKeyVals = mapM (getContractKeyVals)
-
-getContractKeyVals :: Account -> Redis (Maybe ([(B.ByteString, B.ByteString)]))
-getContractKeyVals acct = getInNamespace Snapshot acct >>= \case
-    Left _        -> return Nothing
-    Right Nothing -> return Nothing
-    Right (Just (keyvals)) ->  return . Just $ fromValue keyvals 
-
-insertCode :: CodePtr -> B.ByteString -> Redis (Either Reply Status)
-insertCode ptr code = do
-    res <- multiExec $ set (inNamespace Snapshot ptr) (toValue code)
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertCode - Aborted")
-
-getAllCode :: [CodePtr] -> Redis ([Maybe B.ByteString])
-getAllCode = mapM (getCode)
-
-getCode :: CodePtr -> Redis (Maybe (B.ByteString))
-getCode ptr = do
-    getInNamespace Snapshot ptr >>= \case
-        Left _        -> return Nothing
-        Right Nothing -> return Nothing
-        Right (Just (code)) ->  return . Just $ fromValue code
