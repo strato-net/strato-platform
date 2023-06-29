@@ -399,9 +399,7 @@ handleEvents peer = awaitForever $ \case
               -- Handle code
               let onlyCodePtrs = map (\(SS.AddressState'' _ _ _ _ _ ch _) -> ch) onlyStates
               allCode <- runStratoRedisIO $ getAllCode onlyCodePtrs
-              $logInfoS "Debug1" $ T.pack $ show allCode
               let addrStatesWithCode = zipWith (\code (acct, addrState) -> (acct, addrState{SS.addressStateCode = fromMaybe B.empty code})) allCode newAddrStates
-              $logInfoS "Debug2" $ T.pack $ show addrStatesWithCode
               let theSnapshot' = theSnapshot{SS.addressStateLeaves = addrStatesWithCode}
               yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = formattedHeaders}
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
