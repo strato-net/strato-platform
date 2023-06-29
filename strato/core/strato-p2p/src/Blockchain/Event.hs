@@ -34,6 +34,7 @@ import           Data.Map.Internal                     (WhenMissing(..), WhenMat
 import           Data.Map.Merge.Strict
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
+import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import           Data.Ranged                           (rSetUnion, rSetIntersection)
@@ -74,7 +75,7 @@ import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.StateRoot     (unboxStateRoot)
-import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot, getAllContractKeyVals)
+import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot, getAllContractKeyVals, getAllCode)
 import           Blockchain.Verification
 import qualified Blockchain.VMOptions                  as VM
 
@@ -389,11 +390,18 @@ handleEvents peer = awaitForever $ \case
             _ -> do
               headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ SS.fromBlockNumber theSnapshot) [(1 :: Integer)..]
               let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
-              $logInfoS "handleEvents/GetSnapshot/Debug" $ T.pack $ (show $ blockHeaderBlockNumber $ head formattedHeaders) ++ "  " ++ (show $ blockHeaderBlockNumber $ last formattedHeaders)
-              let onlyAccounts = map (\(x, _) -> x) $ SS.addressStateLeaves theSnapshot
+              let (onlyAccounts, onlyStates) = unzip $ SS.addressStateLeaves theSnapshot
+
+              -- Handle contract storage
               allStorage <- runStratoRedisIO $ getAllContractKeyVals onlyAccounts
               let newAddrStates = zipWith (\kv (acct, addrState) -> (acct, addrState{SS.addressStateStorageKeyVals = fromMaybe [] kv})) allStorage $ SS.addressStateLeaves theSnapshot
-              let theSnapshot' = theSnapshot{SS.addressStateLeaves = newAddrStates}
+
+              -- Handle code
+              let onlyCodePtrs = map (\(SS.AddressState'' _ _ _ _ _ ch _) -> ch) onlyStates
+              allCode <- runStratoRedisIO $ getAllCode onlyCodePtrs
+              let addrStatesWithCode = zipWith (\code (acct, addrState) -> (acct, addrState{SS.addressStateCode = fromMaybe B.empty code})) allCode newAddrStates
+
+              let theSnapshot' = theSnapshot{SS.addressStateLeaves = addrStatesWithCode}
               yieldR . SnapshotResponse $ theSnapshot' {SS.blockHeaders = formattedHeaders}
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 

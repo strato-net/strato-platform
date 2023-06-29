@@ -44,7 +44,7 @@ module Blockchain.Strato.RedisBlockDB
     , getSyncStatus, putSyncStatus, getSyncStatusNow
     , getVmGasCap, putVmGasCap
     , getSnapShot, insertSnapShot, getContractKeyVals, insertContractKeyVals, getAllContractKeyVals
-    , getCode, insertCode
+    , getCode, getAllCode, insertCode
     ) where
 
 import           BlockApps.X509.Certificate
@@ -1141,6 +1141,9 @@ insertCode ptr code = do
     case res of
         TxSuccess _ -> pure $ Right Ok
         _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertCode - Aborted")
+
+getAllCode :: [CodePtr] -> Redis ([Maybe B.ByteString])
+getAllCode = mapM (getCode)
 
 getCode :: CodePtr -> Redis (Maybe (B.ByteString))
 getCode ptr = do
