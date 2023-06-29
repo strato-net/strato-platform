@@ -129,8 +129,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   let userOrganization
   
   if (!serviceUser) {
-    const userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    let userCertificate = await certificateJs.getCertificateMe(rawAdmin);
     console.log('dapp - userCertificate', userCertificate)
+    if (userCertificate === null || userCertificate === undefined) { 
+      // delay for 6 seconds and check again if cert got created successfully
+      console.log('user not found in first attempt, this may be a brand new registration, recheck in 9 secs')
+      await new Promise(resolve => setTimeout(resolve, 9000));
+      userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+      console.log('user content from second attempt', userCertificate)
+    }
     contract.userOrganization = userCertificate.organization
     userOrganization = userCertificate.organization
 

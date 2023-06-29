@@ -52,13 +52,23 @@ class AuthenticationController {
       const userResponse = await oauthHelper.getStratoUserFromToken(accessToken)
       const user = { ...userResponse.user, ...userCredentials }
       try {
-        const cert = await certificateJs.getCertificateMe(user)
+        let cert = await certificateJs.getCertificateMe(user)
         // user does not have a valid certificate in STRATO!
         if (!cert) {
-          console.error('User does not have a valid certificate in STRATO!')
-          rest.response.status(RestStatus.UNAUTHORIZED, res, { message: 'User does not have a valid certificate in STRATO!' })
-          // rest.response.status('User does not have a valid certificate in STRATO!', res)
-          return next()
+          // delay for 6 seconds and check again if cert got created successfully
+          console.log('Cert not found in first attempt')
+          await new Promise(resolve => setTimeout(resolve, 6000));
+          cert = await certificateJs.getCertificateMe(user)
+          console.log('Cert content from second attempt', cert)
+
+          if (!cert) {
+            console.log('Cert not found even in second attempt')
+
+            console.error('User does not have a valid certificate in STRATO!')
+            rest.response.status(RestStatus.UNAUTHORIZED, res, { message: 'User does not have a valid certificate in STRATO!' })
+            // rest.response.status('User does not have a valid certificate in STRATO!', res)
+            return next()
+          }          
         }
       } catch (e) {
         // user does not have a valid certificate in STRATO!
