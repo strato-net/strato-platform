@@ -252,6 +252,12 @@ handleMsgServerConduit myPubkey peer = do
                   genesisHash = genHash,
                   rootCerts= rootCerts'
               }
+              (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+              mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+              yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+              yield . Right $ GetChainDetails []
+              handleGetChainDetails peer S.empty
+              lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
@@ -265,6 +271,12 @@ handleMsgServerConduit myPubkey peer = do
                   latestHash = bHash,
                   genesisHash = genHash
               })
+            (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+            mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+            yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+            yield . Right $ GetChainDetails []
+            handleGetChainDetails peer S.empty
+            lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
