@@ -11,16 +11,8 @@ class UsersController {
       const { dapp, accessToken, decodedToken, address: userAddress } = req
       const username = decodedToken.preferred_username
 
-      let user = await dapp.getCertificate({ userAddress })
-
-      console.log('me USER ', user)
-      if (user === null || user === undefined) { 
-          console.log('user not found in first attempt')
-          await new Promise(resolve => setTimeout(resolve, 6000));
-          user = await dapp.getCertificate({ userAddress })
-          console.log('user content from second attempt', user)
-      }
-
+      const user = await dapp.getCertificate({ userAddress })
+     
       if (!user || Object.keys(user).length == 0) {
         rest.response.status400(res, { username }) 
       }
