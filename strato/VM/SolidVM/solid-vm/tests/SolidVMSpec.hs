@@ -7077,7 +7077,7 @@ contract A {
 }
 
 contract qq {
-  constructor() public returns () {
+  constructor() public returns () { 
     A a = new A();
     a.f();
     return;
@@ -7096,4 +7096,42 @@ contract qq {
 }
 |] 
     getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
+
+  fit "can use using statement" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq {
+  using SafeMath for uint;
+  function useUsing(uint _x) returns (uint) {
+    return _x.add(1);
+  }
+  uint x = useUsing(3);
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
+  fit "can use libraries" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq is SafeMath {
+  function useUsing(uint _x) returns (uint) {
+    return add(_x,1);
+  }
+  uint x = useUsing(3);
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
 

@@ -1634,7 +1634,93 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
       ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
-      m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
+      -- This is for the case where we are using a using declartion such as 
+      {-
+      library SafeMath {
+          function add(uint a, uint b) returns (uint) {
+            return a + b;
+          }
+        }
+        contract qq {
+          using SafeMath for uint;
+          function useUsing(uint _x) returns (uint) {
+            return _x.add(1);
+          }
+          uint x = useUsing(3);
+        }
+    -}
+    -- we should get the using declartions from the current contract and then look through all contracts for the contract with the contratName in the Using
+    -- and the function name given by SomeString
+
+      (_, someString) -> do
+        ctrct <- getCurrentContract
+        let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
+        let usingDecls = concat $ M.elems usingDeclsInContract
+        -- iterate through the list of using declartions and find ones that have the someString as a function name
+        (_, cc) <- getCurrentCodeCollection
+        -- get the usingContract name
+        let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
+        -- search through the contracts in the code collection for the contract with the name usingContractName
+        let contracts = cc ^. CC.contracts
+        let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
+        let usingContracts' = catMaybes usingContracts
+        -- look throught the functions of each contract and find the one with the name someString
+        let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
+        let theFunction = map (\y -> M.lookup someString y) usingFunctions 
+        let theFunction' = catMaybes theFunction
+        if length theFunction' == 0 then
+          typeError ("illegal member access: function you are using, is not in a using claused library ") (x, someString)
+        else do
+            curAccount <- getCurrentAccount
+                        
+            let theFinalFunc = Constant $ SContractFunction (Just $ CC._contractName $ last usingContracts') (accountOnUnspecifiedChain $ curAccount) someString
+           
+        --(SBuiltinVariable "msg", "data") -> do
+        --        contract' <- getCurrentContract
+        --        functionName <- getCurrentFunctionName
+        --        callInfo <- getCurrentCallInfo
+        --        let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
+        --            localVars = localVariables callInfo
+        --        argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
+        --        argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
+        --        return . Constant . SString $ "("++argsToStr++")"
+        --      (SBuiltinVariable "msg", "sig") -> do
+        --        functionName <- getCurrentFunctionName
+        --        contract' <- getCurrentContract
+        --        let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
+        --            argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
+        --            argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
+        --            calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
+        --        return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
+
+        --            callData <- getCallData
+        --            let theArgs = callData ^. CC.arguments
+        --            let theArgs' = argString : theArgs
+--            data CallInfo = CallInfo
+--              { currentFunctionName :: SolidString
+--              , currentAccount      :: Account
+--              , currentContract     :: CC.Contract
+--              , codeCollection      :: CC.CodeCollection
+--              , collectionHash      :: Keccak256
+--              , localVariables      :: Map SolidString (SVMType.Type, Variable)
+--              , variableStack       :: [Map SolidString (SVMType.Type, Variable)]
+--              , readOnly            :: Bool
+--              , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
+--              , currentSourcePos    :: Maybe SourcePosition
+--              , isFreeFunction      :: Bool
+--              } deriving (Show)
+
+
+
+
+            -- now we add the argString to the front of the arguments
+            -- we need to get the arguments from the callInfo
+
+
+            return theFinalFunc
+
+        
+     -- m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref

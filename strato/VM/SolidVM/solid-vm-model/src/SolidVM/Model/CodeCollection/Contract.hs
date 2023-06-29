@@ -10,6 +10,7 @@
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
   Contract,
+  ContractType(..),
   contractName,
   parents,
   constants,
@@ -23,6 +24,7 @@ module SolidVM.Model.CodeCollection.Contract (
   modifiers,
   usings,
   constructor,
+  contractType,
   contractContext
   ) where
 
@@ -44,6 +46,10 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
+
+data ContractType = ContractType | LibraryType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
+
+
 -- Changes to this structure should also have changes in the Unparser :)
 data ContractF a =
   Contract {     
@@ -60,6 +66,7 @@ data ContractF a =
     _constructor :: Maybe (FuncF a),
     _modifiers :: Map SolidString (ModifierF a),
     _usings :: Map SolidString [UsingF a],
+    _contractType :: ContractType,
     _contractContext :: a
   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
 
@@ -90,6 +97,7 @@ instance Arbitrary Contract  where
     _constructor  =  Nothing ,
     _modifiers  =  empty ,
     _usings  =  empty ,
+    _contractType  =  ContractType ,
     _contractContext = a
   }]
 

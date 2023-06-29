@@ -1362,7 +1362,7 @@ contract A {
     
     fit "Can typecheck `using` expressions" $
       let anns = runTypechecker [r|
-contract SafeMath {
+library SafeMath {
   function add(uint a, uint b) returns (uint) {
     return a + b;
   }

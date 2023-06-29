@@ -34,7 +34,10 @@ module SolidVM.Model.CodeCollection.Function (
   modifierArgs,
   modifierSelector,
   modifierContents,
-  modifierContext
+  modifierContext,
+  usingContract,
+  usingType,
+  usingContext
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~), makeLenses)
@@ -174,6 +177,8 @@ data UsingF a = Using
   , _usingType     :: SolidString -- TODO: Use Type here
   , _usingContext  :: a
   } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
+
+makeLenses ''UsingF
 
 type Using = Positioned UsingF
 
