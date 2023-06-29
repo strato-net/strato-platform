@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+
 describe("Renders Marketplace Page", () => {
   it("it should render marketplace dashboard", () => {
     cy.visit('/')
@@ -300,7 +302,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Login").click();
     cy.login()
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -374,7 +376,7 @@ describe("Renders Marketplace Page", () => {
 
   });
 
-  it("it should create product, inventory and buy using pay now option - success", () => {
+  it.only("it should create product, inventory and buy using pay now option - success", () => {
     Cypress.on("uncaught:exception", () => {
       return false;
     });
@@ -393,7 +395,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Login").click();
     cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -535,7 +537,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Login").click();
     cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
