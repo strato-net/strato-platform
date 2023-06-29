@@ -14,7 +14,7 @@ class UsersController {
       let user = await dapp.getCertificate({ userAddress })
 
       console.log('me USER ', user)
-      if (!user) { 
+      if (user === null || user === undefined) { 
           console.log('user not found in first attempt')
           await new Promise(resolve => setTimeout(resolve, 6000));
           user = await dapp.getCertificate({ userAddress })
