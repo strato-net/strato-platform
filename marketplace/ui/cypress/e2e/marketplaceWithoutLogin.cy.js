@@ -34,7 +34,8 @@ describe("Renders Marketplace Page - No Authentication", () => {
   it("it should render product list page", () => {
     cy.visit('/')
     cy.url().should("contain", "marketplace");
-    cy.wait(20000)
+
+    cy.get("#viewMore").should('exist')
     cy.get("#viewMore").should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
     cy.get("nav").contains("Home").should("exist");
@@ -61,10 +62,10 @@ describe("Renders Marketplace Page - No Authentication", () => {
       url: `/api/v1/marketplace/topselling?offset=0`,
     }).then(({ status, body }) => {
       expect(status).to.eq(200);
-      cy.wait(20000);
-
       if (body.data.length !== 0) {
         let inventory = body.data[0];
+        cy.get("#topSelling").should('exist')
+        cy.get("#topSellingChild").should('exist')
         cy.get("#topSelling").children().first().click();
 
         cy.url().should("include", "/marketplace/productList/")
