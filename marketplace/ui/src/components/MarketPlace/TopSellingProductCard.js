@@ -40,14 +40,15 @@ const TopSellingProductCard = () => {
 
   const naviroute = routes.MarketplaceProductDetail.url;
 
+  const limit = 3;
+
   const getPrevProds = () => {
-    if (offset > 0) setOffset(0);
-    // setOffset(offset-limit);
+    if (offset > 0) setOffset(offset-limit);
   };
 
   const getNextProds = () => {
-    setOffset(3);
-    // setOffset(offset+limit);
+    // setOffset(3);
+    setOffset(offset+limit);
   };
 
   const navigate = useNavigate();
