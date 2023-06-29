@@ -135,7 +135,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       console.log('user not found in first attempt')
       await new Promise(resolve => setTimeout(resolve, 6000));
       userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-      console.log('user content from second attempt', user)
+      console.log('user content from second attempt', userCertificate)
     }
     contract.userOrganization = userCertificate.organization
     userOrganization = userCertificate.organization
