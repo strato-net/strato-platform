@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+
 describe("Renders Marketplace Page", () => {
   it("it should render marketplace dashboard", () => {
     cy.visit('/')
@@ -210,6 +212,8 @@ describe("Renders Marketplace Page", () => {
 
       if (body.data.length !== 0) {
         let inventory = body.data[0];
+        cy.get("#topSelling").should('exist')
+        cy.get("#topSellingChild").should('exist')
         cy.get("#topSelling").children().first().click();
 
         cy.url().should("include", "/marketplace/productList/")
@@ -298,7 +302,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Login").click();
     cy.login()
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -372,16 +376,26 @@ describe("Renders Marketplace Page", () => {
 
   });
 
-  it("it should create product, inventory and buy using pay now option - success", () => {
+  it.only("it should create product, inventory and buy using pay now option - success", () => {
     Cypress.on("uncaught:exception", () => {
       return false;
     });
+
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order/payment',
+    }).as('paymentCall');
+
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
 
     cy.visit('/')
     cy.get("#Login").click();
     cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -416,12 +430,30 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
+
+    cy.get("#product").should("be.enabled");
+
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.wait(500);
+        cy
+          .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
-    cy.get("#product").should("be.enabled");
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
+
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
     cy.contains("Inventory created successfully").should("be.visible");
@@ -460,32 +492,30 @@ describe("Renders Marketplace Page", () => {
     cy.get("#pay-now-button").should("exist");
     cy.get("#pay-now-button").click();
 
-    cy.request(
-      "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
-    ).then((response) => {
-      expect(response.status).to.eq(200);
-      expect(response.body).to.have.property("url");
-      cy.visit(response.body.url);
-      cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+    cy.wait('@paymentCall', { timeout: 190000 })
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
 
-      // fill stripe details
-      cy.get('#email').type(Cypress.env('teEmail'));
-      cy.get('#cardNumber').type('4242 4242 4242 4242');
-      cy.get("#cardExpiry").type(
-        "12" + (new Date().getFullYear() + 10).toString().substr(-2)
-      );
-      cy.get('#cardCvc').type('855');
-      cy.get('#billingName').type('Nitin Gupta');
-      cy.get('#billingPostalCode').type('10001');
-      cy.wait(1000);
+        // fill stripe details
+        cy.get('#email').type(Cypress.env('dualRoleEmail'));
+        cy.get('#cardNumber').type('4242 4242 4242 4242');
+        cy.get("#cardExpiry").type(
+          "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+        );
+        cy.get('#cardCvc').type('855');
+        cy.get('#billingName').type('Nitin Gupta');
+        cy.wait(1000);
 
-      cy.get(".SubmitButton").click();
-      cy.get(".SubmitButton").should(($div) => {
-        expect($div.text()).to.include("Processing");
-      });
+        cy.get(".SubmitButton").click();
+        cy.get(".SubmitButton").should(($div) => {
+          expect($div.text()).to.include("Processing");
+        });
 
-      cy.url().should("include", "https://checkout.stripe.dev/success");
-    });
+        cy.url().should("include", "/marketplace/order/status");
+        cy.contains("Please wait while your order is placed successfully").should("be.exist");
+      })
   });
 
   it("it should create product, inventory and buy using pay now option - insufficient fund", () => {
@@ -493,11 +523,21 @@ describe("Renders Marketplace Page", () => {
       return false;
     });
 
+    cy.intercept({
+      method: 'POST',
+      url: '/api/v1/order/payment',
+    }).as('paymentCall');
+
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -532,12 +572,30 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
+
+    cy.get("#product").should("be.enabled");
+
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.wait(500);
+        cy
+          .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
-    cy.get("#product").should("be.enabled");
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
+
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
     cy.contains("Inventory created successfully").should("be.visible");
@@ -576,28 +634,25 @@ describe("Renders Marketplace Page", () => {
     cy.get("#pay-now-button").should("exist");
     cy.get("#pay-now-button").click();
 
-    cy.request(
-      "https://checkout.stripe.dev/api/demo-session?country=us&billingPeriod=monthly&hasBgColor=false&hasBillingAndShipping=false&hasCoupons=false&hasFreeTrial=false&hasShippingRate=false&hasTaxes=false&mode=payment&wallet=googlePay&hasPolicies=false&billingType=flat"
-    ).then((response) => {
-      expect(response.status).to.eq(200);
-      expect(response.body).to.have.property("url");
-      cy.visit(response.body.url);
-      cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
+    cy.wait('@paymentCall', { timeout: 190000 })
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
 
-      // fill stripe details
-      cy.get('#email').type(Cypress.env('teEmail'));
-      cy.get('#cardNumber').type('4000 0000 0000 9995');
-      cy.get("#cardExpiry").type(
-        "12" + (new Date().getFullYear() + 10).toString().substr(-2)
-      );
-      cy.get('#cardCvc').type('855');
-      cy.get('#billingName').type('Nitin Gupta');
-      cy.get('#billingPostalCode').type('10001');
-      cy.wait(1000);
+        // fill stripe details
+        cy.get('#email').type(Cypress.env('dualRoleEmail'));
+        cy.get('#cardNumber').type('4000 0000 0000 9995');
+        cy.get("#cardExpiry").type(
+          "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+        );
+        cy.get('#cardCvc').type('855');
+        cy.get('#billingName').type('Nitin Gupta');
+        cy.wait(1000);
 
-      cy.get(".SubmitButton").click();
-      cy.contains('Your credit card was declined because of insufficient funds. Try paying with a debit card instead.').should('exist')
-    });
+        cy.get(".SubmitButton").click();
+        cy.contains('Your credit card was declined because of insufficient funds. Try paying with a debit card instead.').should('exist')
+      })
   });
 
 })

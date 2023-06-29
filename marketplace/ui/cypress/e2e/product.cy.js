@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+
 describe("Renders Products Page", () => {
   beforeEach(function () {
     cy.visit('/')
@@ -32,7 +34,7 @@ describe("Renders Products Page", () => {
     cy.get("#add-product-button").click();
     cy.get("#modal-title").contains("Add Product");
 
-    cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${Math.floor(Math.random() * 100)}`);
+    cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${dayjs().unix()}`);
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
     cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");

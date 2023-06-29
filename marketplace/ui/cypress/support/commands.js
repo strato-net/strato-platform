@@ -1,6 +1,6 @@
 import "cypress-file-upload";
 import { productData, inventoryData } from '../fixtures/data.js'
-
+import dayjs from "dayjs";
 
 // ***********************************************
 // This example commands.js shows you how to
@@ -82,7 +82,7 @@ Cypress.Commands.add("createProduct", () => {
   cy.get("#add-product-button").should("exist");
   cy.get("#add-product-button").click();
   cy.get("#modal-title").contains("Add Product");
-  cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${Math.floor(Math.random() * 100)}`);
+  cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${dayjs().unix()}`);
   cy.get("#category").type("Art{enter}");
   cy.get("#subCategory").type("Art{enter}");
   cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
