@@ -73,9 +73,10 @@ tableNameToText (MappingTableName o a c m ) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> tableSeparator <> c <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
-  in "mapping@" <> prefix <> m
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndMapping = c <> "." <> m
+  in "mapping@" <> prefix <> contractAndMapping
 tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
@@ -91,6 +92,31 @@ tableNameToText (EventTableName o a c e) =
                    else o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
+
+tableNameToTextPostgres :: TableName -> Text
+tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
+
+-- TODO: move this import somewhere better
+tableNameToDoubleQuoteText :: TableName -> Text
+tableNameToDoubleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
+
+escapeQuotes :: Text -> Text
+escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
+
+escapeSingleQuotes :: Text -> Text
+escapeSingleQuotes = T.replace "\'" "\'\'"
+
+escapeDoubleQuotes :: Text -> Text
+escapeDoubleQuotes = T.replace "\"" "\\\""
+
+wrapSingleQuotes :: Text -> Text
+wrapSingleQuotes = wrap1 "\'"
+
+wrap :: Text -> Text -> Text -> Text
+wrap b e x = T.concat [b, x, e]
+
+wrap1 :: Text -> Text -> Text
+wrap1 t = wrap t t
 
 xabiToText :: Xabi -> Text
 xabiToText = T.replace "\'" "\'\'"
@@ -132,8 +158,10 @@ getTableColumns globalsIORef tableName = do
   if isJust columns
     then return columns
     else do -- not in map, so check in cirrus
-      let queryFor t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name Like \'" <> t <> "\';"
-      results :: [PGValues] <- liftIO $ pgQuery cirrusConn $ queryFor $ tableNameToText tableName
+      let queryFor t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name like " <> t <> ";"
+      let theQuery = queryFor $ tableNameToDoubleQuoteText tableName
+      liftIO $ print theQuery -- just for logging; be sure to remove later
+      results :: [PGValues] <- liftIO $ pgQuery cirrusConn theQuery
       if null results
         then return Nothing
         else do

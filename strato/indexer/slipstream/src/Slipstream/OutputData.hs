@@ -103,10 +103,6 @@ data ProcessedMappingRow = ProcessedMappingRow
 crashOnSQLError :: Bool
 crashOnSQLError = False
 
-
-tableSeparator :: Text
-tableSeparator = "-"
-
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
 tshow :: Show a => a -> Text
@@ -309,38 +305,6 @@ mappingTableName o a n m = uncurry3' MappingTableName $ constructMappingTableNam
 tableNameToDoubleQuoteText :: TableName -> Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 
-
-tableNameToText :: TableName -> Text
-tableNameToText (IndexTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
-tableNameToText (MappingTableName o a c m ) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndMapping = c <> "." <> m
-  in "mapping@" <> prefix <> contractAndMapping
-tableNameToText (HistoryTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in "history@" <> prefix <> c
-tableNameToText (EventTableName o a c e) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = c <> "." <> e
-  in prefix <> contractAndEvent
 
 createExpandIndexTable
   :: OutputM m
