@@ -210,6 +210,8 @@ describe("Renders Marketplace Page", () => {
 
       if (body.data.length !== 0) {
         let inventory = body.data[0];
+        cy.get("#topSelling").should('exist')
+        cy.get("#topSellingChild").should('exist')
         cy.get("#topSelling").children().first().click();
 
         cy.url().should("include", "/marketplace/productList/")
