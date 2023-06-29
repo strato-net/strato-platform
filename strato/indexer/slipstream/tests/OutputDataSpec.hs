@@ -24,11 +24,12 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import Slipstream.Events
+import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+-- import Slipstream.Processor
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
@@ -49,16 +50,15 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [(ProcessedContract, Contract)]
+              -> [(SE.ProcessedContract, Contract)]
               -> ConduitM () Text m ()
 createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-    _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
-    createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    _ <- createIndexTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
+    createHistoryTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
-
 
 
 spec :: Spec
@@ -71,19 +71,19 @@ spec = do
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [(ProcessedContract {
-            address = testAdd,
-            codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
-            organization = "",
-            application = "",
-            contractName = "Vehicle",
-            chain = "<CHAIN>",
-            blockHash = hash "<BLOCKHASH>",
-            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            blockNumber = 123,
-            transactionHash = hash "<TRANSACTIONHASH>",
-            transactionSender = testAdd,
-            contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "Vehicle",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 123,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -136,19 +136,19 @@ spec = do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
           cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
-      let input = [(ProcessedContract {
-             address = testAdd,
-             codehash = cHash,
-             organization = "",
-             application = "",
-             contractName = "Vehicle2",
-             chain = "<CHAIN>",
-             blockHash = hash "<BLOCKHASH>",
-             blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-             blockNumber = 123,
-             transactionHash = hash "<TRANSACTIONHASH>",
-             transactionSender = testAdd,
-             contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+             SE.address = testAdd,
+             SE.codehash = cHash,
+             SE.organization = "",
+             SE.application = "",
+             SE.contractName = "Vehicle2",
+             SE.chain = "<CHAIN>",
+             SE.blockHash = hash "<BLOCKHASH>",
+             SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+             SE.blockNumber = 123,
+             SE.transactionHash = hash "<TRANSACTIONHASH>",
+             SE.transactionSender = testAdd,
+             SE.contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -236,19 +236,19 @@ spec = do
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [(ProcessedContract {
-            address = testAdd,
-            codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
-            organization = "",
-            application = "",
-            contractName = "\"Vehicle''",
-            chain = "<CHAIN>",
-            blockHash = hash "<BLOCKHASH>",
-            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            blockNumber = 123,
-            transactionHash = hash "<TRANSACTIONHASH>",
-            transactionSender = testAdd,
-            contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "\"Vehicle''",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 123,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
@@ -299,19 +299,19 @@ spec = do
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
-        input = [(ProcessedContract {
-          address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          organization = "MyOrg",
-          application = "MyApp",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 123,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList
+        input = [(SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+          SE.organization = "MyOrg",
+          SE.application = "MyApp",
+          SE.contractName = "SwissArmy",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
             , ("contract", V.ValueContract $ unspecifiedChain 0x999)
@@ -439,19 +439,19 @@ spec = do
 -}
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
-        input = (ProcessedContract {
-                    address = testAdd,
-                    codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-                    organization = "MyOrg",
-                    application = "MyApp",
-                    contractName = "SwissArmy",
-                    chain = "<CHAIN>",
-                    blockHash = hash "<BLOCKHASH>",
-                    blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-                    blockNumber = 146,
-                    transactionHash = hash "<TRANSACTIONHASH>",
-                    transactionSender = testAdd,
-                    contractData = M.fromList [ ("isIterable", bool False)
+        input = (SE.ProcessedContract {
+                    SE.address = testAdd,
+                    SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                    SE.organization = "MyOrg",
+                    SE.application = "MyApp",
+                    SE.contractName = "SwissArmy",
+                    SE.chain = "<CHAIN>",
+                    SE.blockHash = hash "<BLOCKHASH>",
+                    SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+                    SE.blockNumber = 146,
+                    SE.transactionHash = hash "<TRANSACTIONHASH>",
+                    SE.transactionSender = testAdd,
+                    SE.contractData = M.fromList [ ("isIterable", bool False)
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
                                     , ("keys", V.ValueArraySentinel 1)
@@ -472,25 +472,25 @@ spec = do
                 )
     g <- newGlobals M.empty fakeHandle
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
     let testAdd = Address 0x98eaddede
-        input = [(ProcessedContract {
-          address = testAdd,
-          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          organization = "",
-          application = "",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 123,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList
+        input = [(SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          SE.organization = "",
+          SE.application = "",
+          SE.contractName = "SwissArmy",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
             , ("contract", V.ValueContract $ unspecifiedChain 0x999)
@@ -593,19 +593,19 @@ spec = do
   describe "Cirrus scrape tests" $ do
     it "uses values in non-empty cache to remember tables from before a restart" $ do
       let testAdd = Address 0x98eaddede
-          input = [(ProcessedContract {
-            address = testAdd,
-            codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
-            organization = "",
-            application = "",
-            contractName = "SwissArmy",
-            chain = "<CHAIN>",
-            blockHash = hash "<BLOCKHASH>",
-            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            blockNumber = 124,
-            transactionHash = hash "<TRANSACTIONHASH>",
-            transactionSender = testAdd,
-            contractData = M.fromList [("str", bytes "Hello, World!")]
+          input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "SwissArmy",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 124,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.fromList [("str", bytes "Hello, World!")]
             }, createDummyContract [("str", SVMType.String Nothing)])]
           cache = M.singleton (IndexTableName "" "" "SwissArmy") ["str"]
 
@@ -626,7 +626,6 @@ spec = do
       PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
 
 
-
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
@@ -634,7 +633,8 @@ createDummyContract v =
         _varIsPublic=True,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False
+        _isImmutable = False,
+        _isRecord = True
         }
   in
     Contract{

@@ -47,7 +47,6 @@ library:
   - seqevents
   - solid-vm
   - stm
-  - strato-adit
   - strato-conf
   - strato-genesis
   - strato-index

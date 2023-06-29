@@ -837,13 +837,13 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
 
   when isRCC (do
                 addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
-                forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
+                forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
                   v <- expToVar e
                   setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
-                forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+                forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
                   case theType of
-                    SVMType.Mapping _ _ _-> return ()
-                    SVMType.Array _ _-> return ()
+                    SVMType.Mapping _ _ _ -> return () 
+                    SVMType.Array _ _ -> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
@@ -883,7 +883,7 @@ runStatements (s:rest) = do
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
-  decrementGas 50000
+  decrementGas 1
   ret <- runStatement s
 
   case ret of
@@ -1304,7 +1304,7 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-  decrementGas 50000
+  decrementGas 1
   if c
     then do
       result <- code
@@ -1318,7 +1318,7 @@ while condition code = do
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 doWhile condition code = do
   result <- code
-  decrementGas 50000
+  decrementGas 1
   case result of
     Nothing -> do
       c <- condition
@@ -1408,7 +1408,7 @@ expToPath x = todo "expToPath/unhandled" x
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
-  decrementGas 50000
+  decrementGas 1
   return v
 
 decrementGas :: MonadSM m => Gas -> m ()
@@ -2773,13 +2773,13 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   addCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False
 
-  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
+  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
-  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
-    case theType of
-      SVMType.Mapping _ _ _-> return ()
+  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+    case theType  of
+      SVMType.Mapping _ _ _ -> return ()
       SVMType.Array _ _-> return ()
       t -> do 
         defVal <- createDefaultValue cc contract' t

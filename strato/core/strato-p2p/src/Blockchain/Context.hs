@@ -111,7 +111,6 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
-import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
@@ -200,8 +199,8 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , blockHeaders          :: [BlockData]
-  , remainingBlockHeaders :: RemainingBlockHeaders
+  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
@@ -403,15 +402,38 @@ instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
-  get _   = blockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
+  get _   = do
+    (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      Mod.put (Proxy @[BlockData]) []
+      pure []
+    else 
+      pure bHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
   access _ = Mod.get (Proxy @[BlockData])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
-  get _   = remainingBlockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
+  get _   = do
+    (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      let emptyRBH = RemainingBlockHeaders []
+      Mod.put (Proxy @RemainingBlockHeaders) emptyRBH
+      pure emptyRBH
+    else 
+      pure remBHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
@@ -541,6 +563,7 @@ type MonadP2P m = ( MonadIO m
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
+                       , BondedPeers
                        , PublicKey
                        ] m
                   , All '[Mod.Modifiable]
@@ -637,8 +660,8 @@ initContext :: Context
 initContext = Context
   { actionTimestamp = emptyActionTimestamp
   , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-  , blockHeaders = []
-  , remainingBlockHeaders = RemainingBlockHeaders []
+  , blockHeaders = ([], jamshidBirth)
+  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
   }
@@ -699,13 +722,8 @@ withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
 
-withCertifiedPeer :: ( MonadIO m
-                     , A.Selectable Address X509CertInfoState m
-                     )
-                  => PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer p f = getPeerX509 p >>= \case
-  Just x | isValid x -> f
-  _ -> pure . Just $ toException NoPeerCertificate
+withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

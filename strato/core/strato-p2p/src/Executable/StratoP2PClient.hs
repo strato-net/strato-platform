@@ -108,14 +108,16 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
 
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
-
-  !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx 
-  fmap (either Just (const Nothing)) . try . runConduit $ eventSource
-                  .| handleMsgClientConduit myPublic peer
-                  .| eventSink
-                  .| pSink
+  mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
+  case mConnectionResult of
+    Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
+    Just (_, (outCtx, inCtx)) -> do
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSink <- mkEthP2PEventConduit peerStr outCtx 
+      fmap (either Just (const Nothing)) . try . runConduit $ eventSource
+                      .| handleMsgClientConduit myPublic peer
+                      .| eventSink
+                      .| pSink
 
 
 runPeerInList :: ( MonadP2P m
@@ -139,7 +141,7 @@ stratoP2PClient runner = runner $ \_ -> do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    ePeers <- getAvailablePeers
+    ePeers <- getBondedPeers
     case ePeers of
       Left err -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
@@ -158,7 +160,7 @@ stratoP2PClient runner = runner $ \_ -> do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> do
+            Just _  -> void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
               result <- try $ liftIO $ Async.withAsync (runLoggingT . runner $ \sSource -> runPeerInList p sSource) $ \res -> Async.waitCatch res
               handleRunPeerResult p result
               liftIO (SSem.signal sem)

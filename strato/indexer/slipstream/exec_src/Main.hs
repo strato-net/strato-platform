@@ -60,6 +60,7 @@ createBlocEnv = liftIO $ do
                  , evmCompatible=False
                  , txSizeLimit=0
                  , accountNonceLimit=0
+                 , gasLimit=0
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }

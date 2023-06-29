@@ -17,9 +17,9 @@ defineFlag "l:listen" (30303 :: Int) "Listen on port"
 defineFlag "sqlPeers" False "Choose peers from the SQL DB, not the config file"
 defineFlag "syncBacktrackNumber" (10::Integer) "block number to go back when syncing"
 defineFlag "debugFail" True "Fail on errors we're not supposed to reach. If false, just log insteand and go on"
-defineFlag "maxConn" (1000::Int) "Maximum number of client connections."
-defineFlag "connectionTimeout" (300 :: Int) "Number of seconds to tolerate a useless peer"
-defineFlag "maxReturnedHeaders" (500 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
+defineFlag "maxConn" (20::Int) "Maximum number of client connections."
+defineFlag "connectionTimeout" (30 :: Int) "Number of seconds to tolerate a useless peer"
+defineFlag "maxReturnedHeaders" (200 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
@@ -40,5 +40,10 @@ computeNetworkID =
       if flags_testnet
       then 0
       else 1
-    (network, -1) -> bytes2Integer $ map c2w network
-    (_, _) -> toInteger flags_networkID
+    (network, -1) -> newtorkToID network
+    (_, networkID) -> networkID -- providing a networkID will ignore network name
+
+    where newtorkToID :: String -> Integer
+          newtorkToID network = case network of 
+            "mercata-hydrogen" -> 7596898649924658542 -- mercata-hydrogen networkID was manually changed
+            n -> bytes2Integer $ map c2w n

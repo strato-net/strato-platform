@@ -1,5 +1,6 @@
 {-# LANGUAGE
-      DataKinds
+    BangPatterns
+    , DataKinds
     , DeriveGeneric
     , FlexibleContexts
     , FlexibleInstances
@@ -18,7 +19,7 @@
 
 module Slipstream.Processor
   ( processTheMessages
-  , parseActions -- For testing
+  , parseActions
   ) where
 
 import Prelude hiding (lookup)
@@ -35,6 +36,7 @@ import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.IORef
+import qualified Data.Set as S
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -80,6 +82,7 @@ import SelectAccessible                         ()
 
 import Slipstream.Data.Action
 import Slipstream.Events
+import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -89,6 +92,7 @@ import Slipstream.Options
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 
 import Text.Format
 
@@ -153,6 +157,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
+  , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
 
 enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
@@ -302,6 +307,24 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
+rowToMappings :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
+rowToMappings row = do
+  let newState = case actionStorage row of
+                    Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp
+                    _ -> [] 
+  return $ (Map.fromList $ newState)
+
+
+processedContractToProcessedMappingRows :: MonadIO m => Map.Map Text Value -> [Text]-> AggregateAction -> ABIID ->m [ProcessedMappingRow]
+processedContractToProcessedMappingRows state mapNames row abiid = do
+  let valueMappingsMap =  Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (state)
+      onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames)) 
+      recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
+  if null valueMappingsMap then return $ []
+  else do
+    let result = concatMap (\(mName, theMap) -> map (\(k,v) -> processedMappingRow mName row abiid (SimpleValue k) v ) (Map.toList theMap)) (recordVMs)
+    return $ result
+      
 rowToHistories :: (MonadIO m) =>
                   IORef Globals -> ABIID -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
@@ -344,6 +367,24 @@ contractToEventTables (org, app, name) c =
           eventFields = map fst $ _eventLogs fields
         }
 
+processedMappingRow ::  Text -> AggregateAction -> ABIID -> Value -> Value-> ProcessedMappingRow
+processedMappingRow mapping AggregateAction{..} ABIID{..} k v =
+   ProcessedMappingRow {
+    address           =  actionAccount ^. accountAddress 
+  , codehash          =  actionCodeHash 
+  , organization      =  actionOrganization 
+  , application       =  actionApplication 
+  , contractname      =  aiName 
+  , mapname           =  mapping
+  , chain             =  aiChain 
+  , blockHash         =  actionBlockHash 
+  , blockTimestamp    =  actionBlockTimestamp 
+  , blockNumber       =  actionBlockNumber 
+  , transactionHash   =  actionTxHash 
+  , transactionSender =  actionTxSender ^. accountAddress 
+  , mapDataKey        =  k
+  , mapDataValue      =  v
+   }
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
@@ -412,7 +453,7 @@ getEVMInserts g row actions acct = do
       oldState <- readPreviousEVMState g acct cont
       indexContract <- rowToInsert g abiid row cont oldState
       hs <- rowToHistories g abiid actions cont oldState
-      pure . Right $ BatchedInserts indexContract hs
+      pure . Right $ BatchedInserts indexContract hs []
 
 getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
 getInsertsIgnoreEVM _ _ _ _ = pure $ Left "EVM code indexing ignored"
@@ -429,16 +470,16 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
+      creates = [(c, cp, o, a, hl, rm) | CodeCollectionAdded c cp o a hl rm <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
-
+    
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
     case cc' of
       Right cc -> do
@@ -453,15 +494,28 @@ processTheMessages env sqlEnv conn g messages = do
                             SolidVMCode n' _ | nameString /= n' -> T.pack n'
                             _ -> a
 
+
+                -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
+                -- We will then create a table for each of these mappings and add a foreign key to the main table
+
+                let storageDefs' = c ^. storageDefs
+                    storageDefsList = Map.toList storageDefs'
+                    listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
+                    listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
+                    mapNames = map fst listOfMappingsWithRecords
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
                 let nameParts = (o, a', n)
 
-                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+                --Create mapping tables
+                forM_ mapNames $ \m -> do 
+                  outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
--- mark
+-- mark        
+                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+                
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn . createEventTables g $ contractToEventTables nameParts c
@@ -470,8 +524,7 @@ processTheMessages env sqlEnv conn g messages = do
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
-
-              pure $ Right deferredForeignKeys -- Either String String
+              pure $ Right deferredForeignKeys
 
       Left cc -> do
         $logInfoS "processTheMessages" $ T.pack cc
@@ -507,9 +560,13 @@ processTheMessages env sqlEnv conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          stateDiff <- rowToMappings row
+          mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
-          pure . Right $ BatchedInserts indexContract hs
+          pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
+          pure . Right $ BatchedInserts indexContract hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -517,12 +574,13 @@ processTheMessages env sqlEnv conn g messages = do
   let insertsByCodeHash = map snd
                         -- SolidVM contracts can have the same codehash and be different:
                         -- the codehash is just a sourcehash.
-                        . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
+                        . partitionWith (SE.codehash . indexInsert &&& SE.contractName . indexInsert)
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
+    unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -539,4 +597,5 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+
 

@@ -210,7 +210,7 @@ instance Default ContextState where
     { _memDBs            = def
     , _baggerState       = defaultBaggerState
     , _bestBlockInfo     = Unspecified
-    , _vmGasCap          = 13500900000 * 2 -- 13500900000 is the most gas used in a tx on STRATO Mercata as of 4/11/23
+    , _vmGasCap          = Gas flags_gasLimit
     , _hasBlockstanbul   = True
     , _blockRequested    = False
     , _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache"
@@ -583,7 +583,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _baggerState       = defaultBaggerState
             , _bestBlockInfo     = Unspecified
             , _hasBlockstanbul   = False
-            , _vmGasCap          = fromIntegral (maxBound :: Int)
+            , _vmGasCap          = 100000
             , _blockRequested    = False
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing

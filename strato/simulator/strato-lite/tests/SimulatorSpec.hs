@@ -43,12 +43,12 @@ import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SolidStorageDB
+import           Blockchain.EthEncryptionException     (EthEncryptionException(..))
 import           BlockApps.X509.Certificate           
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
-import           Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -78,10 +78,8 @@ import           Text.RawString.QQ
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
-createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
-createPeer' pk identity as certs n ip = do
-  inet <- newTVarIO preAlGoreInternet
-  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) []
+instance Eq SomeException where
+  _ == _ = True -- for the purpose of my test, all exceptions are equal
 
 spec :: Spec
 spec = do
@@ -767,6 +765,21 @@ contract B {
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
+    it "will throw an exception if the handshake times out" $ do
+      serverPKey <- newPrivateKey
+      clientPKey <- newPrivateKey
+      let validatorAddresses = fromPrivateKey <$> [serverPKey, clientPKey]
+          validatorInfos = [ CommonName "GrumpyCat, Inc" "" "GrumpyCat" True
+                           , CommonName "BlockApps" "" "Aya" True
+                           ]
+          zippedValidators = zip validatorAddresses validatorInfos
+      certs <- traverse (uncurry selfSignCert) $ zip [serverPKey, clientPKey] validatorInfos
+      server' <- createPeer' serverPKey (validatorInfos !! 0) zippedValidators certs "server" "1.1.1.1"
+      client' <- createPeer' clientPKey (validatorInfos !! 1) zippedValidators certs "client" "2.2.2.2"
+      connection <- createGermophobicConnection server' client'
+      void . timeout (3 * 1000 * 1000) $ runConnection connection
+      clientExcept <- readTVarIO $ connection ^. clientException
+      clientExcept `shouldBe` Just (toException $ HandshakeException "handshake timed out")
 
   describe "X.509 Private Chain exchange" $ do
     it "can add an organization to a private chain" $ do

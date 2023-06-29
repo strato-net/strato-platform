@@ -65,7 +65,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -78,6 +77,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
+import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Data.ExecResults
 import           Blockchain.DB.CodeDB                  (getCode, CodeKind(..))
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
@@ -89,6 +89,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Gas           (Gas (..))
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
@@ -433,7 +434,7 @@ runChainConstructors cId cInfo = do
             ""
             0
             0 --block number
-            100000000000
+            (toInteger flags_gasLimit)
             0
             (bSumTimestamp curBlockSummary)
             ""
@@ -446,7 +447,7 @@ runChainConstructors cId cInfo = do
          0 --value
          1 --gasPrice
          ""
-         1000000000000 --availableGas
+         (Gas $ toInteger flags_gasLimit) --availableGas
          sender
          (Keccak256.unsafeCreateKeccak256FromWord256 0)
          (Just cId)
@@ -572,15 +573,14 @@ sendOutEvent (OutAction act) =
               historyList=
                   case join $ fmap (M.lookup "history") (a^.Action.metadata) of
                     Nothing -> []
-                    Just v -> T.splitOn "," v
+                    Just v -> T.splitOn "," v,
+              recordMappings = []
             }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       eventEvents = map EventEmitted . toList $ Action._events act
       actionEvents = [NewAction $ filterOutEvents act]
    in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
-sendOutEvent (OutBlock o) = loopTimeit "produceUnminedBlocksM" $
-  void . K.withKafkaRetry1s $ produceUnminedBlocksM [outputBlockToBlock o]
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
@@ -599,6 +599,7 @@ sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
       ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 
 -- sendOutEvents :: VmOutEventBatch -> ContextM ()
 -- sendOutEvents OutBatch{..} = do

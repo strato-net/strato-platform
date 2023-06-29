@@ -208,7 +208,7 @@ data Action = Action
   , _transactionHash    :: Keccak256
   , _transactionChainId :: Maybe Word256
   , _transactionSender  :: Account
-  , _actionData               :: Map Account ActionData
+  , _actionData         :: Map Account ActionData
   , _metadata           :: Maybe (Map Text Text)
   , _events             :: S.Seq Event
   } deriving (Eq, Show, Generic, NFData)

@@ -48,7 +48,7 @@ import           Data.Ranged
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
-import           Data.Time.Clock                       (getCurrentTime)
+import           Data.Time.Clock                       (UTCTime(..), getCurrentTime, diffUTCTime)
 import           Data.Text (Text)
 import qualified Data.Text                             as T
 import qualified Data.Text.Encoding                    as Text
@@ -149,8 +149,8 @@ preAlGoreInternet :: Internet
 preAlGoreInternet = Internet M.empty M.empty
 
 data P2PContext = P2PContext
-  { _blockHeaders          :: [DataDefs.BlockData]
-  , _remainingBlockHeaders :: RemainingBlockHeaders
+  { _blockHeaders          :: ([DataDefs.BlockData], UTCTime)
+  , _remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime)
   , _actionTimestamp       :: ActionTimestamp
   , _peerAddr              :: PeerAddress
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
@@ -159,8 +159,8 @@ data P2PContext = P2PContext
 makeLenses ''P2PContext
 
 instance Default P2PContext where
-  def = P2PContext []
-                   (RemainingBlockHeaders [])
+  def = P2PContext ([], jamshidBirth)
+                   (RemainingBlockHeaders [], jamshidBirth)
                    emptyActionTimestamp
                    (PeerAddress Nothing)
                    S.empty
@@ -291,18 +291,41 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible ActionTimestamp (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @ActionTimestamp)
 
-instance MonadIO m => Mod.Modifiable [DataDefs.BlockData] (MonadP2PTest m) where
-  get _ = use blockHeaders
-  put _ = assign blockHeaders
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [DataDefs.BlockData] (MonadP2PTest m) where
+  get _ = do
+    (bHeaders, lastUpdateTS) <- use blockHeaders
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Mod.Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      Mod.put (Mod.Proxy @[DataDefs.BlockData]) []
+      pure []
+    else 
+      pure bHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    assign blockHeaders (k, now)
 
-instance MonadIO m => Mod.Accessible [DataDefs.BlockData] (MonadP2PTest m) where
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible [DataDefs.BlockData] (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @[DataDefs.BlockData])
 
-instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
-  get _ = use remainingBlockHeaders
-  put _ = assign remainingBlockHeaders
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
+  get _ = do
+    (remBHeaders, lastUpdateTS) <- use remainingBlockHeaders
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Mod.Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      let emptyRBH = RemainingBlockHeaders []
+      Mod.put (Mod.Proxy @RemainingBlockHeaders) emptyRBH
+      pure emptyRBH
+    else 
+      pure remBHeaders
+  put _ k = do 
+    now <- liftIO getCurrentTime
+    assign remainingBlockHeaders (k, now)
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
 
 instance MonadIO m => Mod.Accessible MaxReturnedHeaders (MonadTest m) where
@@ -1142,13 +1165,13 @@ instance (Monad m, A.Replaceable T.Text PPeer m) => A.Replaceable T.Text PPeer (
 startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
-newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
-newBlockstanbulContext paddr as =
+newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> Bool -> BlockstanbulContext
+newBlockstanbulContext paddr as valBehav =
   let ckpt = startingCheckpoint as
-  in newContext ckpt paddr True
+  in newContext ckpt paddr valBehav
 
 emptyBlockstanbulContext :: BlockstanbulContext
-emptyBlockstanbulContext = newBlockstanbulContext undefined []
+emptyBlockstanbulContext = newBlockstanbulContext undefined [] True
   
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
@@ -1283,6 +1306,16 @@ addValidatorsToCertMap vals m =
       insertValidatorInfo (a, b) = M.insert a (Modification (cmpsToXcis a b))
    in foldr insertValidatorInfo m vals
 
+createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
+createPeer' pk identity as certs n ip = do
+  inet <- newTVarIO preAlGoreInternet
+  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) [] True
+
+createNonvalPeer :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
+createNonvalPeer pk identity as certs n ip = do
+  inet <- newTVarIO preAlGoreInternet
+  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) [] False
+
 createPeer :: PrivateKey
            -> ChainMemberParsedSet
            -> [(Address, ChainMemberParsedSet)]
@@ -1293,8 +1326,9 @@ createPeer :: PrivateKey
            -> TCPPort
            -> UDPPort
            -> [IPAsText]
+           -> Bool
            -> IO P2PPeer
-createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes = do
+createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes valBehav = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -1307,7 +1341,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
   atomically $ do
     modifyTVar inet $ tcpPorts . at (ipAsText, tcpPort) ?~ tcpVSock
     modifyTVar inet $ udpPorts . at (ipAsText, udpPort) ?~ udpVSock
-  seqCtx' <- newSequencerContext $ newBlockstanbulContext selfId (snd <$> initialValidators')
+  seqCtx' <- newSequencerContext $ newBlockstanbulContext selfId (snd <$> initialValidators') valBehav
   let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
       initialValidators = fst <$> initialValidators'
   cache  <- TRC.new 64
@@ -1590,6 +1624,35 @@ createConnection server' client' = do
     serverExceptionTVar
     clientExceptionTVar
 
+createGermophobicConnection :: P2PPeer
+                            -> P2PPeer
+                            -> IO P2PConnection
+createGermophobicConnection server' client' = do
+  serverToClientTQueue <- newTQueueIO
+  clientToServerTQueue <- newTQueueIO
+  clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
+  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server'
+  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
+  serverExceptionTVar <- newTVarIO Nothing
+  clientExceptionTVar <- newTVarIO Nothing
+  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
+      rServer = pure Nothing -- server is germophobic; will not conduct handshake
+      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
+      rClient = runEthClientConduit (_p2pPeerPPeer server')
+                                    (sourceTQueue serverToClientTQueue)
+                                    (sinkTQueue clientToServerTQueue)
+                                    (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                    ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+  pure $ P2PConnection
+    serverToClientTQueue
+    clientToServerTQueue
+    server'
+    client'
+    (runReaderT rServer serverCtx)
+    (runReaderT rClient clientCtx)
+    serverExceptionTVar
+    clientExceptionTVar
+
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)
 
@@ -1675,7 +1738,7 @@ createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do
   certs <- asks _initialCerts
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
-  liftIO $ createPeer pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes
+  liftIO $ createPeer pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes True
 
 addNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
 addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
@@ -1752,7 +1815,7 @@ runNetwork nodesList validatorsFilter = do
   certs <- traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
   let bootNodes = (\(_, (_,i,_,_)) -> i) <$> nodesList
-  peers <- traverse (\(p,(n,(c,i,t,u))) -> createPeer p c validators' certs inet n i t u bootNodes) $ zip privKeys nodesList
+  peers <- traverse (\(p,(n,(c,i,t,u))) -> createPeer p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
   nodeThreads' <- for nodesMap $ async . runNode
@@ -1770,7 +1833,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
       validators' = makeValidators validatorsPrivKeys
   certs <- traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
-  peers <- traverse (\(p,(n,i,c)) -> createPeer p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) []) $ zip privKeys nodesList
+  peers <- traverse (\(p,(n,i,c)) -> createPeer p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) [] True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip ((\(a,_,_) -> a) <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
