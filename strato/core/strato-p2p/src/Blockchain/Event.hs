@@ -396,15 +396,10 @@ handleEvents peer = awaitForever $ \case
           _ <- runStratoRedisIO $ insertSnapshot partNum snapshot
           case partNum < totalNum of
             True -> yieldR $ GetSnapshot $ partNum + 1
-            False -> yieldL $ ToUnseq $ IESnapshot <$> []
-              -- let blockDataLs  = fmap headerToBlockData $ SS.blockHeaders snapshot
-              -- let stateRootsLs = map (\(BlockData _ _ _ sr _ _ _ _ _ _ _ _ _ _ _) -> unsafeCreateKeccak256FromByteString $ unboxStateRoot sr) blockDataLs
-              -- _ <- liftIO $ runStratoRedisIO $ insertHeaders $ M.fromList (zip stateRootsLs blockDataLs) 
-              -- syncFetch Forward (1 + SS.fromBlockNumber snapshot)
-              -- lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
-              -- where
-              --   headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-              --     BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+            False -> do
+              lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
+              yieldL $ ToUnseq $ IESnapshot <$> []
+              syncFetch Forward (1 + SS.fromBlockNumber snapshot)
         False ->
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Disregarding snapshot from " ++ peerString peer ++ " because it's sus."
 

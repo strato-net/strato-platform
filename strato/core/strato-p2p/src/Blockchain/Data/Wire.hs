@@ -346,7 +346,7 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
 obj2WireMessage 0x1f (RLPArray [partNum]) =
   GetSnapshot $ rlpDecode partNum
 obj2WireMessage 0x21 (RLPArray [thisNum, totalNum, bytes]) = 
-  SnapshotResponse SS.RedisSnapshot {
+  SnapshotResponse $ SS.RedisSnapshot {
       partNumber = rlpDecode thisNum,
       totalParts = rlpDecode totalNum,
       snapshotBytes = rlpDecode bytes
