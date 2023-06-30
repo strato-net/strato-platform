@@ -37,7 +37,7 @@ recordView View{..} = liftIO $ do
 {-# NOINLINE validatorView #-}
 validatorView :: Vector Text Gauge
 validatorView = unsafeRegister
-              . vector "validator_view"
+              . vector "view_field"
               . gauge
               $ Info "pbft_current_view" "The validator status of this node (1.0 = validator, 0.0 = non-validator))"
 
