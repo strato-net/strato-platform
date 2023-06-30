@@ -178,6 +178,7 @@ nextRound nt = do
   pendingRound .= Nothing
 
   isValidator .= (self `elem` vals)
+  use isValidator >>= recordValidator
 
   yieldR . NewCheckpoint =<< liftA2 Checkpoint (use view)
                                                (uses validators (S.toList . unChainMembers))
