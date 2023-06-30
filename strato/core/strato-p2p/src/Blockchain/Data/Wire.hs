@@ -257,8 +257,8 @@ instance Format Message where
       formatUncles uncles = "\nUncles:" ++ tab' ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
 
-  format (GetSnapshot) =
-    CL.blue "GetSnapshot\n" ++ "Snapshot GET request"
+  format (GetSnapshot num) =
+    CL.blue "GetSnapshot\n" ++ "Snapshot GET request part" ++ (show num)
 
   format (SnapshotResponse snapshot) =
     CL.blue "SnapshotResponse\n" ++ "Snapshot\n " ++ (show snapshot)
@@ -345,12 +345,11 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
 -- snap sync
 obj2WireMessage 0x1f (RLPArray [partNum]) =
   GetSnapshot $ rlpDecode partNum
-obj2WireMessage 0x21 (RLPArray [RLPArray bh, stateroot, bestblock, RLPArray address_state_keyvals]) = 
-  SnapshotResponse SS.Snapshot {
-      blockHeaders = rlpDecode <$> bh,
-      fromStateroot = rlpDecode stateroot,
-      fromBlockNumber = rlpDecode bestblock,
-      addressStateLeaves = rlpDecode <$> address_state_keyvals
+obj2WireMessage 0x21 (RLPArray [thisNum, totalNum, bytes]) = 
+  SnapshotResponse SS.RedisSnapshot {
+      partNumber = rlpDecode thisNum,
+      totalParts = rlpDecode totalNum,
+      snapshotBytes = rlpDecode bytes
     }
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
@@ -417,7 +416,7 @@ wireMessage2Obj (GetTransactions trhashes) =
 wireMessage2Obj (GetSnapshot partNum) =
   (0x1f, RLPArray [rlpEncode partNum])
 
-wireMessage2Obj (RedisSnapshot currNum totalNum snapshotChunk) =
+wireMessage2Obj (SnapshotResponse (SS.RedisSnapshot currNum totalNum snapshotChunk)) =
   (0x21, RLPArray [
     rlpEncode currNum,
     rlpEncode totalNum,

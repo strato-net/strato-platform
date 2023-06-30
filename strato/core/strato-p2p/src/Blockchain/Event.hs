@@ -34,7 +34,6 @@ import           Data.Map.Internal                     (WhenMissing(..), WhenMat
 import           Data.Map.Merge.Strict
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
-import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import           Data.Ranged                           (rSetUnion, rSetIntersection)
@@ -74,8 +73,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.Model.StateRoot     (unboxStateRoot)
-import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, insertHeaders, getSnapShot, getAllContractKeyVals, getAllCode)
+import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, getSnapshot, insertSnapshot)
 import           Blockchain.Verification
 import qualified Blockchain.VMOptions                  as VM
 
@@ -382,23 +380,23 @@ handleEvents peer = awaitForever $ \case
       case VM.flags_createSnapshots of
         True -> do
           $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Received a snapshot part " ++ (show partNum) ++ " request from " ++ peerString peer
-          redisSnapshot <- runStratoRedisIO $ getSnapShot partNum
+          redisSnapshot <- runStratoRedisIO $ getSnapshot partNum
           case redisSnapshot of
             Nothing -> $logErrorS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot part " ++ (show partNum) ++ " from Redis failed."
-            Just snapshot -> yieldR . SnapshotResponse snapshot
+            Just snapshot -> yieldR $ SnapshotResponse snapshot
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 
     MsgEvt (SnapshotResponse snapshot) -> do
       trustedSnapshotNodes <- lift $ unSnapshotNodes <$> Mod.access (Proxy @SnapshotNodes)
       case S.member (pPeerIp peer) trustedSnapshotNodes of
         True -> do
-          let partNum = partNumber snapshot
-          let totalNum = totalParts snapshot
+          let partNum = SS.partNumber snapshot
+          let totalNum = SS.totalParts snapshot
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot part " ++ (show partNum) ++ " from " ++ peerString peer ++ "\n" ++ show snapshot
-          _ <- runStratoRedisIO $ insertSnapShot partNum snapshot
+          _ <- runStratoRedisIO $ insertSnapshot partNum snapshot
           case partNum < totalNum of
-            True -> yieldR . GetSnapshot $ partNum + 1
-            False -> yieldL . ToUnseq $ IESnapshot
+            True -> yieldR $ GetSnapshot $ partNum + 1
+            False -> yieldL $ ToUnseq $ IESnapshot <$> []
               -- let blockDataLs  = fmap headerToBlockData $ SS.blockHeaders snapshot
               -- let stateRootsLs = map (\(BlockData _ _ _ sr _ _ _ _ _ _ _ _ _ _ _) -> unsafeCreateKeccak256FromByteString $ unboxStateRoot sr) blockDataLs
               -- _ <- liftIO $ runStratoRedisIO $ insertHeaders $ M.fromList (zip stateRootsLs blockDataLs) 

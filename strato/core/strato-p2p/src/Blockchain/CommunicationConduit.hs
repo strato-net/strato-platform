@@ -213,7 +213,7 @@ handleMsgClientConduit myId peer = do
                   (True, False, False) -> do
                     -- Snap Sync: Get Snapshot
                     $logInfoS "handleMsgClientConduit" $ T.pack $ "Asking for snapshot from" ++ (show $ pPeerIp peer)
-                    yield . Right $ GetSnapshot
+                    yield . Right $ GetSnapshot 1
                   (True, False, True) -> do
                     $logInfoS "handleMsgClientConduit" $ T.pack $ "This is not suppose to happen."
                   (True, True, False) -> do
@@ -251,7 +251,7 @@ handleMsgClientConduit myId peer = do
                   (True, False, False) -> do
                     -- Snap Sync: Get Snapshot
                     $logInfoS "handleMsgClientConduit" $ T.pack $ "Asking for snapshot from" ++ (show $ pPeerIp peer)
-                    yield . Right $ GetSnapshot
+                    yield . Right $ GetSnapshot 1
                   (True, False, True) -> do
                     $logInfoS "handleMsgClientConduit" $ T.pack $ "This is not suppose to happen."
                   (True, True, False) -> do

@@ -797,7 +797,7 @@ makeSnapShot s blockNumber = do
     go currNum totalNum bs = do
       let (chunk, rest) = B.splitAt 33000000 bs -- 33554432 is the maximum size we can send so we send 33000000 :)
       let redisSnapshot = SS.RedisSnapshot currNum totalNum chunk
-      void . Redis.runStratoRedisIO $ Redis.insertSnapShot currNum redisSnapshot
+      void . Redis.runStratoRedisIO $ Redis.insertSnapshot currNum redisSnapshot
       case currNum <= totalNum of
         True -> go (currNum + 1) totalNum rest
         False -> return ()

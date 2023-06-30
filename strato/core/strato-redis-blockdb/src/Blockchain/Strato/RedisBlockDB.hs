@@ -43,7 +43,7 @@ module Blockchain.Strato.RedisBlockDB
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     , getSyncStatus, putSyncStatus, getSyncStatusNow
     , getVmGasCap, putVmGasCap
-    , getSnapShot, insertSnapShot
+    , getSnapshot, insertSnapshot, getSnapshotRange
     ) where
 
 import           BlockApps.X509.Certificate
@@ -1099,17 +1099,22 @@ runStratoRedisIO r = liftIO $ do
 --         Just c  -> return . Just $ (orgName &&& orgUnit) c
 
 -- snap sync
-insertSnapShot :: Integer
+insertSnapshot :: Integer
                -> SS.RedisSnapshot
                -> Redis (Either Reply Status)
-insertSnapShot number snapshot = do
+insertSnapshot number snapshot = do
     res <- multiExec $ set (inNamespace Snapshot $ S8.pack $ "snapshotPart" ++ (show number)) (toValue snapshot)
     case res of
         TxSuccess _ -> pure $ Right Ok
         _ -> pure . Left $ SingleLine (S8.pack $ "Something went wrong with insertSnapshot - Aborted")
 
-getSnapShot :: Integer -> Redis (Maybe (SS.RedisSnapshot))
-getSnapShot number = (getInNamespace Snapshot $ S8.pack $ "snapshotPart" ++ (show number)) >>= \case
+getSnapshot :: Integer -> Redis (Maybe (SS.RedisSnapshot))
+getSnapshot number = (getInNamespace Snapshot $ S8.pack $ "snapshotPart" ++ (show number)) >>= \case
     Left _        -> return Nothing
     Right Nothing -> return Nothing
     Right (Just (snapshot)) ->  return . Just $ fromValue snapshot 
+
+getSnapshotRange :: [Integer] -> Redis ([Maybe SS.RedisSnapshot])
+getSnapshotRange range = case (head range) > (last range) of
+    True -> pure $ []
+    False -> mapM (getSnapshot) range
