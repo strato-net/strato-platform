@@ -75,15 +75,15 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   doAuthn <- use productionAuth
   authenticated <- lift $ authenticate iev    --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
   let raiseInProd reason = when doAuthn $ do
-        $logWarnS "blockstanbul/auth" . T.pack $ reason 
+        $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason                  --debug statement?
-  unless authenticated $ do               
+  unless authenticated $ do
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
   case iev of                         -- cases of valid and non valid input (for approval of messages and tx's?)
     -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
     -- but with incorrect extraData.
-    IMsg _ (Preprepare _ pp) -> do     
+    IMsg _ (Preprepare _ pp) -> do
       vals <- use validators            -- this is _validators from bloctanbul context?
       let valSet = unChainMembers vals
       let payloadVals = getValidatorList pp  -- getvalslsit::Block -> [Address] to word256 x 2
@@ -136,7 +136,7 @@ roundChange = do
   nextView <- uses view (over round (+1))
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
-  valB <- use validatorBehavior
+  valB <- use isMirrorNode
   when (valB) $ do
     msg <- signMessage rawMsg
     yieldR msg
@@ -163,10 +163,10 @@ nextRound nt = do
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
-        valB <- use validatorBehavior
+        valB <- use isMirrorNode
         when (valB) $ do
-          msg <- signMessage (Preprepare v lb) 
-          yieldR msg 
+          msg <- signMessage (Preprepare v lb)
+          yieldR msg
 
   prepared .= M.empty
   committed .= M.empty
@@ -176,6 +176,8 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+
+  isValidator .= (self `elem` vals)
 
   yieldR . NewCheckpoint =<< liftA2 Checkpoint (use view)
                                                (uses validators (S.toList . unChainMembers))
@@ -200,8 +202,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
    AuthSuccess -> case ev of
     ValidatorBehaviorChange vc -> do
       case vc of
-          ForcedValidator fv -> modify' $ validatorBehavior .~ fv
-      valB <- use validatorBehavior
+          ForcedValidator fv -> modify' $ isMirrorNode .~ fv
+      valB <- use isMirrorNode
       $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
     ValidatorChange val dir -> do
       modify' $ validators %~ (\(ChainMembers cm) ->
@@ -247,7 +249,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         vs <- use validators
         let blockWithVs = addValidators vs blk
-        pseal <- proposerSeal blockWithVs 
+        pseal <- proposerSeal blockWithVs
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
@@ -265,7 +267,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            valB <- use validatorBehavior
+            valB <- use isMirrorNode
             when (valB) $ do
               msg <- signMessage (Preprepare v realSealed)
               yieldR msg
@@ -302,7 +304,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   wasProposed <- isJust <$> use proposal
                   unless wasProposed . yieldL $ OMsg auth ppp
                   proposal .= Just pp
-                  valB <- use validatorBehavior
+                  valB <- use isMirrorNode
                   when (valB) $ do
                     msg <- signMessage (Prepare v (blockHash pp))
                     yieldR msg
@@ -318,7 +320,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         seal <- commitmentSeal di
-        valB <- use validatorBehavior
+        valB <- use isMirrorNode
         when (valB) $ do
           msg <- signMessage (Commit v di seal)
           yieldR msg
@@ -355,7 +357,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           when (3 * sameRNCount > total && Just rn > sentRN) $ do
             pendingRound .= Just rn
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            valB <- use validatorBehavior
+            valB <- use isMirrorNode
             when (valB) $ do
               msg <- signMessage rawMsg
               yieldR msg
@@ -428,7 +430,7 @@ sendMessages = fmap (map fromE) . sendMessages'
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
-  let out = fromE <$> eout 
+  let out = fromE <$> eout
   $logDebugS "sendAllMessages" . T.pack $ format out
   case mapMaybe loopback eout of
              [] -> return out
@@ -454,7 +456,7 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    ForcedConfigChange{} -> inc "forced_config_change"
    ValidatorBehaviorChange{} -> inc "validator_behavior_change"
    ValidatorChange{} -> inc "validator_change"
-   
+
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
 recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter

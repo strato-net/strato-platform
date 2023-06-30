@@ -7,7 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Blockstanbul.StateMachine where 
+module Blockchain.Blockstanbul.StateMachine where
 
 
 import           Conduit
@@ -76,7 +76,9 @@ data BlockstanbulContext = BlockstanbulContext {
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
   , _lastParent :: Maybe Keccak256
-  , _validatorBehavior :: Bool
+  -- Validator characteristics
+  , _isMirrorNode :: Bool
+  , _isValidator :: Bool
 }
 makeLenses ''BlockstanbulContext
 
@@ -93,6 +95,7 @@ debugShowCtx = do
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
+  infoLog "showctx/isValidator" isValidator show
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
@@ -119,7 +122,8 @@ newContext (Checkpoint v as) chainm valB =
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _lastParent = Nothing
-     , _validatorBehavior = valB
+     , _isMirrorNode = valB
+     , _isValidator = False
      }
 
 generateNonceMap :: [ChainMemberParsedSet] -> M.Map ChainMemberParsedSet Int
