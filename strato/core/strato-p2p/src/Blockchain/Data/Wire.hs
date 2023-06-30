@@ -261,7 +261,7 @@ instance Format Message where
     CL.blue "GetSnapshot\n" ++ "Snapshot GET request part" ++ (show num)
 
   format (SnapshotResponse snapshot) =
-    CL.blue "SnapshotResponse\n" ++ "Snapshot\n " ++ (show snapshot)
+    CL.blue "SnapshotResponse\n" ++ "Snapshot\n " ++ (show $ SS.partNumber snapshot)
 
   format (Blockstanbul msg) = CL.blue "Blockstanbul\n" ++ "  msg: " ++ PBFT.shortFormat msg
 
