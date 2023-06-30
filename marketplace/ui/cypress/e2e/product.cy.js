@@ -51,7 +51,7 @@ describe("Renders Products Page", () => {
     cy.contains("Product created successfully").should("be.visible");
   });
 
-  it.only("it should delete a product", () => {
+  it("it should delete a product", () => {
     const productName = `Corn Seeds ${dayjs().unix()}`;
     cy.createProduct(productName);
 
@@ -79,7 +79,7 @@ describe("Renders Products Page", () => {
     });
   });
   
-  it.only("it should edit a product", () => {
+  it("it should edit a product", () => {
     const productName = `Corn Seeds ${dayjs().unix()}`;
     cy.createProduct(productName);
 
@@ -109,7 +109,7 @@ describe("Renders Products Page", () => {
     });
   });
 
-  it.only("it should edit and change a product picture", () => {
+  it("it should edit and change a product picture", () => {
     const productName = `Corn Seeds ${dayjs().unix()}`;
     cy.createProduct(productName);
 

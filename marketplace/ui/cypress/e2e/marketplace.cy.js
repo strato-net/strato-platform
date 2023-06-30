@@ -487,8 +487,10 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Marketplace").should("exist");
     cy.url().should("contain", "marketplace");
 
-    cy.get("#buy-now-button").should('exist')
-    cy.get("#buy-now-button").click()
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
@@ -631,8 +633,10 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Marketplace").should("exist");
     cy.url().should("contain", "marketplace");
 
-    cy.get("#buy-now-button").should('exist')
-    cy.get("#buy-now-button").click()
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
