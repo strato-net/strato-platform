@@ -298,6 +298,11 @@ describe("Renders Marketplace Page", () => {
   });
 
   it("Unpublish and Inventory and it should not appear in Marketplace for other Buyers", () => {
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
@@ -343,9 +348,25 @@ describe("Renders Marketplace Page", () => {
     cy.get(".ant-upload").contains("Upload CSV").should("exist")
     cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
     cy.get("#product").should("be.enabled");
+
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.wait(500);
+        cy
+          .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('[value="false"]').check();
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
     cy.get("button").contains("Create Inventory").should("be.visible");
     cy.get("button").contains("Create Inventory").click();
     cy.contains("Inventory created successfully").should("be.visible");
@@ -376,7 +397,7 @@ describe("Renders Marketplace Page", () => {
 
   });
 
-  it.only("it should create product, inventory and buy using pay now option - success", () => {
+  it("it should create product, inventory and buy using pay now option - success", () => {
     Cypress.on("uncaught:exception", () => {
       return false;
     });
@@ -515,6 +536,9 @@ describe("Renders Marketplace Page", () => {
 
         cy.url().should("include", "/marketplace/order/status");
         cy.contains("Please wait while your order is placed successfully").should("be.exist");
+        cy.get('#bought-tab', { timeout: 120000 })
+        cy.get('#sold-tab', { timeout: 120000 })
+        cy.url().should("include", "/marketplace/orders");
       })
   });
 
@@ -572,7 +596,6 @@ describe("Renders Marketplace Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
-
     cy.get("#product").should("be.enabled");
 
     cy.get("#product").click()

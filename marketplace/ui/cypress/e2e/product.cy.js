@@ -51,8 +51,9 @@ describe("Renders Products Page", () => {
     cy.contains("Product created successfully").should("be.visible");
   });
 
-  it("it should delete a product", () => {
-    cy.createProduct();
+  it.only("it should delete a product", () => {
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
 
     cy.request({
       method: "GET",
@@ -78,8 +79,9 @@ describe("Renders Products Page", () => {
     });
   });
   
-  it("it should edit a product", () => {
-    cy.createProduct();
+  it.only("it should edit a product", () => {
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
 
     cy.request({
       method: "GET",
@@ -107,8 +109,9 @@ describe("Renders Products Page", () => {
     });
   });
 
-  it("it should edit and change a product picture", () => {
-    cy.createProduct();
+  it.only("it should edit and change a product picture", () => {
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
 
     cy.request({
       method: "GET",

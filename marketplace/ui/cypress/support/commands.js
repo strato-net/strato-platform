@@ -75,14 +75,14 @@ Cypress.Commands.add("loginAsCertifier", () => {
   });
 });
 
-Cypress.Commands.add("createProduct", () => {
+Cypress.Commands.add("createProduct", (productName) => {
   cy.get("#Products").should("exist");
   cy.get("#Products").click();
   cy.url().should("include", "/products");
   cy.get("#add-product-button").should("exist");
   cy.get("#add-product-button").click();
   cy.get("#modal-title").contains("Add Product");
-  cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${dayjs().unix()}`);
+  cy.get('input[placeholder="Enter Name"]').type(productName);
   cy.get("#category").type("Art{enter}");
   cy.get("#subCategory").type("Art{enter}");
   cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
@@ -98,7 +98,7 @@ Cypress.Commands.add("createProduct", () => {
   cy.contains("Product created successfully").should("be.visible");
 });
 
-Cypress.Commands.add("createInventory", () => {
+Cypress.Commands.add("createInventory", (productName) => {
   cy.get("#Inventory").should("exist");
   cy.get("#Inventory").click();
   cy.url().should("include", "/inventories");
@@ -117,8 +117,24 @@ Cypress.Commands.add("createInventory", () => {
   cy.get(".ant-upload").contains("Upload CSV").should("exist")
   cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
   cy.get("#product").should("be.enabled");
-  cy.wait(5000);
-  cy.get("#product").type("{enter}{enter}");
+
+  cy.get("#product").click()
+  cy.wait('@productNameCall')
+    .its('response.body')
+    .then((body) => {
+      console.log(body);
+      cy.wait(500);
+      cy
+        .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+        .find('.ant-select-item-option')
+        .each(el => {
+          if (el.text() === productName) {
+            cy.wait(500)
+            cy.wrap(el).click();
+            cy.wait(500)
+          }
+        })
+    })
   cy.get("button").contains("Create Inventory").should("be.visible");
   cy.get("button").contains("Create Inventory").click();
   cy.contains("Inventory created successfully").should("be.visible");

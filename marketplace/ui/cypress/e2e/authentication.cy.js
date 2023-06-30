@@ -30,6 +30,5 @@ describe("Renders User onboarding Page", () => {
         cy.get("#Inventory").should("not.exist");
         cy.get("#Products").should("not.exist");
         cy.get("#Events").should("not.exist");
-
     });
 });

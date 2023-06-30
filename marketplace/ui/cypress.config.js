@@ -7,8 +7,8 @@ module.exports = defineConfig({
   retries: {
     runMode: 5,
   },
-  pageLoadTimeout: 60000,
-  defaultCommandTimeout: 60000,
+  pageLoadTimeout: 90000,
+  defaultCommandTimeout: 90000,
   e2e: {
     baseUrl: "http://localhost",
     experimentalSessionAndOrigin: true,

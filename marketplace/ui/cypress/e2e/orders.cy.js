@@ -295,12 +295,18 @@ describe("Renders Orders Page", () => {
       url: '/api/v1/order',
     }).as('ordersCall');
 
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.loginAsSeller()
 
-    cy.createProduct();
-    cy.createInventory();
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();

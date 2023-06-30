@@ -1,4 +1,5 @@
 import { INVENTORY_STATUS } from "../../src/helpers/constants"
+import dayjs from "dayjs";
 
 describe("Renders Inventory Page", () => {
   beforeEach(function () {
@@ -30,7 +31,7 @@ describe("Renders Inventory Page", () => {
       url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
     }).as('productNameCall');
 
-    const productName = `Corn Seeds ${Math.floor(Math.random() * 100)}`;
+    const productName = `Corn Seeds ${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -65,25 +66,26 @@ describe("Renders Inventory Page", () => {
     cy.contains("Add Inventory").should("be.visible");
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
-    
+
     cy.get("#product").should("be.enabled");
-   
+
     cy.get("#product").click()
     cy.wait('@productNameCall')
-    .its('response.body')
-    .then((body) => {
-      console.log(body);
-      cy.wait(500);
-      cy
-      .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
-      .find('.ant-select-item-option')
-      .each(el => {
-      if (el.text() === productName) {
-          cy.wait(500)
-          cy.wrap(el).click();
-          cy.wait(500)
-      }
-    })})
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.wait(500);
+        cy
+          .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
@@ -95,7 +97,14 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should create an inventory without serial number", () => {
-    cy.createProduct();
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
+
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");
@@ -109,8 +118,24 @@ describe("Renders Inventory Page", () => {
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
     cy.get("#product").should("be.enabled");
-    cy.wait(5000);
-    cy.get("#product").type("{enter}{enter}");
+
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+      .its('response.body')
+      .then((body) => {
+        console.log(body);
+        cy.wait(500);
+        cy
+          .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('input[placeholder="Enter Quantity"]').type("1");
     cy.get('input[placeholder="Enter Price"]').type("1000");
     cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
@@ -297,9 +322,15 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should add event to an inventory", () => {
-    cy.createProduct();
-    cy.createInventory();
-    
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
+
     cy.get("#Inventory").should("exist");
     cy.get("#Inventory").click();
     cy.url().should("include", "/inventories");

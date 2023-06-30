@@ -4,8 +4,8 @@ describe("Renders Events Page", () => {
   beforeEach(function () {
     cy.visit('/')
     cy.get("#Login").click();
-    
-    cy.loginAsSeller()
+
+    cy.login()
   });
 
   it("it should render empty event type list components", () => {
@@ -42,8 +42,14 @@ describe("Renders Events Page", () => {
   });
 
   it("it should create an event", () => {
-    cy.createProduct();
-    cy.createInventory();
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
 
     cy.get("#Events").should("exist");
     cy.get("#Events").click();
@@ -58,8 +64,22 @@ describe("Renders Events Page", () => {
     cy.get("#category").type("Art{enter}");
     cy.get("#subCategory").type("Art{enter}");
 
-    cy.wait(10000)
-    cy.get("#product").should("be.enabled").type("{enter}{enter}");
+    cy.get("#product").should("be.enabled");
+    cy.get("#product").click()
+    cy.wait('@productNameCall')
+      .its('response.body')
+      .then(() => {
+        cy.wait(500);
+        cy.get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
+          .find('.ant-select-item-option')
+          .each(el => {
+            if (el.text() === productName) {
+              cy.wait(500)
+              cy.wrap(el).click();
+              cy.wait(500)
+            }
+          })
+      })
     cy.get('.ant-picker-input').click();
     cy.get('.ant-picker-date-panel')
       .contains('.ant-picker-cell', dayjs().date()).click();
