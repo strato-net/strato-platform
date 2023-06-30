@@ -3,11 +3,25 @@ import dayjs from "dayjs";
 describe("Renders Orders Page", () => {
 
   it("it should create an order", () => {
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
 
-    cy.get("#Art").click();
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
+
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+    cy.loginAsSeller();
+
     cy.get("#Marketplace").should("exist");
     cy.get("#Marketplace").click();
     cy.url().should("include", "/marketplace");
@@ -15,8 +29,8 @@ describe("Renders Orders Page", () => {
     cy.get("#Art").should("exist");
     cy.get("#Art").click();
 
-    cy.get("#buy-now-button").should("exist");
-    cy.get("#buy-now-button").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
@@ -48,18 +62,30 @@ describe("Renders Orders Page", () => {
   });
 
   it("it should able to cancel order as a buyer", () => {
-
     cy.intercept({
       method: 'POST',
       url: '/api/v1/order',
     }).as('ordersCall');
 
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
 
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
 
-    cy.get("#Art").click();
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
+
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+    cy.loginAsSeller();
+
     cy.get("#Marketplace").should("exist");
     cy.get("#Marketplace").click();
     cy.url().should("include", "/marketplace");
@@ -67,8 +93,8 @@ describe("Renders Orders Page", () => {
     cy.get("#Art").should("exist");
     cy.get("#Art").click();
 
-    cy.get("#buy-now-button").should("exist");
-    cy.get("#buy-now-button").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
@@ -99,8 +125,7 @@ describe("Renders Orders Page", () => {
       .click()
       .then(() => {
         let orderAddress
-        // cy.wait(2000);
-        cy.wait('@ordersCall', { timeout: 60000 })
+        cy.wait('@ordersCall', { timeout: 190000 })
           .its('response.body')
           .then((body) => {
             console.log(body)
@@ -109,7 +134,6 @@ describe("Renders Orders Page", () => {
               cy.contains("Order created successfully").should("be.visible");
               cy.get("#Orders").click();
               cy.url().should("include", "/orders");
-              const org = Cypress.env("buyerOrg");
               cy.get("#bought-tab").should("exist");
               cy.get("#bought-tab").click();
 
@@ -132,9 +156,24 @@ describe("Renders Orders Page", () => {
       url: '/api/v1/order',
     }).as('ordersCall');
 
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
     cy.login()
+
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
+
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+    cy.loginAsSeller();
 
     cy.get("#Art").click();
     cy.get("#Marketplace").should("exist");
@@ -144,8 +183,8 @@ describe("Renders Orders Page", () => {
     cy.get("#Art").should("exist");
     cy.get("#Art").click();
 
-    cy.get("#buy-now-button").should("exist");
-    cy.get("#buy-now-button").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
@@ -190,7 +229,7 @@ describe("Renders Orders Page", () => {
 
               cy.visit('/')
               cy.get("#Login").click();
-              cy.loginAsSeller()
+              cy.login()
 
               cy.get("#Orders").should("exist");
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
@@ -214,11 +253,25 @@ describe("Renders Orders Page", () => {
       url: '/api/v1/order',
     }).as('ordersCall');
 
+    cy.intercept({
+      method: 'GET',
+      url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
+    }).as('productNameCall');
+
     cy.visit('/')
     cy.get("#Login").click();
-    cy.login()
+    cy.loginAsSeller()
 
-    cy.get("#Art").click();
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+    cy.createInventory(productName);
+
+    cy.get("#user-dropdown").click();
+    cy.get("#logout").click();
+    cy.get("#Orders").should("not.exist");
+    cy.get("#Login").click();
+    cy.login();
+
     cy.get("#Marketplace").should("exist");
     cy.get("#Marketplace").click();
     cy.url().should("include", "/marketplace");
@@ -226,8 +279,8 @@ describe("Renders Orders Page", () => {
     cy.get("#Art").should("exist");
     cy.get("#Art").click();
 
-    cy.get("#buy-now-button").should("exist");
-    cy.get("#buy-now-button").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
@@ -274,14 +327,20 @@ describe("Renders Orders Page", () => {
               cy.get("#Orders").should("exist");
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
               cy.url().should(`include`, `/marketplace/sold-orders/${orderAddress}`);
+
+              cy.get("#upload-button").should("exist");
+              cy.get("#upload-button").click();
+              cy.get(".ant-upload").contains("Upload CSV").should("exist")
+              cy.get('input[type="file"]').selectFile('cypress/fixtures/sample_1.csv', { force: true })
+              cy.get("#confirm-button").should("exist");
+              cy.get("#confirm-button").click();
+              cy.contains("Item created successfully").should("be.visible");
+
               cy.get('textarea[placeholder="Enter Comments"]').type("I want to close this order");
               cy.get('.ant-picker-input').click();
-              cy.get('.ant-picker-date-panel')
-                .contains('.ant-picker-cell', dayjs().date()).click();
-              cy.get('.ant-select-selector').click();
-              cy.contains('.ant-select-item-option-content', 'Canceled').click();
-              cy.get("#yes-button").should("exist");
-              cy.get("#yes-button").click();
+              cy.get('.ant-picker-today-btn').click();
+              cy.get("#save-button").should("exist");
+              cy.get("#save-button").click();
 
               cy.contains("Order has been updated").should("be.visible");
             }
@@ -317,8 +376,10 @@ describe("Renders Orders Page", () => {
     cy.login()
 
     cy.url().should("include", "/marketplace");
-    cy.get("#buy-now-button").should("exist");
-    cy.get("#buy-now-button").click();
+    cy.get("#Art").should("exist");
+    cy.get("#Art").click();
+    cy.get(`#${productName}-buy-now`).should("exist");
+    cy.get(`#${productName}-buy-now`).click();
     cy.url().should("include", "/marketplace/checkout");
     cy.get("#submit-order-button").should("exist");
     cy.get("#submit-order-button").click();
