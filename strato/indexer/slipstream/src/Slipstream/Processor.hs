@@ -34,6 +34,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
+import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
 import qualified Data.Set as S
@@ -66,7 +67,6 @@ import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
@@ -337,36 +337,6 @@ rowToHistories _ abiId actions cont oldState = do
     newMap <- gets Map.fromList
     return $ processedContract abiId newMap hRow
 
--- Parses xabi event declarations to create a table,
--- ignoring indexes and anonymous flag
--- Only needs xabi events
--- createEvents :: Monad m =>
---                 (Map.Map Text OLD.Event) -> Text -> Text -> m [EventTable]
--- createEvents events' org app = do
---   return $ map makeEvent $ Map.toList events'
---   where
---     makeEvent :: (Text, OLD.Event) -> EventTable
---     makeEvent (name, event) =
---       EventTable
---       { eventOrganization = org
---       , eventApplication  = app
---       , eventContractName = name
---       , eventName = name
---       , eventFields = map fst $ OLD.eventLogs event
---       }
-
-contractToEventTables :: (Text, Text, Text) -> Contract -> [EventTable]
-contractToEventTables (org, app, name) c =
-  flip map (Map.toList $ c ^. events) $
-      \(eName, fields) ->
-        EventTable {
-          eventOrganization = org,
-          eventApplication  = app,
-          eventContractName = name,
-          eventName = labelToText eName,
-          eventFields = map fst $ _eventLogs fields
-        }
-
 processedMappingRow ::  Text -> AggregateAction -> ABIID -> Value -> Value-> ProcessedMappingRow
 processedMappingRow mapping AggregateAction{..} ABIID{..} k v =
    ProcessedMappingRow {
@@ -397,8 +367,18 @@ parseActions events' =
   . filter matters
   . concatMap (flatten) $ [a | NewAction a <- events']
 
-parseEvents :: [VMEvent] -> [Action.Event]
-parseEvents events' = [a | EventEmitted a <- events']
+parseEvents :: [VMEvent] -> [AggregateEvent]
+parseEvents = concatMap parseEvent
+  where parseEvent (NewAction a) = mkAggregateEvent a <$> toList (Action._events a)
+        parseEvent _ = []
+        mkAggregateEvent a e = AggregateEvent
+          { eventBlockHash      = Action._blockHash a
+          , eventBlockTimestamp = Action._blockTimestamp a
+          , eventBlockNumber    = Action._blockNumber a
+          , eventTxHash         = Action._transactionHash a
+          , eventTxSender       = Action._transactionSender a
+          , eventEvent          = e
+          }
 
 getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)))
@@ -518,7 +498,7 @@ processTheMessages env sqlEnv conn g messages = do
                 
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
-                outputData conn . createEventTables g $ contractToEventTables nameParts c
+                outputData conn $ createExpandEventTables g c nameParts
 
                 return deferredForeignKeys
 
@@ -590,7 +570,7 @@ processTheMessages env sqlEnv conn g messages = do
     notifyPostgREST conn
 
   when (length events' > 0) $
-    outputData conn $ insertExpandEventTables g events'
+    outputData conn $ insertEventTables g events'
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
