@@ -426,7 +426,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
                   Just "EVM" -> EVM.create
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> SolidVM.create
+                  Nothing -> EVM.create
                   Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
                     \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                                  return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)

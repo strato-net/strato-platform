@@ -346,11 +346,8 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned :: ( MonadLogger m
-                               , A.Selectable Account ContractDetails m
-                               , A.Selectable Account AddressState m
-                               , (Keccak256 `A.Alters` SourceMap) m
+                               , A.Selectable Account Contract m
                                , HasBlocEnv m
-                               , HasBlocSQL m
                                , HasSQL m
                                , HasVault m
                                ) => Maybe Text                     -- ^ jwt
@@ -403,13 +400,14 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
         txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams [contract']
         forStateT Map.empty txsWithParams $
           \(UploadListContract name srcs args params value cid' md) -> do
-            (src, xabi) <- do
-              cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+            (src, contract) <- do
+              cd <- fmap snd . lift $ getContractDetailsForContract srcs (Just name) >>= \case
                 Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
                 Just x -> pure x
-              at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
+              at name <?= (srcs, cd)
 
-            let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
             (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
             let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
@@ -429,24 +427,17 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
         forStateT Map.empty txsWithParams $
           \MethodCall{..} -> do
             let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-            mXabi <- use $ at theAccount
-            xabi <- case mXabi of
+            mContract <- use $ at theAccount
+            contract <- case mContract of
               Just x -> pure x
               Nothing -> do
-                mXabi' <- lift $ fmap contractdetailsXabi <$> A.select (A.Proxy @ContractDetails) theAccount
-                x <- case mXabi' of
+                mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+                x <- case mContract' of
                   Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                   Just x -> pure x
                 at theAccount <?= x
-            contract' <- case xAbiToContract xabi of
-              Left err -> throwIO . AnError $ Text.pack err
-              Right c -> return c
-            let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
-            sel <-
-              case maybeFunc of
-              Just (_, TypeFunction selector _ _) -> return selector
-              _ -> lift $ throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-            let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
+            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
             (argsBin, argsAsSource) <-
               lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
             let methodcallMetadataWithCallInfo = Just $
@@ -459,7 +450,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 addr
                 (fromMaybe emptyTxParams _methodcallTxParams)
                 (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ sel <> argsBin)
+                (Code $ "dead" <> argsBin)
                 _methodcallChainid
       GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
