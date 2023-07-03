@@ -363,7 +363,7 @@ describe("Renders Orders Page", () => {
     cy.get("#Login").click();
     cy.loginAsSeller()
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
     cy.createInventory(productName);
 
