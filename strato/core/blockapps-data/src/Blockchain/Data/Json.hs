@@ -40,6 +40,8 @@ jsonBlk = return . toJSON
 
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
+data UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (Eq, Show, Generic)
+
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
 
 instance ToSchema RawTransaction' where
@@ -136,6 +138,74 @@ instance FromJSON RawTransaction' where
                  h
                  o)
                next)
+    parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
+
+instance ToSchema UnsignedRawTransaction' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "UnsignedRawTransaction'") mempty
+
+instance ToJSON UnsignedRawTransaction' where
+    toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cid _ _ _ md _ _ _)) =
+        object $
+          [ "nonce" .= non
+          , "gasPrice" .= gp
+          , "gasLimit" .= gl
+          , "to" .= ta
+          , "value" .= show val
+          , "codeOrData" .= cod
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0==cid) then Nothing else Just cid))
+            ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+    toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cid _ _ _ md _ _ _)) =
+        object $
+          [ "nonce" .= non
+          , "gasPrice" .= gp
+          , "gasLimit" .= gl
+          , "value" .= show val
+          , "codeOrData" .= cod
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0==cid) then Nothing else Just cid))
+            ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+
+instance FromJSON UnsignedRawTransaction' where
+    parseJSON (Object t) = do
+      fa <- t .:? "from" .!= (Address 0)
+      tnon  <- t .:? "nonce" .!= 0
+      tgp <- t .:? "gasPrice" .!= 0
+      tgl <- t .:? "gasLimit" .!= 0
+      tto <- t .:? "to"
+      tval <- LabeledError.read "FromJSON/UnsignedRawTransaction'" <$> t .:? "value" .!= "0"
+      tcd <- t .:? "codeOrData" .!= Code ""
+      cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
+      (tr :: Integer) <- parseHexStr (t .: "r")
+      (ts :: Integer) <- parseHexStr (t .: "s")
+      (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
+      md <- t .:? "metadata"
+      bn <- t .:? "blockNumber" .!= (-1)
+      h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
+      -- Unfortunately, time is rendered with `show` in ToJSON for UnsignedRawTransaction'
+      -- instead of using the ToJSON instance for UTCTime, and so it fails
+      -- to parse in FromJSON for UTCTime.
+      let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
+      time <- t .:? "timestamp" .!= defaultTime
+      o <- t .:? "origin" .!= API
+
+      return (UnsignedRawTransaction'
+               (RawTransaction
+                 time
+                 fa
+                 (tnon :: Integer)
+                 (tgp :: Integer)
+                 (tgl :: Integer)
+                 (tto :: Maybe Address)
+                 (tval :: Integer)
+                 (tcd :: Code)
+                 (fromMaybe 0 (cid :: Maybe Word256))
+                 (tr :: Integer)
+                 (ts :: Integer)
+                 (tv :: Word8)
+                 (M.toList <$> md)
+                 bn
+                 h
+                 o))
     parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
 rtToRtPrime :: (String , RawTransaction) -> RawTransaction'

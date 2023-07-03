@@ -16,6 +16,7 @@ module Bloc.Server.Transaction (
   postBlocTransaction,
   postBlocTransactionRaw,
   postBlocTransactionBody,
+  postBlocTransactionUnsigned,
   postBlocTransactionParallel,
   ) where
 
@@ -350,6 +351,134 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
       GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where hash' = transactionHash . rawTX2TX . rtPrimeToRt
         fromTransfer = \case
+          BlocTransfer t -> return t
+          _ -> throwIO $ UserError "Could not decode transfer arguments from body"
+        fromContract = \case
+          BlocContract c -> return c
+          _ -> throwIO $ UserError "Could not decode contract arguments from body"
+        fromFunction = \case
+          BlocFunction f -> return f
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
+
+-- | postBlocTransactionUnsigned
+postBlocTransactionUnsigned :: ( MonadLogger m
+                               , A.Selectable Account ContractDetails m
+                               , A.Selectable Account AddressState m
+                               , (Keccak256 `A.Alters` SourceMap) m
+                               , HasBlocEnv m
+                               , HasBlocSQL m
+                               , HasSQL m
+                               , HasVault m
+                               ) => Maybe Text                     -- ^ jwt
+                                 -> Maybe ChainId                  -- ^ shard id
+                                 -> PostBlocTransactionRequest     -- ^ SolidVM transactions
+                                 -> m [BlocTransactionUnsignedResult]  -- ^ tx hash & raw tx data
+postBlocTransactionUnsigned Nothing _ _ = throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
+postBlocTransactionUnsigned _ _ (PostBlocTransactionRequest _ [] _ _) = return []
+postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+  addr <- case mAddr of -- This is just to get the user's nonce if they didn't supply one
+    Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
+    Just addr' -> return addr'
+  fmap join . forM txList $ \tx -> case transactionType tx of
+      TRANSFER -> do
+        tx' <- fromTransfer tx
+        let t = (\(TransferPayload t' v x c m) -> SendTransaction t' v (mergeTxParams x txParams) c m) tx'
+            txWithChainid = (sendtransactionChainid %~ (<|> cid)) t
+        txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams [txWithChainid]
+        mapM (\(SendTransaction toAddr (Strung value) params cid' md) -> do
+              let header = TransactionHeader
+                    (Just toAddr)
+                    addr
+                    (fromMaybe emptyTxParams params)
+                    (Wei $ fromIntegral value)
+                    (Code ByteString.empty)
+                    cid'
+              prepareUnsignedRawTx md header) txsWithParams
+      CONTRACT -> do
+        ps <- fromContract tx
+        let srcMap :: ContractPayload -> Maybe SourceMap
+            srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+            src' :: ContractPayload -> Maybe SourceMap
+            src' p = if contractpayloadSrc p == mempty
+                        then Nothing
+                        else Just $ contractpayloadSrc p
+            getSrc p = fromMaybe mempty $ src' p <|> srcMap p
+            upload = (\p@(ContractPayload _ c a v x cid' m) -> do
+                            let cn = fromMaybe "unnamed_contract" c
+                            UploadListContract (fromJust c)
+                                                (getSrc p)
+                                                (fromMaybe Map.empty a)
+                                                (mergeTxParams x txParams)
+                                                v
+                                                cid'
+                                                (case m of
+                                                  Nothing -> Just $ Map.singleton "history" cn
+                                                  Just h -> Just $ Map.insert "history" cn h))
+                                                ps
+            contract' = (uploadlistcontractChainid %~ (<|> cid)) upload
+        txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams [contract']
+        forStateT Map.empty txsWithParams $
+          \(UploadListContract name srcs args params value cid' md) -> do
+            (src, xabi) <- do
+              cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+                Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+                Just x -> pure x
+              at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
+
+            let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+            (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
+
+            let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+            lift . prepareUnsignedRawTx metadata' $
+                TransactionHeader
+                  Nothing
+                  addr
+                  (fromMaybe emptyTxParams params)
+                  (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                  (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                  cid'
+      FUNCTION -> do
+        p <- fromFunction tx
+        let mapMethodCalls = (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+            txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
+        txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
+        forStateT Map.empty txsWithParams $
+          \MethodCall{..} -> do
+            let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+            mXabi <- use $ at theAccount
+            xabi <- case mXabi of
+              Just x -> pure x
+              Nothing -> do
+                mXabi' <- lift $ fmap contractdetailsXabi <$> A.select (A.Proxy @ContractDetails) theAccount
+                x <- case mXabi' of
+                  Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                  Just x -> pure x
+                at theAccount <?= x
+            contract' <- case xAbiToContract xabi of
+              Left err -> throwIO . AnError $ Text.pack err
+              Right c -> return c
+            let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
+            sel <-
+              case maybeFunc of
+              Just (_, TypeFunction selector _ _) -> return selector
+              _ -> lift $ throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+            let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
+            (argsBin, argsAsSource) <-
+              lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+            let methodcallMetadataWithCallInfo = Just $
+                  Map.insert "funcName" methodcallMethodName
+                  $ Map.insert "args" argsAsSource
+                  $ fromMaybe Map.empty methodcallMetadata
+            lift . prepareUnsignedRawTx methodcallMetadataWithCallInfo $
+              TransactionHeader
+                (Just methodcallContractAddress)
+                addr
+                (fromMaybe emptyTxParams _methodcallTxParams)
+                (Wei (fromIntegral $ unStrung methodcallValue))
+                (Code $ sel <> argsBin)
+                _methodcallChainid
+      GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
+  where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
         fromContract = \case
@@ -989,6 +1118,38 @@ preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
     metadata = Map.toList <$> transactionMetadata tx
 
+preparePostUnsignedRawTx
+  :: UTCTime
+  -> UnsignedTransaction
+  -> Maybe (Map Text Text)
+  -> UnsignedRawTransaction'
+preparePostUnsignedRawTx time tx md = UnsignedRawTransaction' $ RawTransaction
+  time
+  (Address 0)
+  (fromIntegral nonce')
+  (fromIntegral gasPrice)
+  (fromIntegral gasLimit)
+  toAddr
+  (fromIntegral value)
+  code
+  chainId
+  0
+  0
+  0
+  metadata
+  0
+  zeroHash
+  API
+  where
+    Gas gasLimit = unsignedTransactionGasLimit tx
+    Wei gasPrice = unsignedTransactionGasPrice tx
+    Nonce nonce' = unsignedTransactionNonce tx
+    Wei value = unsignedTransactionValue tx
+    code = unsignedTransactionInitOrData tx
+    toAddr = unsignedTransactionTo tx
+    chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx
+    metadata = Map.toList <$> md
+
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t{transactionMetadata = m}
 
@@ -1000,6 +1161,15 @@ signAndPrepare jwtToken from md th = do
   time <- liftIO getCurrentTime
   fmap (preparePostTx time from . addMetadata md) . sign' $ prepareUnsignedTx gasLimit th
 
+prepareUnsignedRawTx :: (MonadIO m, HasBlocEnv m) =>
+                  Maybe (Map Text Text) -> TransactionHeader -> m BlocTransactionUnsignedResult
+prepareUnsignedRawTx md th = do
+  gasLimit <- fmap gasLimit getBlocEnv 
+  time <- liftIO getCurrentTime
+  let unsigned = prepareUnsignedTx gasLimit th
+      msgHash = unsafeCreateKeccak256FromByteString $ rlpHash unsigned
+      unsignedRawTx = preparePostUnsignedRawTx time unsigned md
+  pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)
 
 constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
                                Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m (ByteString, Text)
