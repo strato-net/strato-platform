@@ -29,6 +29,8 @@ packages:
 - core/vm-runner/
 - core/vm-tools/
 
+- identity-provider/
+
 - indexer/slipstream
 - indexer/strato-index
 

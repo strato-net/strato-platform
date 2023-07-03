@@ -1,6 +1,6 @@
-name:                identity-provider
+name:                blockapps-identity-provider
 version:             0.1.0.0
-github:              "githubuser/identity-provider"
+github:              "githubuser/blockapps-identity-provider"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2023 Author name here"
@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
+- common-log 
 
 ghc-options:
 - -Wall
@@ -31,12 +32,14 @@ ghc-options:
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
+- -dynamic
 
 library:
   source-dirs: src
-  dependencies: 
-  - servant
+  dependencies:
+  - servant-server
   - strato-model
+  - text
 
 executables:
   identity-provider-exe:
@@ -47,7 +50,8 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - identity-provider
+    - blockapps-identity-provider
+    - warp
 
 tests:
   identity-provider-test:
@@ -58,4 +62,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - identity-provider
+    - blockapps-identity-provider

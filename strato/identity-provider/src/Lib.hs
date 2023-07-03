@@ -1,17 +1,30 @@
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeApplications  #-}
 
-module Lib
-    ( someFunc
-    ) where
+module Lib 
+    ( identityProviderApp
+    )
+where
 
 import           Servant
-import           Blockchain.Strato.Model.Address
+
+import           Data.Text (Text)
+import           Blockchain.Strato.Model.Address (Address(..))
 
 
-type MakeCert = "cert"
-              -- what headers to include?
-              :> Post '[Text] Address --should return cert address
+type MakeCert = "cert" -- what headers to include?
+              :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+              :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER" Text
+              :> Post '[JSON] Address --should return cert address
 
 type IdentityProviderAPI = MakeCert --only 1 endpoint
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+makeCert :: Text -> Text -> Handler Address
+makeCert _ _ = return $ Address 0x509
+
+identityProviderServer :: Server IdentityProviderAPI
+identityProviderServer = makeCert
+
+identityProviderApp :: Application
+identityProviderApp = serve (Proxy @IdentityProviderAPI) identityProviderServer
