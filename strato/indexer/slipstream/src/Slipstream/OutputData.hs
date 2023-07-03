@@ -13,6 +13,7 @@ module Slipstream.OutputData (
   outputData,
   outputData',
   OutputM,
+  ProcessedMappingRow(..),
   insertExpandEventTables,
   insertIndexTable,
   insertForeignKeys,
@@ -42,7 +43,8 @@ import qualified Data.Map                        as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
-import           Data.List (nubBy)
+import           Data.Time
+import           Data.List (nubBy, groupBy)
 import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
@@ -59,8 +61,10 @@ import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.CodePtr
+import qualified BlockApps.Solidity.Value as V
 
-import           Slipstream.Events
+import qualified Slipstream.Events as E
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
@@ -70,6 +74,22 @@ import           SolidVM.Model.CodeCollection              hiding (contractName,
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
 
+data ProcessedMappingRow = ProcessedMappingRow
+  { address           :: Address
+  , codehash          :: CodePtr
+  , organization      :: Text
+  , application       :: Text
+  , contractname      :: Text
+  , mapname           :: Text
+  , chain             :: Text
+  , blockHash         :: Keccak256
+  , blockTimestamp    :: UTCTime
+  , blockNumber       :: Integer
+  , transactionHash   :: Keccak256
+  , transactionSender :: Address
+  , mapDataKey        :: V.Value
+  , mapDataValue      :: V.Value
+  } deriving (Show)
 
 crashOnSQLError :: Bool
 crashOnSQLError = False
@@ -131,20 +151,20 @@ tableColumns = mapMaybe go
 partialParseTableColumns :: TableColumns -> [Text]
 partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe . T.words)
 
-makeAccount :: ProcessedContract -> Text
-makeAccount c@ProcessedContract{chain=""} = tshow $ address c
-makeAccount c = T.concat [
-  tshow $ address c,
+makeAccount :: E.ProcessedContract -> Text
+makeAccount E.ProcessedContract{chain="", address=addr} = tshow $ addr
+makeAccount E.ProcessedContract{chain=chain, address=addr} = T.concat [
+  tshow $ addr,
   ":",
-  chain c
+  chain
   ]
 
 makeAccountM:: ProcessedMappingRow -> Text
-makeAccountM m@ProcessedMappingRow{m_chain=""} = tshow $ m_address m
-makeAccountM m = T.concat [
-  tshow $ m_address m,
+makeAccountM ProcessedMappingRow{chain="", address=addr} = tshow $ addr
+makeAccountM ProcessedMappingRow{chain=chain, address=addr} = T.concat [
+  tshow $ addr,
   ":",
-  m_chain m
+  chain
   ]
 
 tableUpsert :: [Text] -> Text
@@ -217,16 +237,16 @@ baseColumns = [ "record_id"
               ]
 
 baseMappingColumns :: TableColumns
-baseMappingColumns = [ "m_record_id"
-              , "m_address"
-              , "m_chainId"
-              , "m_block_hash"
-              , "m_block_timestamp"
-              , "m_block_number"
-              , "m_transaction_hash"
-              , "m_transaction_sender"
-              , "m_contractname"
-              , "m_mapname"
+baseMappingColumns = [ "record_id"
+              , "address"
+              , "chainId"
+              , "block_hash"
+              , "block_timestamp"
+              , "block_number"
+              , "transaction_hash"
+              , "transaction_sender"
+              , "contractname"
+              , "mapname"
               ]
 
 baseTableColumns :: TableColumns
@@ -286,9 +306,10 @@ tableNameToText (MappingTableName o a c m ) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> tableSeparator <> c <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator <> c <> tableSeparator
-  in "mapping@" <> prefix <> m
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndMapping = c <> "." <> m
+  in "mapping@" <> prefix <> contractAndMapping
 tableNameToText (HistoryTableName o a c) =
   let prefix = if T.null o
                  then ""
@@ -557,7 +578,7 @@ expandTableQuery tableName cols = T.concat
   ]
 
 insertIndexTable :: OutputM m
-                 => [ProcessedContract]
+                 => [E.ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yieldMany $ insertIndexTableQuery contracts
@@ -567,25 +588,27 @@ insertMappingTable :: OutputM m
                  -> ConduitM () Text m ()
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = do
-  let newMaps = nubBy ((==) `on` m_mapDataKey) maps
-  $logInfoS "insertMappingTable" $ T.pack $ show maps
-  yieldMany $ insertMappingTableQuery newMaps
+  let newMaps = nubBy ((==) `on` mapDataKey) maps
+  $logInfoS "insertMappingTable" $ T.pack $ show newMaps
+  let grouped = (groupBy ((==) `on` mapname) newMaps)
+      results  = concat $ map insertMappingTableQuery grouped
+  yieldMany $ results
 
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
-                     PGConnection -> [ProcessedContract] -> m ()
+                     PGConnection -> [E.ProcessedContract] -> m ()
 insertForeignKeys conn contracts = do
-  forM_ contracts $ \c -> do
+  forM_ contracts $ \c@E.ProcessedContract { organization = org, application = app, contractName= cName, contractData = contractData } -> do
     let tableName = indexTableName
-                            (organization c)
-                            (application c)
-                            (contractName c)
+                            (org) 
+                            (app)
+                            (cName)
 
     --There are still reasons why a foreign key insertion might fail
     --  1. The field type was changed in a solidity contract version update
     --  2. solidity uses inheritance, and the foreign key points to the parent table
     --  3. The user just sets a variable to a made up invalid address (0x1234)
     --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
-    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
+    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) -> do
       dbQuery conn $
             "UPDATE " <>
             tableNameToDoubleQuoteText tableName <>
@@ -607,14 +630,14 @@ insertForeignKeys conn contracts = do
               wrapSingleQuotes (makeAccount c)
 
 insertHistoryTable :: OutputM m
-                   => [ProcessedContract]
+                   => [E.ProcessedContract]
                    -> ConduitM () Text m ()
 insertHistoryTable [] = return () --no data, do nothing
-insertHistoryTable contracts@(x:_) = do
+insertHistoryTable contracts@(E.ProcessedContract { organization = org, application = app, contractName= cName }:_) = do
   let tableName = historyTableName
-          (organization x)
-          (application x)
-          (contractName x)
+          (org)
+          (app)
+          (cName)
   $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
@@ -634,9 +657,9 @@ createMappingTableQuery (o, a, n, m) =
   let tableName = mappingTableName o a n m
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["m_record_id text", "m_address text", "\"m_chainId\" text", "m_block_hash text", "m_block_timestamp text",
-               "m_block_number text", "m_transaction_hash text", "m_transaction_sender text", "m_contractname text", "m_mapname text","key text", "value text"]
-        , ",\n  PRIMARY KEY (m_address, key));"
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "mapname text","key text", "value text"]
+        , ",\n  PRIMARY KEY (address, key));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -668,26 +691,26 @@ addHistoryUnique (o, a, n) =
       wrapDoubleQuotes indexName <>
       ";"]
 
-insertIndexTableQuery :: [ProcessedContract] -> [Text]
+insertIndexTableQuery :: [E.ProcessedContract] -> [Text]
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
 insertIndexTableQuery cs = concat $
-  let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData c)) <$> cs
+  let cs' = (\c@E.ProcessedContract{contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
    in flip map (map snd $ partitionWith (length . snd) cs') $ \case
         [] -> []
         contracts@((x,list):_) ->
           let tableName = indexTableName
-                  (organization x)
-                  (application x)
-                  (contractName x)
+                  (E.organization x)
+                  (E.application x)
+                  (E.contractName x)
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
               baseVals = [ makeAccount
-                         , tshow . address
-                         , chain
-                         , T.pack . keccak256ToHex . blockHash
-                         , tshow . blockTimestamp
-                         , tshow . blockNumber
-                         , T.pack . keccak256ToHex . transactionHash
-                         , tshow . transactionSender
+                         , tshow . E.address
+                         , E.chain
+                         , T.pack . keccak256ToHex . E.blockHash
+                         , tshow . E.blockTimestamp
+                         , tshow . E.blockNumber
+                         , T.pack . keccak256ToHex . E.transactionHash
+                         , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -717,26 +740,26 @@ insertIndexTableQuery cs = concat $
 insertMappingTableQuery :: [ProcessedMappingRow] -> [Text]
 insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
 insertMappingTableQuery ms = concat $
-  let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", m_mapDataKey m), ("value", m_mapDataValue m)])) <$> ms
+  let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", mapDataKey m), ("value", mapDataValue m)])) <$> ms
    in flip map (map snd $ partitionWith (length . snd) ms') $ \case
         [] -> []
         mappings@((x,list):_) ->
           let tableName = mappingTableName
-                  (m_organization x)
-                  (m_application x)
-                  (m_contractname x)
-                  (m_mapname x)
+                  (organization x)
+                  (application x)
+                  (contractname x)
+                  (mapname x)
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst list
               baseVals = [ makeAccountM
-                         , tshow . m_address
-                         , m_chain
-                         , T.pack . keccak256ToHex . m_blockHash
-                         , tshow . m_blockTimestamp
-                         , tshow . m_blockNumber
-                         , T.pack . keccak256ToHex . m_transactionHash
-                         , tshow . m_transactionSender
-                         , m_contractname
-                         , m_mapname
+                         , tshow . address
+                         , chain
+                         , T.pack . keccak256ToHex . blockHash
+                         , tshow . blockTimestamp
+                         , tshow . blockNumber
+                         , T.pack . keccak256ToHex . transactionHash
+                         , tshow . transactionSender
+                         , contractname
+                         , mapname
                          ]
               vals = flip map mappings $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -749,41 +772,41 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (m_address, key) DO UPDATE SET
-    m_record_id = excluded.m_record_id,
-    m_address = excluded.m_address,
-    "m_chainId" = excluded."m_chainId",
-    m_block_hash = excluded.m_block_hash,
-    m_block_timestamp = excluded.m_block_timestamp,
-    m_block_number = excluded.m_block_number,
-    m_transaction_hash = excluded.m_transaction_hash,
-    m_transaction_sender = excluded.m_transaction_sender,
-    m_contractname = excluded.m_contractname,
-    m_mapname = excluded.m_mapname,
+  ON CONFLICT (address, key) DO UPDATE SET
+    record_id = excluded.record_id,
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    contractname = excluded.contractname,
+    mapname = excluded.mapname,
     value = excluded.value|]
                 , ";"
                 ]
 
-insertHistoryTableQuery :: [ProcessedContract] -> [Text]
+insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
 insertHistoryTableQuery cs = concat $
-  let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ contractData c)) <$> cs
+  let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
    in flip map (map snd $ partitionWith (length . snd) cs') $ \case
         [] -> []
         contracts@((x,list):_) ->
           let tableName = historyTableName
-                  (organization x)
-                  (application x)
-                  (contractName x)
+                  (E.organization x)
+                  (E.application x)
+                  (E.contractName x)
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
               baseVals = [ makeAccount
-                         , tshow . address
-                         , chain
-                         , T.pack . keccak256ToHex . blockHash
-                         , tshow . blockTimestamp
-                         , tshow . blockNumber
-                         , T.pack . keccak256ToHex . transactionHash
-                         , tshow . transactionSender
+                         , tshow . E.address
+                         , E.chain
+                         , T.pack . keccak256ToHex . E.blockHash
+                         , tshow . E.blockTimestamp
+                         , tshow . E.blockNumber
+                         , T.pack . keccak256ToHex . E.transactionHash
+                         , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -804,39 +827,39 @@ insertHistoryTableQuery cs = concat $
 -- globals{createdEvents}
 createEventTables :: OutputM m
                   => IORef Globals
-                  -> [EventTable]
+                  -> [E.EventTable]
                   -> ConduitM () Text m ()
 createEventTables globalsIORef events = do
   yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
 
 createEventTable :: OutputM m
                  => IORef Globals
-                 -> EventTable
+                 -> E.EventTable
                  -> m (Maybe Text)
 createEventTable globalsIORef ev = do
   let (org, app, cname) = constructTableNameParameters
-          (eventOrganization ev)
-          (eventApplication ev)
-          (eventContractName ev)
-      eventTable = EventTableName org app cname (escapeQuotes $ eventName ev)
+          (E.eventOrganization ev)
+          (E.eventApplication ev)
+          (E.eventContractName ev)
+      eventTable = EventTableName org app cname (escapeQuotes $ E.eventName ev)
 
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   if eventAlreadyCreated then
     return Nothing
   else do
-    setTableCreated globalsIORef eventTable $ eventFields ev
+    setTableCreated globalsIORef eventTable $ E.eventFields ev
     return (Just $ createEventTableQuery ev)
 
-createEventTableQuery :: EventTable -> Text
+createEventTableQuery :: E.EventTable -> Text
 createEventTableQuery ev =
   let (org, app, cname) = constructTableNameParameters
-          (eventOrganization ev)
-          (eventApplication ev)
-          (eventContractName ev)
-      tableName = EventTableName org app cname (escapeQuotes $ eventName ev)
+          (E.eventOrganization ev)
+          (E.eventApplication ev)
+          (E.eventContractName ev)
+      tableName = EventTableName org app cname (escapeQuotes $ E.eventName ev)
 
       cols = csv $ ["id SERIAL NOT NULL", "address text"] ++
-                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev)
+                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ E.eventFields ev)
   in T.concat
       [ "CREATE TABLE IF NOT EXISTS "
       , tableNameToDoubleQuoteText tableName

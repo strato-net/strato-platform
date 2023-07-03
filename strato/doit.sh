@@ -111,15 +111,6 @@ function newnode {
 
 
 
-  if $mineBlocks
-  then echo "Starting strato-adit"
-      aMiner=$miningAlgorithm
-      if [ $blockstanbul = true ]; then
-        aMiner=Instant
-      fi
-      export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
-  fi
 
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
@@ -234,9 +225,8 @@ function newnode {
       gasFlag="--gasLimit=${gasLimit}"
   fi
   echo "Starting vm-runner"
-  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
+  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks  \
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
                          --debugPort=$debugPort --debugWSPort=$debugWSPort \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
