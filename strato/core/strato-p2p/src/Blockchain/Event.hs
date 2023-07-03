@@ -399,7 +399,7 @@ handleEvents peer = awaitForever $ \case
             False -> do
               lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
               yieldL $ ToUnseq $ IESnapshot <$> []
-              syncFetch Forward (1 + SS.fromBlockNumber snapshot)
+              syncFetch Forward (1 + SS.fromBlock snapshot)
         False ->
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Disregarding snapshot from " ++ peerString peer ++ " because it's sus."
 

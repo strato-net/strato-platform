@@ -345,10 +345,11 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
 -- snap sync
 obj2WireMessage 0x1f (RLPArray [partNum]) =
   GetSnapshot $ rlpDecode partNum
-obj2WireMessage 0x21 (RLPArray [thisNum, totalNum, bytes]) = 
+obj2WireMessage 0x21 (RLPArray [thisNum, totalNum, blockN, bytes]) = 
   SnapshotResponse $ SS.RedisSnapshot {
       partNumber = rlpDecode thisNum,
       totalParts = rlpDecode totalNum,
+      fromBlock  =  rlpDecode blockN,
       snapshotBytes = rlpDecode bytes
     }
 
@@ -416,10 +417,11 @@ wireMessage2Obj (GetTransactions trhashes) =
 wireMessage2Obj (GetSnapshot partNum) =
   (0x1f, RLPArray [rlpEncode partNum])
 
-wireMessage2Obj (SnapshotResponse (SS.RedisSnapshot currNum totalNum snapshotChunk)) =
+wireMessage2Obj (SnapshotResponse (SS.RedisSnapshot currNum totalNum blockNum snapshotChunk)) =
   (0x21, RLPArray [
     rlpEncode currNum,
     rlpEncode totalNum,
+    rlpEncode blockNum,
     rlpEncode snapshotChunk
   ])
 

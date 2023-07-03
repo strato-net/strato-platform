@@ -790,15 +790,17 @@ makeSnapShot s blockNumber = do
   let fullSnapshot = rlpSerialize . rlpEncode $ SS.Snapshot formattedHeaders s blockNumber addrStatesWithCode
   let totalParts = ceiling (fromIntegral ((B.length fullSnapshot) `div` 33000000) :: Double)
   
-  go 1 totalParts fullSnapshot
+  go 1 totalParts blockNumber fullSnapshot
+
+
 
   where
     formatAddressState (AddressState a b c d e) = SS.AddressState'' a b c [] B.empty d e
-    go currNum totalNum bs = do
+    go currNum totalNum blockNum bs = do
       let (chunk, rest) = B.splitAt 33000000 bs -- 33554432 is the maximum size we can send so we send 33000000 :)
-      let redisSnapshot = SS.RedisSnapshot currNum totalNum chunk
+      let redisSnapshot = SS.RedisSnapshot currNum totalNum blockNum chunk
       void . Redis.runStratoRedisIO $ Redis.insertSnapshot currNum redisSnapshot
       case currNum <= totalNum of
-        True -> go (currNum + 1) totalNum rest
+        True -> go (currNum + 1) totalNum blockNum rest
         False -> return ()
 

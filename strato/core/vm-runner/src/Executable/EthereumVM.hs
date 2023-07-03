@@ -763,7 +763,7 @@ getUnprocessedKafkaEvents offset = do
 doSnapSync :: VMBase m => m ()
 doSnapSync = do
   part1 <- Redis.runStratoRedisIO $ Redis.getSnapshot 1
-  let part1'@(SS.RedisSnapshot _ totalNum _) = fromJust part1 
+  let part1'@(SS.RedisSnapshot _ totalNum _ _) = fromJust part1 
   otherParts <- Redis.runStratoRedisIO $ Redis.getSnapshotRange [2..totalNum]
   let snapshotByteString = BS.concat $ map (\x -> SS.snapshotBytes x) ([part1'] ++ (catMaybes otherParts))
   let snapshot :: SS.Snapshot = rlpDecode $ rlpDeserialize $ snapshotByteString

@@ -37,6 +37,7 @@ import           Text.Tools
 data RedisSnapshot = RedisSnapshot {
     partNumber            :: Integer,
     totalParts            :: Integer,
+    fromBlock             :: Integer,
     snapshotBytes         :: B.ByteString
 } deriving (Eq, Show, Generic, NFData)
 
@@ -46,11 +47,12 @@ instance RLPSerializable RedisSnapshot where
     rlpEncode RedisSnapshot {
         partNumber = pn,
         totalParts = tp,
+        fromBlock  = fb,
         snapshotBytes = sb
-    } = RLPArray [rlpEncode pn, rlpEncode tp, rlpEncode sb]
+    } = RLPArray [rlpEncode pn, rlpEncode tp, rlpEncode fb, rlpEncode sb]
 
-    rlpDecode (RLPArray [a, b, c]) = 
-        RedisSnapshot (rlpDecode a) (rlpDecode b) (rlpDecode c)
+    rlpDecode (RLPArray [a, b, c, d]) = 
+        RedisSnapshot (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode d)
 
     rlpDecode (RLPArray arr) = error ("rlpDecode for RedisSnapshot called on object with wrong amount of data, length arr = " ++ show arr)
     rlpDecode x = error ("rlpDecode for RedisSnapshot... something went massively wrong: " ++ show x)
