@@ -13,6 +13,7 @@ OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
+debugWSHost=${debugWSHost:-strato}
 debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}

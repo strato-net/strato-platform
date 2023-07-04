@@ -14,8 +14,8 @@ marketplaceUiUrlPrefix: "/marketplace"
 
 nodes:
   - id: 0
-    label: mercata-testnet-node1
-    url: https://node1.mercata-testnet2.blockapps.net
+    label: localhost
+    url: http://localhost
     port: 30303
     oauth:
       appTokenCookieName: asset_framework_session
