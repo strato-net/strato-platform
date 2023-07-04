@@ -136,7 +136,7 @@ roundChange = do
   nextView <- uses view (over round (+1))
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
-  valB <- use isMirrorNode
+  valB <- use validatorBehavior
   when (valB) $ do
     msg <- signMessage rawMsg
     yieldR msg
@@ -163,7 +163,7 @@ nextRound nt = do
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
-        valB <- use isMirrorNode
+        valB <- use validatorBehavior
         when (valB) $ do
           msg <- signMessage (Preprepare v lb)
           yieldR msg
@@ -203,8 +203,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
    AuthSuccess -> case ev of
     ValidatorBehaviorChange vc -> do
       case vc of
-          ForcedValidator fv -> modify' $ isMirrorNode .~ fv
-      valB <- use isMirrorNode
+          ForcedValidator fv -> modify' $ validatorBehavior .~ fv
+      valB <- use validatorBehavior
       $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
     ValidatorChange val dir -> do
       modify' $ validators %~ (\(ChainMembers cm) ->
@@ -268,7 +268,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            valB <- use isMirrorNode
+            valB <- use validatorBehavior
             when (valB) $ do
               msg <- signMessage (Preprepare v realSealed)
               yieldR msg
@@ -305,7 +305,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   wasProposed <- isJust <$> use proposal
                   unless wasProposed . yieldL $ OMsg auth ppp
                   proposal .= Just pp
-                  valB <- use isMirrorNode
+                  valB <- use validatorBehavior
                   when (valB) $ do
                     msg <- signMessage (Prepare v (blockHash pp))
                     yieldR msg
@@ -321,7 +321,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         seal <- commitmentSeal di
-        valB <- use isMirrorNode
+        valB <- use validatorBehavior
         when (valB) $ do
           msg <- signMessage (Commit v di seal)
           yieldR msg
@@ -358,7 +358,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           when (3 * sameRNCount > total && Just rn > sentRN) $ do
             pendingRound .= Just rn
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            valB <- use isMirrorNode
+            valB <- use validatorBehavior
             when (valB) $ do
               msg <- signMessage rawMsg
               yieldR msg

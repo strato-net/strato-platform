@@ -77,7 +77,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- make it required
   , _lastParent :: Maybe Keccak256
   -- Validator characteristics
-  , _isMirrorNode :: Bool
+  , _validatorBehavior :: Bool
   , _isValidator :: Bool
 }
 makeLenses ''BlockstanbulContext
@@ -122,7 +122,7 @@ newContext (Checkpoint v as) chainm valB =
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _lastParent = Nothing
-     , _isMirrorNode = valB
+     , _validatorBehavior = valB
      , _isValidator = False
      }
 

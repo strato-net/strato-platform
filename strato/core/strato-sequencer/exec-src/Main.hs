@@ -56,7 +56,7 @@ main = do
   putStrLn $ "strato-sequencer network: " ++ show flags_network
   putStrLn $ "strato-sequencer validators: " ++ show validators
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
-  putStrLn $ "strato-sequencer isMirrorNode: " ++ show flags_validatorBehavior
+  putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
   putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
 
   pkg <- atomically newCablePackage
