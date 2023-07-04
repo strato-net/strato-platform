@@ -762,18 +762,20 @@ getUnprocessedKafkaEvents offset = do
 -- snap sync
 doSnapSync :: VMBase m => m ()
 doSnapSync = do
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack "Starting snapshot process" 
   part1 <- Redis.runStratoRedisIO $ Redis.getSnapshot 1
   let part1'@(SS.RedisSnapshot _ totalNum _ _) = fromJust part1 
   otherParts <- Redis.runStratoRedisIO $ Redis.getSnapshotRange [2..totalNum]
   let snapshotByteString = BS.concat $ map (\x -> SS.snapshotBytes x) ([part1'] ++ (catMaybes otherParts))
-  let snapshot :: SS.Snapshot = rlpDecode $ rlpDeserialize $ snapshotByteString
+  let SS.Snapshot{..} :: SS.Snapshot = rlpDecode $ rlpDeserialize $ snapshotByteString
   
-  $logInfoS "DEBUG" $ T.pack $ (show snapshot)
-  -- let bestBlockHash = blockHeaderHash $ last blockHeaders
-  -- _ <- traverse (putBlockHeaderInChainDB) blockHeaders
-  -- withCurrentBlockHash' bestBlockHash $ do
-  --   _ <- traverse insertAndCheckStateRoot addressStateLeaves
-  --   _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
+  let bestBlockHash = blockHeaderHash $ last $ blockHeaders 
+  _ <- traverse (putBlockHeaderInChainDB) blockHeaders 
+  withCurrentBlockHash' bestBlockHash $ do
+    _ <- traverse insertAndCheckStateRoot addressStateLeaves
+    _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
+    return ()
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack "snapshot insertion complete" 
   return ()
 
 insertAndCheckStateRoot :: VMBase m => (Account, SS.AddressState'') -> m ()

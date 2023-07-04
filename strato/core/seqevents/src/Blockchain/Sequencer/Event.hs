@@ -70,7 +70,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEForcedConfigChange PBFT.ForcedConfigChange
                  | IEValidatorBehavior PBFT.ForcedValidatorChange
                  | IEDeleteDepBlock Keccak256
-                 | IESnapshot Snapshot
+                 | IESnapshot RedisSnapshot
                  deriving (Eq, Show, GHCG.Generic)
 
 

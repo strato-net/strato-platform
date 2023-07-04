@@ -657,7 +657,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETSnapshot -> do
       record "inevent_type_snapshot" "Snapshot"
       let snapshots = [a | IESnapshot a <- events]
-      let snapshotBlockNum = SS.fromBlockNumber $ last snapshots
+      let snapshotBlockNum = SS.fromBlock $ last snapshots
       let snapCheckpoint = Just snapshotBlockNum
       Mod.put (Mod.Proxy @(Maybe Integer)) snapCheckpoint
       mBlockstanbulCntxt <- getBlockstanbulContext

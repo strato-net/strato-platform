@@ -42,6 +42,7 @@ data RedisSnapshot = RedisSnapshot {
 } deriving (Eq, Show, Generic, NFData)
 
 deriving instance Data RedisSnapshot
+deriving instance Binary RedisSnapshot
 
 instance RLPSerializable RedisSnapshot where
     rlpEncode RedisSnapshot {
@@ -56,6 +57,19 @@ instance RLPSerializable RedisSnapshot where
 
     rlpDecode (RLPArray arr) = error ("rlpDecode for RedisSnapshot called on object with wrong amount of data, length arr = " ++ show arr)
     rlpDecode x = error ("rlpDecode for RedisSnapshot... something went massively wrong: " ++ show x)
+
+instance Arbitrary RedisSnapshot where
+    arbitrary = do
+        pn  <- arbitrary     
+        tbp <- arbitrary  
+        fbn <- arbitrary 
+        oneof [ return $ RedisSnapshot {
+                    partNumber= pn,
+                    totalParts = tbp,
+                    fromBlock = fbn,
+                    snapshotBytes = B.empty
+                }]
+
 
 data Snapshot = Snapshot {
     blockHeaders          :: [BlockHeader],
