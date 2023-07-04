@@ -788,14 +788,16 @@ makeSnapShot s blockNumber = do
   let addrStatesWithCode = zipWith (\(_, code) (acct, addrState) -> (acct, addrState{SS.addressStateCode = code})) allCode addrStatesWithStorage
 
   let fullSnapshot = rlpSerialize . rlpEncode $ SS.Snapshot formattedHeaders s blockNumber addrStatesWithCode
-  let totalParts = ceiling (((fromIntegral $  B.length fullSnapshot) / 33000000) :: Double)
+  let totalParts = ceiling (((fromIntegral $  B.length fullSnapshot) / 1000000) :: Double)
   
   go 1 totalParts blockNumber fullSnapshot
 
   where
     formatAddressState (AddressState a b c d e) = SS.AddressState'' a b c [] B.empty d e
     go currNum totalNum blockNum bs = do
-      let (chunk, rest) = B.splitAt 33000000 bs -- 33554432 is the maximum size we can send so we send 33000000 :)
+      -- 33554432 is the maximum size we can send out in theory,
+      -- but sending out  30000000 also doesn't work. TODO optimize this value
+      let (chunk, rest) = B.splitAt 1000000 bs 
       let redisSnapshot = SS.RedisSnapshot currNum totalNum blockNum chunk
       void . Redis.runStratoRedisIO $ Redis.insertSnapshot currNum redisSnapshot
       case currNum <= totalNum of
