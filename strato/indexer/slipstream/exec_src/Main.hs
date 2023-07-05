@@ -15,15 +15,10 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
--- import qualified Data.Map as M
--- import           Data.Maybe
--- import qualified Data.Text as T
 import Data.String
 import Data.Set as S (empty)
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
--- import Data.Text.Encoding
--- import Database.PostgreSQL.Typed.Types
 import HFlags
 import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
@@ -40,7 +35,6 @@ import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 
 import Slipstream.MessageConsumer
--- import Slipstream.Data.Globals
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
 import Slipstream.Options

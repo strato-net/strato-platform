@@ -38,7 +38,7 @@ data CirrusHandle = CirrusHandle {cirrusConn :: PGConnection, queriedMaps ::S.Se
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
                        , coldStorageHandle :: Handle
-                       , cirrusHandle :: CirrusHandle -- TODO: make something like Handle so can pass specs
+                       , cirrusHandle :: CirrusHandle
                        } deriving (Generic, NFData)
 
 data TableName = 

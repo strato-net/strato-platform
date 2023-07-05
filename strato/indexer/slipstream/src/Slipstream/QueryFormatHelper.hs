@@ -44,6 +44,9 @@ escapeDoubleQuotes = T.replace "\"" "\\\""
 escapeQuotes :: T.Text -> T.Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
+escapeUnderscores :: T.Text -> T.Text
+escapeUnderscores = T.replace "_" "\\_"
+
 tableSeparator :: T.Text
 tableSeparator = "-"
 

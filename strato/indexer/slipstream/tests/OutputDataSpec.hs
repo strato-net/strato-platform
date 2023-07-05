@@ -60,8 +60,8 @@ createInserts globalsIORef contracts = do
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
 
-fakePGConnection :: CirrusHandle
-fakePGConnection = FakeCirrusHandle
+fakeCirrusHandle :: CirrusHandle
+fakeCirrusHandle = FakeCirrusHandle
 
 spec :: Spec
 spec = do
@@ -93,7 +93,7 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals fakeHandle fakePGConnection
+      g <- newGlobals fakeHandle fakeCirrusHandle
       [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
@@ -157,7 +157,7 @@ spec = do
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals fakeHandle fakePGConnection
+      g <- newGlobals fakeHandle fakeCirrusHandle
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g input .| sinkList
@@ -258,7 +258,7 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals fakeHandle fakePGConnection
+      g <- newGlobals fakeHandle fakeCirrusHandle
       [vehicleCreate, _, _, _, vehicleInsert, _] <-
           runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate `shouldBe`
@@ -344,7 +344,7 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals fakeHandle fakePGConnection
+    g <- newGlobals fakeHandle fakeCirrusHandle
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
@@ -472,7 +472,7 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals fakeHandle fakePGConnection
+    g <- newGlobals fakeHandle fakeCirrusHandle
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
@@ -523,7 +523,7 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals fakeHandle fakePGConnection
+    g <- newGlobals fakeHandle fakeCirrusHandle
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 

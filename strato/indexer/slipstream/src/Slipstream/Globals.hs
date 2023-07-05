@@ -65,14 +65,14 @@ isTableCreated globalsIORef tableName = do
   if tableName `M.member` createdTables
     then return True
     -- if table not in map, query cirrus to check if it's made
-    -- (getTableColumns does query and updates map when appropriate)
-    else isJust <$> getTableColumns globalsIORef tableName
+    else do
+      createdTables' <- scrapeFor globalsIORef tableName 
+      return $ tableName `M.member` createdTables'
 
 
 getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
 getMappingTables globalsIORef org app contract = do
-  scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables
-  Globals{..} <- readIORef globalsIORef
+  createdTables <- scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables
   let mappingTables = M.filterWithKey isMappingTableName createdTables
                         where
                           isMappingTableName :: TableName -> TableColumns -> Bool
@@ -89,16 +89,17 @@ getTableColumns globalsIORef tableName = do
   if isJust columns
     then return columns
     else do
-      scrapeFor globalsIORef tableName
-      return $ M.lookup tableName createdTables
+      createdTables' <- scrapeFor globalsIORef tableName
+      return $ M.lookup tableName createdTables'
 
-scrapeFor :: MonadIO m => IORef Globals -> TableName -> m ()
+-- scrape cirrus for a table and return the (potentially updated) createdTables map
+scrapeFor :: MonadIO m => IORef Globals -> TableName -> m (M.Map TableName TableColumns)
 scrapeFor globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
   case cirrusHandle of
-    FakeCirrusHandle -> return ()
+    FakeCirrusHandle -> return createdTables
     CirrusHandle{..} -> case tableName of
-      MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return ()
+      MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return createdTables
       MappingTableName org app contract map' -> do
         let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract map'
         results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
@@ -109,22 +110,24 @@ scrapeFor globalsIORef tableName = do
               setTableCreated globalsIORef (MappingTableName org app contract mapName) cols
             _ -> return ()
           ) 
-        g <- readIORef globalsIORef -- need to read again so have current ver of createdTables
+        g@(Globals createdTables' _ _ _) <- readIORef globalsIORef -- need to read again so have current ver of createdTables
         updateGlobals globalsIORef g{cirrusHandle = cirrusHandle{queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
+        return createdTables'
       _ -> do
         cols <- scrapeForCols (tableNameToSingleQuoteText tableName) cirrusConn
         if null cols
-          then return ()
-          else setTableCreated globalsIORef tableName cols
+          then return createdTables
+          else do
+            setTableCreated globalsIORef tableName cols
+            Globals createdTables' _ _ _ <- readIORef globalsIORef
+            return createdTables'
 
   where scrapeForCols :: MonadIO m => T.Text -> PGConnection -> m TableColumns
         scrapeForCols tn cirrusConn = do
-          let theColsQuery = queryForCols tn
-          liftIO $ print theColsQuery -- just for logging; be sure to remove later
-          results :: [PGValues] <- liftIO $ pgQuery cirrusConn theColsQuery
+          results :: [PGValues] <- liftIO $ pgQuery cirrusConn $ queryForCols tn
           return $ mapMaybe (\case [PGTextValue bs] -> Just $ decodeUtf8 bs; _ -> Nothing) results
-        queryForCols t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name like " <> t <> ";"
-        queryForMatchingTables t = let t' = wrapSingleQuotes . wrap1 "%" . escapeQuotes $ tableNameToTextPostgres t
+        queryForCols t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name=" <> t <> ";"
+        queryForMatchingTables t = let t' = wrapSingleQuotes . wrap1 "%" . escapeUnderscores . escapeQuotes $ tableNameToTextPostgres t
                                    in encodeUtf8 $ "SELECT table_name from information_schema.tables WHERE table_name like " <> t' <> ";"
 
 
