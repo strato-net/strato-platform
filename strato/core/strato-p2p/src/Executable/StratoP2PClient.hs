@@ -160,7 +160,7 @@ stratoP2PClient runner = runner $ \_ -> do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
+            Just _  -> do
               result <- try $ liftIO $ Async.withAsync (runLoggingT . runner $ \sSource -> runPeerInList p sSource) $ \res -> Async.waitCatch res
               handleRunPeerResult p result
               liftIO (SSem.signal sem)
