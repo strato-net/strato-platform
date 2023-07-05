@@ -125,13 +125,15 @@ it("it should create product, inventory and buy using pay now option - success",
       cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
 
       // fill stripe details
-      cy.get('#email').type(Cypress.env('dualRoleEmail'));
+      cy.get('#email').type(`demo_${dayjs().unix()}@gmail.com`);
       cy.get('#cardNumber').type('4242 4242 4242 4242');
       cy.get("#cardExpiry").type(
         "12" + (new Date().getFullYear() + 10).toString().substr(-2)
       );
       cy.get('#cardCvc').type('855');
       cy.get('#billingName').type('Nitin Gupta');
+      cy.get('#billingPostalCode').type("12345");
+      cy.get('#enableStripePass').uncheck();
       cy.wait(1000);
 
       cy.get(".SubmitButton").click();
@@ -271,13 +273,15 @@ it("it should create product, inventory and buy using pay now option - insuffici
       cy.url().should("contains", "https://checkout.stripe.com/c/pay/");
 
       // fill stripe details
-      cy.get('#email').type(Cypress.env('dualRoleEmail'));
+      cy.get('#email').type(`demo_${dayjs().unix()}@gmail.com`);
       cy.get('#cardNumber').type('4000 0000 0000 9995');
       cy.get("#cardExpiry").type(
         "12" + (new Date().getFullYear() + 10).toString().substr(-2)
       );
       cy.get('#cardCvc').type('855');
       cy.get('#billingName').type('Nitin Gupta');
+      cy.get('#billingPostalCode').type("12345");
+      cy.get('#enableStripePass').uncheck();
       cy.wait(1000);
 
       cy.get(".SubmitButton").click();
