@@ -34,6 +34,7 @@ instance NFData CirrusHandle where
 
 data CirrusHandle = CirrusHandle {cirrusConn :: PGConnection, queriedMaps ::S.Set (T.Text, T.Text, T.Text)}
                   | FakeCirrusHandle
+
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
                        , coldStorageHandle :: Handle

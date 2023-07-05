@@ -72,6 +72,7 @@ import qualified Slipstream.Events as E
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
+import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts)
@@ -104,45 +105,6 @@ crashOnSQLError :: Bool
 crashOnSQLError = False
 
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
-
-tshow :: Show a => a -> Text
-tshow = T.pack . show
-
-csv :: [Text] -> Text
-csv = T.intercalate ",\n    "
-
-wrap :: Text -> Text -> Text -> Text
-wrap b e x = T.concat [b, x, e]
-
-wrap1 :: Text -> Text -> Text
-wrap1 t = wrap t t
-
-wrapSingleQuotes :: Text -> Text
-wrapSingleQuotes = wrap1 "\'"
-
-wrapDoubleQuotes :: Text -> Text
-wrapDoubleQuotes = wrap1 "\""
-
-wrapParens :: Text -> Text
-wrapParens = wrap "(" ")"
-
-wrapAndEscape :: [Text] -> Text
-wrapAndEscape = wrapParens . csv
-
-wrapAndEscapeDouble :: [Text] -> Text
-wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
-
-unwrapDoubleQuotes :: Text -> Text
-unwrapDoubleQuotes = T.dropAround (== '"')
-
-escapeSingleQuotes :: Text -> Text
-escapeSingleQuotes = T.replace "\'" "\'\'"
-
-escapeDoubleQuotes :: Text -> Text
-escapeDoubleQuotes = T.replace "\"" "\\\""
-
-escapeQuotes :: Text -> Text
-escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 fillEmptyEntries :: Functor f => [f Text] -> [f Text]
 fillEmptyEntries = zipWith go [(1 :: Int)..]
@@ -300,10 +262,6 @@ indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o 
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
-
--- sometimes we need the unwrapped tablename
-tableNameToDoubleQuoteText :: TableName -> Text
-tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 
 
 createExpandIndexTable

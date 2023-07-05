@@ -11,11 +11,9 @@ module Slipstream.Globals
   (
     setTableCreated,
     getTableColumns,
-    tableNameToText,
     getMappingTables,
     isTableCreated,
     setContractState,
-    xabiToText,
     flushPendingWrites,
     getContractState,
     forceGlobalEval,
@@ -28,8 +26,6 @@ import           Control.DeepSeq
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Lazy         as BL
 import qualified Data.Cache.LRU               as LRU
 import           Data.Either.Extra
 import qualified Data.Map.Strict              as M
@@ -43,12 +39,12 @@ import           Database.PostgreSQL.Typed.Types
 import           UnliftIO.IORef
 
 import           BlockApps.Solidity.Value
-import           BlockApps.Solidity.Xabi     (Xabi(..))
 import           Blockchain.Strato.Model.Account
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
+import           Slipstream.QueryFormatHelper
 
 newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
 newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) h ch
@@ -57,71 +53,6 @@ updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
-
-tableSeparator :: T.Text
-tableSeparator = "-"
-
-tableNameToText :: TableName -> T.Text
-tableNameToText (IndexTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
-tableNameToText (MappingTableName o a c m ) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndMapping = c <> "." <> m
-  in "mapping@" <> prefix <> contractAndMapping
-tableNameToText (HistoryTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in "history@" <> prefix <> c
-tableNameToText (EventTableName o a c e) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = c <> "." <> e
-  in prefix <> contractAndEvent
-
-tableNameToTextPostgres :: TableName -> T.Text
-tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
-
--- TODO: move this import somewhere better
-tableNameToSingleQuoteText :: TableName -> T.Text
-tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
-
-escapeQuotes :: T.Text -> T.Text
-escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
-
-escapeSingleQuotes :: T.Text -> T.Text
-escapeSingleQuotes = T.replace "\'" "\'\'"
-
-escapeDoubleQuotes :: T.Text -> T.Text
-escapeDoubleQuotes = T.replace "\"" "\\\""
-
-wrapSingleQuotes :: T.Text -> T.Text
-wrapSingleQuotes = wrap1 "\'"
-
-wrap :: T.Text -> T.Text -> T.Text -> T.Text
-wrap b e x = T.concat [b, x, e]
-
-wrap1 :: T.Text -> T.Text -> T.Text
-wrap1 t = wrap t t
-
-xabiToText :: Xabi -> T.Text
-xabiToText = T.replace "\'" "\'\'"
-           . decodeUtf8 . BL.toStrict
-           . JSON.encode
 
 setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
 setTableCreated globalsIORef tableName tableColumns = do
@@ -138,7 +69,6 @@ isTableCreated globalsIORef tableName = do
     else isJust <$> getTableColumns globalsIORef tableName
 
 
--- todo: update this so will scrape for all mapping tables as needed or find better solution
 getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
 getMappingTables globalsIORef org app contract = do
   scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables

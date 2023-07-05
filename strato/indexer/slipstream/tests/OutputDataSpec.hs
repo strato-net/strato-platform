@@ -592,43 +592,6 @@ spec = do
     "strukt" = excluded."strukt";|]
 
 
--- TODO: replace this test or put elsewhere
-  describe "Cirrus scrape tests" $ do
-    xit "uses values in non-empty cache to remember tables from before a restart" $ do
-      let testAdd = Address 0x98eaddede
-          input = [(SE.ProcessedContract {
-            SE.address = testAdd,
-            SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
-            SE.organization = "",
-            SE.application = "",
-            SE.contractName = "SwissArmy",
-            SE.chain = "<CHAIN>",
-            SE.blockHash = hash "<BLOCKHASH>",
-            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            SE.blockNumber = 124,
-            SE.transactionHash = hash "<TRANSACTIONHASH>",
-            SE.transactionSender = testAdd,
-            SE.contractData = M.fromList [("str", bytes "Hello, World!")]
-            }, createDummyContract [("str", SVMType.String Nothing)])]
-          -- cache = M.singleton (IndexTableName "" "" "SwissArmy") ["str"]
-
-      g <- newGlobals fakeHandle fakePGConnection
-
-      queries <- runLoggingT . runConduit $ createInserts g input .| sinkList
-
-      -- should not attempt to create new table
-      elem [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
-      address text,
-      "chainId" text,
-      block_hash text,
-      block_timestamp text,
-      block_number text,
-      transaction_hash text,
-      transaction_sender text,
-      "str" text,
-      PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
-
-
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
