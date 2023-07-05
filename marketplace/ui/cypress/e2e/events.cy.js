@@ -47,7 +47,7 @@ describe("Renders Events Page", () => {
       url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
     }).as('productNameCall');
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
     cy.createInventory(productName);
 

@@ -52,7 +52,7 @@ describe("Renders Products Page", () => {
   });
 
   it("it should delete a product", () => {
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
 
     cy.request({
@@ -80,7 +80,7 @@ describe("Renders Products Page", () => {
   });
   
   it("it should edit a product", () => {
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
 
     cy.request({

@@ -307,7 +307,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#Login").click();
     cy.login()
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();

@@ -19,7 +19,7 @@ it("it should create product, inventory and buy using pay now option - success",
   cy.get("#Login").click();
   cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-  const productName = `Corn Seeds ${dayjs().unix()}`;
+  const productName = `Corn-Seeds-${dayjs().unix()}`;
 
   cy.get("#Products").should("exist");
   cy.get("#Products").click();
@@ -166,7 +166,7 @@ it("it should create product, inventory and buy using pay now option - insuffici
   cy.get("#Login").click();
   cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
-  const productName = `Corn Seeds ${dayjs().unix()}`;
+  const productName = `Corn-Seeds-${dayjs().unix()}`;
 
   cy.get("#Products").should("exist");
   cy.get("#Products").click();

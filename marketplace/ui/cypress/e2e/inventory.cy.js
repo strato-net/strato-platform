@@ -31,7 +31,7 @@ describe("Renders Inventory Page", () => {
       url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
     }).as('productNameCall');
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
 
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
@@ -102,7 +102,7 @@ describe("Renders Inventory Page", () => {
       url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
     }).as('productNameCall');
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
 
     cy.get("#Inventory").should("exist");
@@ -327,7 +327,7 @@ describe("Renders Inventory Page", () => {
       url: '/api/v1/product?isDeleted=false&category=Art&subCategory=Art',
     }).as('productNameCall');
 
-    const productName = `Corn Seeds ${dayjs().unix()}`;
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
     cy.createInventory(productName);
 
