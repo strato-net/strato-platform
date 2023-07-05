@@ -289,8 +289,8 @@ constructMappingTableNameParameters org app contract mapping=
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
-uncurry3' :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry3' f (v, x, y, z) = f v x y z
+uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+uncurry4 f (v, x, y, z) = f v x y z
 
 historyTableName :: Text -> Text -> Text -> TableName
 historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
@@ -299,7 +299,7 @@ indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m = uncurry3' MappingTableName $ constructMappingTableNameParameters o a n m
+mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
 
 -- sometimes we need the unwrapped tablename
 tableNameToDoubleQuoteText :: TableName -> Text

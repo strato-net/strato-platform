@@ -19,6 +19,7 @@ import qualified Data.ByteString.Char8 as BC
 -- import           Data.Maybe
 -- import qualified Data.Text as T
 import Data.String
+import Data.Set as S (empty)
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 -- import Data.Text.Encoding
@@ -97,7 +98,7 @@ main = do
     -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
 
     handle <- runSqlConn initStorage workerConn
-    gref <- newGlobals handle conn
+    gref <- newGlobals handle (CirrusHandle conn S.empty)
     
     sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
 

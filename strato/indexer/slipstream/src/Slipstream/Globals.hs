@@ -34,7 +34,7 @@ import qualified Data.Cache.LRU               as LRU
 import           Data.Either.Extra
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (mapMaybe, isJust)
-import           Data.Text                    (Text)
+import           Data.Set                     as S (member, insert)
 import qualified Data.Text                    as T
 import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed    (pgQuery, PGConnection)
@@ -50,18 +50,18 @@ import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
-newGlobals :: MonadIO m => Handle -> PGConnection -> m (IORef Globals)
-newGlobals h pgc = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) h pgc
+newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
+newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) h ch
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
-tableSeparator :: Text
+tableSeparator :: T.Text
 tableSeparator = "-"
 
-tableNameToText :: TableName -> Text
+tableNameToText :: TableName -> T.Text
 tableNameToText (IndexTableName o a c) =
   let prefix = if T.null o
                  then ""
@@ -93,32 +93,32 @@ tableNameToText (EventTableName o a c e) =
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
 
-tableNameToTextPostgres :: TableName -> Text
+tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 
 -- TODO: move this import somewhere better
-tableNameToDoubleQuoteText :: TableName -> Text
-tableNameToDoubleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
+tableNameToSingleQuoteText :: TableName -> T.Text
+tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
 
-escapeQuotes :: Text -> Text
+escapeQuotes :: T.Text -> T.Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
-escapeSingleQuotes :: Text -> Text
+escapeSingleQuotes :: T.Text -> T.Text
 escapeSingleQuotes = T.replace "\'" "\'\'"
 
-escapeDoubleQuotes :: Text -> Text
+escapeDoubleQuotes :: T.Text -> T.Text
 escapeDoubleQuotes = T.replace "\"" "\\\""
 
-wrapSingleQuotes :: Text -> Text
+wrapSingleQuotes :: T.Text -> T.Text
 wrapSingleQuotes = wrap1 "\'"
 
-wrap :: Text -> Text -> Text -> Text
+wrap :: T.Text -> T.Text -> T.Text -> T.Text
 wrap b e x = T.concat [b, x, e]
 
-wrap1 :: Text -> Text -> Text
+wrap1 :: T.Text -> T.Text -> T.Text
 wrap1 t = wrap t t
 
-xabiToText :: Xabi -> Text
+xabiToText :: Xabi -> T.Text
 xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
@@ -139,10 +139,11 @@ isTableCreated globalsIORef tableName = do
 
 
 -- todo: update this so will scrape for all mapping tables as needed or find better solution
-getMappingTables :: MonadIO m => IORef Globals -> Text -> Text -> Text -> m ([Text])
+getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
 getMappingTables globalsIORef org app contract = do
+  scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables
   Globals{..} <- readIORef globalsIORef
-  let mappingTables = M.filterWithKey isMappingTableName (createdTables)
+  let mappingTables = M.filterWithKey isMappingTableName createdTables
                         where
                           isMappingTableName :: TableName -> TableColumns -> Bool
                           isMappingTableName (MappingTableName o a n _) _ =
@@ -157,19 +158,48 @@ getTableColumns globalsIORef tableName = do
   let columns = M.lookup tableName createdTables
   if isJust columns
     then return columns
-    else do -- not in map, so check in cirrus
-      let queryFor t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name like " <> t <> ";"
-      let theQuery = queryFor $ tableNameToDoubleQuoteText tableName
-      liftIO $ print theQuery -- just for logging; be sure to remove later
-      results :: [PGValues] <- liftIO $ pgQuery cirrusConn theQuery
-      if null results
-        then return Nothing
-        else do
-          let tableColumns = mapMaybe (\case [PGTextValue bs] -> Just $ decodeUtf8 bs; _ -> Nothing) results
-          setTableCreated globalsIORef tableName tableColumns
-          return $ Just tableColumns
+    else do
+      scrapeFor globalsIORef tableName
+      return $ M.lookup tableName createdTables
 
-getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
+scrapeFor :: MonadIO m => IORef Globals -> TableName -> m ()
+scrapeFor globalsIORef tableName = do
+  Globals{..} <- readIORef globalsIORef
+  case cirrusHandle of
+    FakeCirrusHandle -> return ()
+    CirrusHandle{..} -> case tableName of
+      MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return ()
+      MappingTableName org app contract map' -> do
+        let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract map'
+        results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
+        forM_ results (\case
+            [PGTextValue tn] -> do
+              cols <- scrapeForCols (wrapSingleQuotes $ decodeUtf8 tn) cirrusConn
+              let mapName = last $ T.splitOn "." (decodeUtf8 tn)
+              setTableCreated globalsIORef (MappingTableName org app contract mapName) cols
+            _ -> return ()
+          ) 
+        g <- readIORef globalsIORef -- need to read again so have current ver of createdTables
+        updateGlobals globalsIORef g{cirrusHandle = cirrusHandle{queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
+      _ -> do
+        cols <- scrapeForCols (tableNameToSingleQuoteText tableName) cirrusConn
+        if null cols
+          then return ()
+          else setTableCreated globalsIORef tableName cols
+
+  where scrapeForCols :: MonadIO m => T.Text -> PGConnection -> m TableColumns
+        scrapeForCols tn cirrusConn = do
+          let theColsQuery = queryForCols tn
+          liftIO $ print theColsQuery -- just for logging; be sure to remove later
+          results :: [PGValues] <- liftIO $ pgQuery cirrusConn theColsQuery
+          return $ mapMaybe (\case [PGTextValue bs] -> Just $ decodeUtf8 bs; _ -> Nothing) results
+        queryForCols t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name like " <> t <> ";"
+        queryForMatchingTables t = let t' = wrapSingleQuotes . wrap1 "%" . escapeQuotes $ tableNameToTextPostgres t
+                                   in encodeUtf8 $ "SELECT table_name from information_schema.tables WHERE table_name like " <> t' <> ";"
+
+
+
+getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(T.Text,Value)])
 getContractState globalsIORef account = do
   g@Globals{..} <- readIORef globalsIORef
   case LRU.lookup account contractStates of
@@ -185,7 +215,7 @@ getContractState globalsIORef account = do
         in writeIORef globalsIORef g{contractStates = newCache' }
       return mvs
 
-setContractState :: MonadIO m => IORef Globals -> Account -> [(Text,Value)] -> m ()
+setContractState :: MonadIO m => IORef Globals -> Account -> [(T.Text,Value)] -> m ()
 setContractState gref account values = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
