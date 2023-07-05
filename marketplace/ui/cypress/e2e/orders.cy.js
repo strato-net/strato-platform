@@ -440,7 +440,5 @@ describe("Renders Orders Page", () => {
             }
           })
       })
-
-
   });
 });
