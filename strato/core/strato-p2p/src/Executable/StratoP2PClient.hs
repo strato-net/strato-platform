@@ -146,7 +146,7 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        multiThreadedClient peers activePeersSem sSource
+        _ <- withAsync (multiThreadedClient peers activePeersSem sSource) (\a -> waitCatch a)
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
     where
