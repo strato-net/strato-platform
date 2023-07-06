@@ -264,7 +264,7 @@ handleBreakpoint eval pos = do
             then void . atomically $ writeTVar current Running
             else unless (cLen >= n) $ void (atomically $ writeTVar current Running) >> loop d -- Set to running to trigger doPause on next loop
         _ -> do
-          eCmd <- race (doPause >> evalLoop) (atomically $ readTChan operation)
+          eCmd <- doPause >> race evalLoop (atomically $ readTChan operation)
           case eCmd of
             Right Run -> void . atomically $ writeTVar current Running
             Right StepIn -> step 2
