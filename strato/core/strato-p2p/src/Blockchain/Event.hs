@@ -74,7 +74,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, getSnapshot, insertSnapshot)
+import           Blockchain.Strato.RedisBlockDB        (runStratoRedisIO, getSnapshot, insertSnapshot, putHeaders)
 import           Blockchain.Verification
 import qualified Blockchain.VMOptions                  as VM
 
@@ -387,7 +387,7 @@ handleEvents peer = awaitForever $ \case
             Just snapshot@SS.RedisSnapshot{..} -> do
                 let section_size = ceiling (((fromIntegral fromBlock ) / (fromIntegral totalParts)) :: Double)
                 let sectionToTake = (partNumber-1) * section_size ::Integer 
-                headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ [sectionToTake  .. sectionToTake + section_size ]
+                headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ [(if sectionToTake > 500 then 500 else sectionToTake)  .. (if sectionToTake + section_size > 500 then 500 else sectionToTake + section_size) ]
                 $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "We got headers of count " ++ (show $ [sectionToTake  .. sectionToTake + section_size ]) 
                 yieldR $ SnapshotResponse ((fmap (blockDataToBlockHeader . unCanonical . snd) headers), snapshot)
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
@@ -397,11 +397,13 @@ handleEvents peer = awaitForever $ \case
       case S.member (pPeerIp peer) trustedSnapshotNodes of
         True -> do
           let  headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') = BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
-          lift $ putBlockHeaders $ fmap headerToBlockData $ headers
+          let formattedHeaders = fmap headerToBlockData $ headers
+          lift $ putBlockHeaders formattedHeaders
           let partNum = SS.partNumber snapshot
           let totalNum = SS.totalParts snapshot
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot part " ++ (show partNum) ++ " from " ++ peerString peer ++ "\n" ++ show snapshot
           _ <- runStratoRedisIO $ insertSnapshot partNum snapshot
+          _ <- runStratoRedisIO $ putHeaders formattedHeaders
           case partNum < totalNum of
             True -> yieldR $ GetSnapshot $ partNum + 1
             False -> do

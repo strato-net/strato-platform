@@ -768,9 +768,17 @@ doSnapSync = do
   otherParts <- Redis.runStratoRedisIO $ Redis.getSnapshotRange [2..totalNum]
   let snapshotByteString = BS.concat $ map (\x -> SS.snapshotBytes x) ([part1'] ++ (catMaybes otherParts))
   let SS.Snapshot{..} :: SS.Snapshot = rlpDecode $ rlpDeserialize $ snapshotByteString
-  $logInfoS "EthereumVM/doSnapSync" $ T.pack "Starting snapshot process" 
-  let bestBlockHash = blockHeaderHash $ last $ blockHeaders 
-  _ <- traverse (putBlockHeaderInChainDB) blockHeaders 
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack "successful reconstruction of snapshot" 
+  
+  mListHeaders <- mapM (Redis.runStratoRedisIO . Redis.getHeadersByNumber) [1..fromBlockNumber]
+  let blockHeaders'  = catMaybes $ map (snd) $ concat mListHeaders
+  -- let allCaonicalHeaders = mAllCanonicalHeaders
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack $ "DEBUG list of length of redis headers " ++ (show $ length blockHeaders' )
+  
+  let bestBlockHash = blockHeaderHash $ last $ blockHeaders'
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack $ "DEBUG last header is" ++ (show  $ last blockHeaders' )
+
+  _ <- traverse (putBlockHeaderInChainDB) blockHeaders'
   withCurrentBlockHash' bestBlockHash $ do
     _ <- traverse insertAndCheckStateRoot addressStateLeaves
     _ <- liftIO $ Redis.runStratoRedisIO $ Redis.forceBestBlockInfo (Keccak256.unsafeCreateKeccak256FromByteString $ MP.unboxStateRoot fromStateroot) fromBlockNumber 0
