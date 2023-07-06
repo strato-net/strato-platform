@@ -43,7 +43,6 @@ import           BlockApps.Logging
 import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Event
 import           Blockchain.Stream.Action (Action)
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
@@ -54,7 +53,6 @@ import           Text.Tools
 
 data VMEvent =
   NewAction Action |
-  EventEmitted Event |
   CodeCollectionAdded {
     ccString :: Text,
     codePtr :: CodePtr,
@@ -77,7 +75,6 @@ vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
   format (CodeCollectionAdded c cp o a hl rm) =
     "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
     ++ (if (not $ null hl) then " " ++ show hl else "")
