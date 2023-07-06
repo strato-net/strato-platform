@@ -864,7 +864,7 @@ createEventTable globalsIORef (o, a, n) evName ev = do
 
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ fst <$> ev ^. eventLogs
+    setTableCreated globalsIORef eventTable $ fst <$> fillFirstEmptyEntries (ev ^. eventLogs)
     yield $ createEventTableQuery eventTable ev
 
 createEventTableQuery :: TableName -> Event -> Text
