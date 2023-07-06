@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 
@@ -195,7 +196,7 @@ data Message =
   NewBlock Block Integer |
 
   GetSnapshot Integer |
-  SnapshotResponse SS.RedisSnapshot |
+  SnapshotResponse SS.SnapshotPayload|
 
   Blockstanbul PBFT.WireMessage |
 
@@ -260,7 +261,7 @@ instance Format Message where
   format (GetSnapshot num) =
     CL.blue "GetSnapshot\n" ++ "Snapshot GET request part" ++ (show num)
 
-  format (SnapshotResponse snapshot) =
+  format (SnapshotResponse (_, snapshot)) =
     CL.blue "SnapshotResponse\n" ++ "Snapshot\n " ++ (show $ SS.partNumber snapshot)
 
   format (Blockstanbul msg) = CL.blue "Blockstanbul\n" ++ "  msg: " ++ PBFT.shortFormat msg
@@ -345,13 +346,13 @@ obj2WireMessage 0x1e (RLPArray trHashes) =
 -- snap sync
 obj2WireMessage 0x1f (RLPArray [partNum]) =
   GetSnapshot $ rlpDecode partNum
-obj2WireMessage 0x21 (RLPArray [thisNum, totalNum, blockN, bytes]) = 
-  SnapshotResponse $ SS.RedisSnapshot {
+obj2WireMessage 0x21 (RLPArray [RLPArray headers, thisNum, totalNum, blockN, bytes]) = 
+   SnapshotResponse $  ((  (rlpDecode <$> headers),SS.RedisSnapshot {
       partNumber = rlpDecode thisNum,
       totalParts = rlpDecode totalNum,
       fromBlock  =  rlpDecode blockN,
       snapshotBytes = rlpDecode bytes
-    }
+    }) :: SS.SnapshotPayload)
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
@@ -417,8 +418,9 @@ wireMessage2Obj (GetTransactions trhashes) =
 wireMessage2Obj (GetSnapshot partNum) =
   (0x1f, RLPArray [rlpEncode partNum])
 
-wireMessage2Obj (SnapshotResponse (SS.RedisSnapshot currNum totalNum blockNum snapshotChunk)) =
+wireMessage2Obj (SnapshotResponse ((headers, SS.RedisSnapshot currNum totalNum blockNum snapshotChunk) :: SS.SnapshotPayload)) =
   (0x21, RLPArray [
+    RLPArray $ map rlpEncode headers,
     rlpEncode currNum,
     rlpEncode totalNum,
     rlpEncode blockNum,

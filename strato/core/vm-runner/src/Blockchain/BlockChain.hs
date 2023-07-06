@@ -56,8 +56,8 @@ import           UnliftIO.IORef
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.Block
-import           Blockchain.Data.BlockHeader
+-- import           Blockchain.Data.Block
+-- import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
@@ -775,9 +775,10 @@ makeSnapShot s blockNumber = do
   let (onlyAccounts, onlyStates) = unzip formattedAddressStates
 
   -- Get and format headers
-  headers <- fmap M.toList . A.selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger $ blockNumber) [(1 :: Integer)..]
-  let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
-
+  -- headers <- fmap M.toList . A.selectMany (Proxy @(Canonical BlockData)) $ take (fromInteger blockNumber ) [(1 :: Integer)..]
+  -- let formattedHeaders = fmap (blockDataToBlockHeader . unCanonical . snd) headers
+  let formattedHeaders = [] --TODO remove this
+  
   -- Get all contract storage
   storageKeyVals <- mapM (getAllRawStorageKeyValsDB) onlyAccounts
   let formattedStorage = map (\kv -> map (\(k, v) -> (nibbleString2ByteString k, v)) kv) storageKeyVals
@@ -792,6 +793,7 @@ makeSnapShot s blockNumber = do
   
   go 1 totalParts blockNumber fullSnapshot
 
+  $logInfoS "makeSnapShot" . T.pack $ "Successfully made snapshot "
   where
     formatAddressState (AddressState a b c d e) = SS.AddressState'' a b c [] B.empty d e
     go currNum totalNum blockNum bs = do

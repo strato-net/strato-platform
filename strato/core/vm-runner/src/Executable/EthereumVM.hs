@@ -768,7 +768,7 @@ doSnapSync = do
   otherParts <- Redis.runStratoRedisIO $ Redis.getSnapshotRange [2..totalNum]
   let snapshotByteString = BS.concat $ map (\x -> SS.snapshotBytes x) ([part1'] ++ (catMaybes otherParts))
   let SS.Snapshot{..} :: SS.Snapshot = rlpDecode $ rlpDeserialize $ snapshotByteString
-  
+  $logInfoS "EthereumVM/doSnapSync" $ T.pack "Starting snapshot process" 
   let bestBlockHash = blockHeaderHash $ last $ blockHeaders 
   _ <- traverse (putBlockHeaderInChainDB) blockHeaders 
   withCurrentBlockHash' bestBlockHash $ do

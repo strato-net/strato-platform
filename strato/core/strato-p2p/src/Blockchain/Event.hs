@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 module Blockchain.Event (
   module Blockchain.EventModel,
@@ -383,13 +384,20 @@ handleEvents peer = awaitForever $ \case
           redisSnapshot <- runStratoRedisIO $ getSnapshot partNum
           case redisSnapshot of
             Nothing -> $logErrorS "handleEvents/GetSnapshot" $ T.pack $ "Retreiving snapshot part " ++ (show partNum) ++ " from Redis failed."
-            Just snapshot -> yieldR $ SnapshotResponse snapshot
+            Just snapshot@SS.RedisSnapshot{..} -> do
+                let section_size = ceiling (((fromIntegral fromBlock ) / (fromIntegral totalParts)) :: Double)
+                let sectionToTake = (partNumber-1) * section_size ::Integer 
+                headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ [sectionToTake  .. sectionToTake + section_size ]
+                $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "We got headers of count " ++ (show $ [sectionToTake  .. sectionToTake + section_size ]) 
+                yieldR $ SnapshotResponse ((fmap (blockDataToBlockHeader . unCanonical . snd) headers), snapshot)
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
 
-    MsgEvt (SnapshotResponse snapshot) -> do
+    MsgEvt (SnapshotResponse (headers,  snapshot)) -> do
       trustedSnapshotNodes <- lift $ unSnapshotNodes <$> Mod.access (Proxy @SnapshotNodes)
       case S.member (pPeerIp peer) trustedSnapshotNodes of
         True -> do
+          let  headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') = BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+          lift $ putBlockHeaders $ fmap headerToBlockData $ headers
           let partNum = SS.partNumber snapshot
           let totalNum = SS.totalParts snapshot
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot part " ++ (show partNum) ++ " from " ++ peerString peer ++ "\n" ++ show snapshot

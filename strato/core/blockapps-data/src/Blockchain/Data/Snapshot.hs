@@ -11,7 +11,12 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
-module           Blockchain.Data.Snapshot ( Snapshot(..), AddressState''(..), emptySnapshot, RedisSnapshot(..) ) where
+module           Blockchain.Data.Snapshot ( 
+    Snapshot(..), 
+    AddressState''(..), 
+    emptySnapshot, 
+    RedisSnapshot(..),
+    SnapshotPayload ) where
 
 import           Control.DeepSeq
 import           Data.Binary
@@ -33,6 +38,8 @@ import qualified Text.Colors                            as CL
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Text.Tools
+
+type SnapshotPayload = ([BlockHeader], RedisSnapshot)
 
 data RedisSnapshot = RedisSnapshot {
     partNumber            :: Integer,
