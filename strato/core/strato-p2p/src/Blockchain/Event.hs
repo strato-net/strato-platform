@@ -387,7 +387,8 @@ handleEvents peer = awaitForever $ \case
             Just snapshot@SS.RedisSnapshot{..} -> do
                 let section_size = ceiling (((fromIntegral fromBlock ) / (fromIntegral totalParts)) :: Double)
                 let sectionToTake = (partNumber-1) * section_size ::Integer 
-                headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ [(if sectionToTake > 500 then 500 else sectionToTake)  .. (if sectionToTake + section_size > 500 then 500 else sectionToTake + section_size) ]
+                let headersToUse  = if totalParts == partNumber then [1..totalParts] else [(if sectionToTake > 500 then 500 else sectionToTake)  .. (if sectionToTake + section_size > 500 then 500 else sectionToTake + section_size) ]
+                headers <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ headersToUse
                 $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "We got headers of count " ++ (show $ [sectionToTake  .. sectionToTake + section_size ]) 
                 yieldR $ SnapshotResponse ((fmap (blockDataToBlockHeader . unCanonical . snd) headers), snapshot)
         False -> $logInfoS "handleEvents/GetSnapshot" $ T.pack $ "Ignoring snapshot request because we don't make snapshots"
@@ -403,13 +404,14 @@ handleEvents peer = awaitForever $ \case
           let totalNum = SS.totalParts snapshot
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received snapshot part " ++ (show partNum) ++ " from " ++ peerString peer ++ "\n" ++ show snapshot
           _ <- runStratoRedisIO $ insertSnapshot partNum snapshot
-          _ <- runStratoRedisIO $ putHeaders formattedHeaders
           case partNum < totalNum of
             True -> yieldR $ GetSnapshot $ partNum + 1
             False -> do
               lift $ Mod.put (Proxy @HasSnapshot) $ HasSnapshot True
               yieldL $ ToUnseq $ IESnapshot <$> [snapshot]
-              syncFetch Forward (1 + SS.fromBlock snapshot)
+              syncFetch Forward ( 1 + SS.fromBlock snapshot)
+              _ <-  runStratoRedisIO $ putHeaders formattedHeaders
+              $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Received last part of snapshot, updated redis and sending out event to snap sync" 
         False ->
           $logInfoS "handleEvents/SnapshotResponse" $ T.pack $ "Disregarding snapshot from " ++ peerString peer ++ " because it's sus."
 
