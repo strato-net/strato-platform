@@ -41,9 +41,11 @@ validatorView = unsafeRegister
               . gauge
               $ Info "pbft_current_view" "The validator status of this node (1.0 = validator, 0.0 = non-validator))"
 
-recordValidator :: MonadIO m => Bool -> m ()
-recordValidator b = liftIO $ do
-  let b' = if b then 1 else 0 in withLabel validatorView "is_validator" (`setGauge` b')
+recordValidator :: MonadIO m => Bool -> Bool -> m ()
+recordValidator iv vb = liftIO $ do
+  let f b = if b then 1 else 0
+  withLabel validatorView "is_validator" (`setGauge` (f iv))
+  withLabel validatorView "validator_behavior" (`setGauge` (f vb))
 
 {-# NOINLINE authResults #-}
 authResults :: Vector Text Counter
