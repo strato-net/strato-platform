@@ -178,7 +178,6 @@ nextRound nt = do
   pendingRound .= Nothing
 
   isValidator .= (self `elem` vals)
-  use isValidator >>= recordValidator
 
   yieldR . NewCheckpoint =<< liftA2 Checkpoint (use view)
                                                (uses validators (S.toList . unChainMembers))
@@ -423,6 +422,9 @@ sendMessages' wms = do
                            .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
+
+      recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+
       return evs
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
