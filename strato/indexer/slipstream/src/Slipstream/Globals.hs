@@ -125,8 +125,10 @@ scrapeFor globalsIORef tableName = do
   where scrapeForCols :: MonadIO m => T.Text -> PGConnection -> m TableColumns
         scrapeForCols tn cirrusConn = do
           results :: [PGValues] <- liftIO $ pgQuery cirrusConn $ queryForCols tn
-          return $ mapMaybe (\case [PGTextValue bs] -> Just $ decodeUtf8 bs; _ -> Nothing) results
-        queryForCols t = encodeUtf8 $ "SELECT column_name FROM information_schema.columns WHERE table_name=" <> t <> ";"
+          return $ mapMaybe (\case 
+            [PGTextValue colName, PGTextValue colDataType] -> Just $ wrapDoubleQuotes (escapeQuotes $ decodeUtf8 colName) <> " " <> decodeUtf8 colDataType; 
+            _ -> Nothing) results
+        queryForCols t = encodeUtf8 $ "SELECT column_name, data_type FROM information_schema.columns WHERE table_name=" <> t <> ";"
         queryForMatchingTables t = let t' = wrapSingleQuotes . wrap1 "%" . escapeUnderscores . escapeQuotes $ tableNameToTextPostgres t
                                    in encodeUtf8 $ "SELECT table_name from information_schema.tables WHERE table_name like " <> t' <> ";"
 

@@ -786,7 +786,7 @@ createEventTable globalsIORef (o, a, n) evName ev = do
 
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ fst <$> fillFirstEmptyEntries (ev ^. eventLogs)
+    setTableCreated globalsIORef eventTable $ tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
     yield $ createEventTableQuery eventTable ev
 
 createEventTableQuery :: TableName -> Event -> Text
@@ -821,12 +821,11 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
           ]
       pure ()
     Just cols -> do
-      let extras = filter (not . flip elem cols . fst) . fillFirstEmptyEntries $ ev ^. eventLogs
-          extraNames = fst <$> extras
-      unless (null extras) $ do
+      let allTableCols = tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+          extrasWithType = filter (`notElem` cols) allTableCols
+      unless (null extrasWithType) $ do
         $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        setTableCreated globalsIORef tableName $ cols ++ extraNames
-        let extrasWithType = tableColumns $ map (\(x, y) -> (x, indexedTypeType y)) extras
+        setTableCreated globalsIORef tableName allTableCols
         $logInfoS "expandEventTable" $ T.concat
             [ "Adding columns to "
             , (tableNameToText tableName)
