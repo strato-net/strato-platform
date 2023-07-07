@@ -27,6 +27,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
+import           Data.Functor.Identity
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
@@ -192,6 +193,10 @@ instance RLPSerializable B.ByteString where
 instance RLPSerializable T.Text where
   rlpEncode = rlpEncode . encodeUtf8
   rlpDecode = decodeUtf8 . rlpDecode
+
+instance RLPSerializable a => RLPSerializable (Identity a) where
+  rlpEncode = rlpEncode . runIdentity
+  rlpDecode = Identity . rlpDecode
 
 instance RLPSerializable a => RLPSerializable [a] where
   rlpEncode as = RLPArray $ map rlpEncode as
