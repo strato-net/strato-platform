@@ -39,6 +39,8 @@ module Blockchain.SolidVM.SM (
   getCurrentChainId,
   getCurrentFunctionName,
   getCurrentCodeCollection,
+  addFunctionToCurrentContractInCurrentCallInfo,
+  removeFunctionFromCurrentContractInCurrentCallInfo, 
   getEnv,
   getGasInfo,
   getVariableOfName,
@@ -409,6 +411,8 @@ getVariableOfName name = do
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
+                                                ,  CC._usings = M.empty
+                                                ,  CC._contractType = currentContract x^.CC.contractType
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
                               }
@@ -664,6 +668,31 @@ setLocal name val = do
       newVariables = M.insert name (theType, val) locals
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
+addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
+addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
+    cs <- Mod.get (Mod.Proxy @[CallInfo])
+    case cs of
+        (currentCallInfo:_) -> do
+            let contract = currentContract currentCallInfo
+            -- _functions :: Map SolidString (FuncF a),
+                newContract = contract{CC._functions = M.insert funcName funcObject $ CC._functions contract} 
+            Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+                [] -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+                (ci:rest) -> pure $ ci{currentContract=newContract} : rest
+        _ -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+
+removeFunctionFromCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> m ()
+removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
+    cs <- Mod.get (Mod.Proxy @[CallInfo])
+    case cs of
+        (currentCallInfo:_) -> do
+            let contract = currentContract currentCallInfo
+            -- _functions :: Map SolidString (FuncF a),
+                newContract = contract{CC._functions = M.delete funcName $ CC._functions contract} 
+            Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+                [] -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
+                (ci:rest) -> pure $ ci{currentContract=newContract} : rest
+        _ -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
 
 getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
 getCurrentCodeCollection = do
