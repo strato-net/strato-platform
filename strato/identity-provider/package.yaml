@@ -37,6 +37,9 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
+  - aeson
+  - http-client
+  - http-types
   - servant-server
   - strato-model
   - text
@@ -50,6 +53,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
     - blockapps-identity-provider
     - warp
 
