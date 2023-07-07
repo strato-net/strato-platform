@@ -1407,7 +1407,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
-  liftIO $ print $ T.pack $ "expToVar: " ++ show x
+  --liftIO $ print $ T.pack $ "expToVar: " ++ show x
   v <- expToVar' x
   decrementGas 1
   return v
@@ -1826,54 +1826,6 @@ expToVar' (CC.Ternary _ condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
--- case to catch a using statement function like _x.add(3)
-expToVar' (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos firstArgVar) usingFuncName) (CC.OrderedArgs xs)) = do
--- firstArgVar == "_x" and usingFuncName == "add" and xs == [NumberLiteral (line 11, column 19) - (line 11, column 20): ()  1 Nothing] 
-    ctrct <- getCurrentContract
-    
-    let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
-    (_, cc) <- getCurrentCodeCollection
-    let usingDecls = concat $ M.elems usingDeclsInContract
-    -- iterate through the list of using declartions and find ones that have the someString as a function name
-    -- get the usingContract name
-    let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
-    -- search through the contracts in the code collection for the contract with the name usingContractName
-    let contracts = cc ^. CC.contracts
-    let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
-    let usingContracts' = catMaybes usingContracts
-    -- look throught the functions of each contract and find the one with the name usingFuncName
-    let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
-    let theFunction = map (\y -> M.lookup usingFuncName y) usingFunctions
-    let theFunction' = catMaybes theFunction
-    let theFunction'' = case theFunction' of
-                          [] -> internalError "No function found" (firstArgVar, usingFuncName)
-                          (x:_) -> x -- big unknown if there are two functions with the same name
-    -- add theFunction' to the current contract's functions
-    addFunctionToCurrentContractInCurrentCallInfo usingFuncName theFunction''
-
-    -- now we need to get the value of the firstArgVar and prepend it to the xs list
-    let x' = (CC.Variable (firstPos) firstArgVar)
-    let dummyAnnotation :: SourceAnnotation ()
-        dummyAnnotation =
-            SourceAnnotation
-            {
-              _sourceAnnotationStart=SourcePosition {
-                _sourcePositionName="",
-                _sourcePositionLine=0,
-                _sourcePositionColumn=0
-                },
-              _sourceAnnotationEnd=SourcePosition {
-                _sourcePositionName="",
-                  _sourcePositionLine=0,
-                  _sourcePositionColumn=0
-                },
-              _sourceAnnotationAnnotation = ()
-            }
-
-    theResult <- expToVar (CC.FunctionCall dummyAnnotation (CC.Variable dummyAnnotation usingFuncName) (CC.OrderedArgs (x' : xs))) 
-    removeFunctionFromCurrentContractInCurrentCallInfo usingFuncName
-    return theResult
-
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes{}) (CC.OrderedArgs args)) = do
   case args of
     [a] -> do
@@ -1930,341 +1882,346 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
             s <- getVar =<< expToVar expr
             return s
       return saltValue
+-- case to catch a using statement function like _x.add(3)
 
-expToVar' (CC.FunctionCall _ e args) = do
-  case e of -- FunctionCall Special Case when calling a function via Member Access
-    (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
-    (CC.MemberAccess _ expr name) -> do
-      var1 <- expToVar expr
-      val1 <- getVar var1
-      case (val1, name) of
-        (SAccount addr _, "delegatecall") -> do
-          let  (funcName, args') = (case args of
-                (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
-                (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first arguement to be a string" args
-                (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
-          fromAddress <- getCurrentAccount
-          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
-          res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args'
-          case res of
-              Just a  -> return $ Constant  a
-              Nothing -> return $ Constant SNULL
-        (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
+expToVar' theFullExp@(CC.FunctionCall _ e args) = do
+  mUsingCase <- specialUsingChecker theFullExp
+  case mUsingCase of
+    Just aResult -> return aResult
+    Nothing -> do
+      case e of -- FunctionCall Special Case when calling a function via Member Access
+        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
+        (CC.MemberAccess _ expr name) -> do
+          var1 <- expToVar expr
+          val1 <- getVar var1
+          case (val1, name) of
+            (SAccount addr _, "delegatecall") -> do
+              let  (funcName, args') = (case args of
+                    (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
+                    (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first arguement to be a string" args
+                    (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
+              fromAddress <- getCurrentAccount
+              let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
+              res <- callWrapper fromAddress toAddress (Just toAddress)  Nothing funcName False args'
+              case res of
+                  Just a  -> return $ Constant  a
+                  Nothing -> return $ Constant SNULL
+            (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
+            _ -> regularFunctionCall Nothing
         _ -> regularFunctionCall Nothing
-    _ -> regularFunctionCall Nothing
-    where
-      regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
-      regularFunctionCall mSCI = do
-        var <- case mSCI of
-          Just sci -> sci
-          Nothing  -> expToVar' e
-        argVals <- case args of
-                        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
-                        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-        let argCount = case args of
-                        CC.OrderedArgs as -> length as
-                        CC.NamedArgs ns -> length ns
-        case var of
-          Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
-            val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
-            case (val', last pieces) of
+        where
+          regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
+          regularFunctionCall mSCI = do
+            var <- case mSCI of
+              Just sci -> sci
+              Nothing  -> expToVar' e
+            argVals <- case args of
+                            CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                            CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+            let argCount = case args of
+                            CC.OrderedArgs as -> length as
+                            CC.NamedArgs ns -> length ns
+            case var of
+              Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
+                val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
+                case (val', last pieces) of
 
-              (SContract _ toAddress', MS.Field funcName) -> do
-                fromAddress <- getCurrentAccount
-                let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args
-                case res of
-                  Just v -> return $ Constant $ v
-                  Nothing -> return $ Constant SNULL
+                  (SContract _ toAddress', MS.Field funcName) -> do
+                    fromAddress <- getCurrentAccount
+                    let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
+                    res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args
+                    case res of
+                      Just v -> return $ Constant $ v
+                      Nothing -> return $ Constant SNULL
 
-              (SAccount toAddress' _, MS.Field funcName) -> do
-                fromAddress <- getCurrentAccount
-                let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args
-                case res of
-                  Just v -> return $ Constant $ v
-                  Nothing -> return $ Constant SNULL
-              x -> todo "expToVar'/FunctionCall" x
+                  (SAccount toAddress' _, MS.Field funcName) -> do
+                    fromAddress <- getCurrentAccount
+                    let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
+                    res <- callWrapper fromAddress toAddress Nothing Nothing (stringToLabel $ BC.unpack funcName) False args
+                    case res of
+                      Just v -> return $ Constant $ v
+                      Nothing -> return $ Constant SNULL
+                  x -> todo "expToVar'/FunctionCall" x
 
-          Constant (SBuiltinFunction name o) -> case argVals of
-            OrderedVals vs -> Constant <$> callBuiltin name vs o
-            NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
+              Constant (SBuiltinFunction name o) -> case argVals of
+                OrderedVals vs -> Constant <$> callBuiltin name vs o
+                NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
 
-          Constant (SFunction funcName func) -> do
-            ro <- readOnly <$> getCurrentCallInfo
-            contract' <- getCurrentContract
-            address <- getCurrentAccount
-            (hsh, cc) <- getCurrentCodeCollection
-            -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
-            res <- do
-              if (CC._funcIsFree func)
-                then do
-                  matchingOverload <- findM testMatch $ CC._funcOverload func
-                  doesFunctionMatch <- testMatch func
-                  if (doesFunctionMatch)
-                    then runTheCall address contract' funcName hsh cc func argVals ro True
-                    else case matchingOverload of
-                      Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
-                      Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
-                else do
-                  matchingOverload <- findM testMatch $ CC._funcOverload func
-                  doesFunctionMatch <- testMatch func
-                  if (doesFunctionMatch)
-                    then runTheCall address contract' funcName hsh cc func argVals ro False
-                    else case matchingOverload of
-                            Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
-                                          Just ff -> do
-                                            matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
-                                            doesFreeFunctionMatch <- testMatch ff
-                                            if (doesFreeFunctionMatch)
-                                              then runTheCall address contract' funcName hsh cc ff argVals ro True
-                                              else case matchingFreeOverload of
-                                                Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                                                Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
-                                          Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                            Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
-            return . Constant . fromMaybe SNULL $ res
-            where
-              testMatch :: MonadSM m => CC.Func -> m Bool
-              testMatch tf = do
-                let argMapping = mapArgs tf
-                doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC._funcArgs tf))
-                       && ((length argMapping) == (argCount))
-                       && (all (== True) doArgsMatch)
-              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-              testNameAndTypes (_, (t, v)) =
-                -- These cases might not be all inclusive of all valid combinations.
-                case (v, t) of
-                  (SInteger _, SVMType.Int _ _) -> pure $ True
-                  (SString _, SVMType.String _) -> pure $ True
-                  (SString _, SVMType.Bytes _ _) -> pure $ True
-                  (SBool _, SVMType.Bool) -> pure $ True
-                  (SAccount _ _, SVMType.Address _) -> pure $ True
-                  (SAccount _ _, SVMType.Account _) -> pure $ True
-                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                  (SArray x _, SVMType.Array y _) -> pure $ x == y
-                  (SReference addressedPath, _) -> do
-                    refType <- getXabiValueType addressedPath
-                    if (refType == t)
-                      then pure $ True
-                      else
-                        case (refType, t) of
-                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
-                          _ -> pure $ False
-                  _ -> pure $ False
-              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-              mapArgs theFunc = case argVals of
-                OrderedVals vs -> let argMeta =
-                                        map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                        $ CC._funcArgs theFunc
-                                  in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-                NamedVals ns ->
-                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-                      typeAndVal = M.merge (M.dropMissing)
-                                          (M.dropMissing)
-                                          (M.zipWithMatched $ \_k t v -> (t, v))
-                                          strTypes
-                                          $ M.fromList ns
-                      sortedArgs = map snd . sortWith fst
-                                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                                $ M.toList typeAndVal
-                  in sortedArgs
+              Constant (SFunction funcName func) -> do
+                ro <- readOnly <$> getCurrentCallInfo
+                contract' <- getCurrentContract
+                address <- getCurrentAccount
+                (hsh, cc) <- getCurrentCodeCollection
+                -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
+                res <- do
+                  if (CC._funcIsFree func)
+                    then do
+                      matchingOverload <- findM testMatch $ CC._funcOverload func
+                      doesFunctionMatch <- testMatch func
+                      if (doesFunctionMatch)
+                        then runTheCall address contract' funcName hsh cc func argVals ro True
+                        else case matchingOverload of
+                          Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
+                          Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                    else do
+                      matchingOverload <- findM testMatch $ CC._funcOverload func
+                      doesFunctionMatch <- testMatch func
+                      if (doesFunctionMatch)
+                        then runTheCall address contract' funcName hsh cc func argVals ro False
+                        else case matchingOverload of
+                                Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
+                                              Just ff -> do
+                                                matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
+                                                doesFreeFunctionMatch <- testMatch ff
+                                                if (doesFreeFunctionMatch)
+                                                  then runTheCall address contract' funcName hsh cc ff argVals ro True
+                                                  else case matchingFreeOverload of
+                                                    Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                                                    Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                                              Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                                Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
+                return . Constant . fromMaybe SNULL $ res
+                where
+                  testMatch :: MonadSM m => CC.Func -> m Bool
+                  testMatch tf = do
+                    let argMapping = mapArgs tf
+                    doArgsMatch <- mapM testNameAndTypes argMapping
+                    pure $ ((length argMapping) == (length $ CC._funcArgs tf))
+                           && ((length argMapping) == (argCount))
+                           && (all (== True) doArgsMatch)
+                  testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+                  testNameAndTypes (_, (t, v)) =
+                    -- These cases might not be all inclusive of all valid combinations.
+                    case (v, t) of
+                      (SInteger _, SVMType.Int _ _) -> pure $ True
+                      (SString _, SVMType.String _) -> pure $ True
+                      (SString _, SVMType.Bytes _ _) -> pure $ True
+                      (SBool _, SVMType.Bool) -> pure $ True
+                      (SAccount _ _, SVMType.Address _) -> pure $ True
+                      (SAccount _ _, SVMType.Account _) -> pure $ True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                      (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                      (SArray x _, SVMType.Array y _) -> pure $ x == y
+                      (SReference addressedPath, _) -> do
+                        refType <- getXabiValueType addressedPath
+                        if (refType == t)
+                          then pure $ True
+                          else
+                            case (refType, t) of
+                              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
+                              _ -> pure $ False
+                      _ -> pure $ False
+                  mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+                  mapArgs theFunc = case argVals of
+                    OrderedVals vs -> let argMeta =
+                                            map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                            $ CC._funcArgs theFunc
+                                      in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+                    NamedVals ns ->
+                      let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
+                          typeAndVal = M.merge (M.dropMissing)
+                                              (M.dropMissing)
+                                              (M.zipWithMatched $ \_k t v -> (t, v))
+                                              strTypes
+                                              $ M.fromList ns
+                          sortedArgs = map snd . sortWith fst
+                                    . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                                    $ M.toList typeAndVal
+                      in sortedArgs
 
-          Constant (SStructDef structName) -> do
-            contract' <- getCurrentContract
-            case M.lookup structName $ contract'^.CC.structs of
-              Just vals -> do
-                return . Constant . SStruct structName . fmap Constant . M.fromList $
-                  case argVals of
-                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
-                    NamedVals ns -> ns
-              Nothing -> do
-                cc <- getCurrentCodeCollection
-                let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
-                return . Constant . SStruct structName . fmap Constant . M.fromList $
-                  case argVals of
-                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals') as
-                    NamedVals ns -> ns
-
-          Constant (SContractDef contractName') -> do
-            case argVals of
-              OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
-                return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-              OrderedVals [SAccount address _] ->
-                return $ Constant $ SContract contractName' address
-              OrderedVals [SContract _ addr] ->
-                return $ Constant $ SContract contractName' $ addr
-              _ -> typeError "contract variable creation" argVals
-
-          -- Transfer wei, throw error on failure no return on success 
-          -- TODO: When gas gets more implemented ensure that this function does not
-          --       consume more than 2300 gas
-          Constant (SContractItem address' "transfer") -> do
-            from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
-            case argVals of
-              OrderedVals [SInteger amount] -> do
-                res <- pay "built-in transfer function" from address amount
-                case res of
-                  True -> return $ Constant SNULL
-                  _ -> paymentError (show amount) (show address)
-              _ -> paymentError "unknown" (show address)
-
-          -- Send Wei return bool on failure or success
-          -- TODO: When gas gets more implemented ensure that this function does not
-          --       consume more than 2300 gas
-          Constant (SContractItem address' "send") -> do
-            from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
-            success <- case argVals of
-              OrderedVals [SInteger amount] -> do
-                res <- pay "built-in send function" from address amount
-                case res of
-                  True -> return True
-                  _ -> return False
-              _ -> return False
-            return . Constant $ SBool success
-
-          Constant (SContractItem address' "code") -> do
-            --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
-            from <- getCurrentAccount
-            -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
-            --If address' chainId is unset then we set to the current chainId
-              -- Get the code at the address
-            cid <- case (address' ^. namedAccountChainId) of
-              UnspecifiedChain -> do
-                --Assume that the chainId is the same as the from chainId when it is unset 
-                cid1 <- view accountChainId <$> getCurrentAccount
-                case cid1 of
-                  Nothing -> return Nothing
-                  Just cid2 -> return $ Just cid2
-              MainChain -> return Nothing
-              ExplicitChain cid -> return $ Just cid
-            let toAccount = namedAccountToAccount cid address'
-            --check that the from and to are on the same chain`
-            isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
-            unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
-            -- Collect a potential item to search
-            searchTerms <- case argVals of
-                -- catch only the SStrings
-                OrderedVals [SString arguments] -> pure $ Just arguments
-                -- Throw an error if too many arguments are passed
-                OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
-                --If nothing was given or something else, then just return the entire code
-                _ -> pure $ Nothing
-            --get only the contract containing the sweet succulent ContractF definition
-            (!contract, _, _) <- getCodeAndCollection toAccount
-            let codeSnippets :: [String]
-                codeSnippets =
-                  case (fromMaybe "" searchTerms) of
-                    --Unparse just the contract
-                    "" -> [unparseContract contract]
-                    term ->
-                    --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
-                      -- Check for and get the different parts of the contract
-                      let contrString =
-                            case ((contract ^. CC.contractName) == term) of
-                              True -> Just $ unparseContract contract
-                              False -> Nothing
-
-                          constString =
-                            case ((contract ^. CC.constants) M.!? term) of
-                              Just constF -> Just $ unparseConstant (term, constF)
-                              Nothing -> Nothing
-
-                          storjString =
-                            case ((contract ^. CC.storageDefs) M.!? term) of
-                              Just storjF -> Just $ unparseVar (term, storjF)
-                              Nothing -> Nothing
-
-                          enumString =
-                            case ((contract ^. CC.enums) M.!? term) of
-                              Just enumF -> Just $ unparseEnum (term, fst enumF)
-                              Nothing -> Nothing
-
-                          structString =
-                            case ((contract ^. CC.structs) M.!? term) of
-                              Just structF -> Just $ unparseStruct (term, structF)
-                              Nothing -> Nothing
-
-                          eventString =
-                            case ((contract ^. CC.events) M.!? term) of
-                              Just eventF -> Just $ unparseEvent (term, eventF)
-                              Nothing -> Nothing
-
-                          funcString =
-                            case ((contract ^. CC.functions) M.!? term) of
-                              Just funcF -> Just $ unparseFunc (term, funcF)
-                              Nothing -> Nothing
-
-                          modString =
-                            case ((contract ^. CC.modifiers) M.!? term) of
-                              Just modF -> Just $ unparseModifier (term, modF)
-                              Nothing -> Nothing
-
-                      --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
-            pure . Constant $ SString ( unlines codeSnippets)
-
-          Constant (SContractItem address' itemName) -> do
-            from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address Nothing Nothing itemName False args
-            return . Constant . fromMaybe SNULL $ result
-
-          Constant (SContractFunction name address' functionName) -> do
-            from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
-            result <- callWrapper from address Nothing name functionName False args
-            return . Constant . fromMaybe SNULL $ result
-
-          Constant (SEnum enumName) -> do
-            case argVals of
-              OrderedVals [SInteger i] -> do
-                c <- getCurrentContract
-                case M.lookup enumName $ c^.CC.enums  of
-                  Just theEnum -> do
-                    case fst theEnum !? fromInteger i of
-                      Nothing -> typeError "enum val out of range" argVals
-                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+              Constant (SStructDef structName) -> do
+                contract' <- getCurrentContract
+                case M.lookup structName $ contract'^.CC.structs of
+                  Just vals -> do
+                    return . Constant . SStruct structName . fmap Constant . M.fromList $
+                      case argVals of
+                        OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
+                        NamedVals ns -> ns
                   Nothing -> do
-                    (_, cc) <- getCurrentCodeCollection
-                    let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
-                                $ M.lookup enumName $ cc ^.CC.flEnums
-                    case fst theEnum' !? fromInteger i of
-                      Nothing -> typeError "enum val out of range" argVals
-                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
-              _ -> typeError "called enum constructor with improper args" argVals
+                    cc <- getCurrentCodeCollection
+                    let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
+                    return . Constant . SStruct structName . fmap Constant . M.fromList $
+                      case argVals of
+                        OrderedVals as -> zip (map (\(a,_,_) -> a) vals') as
+                        NamedVals ns -> ns
 
-          Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+              Constant (SContractDef contractName') -> do
+                case argVals of
+                  OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
+                    return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
+                  OrderedVals [SAccount address _] ->
+                    return $ Constant $ SContract contractName' address
+                  OrderedVals [SContract _ addr] ->
+                    return $ Constant $ SContract contractName' $ addr
+                  _ -> typeError "contract variable creation" argVals
 
-          Constant SStringConcat -> do
-            case argVals of
-              OrderedVals xs -> do
-                when (any (\x -> case x of
-                                  (SString _) -> False
-                                  _ -> True) xs) $ typeError "string concat" argVals
-                return $ Constant $ SString $ concatMap (\x -> case x of (SString s) -> s; _ -> "") xs
-              _ -> typeError "called string concat with improper args" argVals
+              -- Transfer wei, throw error on failure no return on success 
+              -- TODO: When gas gets more implemented ensure that this function does not
+              --       consume more than 2300 gas
+              Constant (SContractItem address' "transfer") -> do
+                from <- getCurrentAccount
+                let address = namedAccountToAccount (from ^. accountChainId) address'
+                case argVals of
+                  OrderedVals [SInteger amount] -> do
+                    res <- pay "built-in transfer function" from address amount
+                    case res of
+                      True -> return $ Constant SNULL
+                      _ -> paymentError (show amount) (show address)
+                  _ -> paymentError "unknown" (show address)
 
-          Constant SHexDecodeAndTrim ->
-              case argVals of
-                -- bytes should already be hex decoded when appropriate
-                OrderedVals [s@SString{}] -> return $ Constant s
-                _ -> typeError "bytes32ToString with incorrect arguments" argVals
-          Constant SAddressToAscii ->
-            case argVals of
-              OrderedVals [SAccount a _] -> return . Constant . SString $ show a
-              _ -> typeError "addressToAsciiString with incorrect arguments" argVals
+              -- Send Wei return bool on failure or success
+              -- TODO: When gas gets more implemented ensure that this function does not
+              --       consume more than 2300 gas
+              Constant (SContractItem address' "send") -> do
+                from <- getCurrentAccount
+                let address = namedAccountToAccount (from ^. accountChainId) address'
+                success <- case argVals of
+                  OrderedVals [SInteger amount] -> do
+                    res <- pay "built-in send function" from address amount
+                    case res of
+                      True -> return True
+                      _ -> return False
+                  _ -> return False
+                return . Constant $ SBool success
 
-          -- It would be nice to reinterpret two element paths as a function.
-          -- How can we get a to resolve to a local variable instead of a path?
-          -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
+              Constant (SContractItem address' "code") -> do
+                --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
+                from <- getCurrentAccount
+                -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
+                --If address' chainId is unset then we set to the current chainId
+                  -- Get the code at the address
+                cid <- case (address' ^. namedAccountChainId) of
+                  UnspecifiedChain -> do
+                    --Assume that the chainId is the same as the from chainId when it is unset 
+                    cid1 <- view accountChainId <$> getCurrentAccount
+                    case cid1 of
+                      Nothing -> return Nothing
+                      Just cid2 -> return $ Just cid2
+                  MainChain -> return Nothing
+                  ExplicitChain cid -> return $ Just cid
+                let toAccount = namedAccountToAccount cid address'
+                --check that the from and to are on the same chain`
+                isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+                unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+                -- Collect a potential item to search
+                searchTerms <- case argVals of
+                    -- catch only the SStrings
+                    OrderedVals [SString arguments] -> pure $ Just arguments
+                    -- Throw an error if too many arguments are passed
+                    OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
+                    --If nothing was given or something else, then just return the entire code
+                    _ -> pure $ Nothing
+                --get only the contract containing the sweet succulent ContractF definition
+                (!contract, _, _) <- getCodeAndCollection toAccount
+                let codeSnippets :: [String]
+                    codeSnippets =
+                      case (fromMaybe "" searchTerms) of
+                        --Unparse just the contract
+                        "" -> [unparseContract contract]
+                        term ->
+                        --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
+                          -- Check for and get the different parts of the contract
+                          let contrString =
+                                case ((contract ^. CC.contractName) == term) of
+                                  True -> Just $ unparseContract contract
+                                  False -> Nothing
 
-          _ -> typeError "cannot call non-function" var
+                              constString =
+                                case ((contract ^. CC.constants) M.!? term) of
+                                  Just constF -> Just $ unparseConstant (term, constF)
+                                  Nothing -> Nothing
+
+                              storjString =
+                                case ((contract ^. CC.storageDefs) M.!? term) of
+                                  Just storjF -> Just $ unparseVar (term, storjF)
+                                  Nothing -> Nothing
+
+                              enumString =
+                                case ((contract ^. CC.enums) M.!? term) of
+                                  Just enumF -> Just $ unparseEnum (term, fst enumF)
+                                  Nothing -> Nothing
+
+                              structString =
+                                case ((contract ^. CC.structs) M.!? term) of
+                                  Just structF -> Just $ unparseStruct (term, structF)
+                                  Nothing -> Nothing
+
+                              eventString =
+                                case ((contract ^. CC.events) M.!? term) of
+                                  Just eventF -> Just $ unparseEvent (term, eventF)
+                                  Nothing -> Nothing
+
+                              funcString =
+                                case ((contract ^. CC.functions) M.!? term) of
+                                  Just funcF -> Just $ unparseFunc (term, funcF)
+                                  Nothing -> Nothing
+
+                              modString =
+                                case ((contract ^. CC.modifiers) M.!? term) of
+                                  Just modF -> Just $ unparseModifier (term, modF)
+                                  Nothing -> Nothing
+
+                          --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                          in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
+                pure . Constant $ SString ( unlines codeSnippets)
+
+              Constant (SContractItem address' itemName) -> do
+                from <- getCurrentAccount
+                let address = namedAccountToAccount (from ^. accountChainId) address'
+                result <- callWrapper from address Nothing Nothing itemName False args
+                return . Constant . fromMaybe SNULL $ result
+
+              Constant (SContractFunction name address' functionName) -> do
+                from <- getCurrentAccount
+                let address = namedAccountToAccount (from ^. accountChainId) address'
+                result <- callWrapper from address Nothing name functionName False args
+                return . Constant . fromMaybe SNULL $ result
+
+              Constant (SEnum enumName) -> do
+                case argVals of
+                  OrderedVals [SInteger i] -> do
+                    c <- getCurrentContract
+                    case M.lookup enumName $ c^.CC.enums  of
+                      Just theEnum -> do
+                        case fst theEnum !? fromInteger i of
+                          Nothing -> typeError "enum val out of range" argVals
+                          Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                      Nothing -> do
+                        (_, cc) <- getCurrentCodeCollection
+                        let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
+                                    $ M.lookup enumName $ cc ^.CC.flEnums
+                        case fst theEnum' !? fromInteger i of
+                          Nothing -> typeError "enum val out of range" argVals
+                          Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                  _ -> typeError "called enum constructor with improper args" argVals
+
+              Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+
+              Constant SStringConcat -> do
+                case argVals of
+                  OrderedVals xs -> do
+                    when (any (\x -> case x of
+                                      (SString _) -> False
+                                      _ -> True) xs) $ typeError "string concat" argVals
+                    return $ Constant $ SString $ concatMap (\x -> case x of (SString s) -> s; _ -> "") xs
+                  _ -> typeError "called string concat with improper args" argVals
+
+              Constant SHexDecodeAndTrim ->
+                  case argVals of
+                    -- bytes should already be hex decoded when appropriate
+                    OrderedVals [s@SString{}] -> return $ Constant s
+                    _ -> typeError "bytes32ToString with incorrect arguments" argVals
+              Constant SAddressToAscii ->
+                case argVals of
+                  OrderedVals [SAccount a _] -> return . Constant . SString $ show a
+                  _ -> typeError "addressToAsciiString with incorrect arguments" argVals
+
+              -- It would be nice to reinterpret two element paths as a function.
+              -- How can we get a to resolve to a local variable instead of a path?
+              -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
+
+              _ -> typeError "cannot call non-function" var
 
 {-
 SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (SolidString "Hashmap")) [])))
@@ -3450,6 +3407,61 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
           return res
 
     _ -> error "unhandled solid exception" (show ex)
+
+specialUsingChecker :: MonadSM m => CC.Expression -> m (Maybe Variable)
+specialUsingChecker (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos firstArgVar) usingFuncName) (CC.OrderedArgs xs)) = do
+-- firstArgVar == "_x" and usingFuncName == "add" and xs == [NumberLiteral (line 11, column 19) - (line 11, column 20): ()  1 Nothing] 
+    ctrct <- getCurrentContract
+    
+    let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
+    (_, cc) <- getCurrentCodeCollection
+    let usingDecls = concat $ M.elems usingDeclsInContract
+    -- iterate through the list of using declartions and find ones that have the someString as a function name
+    -- get the usingContract name
+    let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
+    -- search through the contracts in the code collection for the contract with the name usingContractName
+    let contracts = cc ^. CC.contracts
+    let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
+    let usingContracts' = catMaybes usingContracts
+    -- look throught the functions of each contract and find the one with the name usingFuncName
+    let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
+    let theFunction = map (\y -> M.lookup usingFuncName y) usingFunctions
+    let theFunction' = catMaybes theFunction
+    let theFunction'' = case theFunction' of
+                          [] -> Nothing 
+                          (x:_) -> Just x -- big unknown if there are two functions with the same name
+    case theFunction'' of
+        Nothing -> return Nothing
+        (Just tf) -> do
+            -- add theFunction' to the current contract's functions
+            addFunctionToCurrentContractInCurrentCallInfo usingFuncName tf 
+
+            -- now we need to get the value of the firstArgVar and prepend it to the xs list
+            let x' = (CC.Variable (firstPos) firstArgVar)
+            let dummyAnnotation :: SourceAnnotation ()
+                dummyAnnotation =
+                    SourceAnnotation
+                    {
+                      _sourceAnnotationStart=SourcePosition {
+                        _sourcePositionName="",
+                        _sourcePositionLine=0,
+                        _sourcePositionColumn=0
+                        },
+                      _sourceAnnotationEnd=SourcePosition {
+                        _sourcePositionName="",
+                          _sourcePositionLine=0,
+                          _sourcePositionColumn=0
+                        },
+                      _sourceAnnotationAnnotation = ()
+                    }
+
+            theResult <- expToVar (CC.FunctionCall dummyAnnotation (CC.Variable dummyAnnotation usingFuncName) (CC.OrderedArgs (x' : xs))) 
+            removeFunctionFromCurrentContractInCurrentCallInfo usingFuncName
+            return $ Just theResult
+specialUsingChecker _ = return $ Nothing 
+
+
+
 
 -- --If given a list, apply a given function to only the first element of the list.
 -- mapOnFirst :: (a -> a) -> [a] -> [a]
