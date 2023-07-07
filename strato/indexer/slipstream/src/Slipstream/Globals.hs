@@ -100,8 +100,8 @@ scrapeFor globalsIORef tableName = do
     FakeCirrusHandle -> return createdTables
     CirrusHandle{..} -> case tableName of
       MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return createdTables
-      MappingTableName org app contract map' -> do
-        let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract map'
+      MappingTableName org app contract "" -> do
+        let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract ""
         results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
         forM_ results (\case
             [PGTextValue tn] -> do
