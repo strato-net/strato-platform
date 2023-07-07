@@ -72,6 +72,7 @@ import qualified Slipstream.Events as E
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
+import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts)
@@ -103,50 +104,7 @@ data ProcessedMappingRow = ProcessedMappingRow
 crashOnSQLError :: Bool
 crashOnSQLError = False
 
-
-tableSeparator :: Text
-tableSeparator = "-"
-
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
-
-tshow :: Show a => a -> Text
-tshow = T.pack . show
-
-csv :: [Text] -> Text
-csv = T.intercalate ",\n    "
-
-wrap :: Text -> Text -> Text -> Text
-wrap b e x = T.concat [b, x, e]
-
-wrap1 :: Text -> Text -> Text
-wrap1 t = wrap t t
-
-wrapSingleQuotes :: Text -> Text
-wrapSingleQuotes = wrap1 "\'"
-
-wrapDoubleQuotes :: Text -> Text
-wrapDoubleQuotes = wrap1 "\""
-
-wrapParens :: Text -> Text
-wrapParens = wrap "(" ")"
-
-wrapAndEscape :: [Text] -> Text
-wrapAndEscape = wrapParens . csv
-
-wrapAndEscapeDouble :: [Text] -> Text
-wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
-
-unwrapDoubleQuotes :: Text -> Text
-unwrapDoubleQuotes = T.dropAround (== '"')
-
-escapeSingleQuotes :: Text -> Text
-escapeSingleQuotes = T.replace "\'" "\'\'"
-
-escapeDoubleQuotes :: Text -> Text
-escapeDoubleQuotes = T.replace "\"" "\\\""
-
-escapeQuotes :: Text -> Text
-escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 fillEmptyEntries :: Functor f => [f Text] -> [f Text]
 fillEmptyEntries = zipWith go [(1 :: Int)..]
@@ -293,8 +251,8 @@ constructMappingTableNameParameters org app contract mapping=
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
-uncurry3' :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry3' f (v, x, y, z) = f v x y z
+uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+uncurry4 f (v, x, y, z) = f v x y z
 
 historyTableName :: Text -> Text -> Text -> TableName
 historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
@@ -303,44 +261,8 @@ indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m = uncurry3' MappingTableName $ constructMappingTableNameParameters o a n m
+mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
 
--- sometimes we need the unwrapped tablename
-tableNameToDoubleQuoteText :: TableName -> Text
-tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
-
-
-tableNameToText :: TableName -> Text
-tableNameToText (IndexTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
-tableNameToText (MappingTableName o a c m ) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndMapping = c <> "." <> m
-  in "mapping@" <> prefix <> contractAndMapping
-tableNameToText (HistoryTableName o a c) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-  in "history@" <> prefix <> c
-tableNameToText (EventTableName o a c e) =
-  let prefix = if T.null o
-                 then ""
-                 else if T.null a
-                   then o <> tableSeparator
-                   else o <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = c <> "." <> e
-  in prefix <> contractAndEvent
 
 createExpandIndexTable
   :: OutputM m
@@ -864,7 +786,7 @@ createEventTable globalsIORef (o, a, n) evName ev = do
 
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ fst <$> fillFirstEmptyEntries (ev ^. eventLogs)
+    setTableCreated globalsIORef eventTable $ tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
     yield $ createEventTableQuery eventTable ev
 
 createEventTableQuery :: TableName -> Event -> Text
@@ -899,12 +821,11 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
           ]
       pure ()
     Just cols -> do
-      let extras = filter (not . flip elem cols . fst) . fillFirstEmptyEntries $ ev ^. eventLogs
-          extraNames = fst <$> extras
-      unless (null extras) $ do
+      let allTableCols = tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+          extrasWithType = filter (`notElem` cols) allTableCols
+      unless (null extrasWithType) $ do
         $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        setTableCreated globalsIORef tableName $ cols ++ extraNames
-        let extrasWithType = tableColumns $ map (\(x, y) -> (x, indexedTypeType y)) extras
+        setTableCreated globalsIORef tableName allTableCols
         $logInfoS "expandEventTable" $ T.concat
             [ "Adding columns to "
             , (tableNameToText tableName)

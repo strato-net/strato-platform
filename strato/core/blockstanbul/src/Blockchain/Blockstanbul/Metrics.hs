@@ -34,6 +34,19 @@ recordView View{..} = liftIO $ do
   withLabel currentView "round_number" (flip setGauge . fromIntegral $ _round)
   withLabel currentView "sequence_number" (flip setGauge . fromIntegral $ _sequence)
 
+{-# NOINLINE validatorView #-}
+validatorView :: Vector Text Gauge
+validatorView = unsafeRegister
+              . vector "view_field"
+              . gauge
+              $ Info "pbft_current_view" "The validator status of this node (1.0 = validator, 0.0 = non-validator))"
+
+recordValidator :: MonadIO m => Bool -> Bool -> m ()
+recordValidator iv vb = liftIO $ do
+  let f b = if b then 1 else 0
+  withLabel validatorView "is_validator" (`setGauge` (f iv))
+  withLabel validatorView "validator_behavior" (`setGauge` (f vb))
+
 {-# NOINLINE authResults #-}
 authResults :: Vector Text Counter
 authResults = unsafeRegister

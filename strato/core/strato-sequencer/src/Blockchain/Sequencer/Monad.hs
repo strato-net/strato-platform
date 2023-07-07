@@ -344,7 +344,7 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
-instance (Address `A.Alters` X509CertInfoState) SequencerM where 
+instance (Address `A.Alters` X509CertInfoState) SequencerM where
   lookup = genericLookupSequencer x509certInfoState
   insert p k v = do
     genericInsertSequencer x509certInfoState p k v
@@ -355,7 +355,7 @@ instance (Address `A.Alters` X509CertInfoState) SequencerM where
     sz <- M.size <$> use x509certInfoState
     liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
 
-instance A.Selectable Address X509CertInfoState SequencerM where 
+instance A.Selectable Address X509CertInfoState SequencerM where
   select = A.lookup
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
@@ -371,11 +371,6 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
--- instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
---   -- TODO: Just using this to sneak past the compiler... actually completethese these out
---   lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
---   insert _ _ _ = pure ()
---   delete _ _ = pure ()
 
 instance A.Selectable Word256 ParentChainIds SequencerM where
   select _ cId = join . fmap (fmap (ParentChainIds . parentChains . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
@@ -413,8 +408,8 @@ instance HasBlockstanbulContext SequencerM where
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
 
--- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
--- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
+-- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
+-- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
 -- easier than making a whole new SequencerM definition just to get a different HasVault instance
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
