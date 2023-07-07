@@ -19,7 +19,6 @@ dependencies:
   - kafka-monad
   - raw-strings-qq
   - utf8-string
-  - regex-posix
   - resourcet
   - sql-monad
   - text
