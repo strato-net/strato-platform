@@ -42,7 +42,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b compose_v2
+          git clone https://github.com/blockapps/strato-getting-started -b master
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
         '''
