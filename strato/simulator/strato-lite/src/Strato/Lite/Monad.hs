@@ -1122,7 +1122,15 @@ instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadT
     let ip = T.unpack t
     stringPPeerMap . at ip . _Just %= (\p -> p{pPeerBondState = s})
 
+instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText t, _) (PeerBondingState s) = do
+    let ip = T.unpack t
+    stringPPeerMap . at ip . _Just %= (\p -> p{pPeerBondState = s})
+
 instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 instance MonadIO m => A.Replaceable PPeer T.Text (MonadTest m) where
