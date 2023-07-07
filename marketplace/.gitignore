@@ -31,4 +31,5 @@ config/*.deploy.json
 .idea/*
 .DS_Store
 
+/ui/cypress.env.json
 

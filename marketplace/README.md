@@ -6,8 +6,8 @@
 
 The following tools should already be installed
 
-1. docker 17.06+
-2. docker-compose 17.06+
+1. Docker 4.1.0+
+2. Docker Compose V2
 3. NodeJS 14.19.1+ (for development mode only)
 4. yarn or npm (for development mode only)
 
@@ -23,12 +23,12 @@ cd tCommerce/nginx-docker
 
 If you are running on Linux, execute the following command:
 ```
-HOST_IP=172.17.0.1 docker-compose up -d
+HOST_IP=172.17.0.1 docker compose up -d
 ```
 
 If you are running on Mac, execute the following command:
 ```
-HOST_IP=docker.for.mac.localhost docker-compose up -d
+HOST_IP=docker.for.mac.localhost docker compose up -d
 ```
 
 #### Deploy the Dapp and Start The Backend
@@ -100,6 +100,19 @@ This should open a browser window and display a basic React webpage.
 
 *NOTE: `yarn develop` will start the UI and use the terminal window to dump log information. To stop the UI, hit `CTRL+C`*.
 
+## Cypress Test
+There are two options: 
+1. Using explorer
+```
+cd marketplace/ui
+yarn run cypress open 
+```
+*NOTE: Select E2E testing in the dialog*
+
+2. Using CLI
+```
+yarn test:e2e
+```
 #### Stopping the App
 
 To stop the app, hit `CTRL+C` on the server and UI windows. To stop the nginx server, run
@@ -112,7 +125,7 @@ docker stop nginx-docker_nginx_1
 
 #### 1. Build docker images
 ```
-sudo docker-compose build
+sudo docker compose build
 ```
 
 #### 2a. Run as tCommerce bootnode (main node in multi-node environment)
@@ -138,7 +151,7 @@ sudo docker-compose build
    
 3. Wait for all docker containers to become healthy (`sudo docker ps`)
 
-*NOTE: Running the command `sudo docker-compose down -vt0 && sudo ./run-app.sh` will clean the app data and then run the app from scratch*
+*NOTE: Running the command `sudo docker compose down -vt0 && sudo ./run-app.sh` will clean the app data and then run the app from scratch*
 
 
 #### 2b. Run as app secondary node (in multi-node environment)
@@ -195,7 +208,7 @@ MP_SERVER_HOST              - (required) App server host (hostname or hostname:p
 SERVER_IP                   - (required) IP address of the machine (preferably public one or the private that is accessible from other nodes in network)
 NODE_LABEL                  - (required) String representing the node identificator (e.g. tCommerce-node1)
 STRATO_NODE_PROTOCOL        - (default: 'http') Protocol of the STRATO node (http|https)
-STRATO_NODE_HOST            - (default: 'strato_nginx_1:80') host (hostname:port) of the STRATO node. By default - call STRATO node in the linked docker network (see bottom of docker-compose.yml)
+STRATO_NODE_HOST            - (default: 'nginx', no port defaults to 80) host (hostname:port) of the STRATO node. By default - call STRATO node in the linked docker network (see bottom of docker-compose.yml)
 STRATO_LOCAL_IP             - (default: empty string, optional) Useful for Prod when STRATO is running on https and we have to call it by real DNS name (SSL requirement) but need to resolve it through the local network (e.g. STRATO port is closed to the world). Non-empty value will create /etc/hosts record in container to resolve hostname provided in STRATO_HOST to STRATO_LOCAL_IP. Example: `172.17.0.1` (docker0 IP of machine - see `ifconfig`). Otherwise - will resolve hostname with public DNS. 
 NODE_PUBLIC_KEY             - (default: dummy hex public key) STRATO node's blockstanbul public key
 OAUTH_APP_TOKEN_COOKIE_NAME - (default: 'tCommerce_session') Browser session cookie name for the node, e.g. tCommerce-node1-session'

@@ -126,7 +126,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMinPrice,
           debouncedMaxPrice
         );
-    } else {
+    } else if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
@@ -306,7 +306,7 @@ const CategoryProductList = ({ user }) => {
                     >
                       <div className="flex flex-col gap-3">
                         {subCategorys.map((subcategory, index) => (
-                          <Checkbox value={subcategory.name} key={index} className="m-0" onChange={onChangeSubCategory}>
+                          <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
                             {subcategory.name}
                           </Checkbox>
                         ))}
