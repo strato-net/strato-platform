@@ -1407,6 +1407,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
+  liftIO $ print $ T.pack $ "expToVar: " ++ show x
   v <- expToVar' x
   decrementGas 1
   return v
@@ -1451,7 +1452,6 @@ expToVar' (CC.PlusPlus _ e) = do
   value <- getInt var
 
   logAssigningVariable $ SInteger value
-
   setVar var $ SInteger $ value + 1
   return $ Constant $ SInteger value
 
@@ -1498,7 +1498,10 @@ expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.Order
   return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
     Just contract -> unparseContract  contract;
     _ -> getRunTimeCodeError "Failed to get contract runtime code " x
-
+-- case to catch _x.add(3) 
+--expToVar' (CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ name) (CC.OrderedArgs args)) _) = do
+--  let args' = map expToPath args
+--  return $ Constant $ SFunctionCall name args'
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
 
@@ -1634,93 +1637,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
       ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
-      -- This is for the case where we are using a using declartion such as 
-      {-
-      library SafeMath {
-          function add(uint a, uint b) returns (uint) {
-            return a + b;
-          }
-        }
-        contract qq {
-          using SafeMath for uint;
-          function useUsing(uint _x) returns (uint) {
-            return _x.add(1);
-          }
-          uint x = useUsing(3);
-        }
-    -}
-    -- we should get the using declartions from the current contract and then look through all contracts for the contract with the contratName in the Using
-    -- and the function name given by SomeString
-
-      (_, someString) -> do
-        ctrct <- getCurrentContract
-        let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
-        let usingDecls = concat $ M.elems usingDeclsInContract
-        -- iterate through the list of using declartions and find ones that have the someString as a function name
-        (_, cc) <- getCurrentCodeCollection
-        -- get the usingContract name
-        let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
-        -- search through the contracts in the code collection for the contract with the name usingContractName
-        let contracts = cc ^. CC.contracts
-        let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
-        let usingContracts' = catMaybes usingContracts
-        -- look throught the functions of each contract and find the one with the name someString
-        let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
-        let theFunction = map (\y -> M.lookup someString y) usingFunctions 
-        let theFunction' = catMaybes theFunction
-        if length theFunction' == 0 then
-          typeError ("illegal member access: function you are using, is not in a using claused library ") (x, someString)
-        else do
-            curAccount <- getCurrentAccount
-                        
-            let theFinalFunc = Constant $ SContractFunction (Just $ CC._contractName $ last usingContracts') (accountOnUnspecifiedChain $ curAccount) someString
-           
-        --(SBuiltinVariable "msg", "data") -> do
-        --        contract' <- getCurrentContract
-        --        functionName <- getCurrentFunctionName
-        --        callInfo <- getCurrentCallInfo
-        --        let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-        --            localVars = localVariables callInfo
-        --        argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
-        --        argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
-        --        return . Constant . SString $ "("++argsToStr++")"
-        --      (SBuiltinVariable "msg", "sig") -> do
-        --        functionName <- getCurrentFunctionName
-        --        contract' <- getCurrentContract
-        --        let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-        --            argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
-        --            argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
-        --            calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
-        --        return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
-
-        --            callData <- getCallData
-        --            let theArgs = callData ^. CC.arguments
-        --            let theArgs' = argString : theArgs
---            data CallInfo = CallInfo
---              { currentFunctionName :: SolidString
---              , currentAccount      :: Account
---              , currentContract     :: CC.Contract
---              , codeCollection      :: CC.CodeCollection
---              , collectionHash      :: Keccak256
---              , localVariables      :: Map SolidString (SVMType.Type, Variable)
---              , variableStack       :: [Map SolidString (SVMType.Type, Variable)]
---              , readOnly            :: Bool
---              , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
---              , currentSourcePos    :: Maybe SourcePosition
---              , isFreeFunction      :: Bool
---              } deriving (Show)
-
-
-
-
-            -- now we add the argString to the front of the arguments
-            -- we need to get the arguments from the callInfo
-
-
-            return theFinalFunc
-
-        
-     -- m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
+          
+       
+      m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
@@ -1906,6 +1825,54 @@ expToVar' (CC.ArrayExpression _ exps) = do
 expToVar' (CC.Ternary _ condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
+
+-- case to catch a using statement function like _x.add(3)
+expToVar' (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos firstArgVar) usingFuncName) (CC.OrderedArgs xs)) = do
+-- firstArgVar == "_x" and usingFuncName == "add" and xs == [NumberLiteral (line 11, column 19) - (line 11, column 20): ()  1 Nothing] 
+    ctrct <- getCurrentContract
+    
+    let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
+    (_, cc) <- getCurrentCodeCollection
+    let usingDecls = concat $ M.elems usingDeclsInContract
+    -- iterate through the list of using declartions and find ones that have the someString as a function name
+    -- get the usingContract name
+    let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
+    -- search through the contracts in the code collection for the contract with the name usingContractName
+    let contracts = cc ^. CC.contracts
+    let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
+    let usingContracts' = catMaybes usingContracts
+    -- look throught the functions of each contract and find the one with the name usingFuncName
+    let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
+    let theFunction = map (\y -> M.lookup usingFuncName y) usingFunctions
+    let theFunction' = catMaybes theFunction
+    let theFunction'' = case theFunction' of
+                          [] -> internalError "No function found" (firstArgVar, usingFuncName)
+                          (x:_) -> x -- big unknown if there are two functions with the same name
+    -- add theFunction' to the current contract's functions
+    addFunctionToCurrentContractInCurrentCallInfo usingFuncName theFunction''
+
+    -- now we need to get the value of the firstArgVar and prepend it to the xs list
+    let x' = (CC.Variable (firstPos) firstArgVar)
+    let dummyAnnotation :: SourceAnnotation ()
+        dummyAnnotation =
+            SourceAnnotation
+            {
+              _sourceAnnotationStart=SourcePosition {
+                _sourcePositionName="",
+                _sourcePositionLine=0,
+                _sourcePositionColumn=0
+                },
+              _sourceAnnotationEnd=SourcePosition {
+                _sourcePositionName="",
+                  _sourcePositionLine=0,
+                  _sourcePositionColumn=0
+                },
+              _sourceAnnotationAnnotation = ()
+            }
+
+    theResult <- expToVar (CC.FunctionCall dummyAnnotation (CC.Variable dummyAnnotation usingFuncName) (CC.OrderedArgs (x' : xs))) 
+    removeFunctionFromCurrentContractInCurrentCallInfo usingFuncName
+    return theResult
 
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes{}) (CC.OrderedArgs args)) = do
   case args of

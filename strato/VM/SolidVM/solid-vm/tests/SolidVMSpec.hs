@@ -39,7 +39,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import qualified Numeric (readHex, showHex)
-import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -7097,7 +7097,7 @@ contract qq {
 |] 
     getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
-  fit "can use using statement" . runTest $ do
+  it "can use using statement" . runTest $ do
     runBS [r|
 
 library SafeMath {
@@ -7116,7 +7116,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 4]
 
 
-  fit "can use libraries" . runTest $ do
+  it "can use libraries" . runTest $ do
     runBS [r|
 
 library SafeMath {
