@@ -46,24 +46,20 @@ const HeaderComponent = ({ user, loginUrl }) => {
     {
       role: 0,
       items: [
-        { label: 'Marketplace', key: '0' },
-        { label: 'Orders', key: '1' },
-        { label: 'Inventory', key: '2' },
-        { label: 'Products', key: '3' },
-        { label: 'Events', key: '4' },
+        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+        { label: <div id="Orders">Orders</div>, key: '1' },
+        { label: <div id="Inventory">Inventory</div>, key: '2' },
+        { label: <div id="Products">Products</div>, key: '3' },
+        { label: <div id="Events">Events</div>, key: '4' },
       ]
     },
     {
       role: 1,
       items: [
-        { label: 'Marketplace', key: '0' },
+        { label: <div id="Marketplace"></div>, key: '0' },
       ]
     },
   ];
-
-  // const demoMenuItems=[
-  //   { label: 'Marketplace', key: '0' },
-  // ];
 
   const navUrls = [
     routes.Marketplace.url,
@@ -113,7 +109,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     {
       key: '1',
       label: (
-        <div type="text" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
+        <div type="text" id="logout" className="w-full text-secondryB text-sm !hover:bg-success" onClick={logout}>
           Logout
         </div>
       ),
@@ -190,10 +186,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} className="text-base text-white"> Login / Register </a> : null
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"> Login / Register </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="dropdown">
+              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
                 {initials}
               </a>
             </Dropdown>

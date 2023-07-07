@@ -100,6 +100,19 @@ This should open a browser window and display a basic React webpage.
 
 *NOTE: `yarn develop` will start the UI and use the terminal window to dump log information. To stop the UI, hit `CTRL+C`*.
 
+## Cypress Test
+There are two options: 
+1. Using explorer
+```
+cd marketplace/ui
+yarn run cypress open 
+```
+*NOTE: Select E2E testing in the dialog*
+
+2. Using CLI
+```
+yarn test:e2e
+```
 #### Stopping the App
 
 To stop the app, hit `CTRL+C` on the server and UI windows. To stop the nginx server, run
