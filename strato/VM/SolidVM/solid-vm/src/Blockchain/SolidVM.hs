@@ -1498,10 +1498,6 @@ expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.Order
   return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
     Just contract -> unparseContract  contract;
     _ -> getRunTimeCodeError "Failed to get contract runtime code " x
--- case to catch _x.add(3) 
---expToVar' (CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ name) (CC.OrderedArgs args)) _) = do
---  let args' = map expToPath args
---  return $ Constant $ SFunctionCall name args'
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
 
