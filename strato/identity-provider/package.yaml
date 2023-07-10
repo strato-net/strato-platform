@@ -38,11 +38,15 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - hflags
   - http-client
   - http-types
+  - mtl
+  - resourcet
   - servant-server
   - strato-model
   - text
+  - unliftio
 
 executables:
   identity-provider-exe:
@@ -55,6 +59,10 @@ executables:
     dependencies:
     - aeson
     - blockapps-identity-provider
+    - hflags
+    - http-client
+    - servant-client
+    - transformers
     - warp
 
 tests:

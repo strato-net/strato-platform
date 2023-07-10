@@ -3,26 +3,44 @@
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module Lib 
     ( AccessToken
     , getAccessToken
     , OAuthUser
     , identityProviderApp
+    , putIdentity
     , getUserByUUID
+    , runContextM'
+    , hoistCoreServer
+    , server
     )
 where
 
+import           UnliftIO                                hiding (Handler)
 import           Servant
 import           Network.HTTP.Client hiding (Proxy)
 import           Network.HTTP.Types.Header (hContentType, hAuthorization)
 
 import           Data.Aeson
--- import           Data.Map
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics
 import           Blockchain.Strato.Model.Address (Address(..))
+
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Resource
+import           BlockApps.Logging
+
 
 newtype AccessToken = AccessToken {access_token :: Text} deriving (Show, Generic)
 instance FromJSON AccessToken
@@ -70,16 +88,30 @@ type PutIdentity = "identity"
 --root cert just files on server's file system (flag to point to files)
 --use makeSignedCert function (or refactor the x509-gen tool)
 --add client binding to tx endpoint (then call it)
-type IdentityProviderAPI = PutIdentity --only 1 endpoint
+type IdentityProviderAPI =  PutIdentity --only 1 endpoint
 
 -- use vault client bindings
-putIdentity :: Text -> Text -> Handler Address
+putIdentity :: (MonadIO m, MonadLogger m) => Text -> Text -> m Address
 putIdentity _ _ = do
     -- first check if a user exists in vault
+    $logInfoS "putIdentity" "just returning x509"
     return $ Address 0x509
 
-identityProviderServer :: Server IdentityProviderAPI
-identityProviderServer = putIdentity
+runContextM' :: MonadUnliftIO m
+            => r
+            -> ReaderT r (ResourceT m) a
+            -> m ()
+runContextM' r = void . runResourceT . flip runReaderT r     
+
+server :: (MonadIO m, MonadLogger m) => ServerT IdentityProviderAPI m
+server = putIdentity
+
+
+hoistCoreServer :: Server IdentityProviderAPI
+hoistCoreServer  = hoistServer (Proxy :: Proxy IdentityProviderAPI) convertErrors server
+  where
+    convertErrors :: LoggingT IO a -> Handler a
+    convertErrors x = Handler $ liftIO $ runLoggingT x 
 
 identityProviderApp :: Application
-identityProviderApp = serve (Proxy @IdentityProviderAPI) identityProviderServer
+identityProviderApp = serve (Proxy :: Proxy IdentityProviderAPI) hoistCoreServer
