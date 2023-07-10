@@ -10,9 +10,12 @@ description:
 
 dependencies:
   - base
+  - containers
+  - data-fix
   - ethereum-rlp
   - leveldb-haskell
   - monad-alter
+  - mtl
   - nibblestring
   - resourcet
   - strato-model
@@ -26,7 +29,6 @@ library:
   - binary
   - bytestring
   - conduit
-  - containers
   - data-default
   - deepseq
   - format

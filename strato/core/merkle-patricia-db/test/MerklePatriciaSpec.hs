@@ -10,8 +10,6 @@ module Main where
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Database.MerklePatricia.InternalMem
-import           Blockchain.Database.MerklePatriciaMem
 import           Blockchain.Strato.Model.Util
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Reader
@@ -45,36 +43,35 @@ addAllKVs sr (x:rest) = do
   sr' <- unsafePutKeyVal sr (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
   addAllKVs sr' rest
 
-addAllKVsMem :: RLPSerializable obj => Monad m => MPMem -> [(N.NibbleString, obj)] -> m MPMem
+addAllKVsMem :: (RLPSerializable obj, (StateRoot `Alters` NodeData) m) => StateRoot -> [(N.NibbleString, obj)] -> m StateRoot
 addAllKVsMem x [] = return x
-addAllKVsMem mpdb (x:rest) = do
-  mpdb' <- unsafePutKeyValMem mpdb (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVsMem mpdb' rest
-
-blank :: MPMem
-blank = initializeBlankMem {mpStateRoot=emptyTriePtr}
+addAllKVsMem sr (x:rest) = do
+  sr' <- unsafePutKeyVal sr (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
+  addAllKVsMem sr' rest
 
 testGetPut :: Test
 testGetPut = TestCase $ do
-  db <- putSingleKV key val
-  res <- getSingleKV db key
+  res <- runMP $ do
+    db <- putSingleKV key val
+    getSingleKV db key
 
   assertEqual "get . put = id" res [(key,val)]
 
 testGetPutRepeated :: Test
 testGetPutRepeated = TestCase $ do
-  db <- putSingleKV key val
-  db2 <- unsafePutKeyValMem db key2 val2
+  res <- runMP $ do
+    db <- putSingleKV key val
+    db2 <- unsafePutKeyVal db key2 val2
 
-  res <- getSingleKV db2 key2
+    getSingleKV db2 key2
 
   assertEqual "get . put . put = id" res [(key2,val2)]
 
 testGetPutRepeatedII :: Test
 testGetPutRepeatedII = TestCase $ do
-  db <- addAllKVsMem blank bigTest
-
-  res <- getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
+  res <- runMP $ do
+    db <- addAllKVsMem emptyTriePtr bigTest
+    getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
 
@@ -86,9 +83,9 @@ testSingleInsert = TestCase $ do
       initializeBlank
       addAllKVs emptyTriePtr [head bigTest]
 
-  sr2 <- addAllKVsMem blank [head bigTest]
+  sr2 <- runMP $ addAllKVsMem emptyTriePtr [head bigTest]
 
-  assertEqual "disk - mem single insert" sr (mpStateRoot sr2)
+  assertEqual "disk - mem single insert" sr sr2
 
 testMultipleInserts :: Test
 testMultipleInserts = TestCase $ do
@@ -98,9 +95,9 @@ testMultipleInserts = TestCase $ do
       initializeBlank
       addAllKVs emptyTriePtr bigTest
 
-  sr2 <- addAllKVsMem blank bigTest
+  sr2 <- runMP $ addAllKVsMem emptyTriePtr bigTest
 
-  assertEqual "disk - mem multiple insert" sr (mpStateRoot sr2)
+  assertEqual "disk - mem multiple insert" sr sr2
 
 
 key :: N.NibbleString
@@ -115,11 +112,11 @@ key2 = (byteString2NibbleString "otherString")
 val2 :: RLPObject
 val2 = (RLPString "thatString2")
 
-putSingleKV :: (Monad m) => Key->Val->m MPMem
-putSingleKV k v= unsafePutKeyValMem blank k v
+putSingleKV :: (StateRoot `Alters` NodeData) m => Key -> Val -> m StateRoot
+putSingleKV = unsafePutKeyVal emptyTriePtr
 
-getSingleKV :: (Monad m) => MPMem -> Key -> m [(Key,Val)]
-getSingleKV db key' = unsafeGetKeyValsMem db key'
+getSingleKV :: (StateRoot `Alters` NodeData) m => StateRoot -> Key -> m [(Key,Val)]
+getSingleKV = unsafeGetKeyVals
 
 spec :: Spec
 spec = do

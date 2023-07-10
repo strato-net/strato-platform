@@ -29,15 +29,15 @@ putManyKeyVal :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
 putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (BF.first MP.keyToSafeKey) listOfInserts
 
-  nd <- MP.getNodeData $ MP.PtrRef sr
+  nd <- MP.getNodeData $ MP.ptrRef sr
 
   finalNd <- putManyKeyVal_nodeData nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
 
   nr <- MP.nodeData2NodeRef finalNd
 
   case nr of
-    MP.PtrRef sr' -> return sr'
-    MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
+    Right sr' -> return sr'
+    Left v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
       let newSR = MP.StateRoot $ keccak256ToByteString $ hash v
       A.insert (A.Proxy @MP.NodeData) newSR finalNd
       return newSR

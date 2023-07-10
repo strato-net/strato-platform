@@ -26,8 +26,8 @@
 
 module Blockchain.Database.MerklePatricia (
   genericLookupDB, genericInsertDB, genericDeleteDB,
-  Key, Val, StateDB(..), StateRoot(..), NodeData(..),
-  openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
+  Key, Val, StateDB(..), StateRoot(..), NodeDataF(..), NodeData,
+  runMP, openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
   initializeBlank, blankStateRoot
   ) where
@@ -42,7 +42,6 @@ import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Strato.Model.Keccak256           (hash, keccak256ToByteString)
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do
@@ -101,11 +100,4 @@ keyExists sr key = isJust <$> getKeyVal sr key
 
 -- | Returns the StateRoot of the blank database
 blankStateRoot :: StateRoot
-blankStateRoot = StateRoot $ keccak256ToByteString $ hash (rlpSerialize $ rlpEncode (0 :: Integer))
-
--- | Initialize the DB by adding a blank stateroot.
-initializeBlank :: (StateRoot `Alters` NodeData) m
-                => m ()
-initializeBlank =
-    let bytes = rlpSerialize $ rlpEncode EmptyNodeData
-    in insert Proxy (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData
+blankStateRoot = emptyTriePtr

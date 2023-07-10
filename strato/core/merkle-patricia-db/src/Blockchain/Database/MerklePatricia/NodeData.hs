@@ -1,31 +1,47 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.Database.MerklePatricia.NodeData (
   Key,
   Val,
-  NodeData(..),
-  NodeRef(..),
-  emptyRef
+  NodeDataF(..),
+  NodeData,
+  NodeDataProof,
+  NodeRefF,
+  NodeRef,
+  runMP,
+  initializeBlank,
+  smallRef,
+  ptrRef,
+  emptyRef,
+  verifyNodeDataProof,
+  verifyMP
   ) where
 
+import qualified Control.Monad.Change.Alter                   as A
+import           Control.Monad.State
 import           Data.Bifunctor                               (first)
 import           Data.Bits
 import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as BC
+import           Data.Fix
 import           Data.Functor.Compose
-import           Data.Functor.Identity
+import           Data.Map.Strict                              (Map)
+import qualified Data.Map.Strict                              as M
 import qualified Data.NibbleString                            as N
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Text.Format
+import           Blockchain.Strato.Model.Keccak256
 
 -------------------------
 
@@ -37,16 +53,18 @@ type Val = RLPObject
 
 -------------------------
 
-data NodeRefF a = SmallRef B.ByteString | PtrRef a deriving (Show, Eq)
+type NodeRefF a = Either B.ByteString a
 
 type NodeRef = NodeRefF StateRoot
 
-emptyRef::NodeRef
-emptyRef = SmallRef $ B.pack [0x80]
+smallRef :: B.ByteString -> NodeRefF a
+smallRef = Left
 
-instance Pretty NodeRef where
-  pretty (SmallRef x) = green $ text $ BC.unpack $ B16.encode x
-  pretty (PtrRef (Identity x))   = green $ text $ format x
+ptrRef :: a -> NodeRefF a
+ptrRef = Right
+
+emptyRef :: NodeRefF a
+emptyRef = Left $ B.pack [0x80]
 
 -------------------------
 
@@ -54,24 +72,37 @@ data NodeDataF a = EmptyNodeData
                  | FullNodeData {
                     -- Why not make choices a map (choices::M.Map N.Nibble NodeRef)?  Because this type tends to be created
                     -- more than items are looked up in it....  It would actually slow things down to use it.
-                    choices :: [Either B.ByteString a],
+                    choices :: [NodeRefF a],
                     nodeVal :: Maybe Val
                    }
                  | ShortcutNodeData {
                      nextNibbleString :: Key,
-                     nextVal          :: Either (Either B.ByteString a) Val
+                     nextVal          :: Either (NodeRefF a) Val
                    }
                  deriving (Show, Eq)
 
+instance Functor NodeDataF where
+  fmap _ EmptyNodeData = EmptyNodeData
+  fmap f (FullNodeData cs v) = FullNodeData (fmap f <$> cs) v
+  fmap f (ShortcutNodeData k v) = ShortcutNodeData k (first (fmap f) v)
+
+instance Monad m => (StateRoot `A.Alters` NodeData) (StateT (Map StateRoot NodeData) m) where
+  lookup _ k   = M.lookup k <$> get
+  insert _ k v = modify' $ M.insert k v
+  delete _ k   = modify' $ M.delete k
+
+runMP :: Monad m => StateT (M.Map StateRoot NodeData) m a -> m a
+runMP f = evalStateT (initializeBlank >> f) M.empty
+
+-- | Initialize the DB by adding a blank stateroot.
+initializeBlank :: (StateRoot `A.Alters` NodeData) m
+                => m ()
+initializeBlank = A.insert A.Proxy emptyTriePtr (EmptyNodeData :: NodeData)
+
+newtype Proof a = Proof { unProof :: (StateRoot, Maybe a) } deriving (Eq, Show, Functor)
+
 type NodeData = NodeDataF StateRoot
-type NodeDataProof = Compose ((,) StateRoot) (Compose Maybe NodeDataF)
-
-newtype Fix f = Fix { unFix :: f (Fix f) }
-
-type Algebra f a = f a -> a
-
-cata :: Functor f => Algebra f a -> Fix f -> a
-cata alg = alg . fmap (cata alg) . unFix
+type NodeDataProof = Compose Proof NodeDataF
 
 unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
 unproofNodeData EmptyNodeData = EmptyNodeData
@@ -82,20 +113,20 @@ valid :: Either a (b, Bool) -> Bool
 valid (Right (_, b)) = b
 valid _              = True
 
-verifyNodeDataProof :: Algebra NodeDataProof (StateRoot, Bool)
-verifyNodeDataProof (Compose (sr, inner)) = (sr, verifyInner inner)
-  where verifyInner (Compose (Just nd@(FullNodeData cs _))) =
+verifyNodeDataProof :: NodeDataProof (StateRoot, Bool) -> (StateRoot, Bool)
+verifyNodeDataProof (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
+  where verifyInner (Just nd@(FullNodeData cs _)) =
           let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
               b = all valid cs
            in s == sr && b
-        verifyInner (Compose (Just nd@(ShortcutNodeData _ (Left b)))) =
+        verifyInner (Just nd@(ShortcutNodeData _ (Left c))) =
           let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
-              b = all valid cs
-           in s == sr & b
-verifyNodeDataProof (Compose (sr, _)) = (sr, True)
+              b = valid c
+           in s == sr && b
+        verifyInner _ = True
 
 verifyMP :: Fix NodeDataProof -> Bool
-verifyMP = snd . cata verifyNodeDataProof
+verifyMP = snd . foldFix verifyNodeDataProof
 
 formatVal::Maybe RLPObject->Doc
 formatVal Nothing  = red $ text "NULL"
@@ -103,13 +134,15 @@ formatVal (Just x) = green $ pretty x
 
 instance Pretty a => Pretty (NodeDataF a) where
   pretty EmptyNodeData = text "    <EMPTY>"
-  pretty (ShortcutNodeData s (Left p)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (pretty p)
+  pretty (ShortcutNodeData s (Left (Left p))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green . text . BC.unpack $ B16.encode p)
+  pretty (ShortcutNodeData s (Left (Right v))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (pretty v)
   pretty (ShortcutNodeData s (Right val)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green $ pretty val)
   pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (showChoice <$> zip ([0..]::[Int]) cs)
     where
       showChoice :: Pretty a => (Int, Either B.ByteString a) -> Doc
       showChoice (v, Left "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
-      showChoice (v, p)       = blue (text $ showHex v "") </> text ": " </> green (pretty p)
+      showChoice (v, Left p)  = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
+      showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
 
 instance RLPSerializable a => RLPSerializable (NodeDataF a) where
   rlpEncode EmptyNodeData = RLPString ""
@@ -129,7 +162,7 @@ instance RLPSerializable a => RLPSerializable (NodeDataF a) where
         case val of
           Left _  -> False
           Right _ -> True
-      encodeVal :: RLPSerializable a => Either (Either B.ByteString a) Val -> RLPObject
+      encodeVal :: RLPSerializable a => Either (NodeRefF a) Val -> RLPObject
       encodeVal (Left (Right x)) = rlpEncode x
       encodeVal (Left (Left x))  = rlpDeserialize x
       encodeVal (Right x)        = x
@@ -152,7 +185,7 @@ instance RLPSerializable a => RLPSerializable (NodeDataF a) where
         RLPScalar 0  -> Nothing
         RLPString "" -> Nothing
         x'           -> Just x'
-      getPtr :: RLPSerializable a => RLPObject -> Either B.ByteString a
+      getPtr :: RLPSerializable a => RLPObject -> NodeRefF a
       getPtr o | B.length (rlpSerialize o) < 32 = Left $ rlpSerialize o
       --getPtr o@(RLPArray [_, _]) = SmallRef $ rlpSerialize o
       getPtr p = Right $ rlpDecode p
