@@ -60,22 +60,21 @@ getUserByUUID token uuid = do
 
 
 
-type PutIdentity = "identity" -- what headers to include? -> shouwl be X-ACCESS-USER-TOKEN
-                :> Header' '[Required, Strict] "Authorization" Text -- parse this as JWT -> get 'sub' field for user's uuid
-                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER" Text
+type PutIdentity = "identity"
+                :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" Text -- pass along for vault calls
+                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text -- need for keycloak query
+                -- maybe in the future we can support "X-IDENTITY-PROVIDER" header too
                 :> Put '[JSON] Address --should return cert address
---realm name should be parameter
+--realm name should be flag
+--node url should also be a flag
 --root cert just files on server's file system (flag to point to files)
---ask Zach where storing org name and common name on keycloak (attribute?)
 --use makeSignedCert function (or refactor the x509-gen tool)
 --add client binding to tx endpoint (then call it)
---node url should also be a param
 type IdentityProviderAPI = PutIdentity --only 1 endpoint
 
 -- use vault client bindings
-makeCert :: Text -> Text -> Handler Address
-makeCert _ _ = do
+putIdentity :: Text -> Text -> Handler Address
+putIdentity _ _ = do
     -- first check if a user exists in vault
     return $ Address 0x509
 

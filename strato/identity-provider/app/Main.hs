@@ -11,6 +11,10 @@ import           Lib
 main :: IO ()
 main = do
     -- $logInfoS "Identity Server Setup" "Initializing identity server..."
+    
+    -- set up vault client connection
+    
+    
     putStrLn "Getting master token"
     mToken <- getAccessToken
     print mToken
