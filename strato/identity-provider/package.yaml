@@ -38,15 +38,19 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - blockapps-vault-wrapper-client
   - hflags
   - http-client
   - http-types
+  - monad-alter
   - mtl
   - resourcet
+  - servant-client
   - servant-server
   - strato-model
   - text
   - unliftio
+  - vault-monad
 
 executables:
   identity-provider-exe:
@@ -61,7 +65,6 @@ executables:
     - blockapps-identity-provider
     - hflags
     - http-client
-    - servant-client
     - transformers
     - warp
 

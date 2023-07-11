@@ -12,8 +12,9 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
-module Lib 
+module Lib
     ( AccessToken
     , getAccessToken
     , OAuthUser
@@ -28,6 +29,7 @@ where
 
 import           UnliftIO                                hiding (Handler)
 import           Servant
+import           Servant.Client hiding (responseBody, manager)
 import           Network.HTTP.Client hiding (Proxy)
 import           Network.HTTP.Types.Header (hContentType, hAuthorization)
 
@@ -36,11 +38,13 @@ import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics
 import           Blockchain.Strato.Model.Address (Address(..))
+import           Strato.Strato23.Client
 
+import           Control.Monad.Change.Modify
+import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           BlockApps.Logging
-
 
 newtype AccessToken = AccessToken {access_token :: Text} deriving (Show, Generic)
 instance FromJSON AccessToken
@@ -76,7 +80,7 @@ getUserByUUID token uuid = do
     response <- httpLbs request manager
     return $ eitherDecode $ responseBody response
 
-
+-- newtype IDServerVaultConn = IDServerVaultConn {vaultConn :: ClientEnv}
 
 type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" Text -- pass along for vault calls
@@ -91,9 +95,11 @@ type PutIdentity = "identity"
 type IdentityProviderAPI =  PutIdentity --only 1 endpoint
 
 -- use vault client bindings
-putIdentity :: (MonadIO m, MonadLogger m) => Text -> Text -> m Address
+putIdentity :: (MonadIO m, MonadLogger m, HasVault m) => Text -> Text -> m Address
 putIdentity _ _ = do
     -- first check if a user exists in vault
+    VaultData url mgr <- access Proxy
+    liftIO $ runClientM (getKey Nothing Nothing) (mkClientEnv mgr url)
     $logInfoS "putIdentity" "just returning x509"
     return $ Address 0x509
 
@@ -103,15 +109,19 @@ runContextM' :: MonadUnliftIO m
             -> m ()
 runContextM' r = void . runResourceT . flip runReaderT r     
 
-server :: (MonadIO m, MonadLogger m) => ServerT IdentityProviderAPI m
+type IDServerM = (ReaderT VaultData (LoggingT IO)) 
+deriving instance HasVault IDServerM 
+server :: (MonadIO m, MonadLogger m, HasVault m) => ServerT IdentityProviderAPI m
 server = putIdentity
 
 
-hoistCoreServer :: Server IdentityProviderAPI
-hoistCoreServer  = hoistServer (Proxy :: Proxy IdentityProviderAPI) convertErrors server
+hoistCoreServer :: String -> Server IdentityProviderAPI
+hoistCoreServer vaulturl = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
   where
-    convertErrors :: LoggingT IO a -> Handler a
-    convertErrors x = Handler $ liftIO $ runLoggingT x 
+    -- convertErrors :: LoggingT IO a -> Handler a
+    convertErrors r x = Handler $ liftIO $ r x
+    runM' :: ReaderT VaultData (LoggingT IO) x -> IO x
+    runM' x = runLoggingT $ runVaultM vaulturl x
 
-identityProviderApp :: Application
-identityProviderApp = serve (Proxy :: Proxy IdentityProviderAPI) hoistCoreServer
+identityProviderApp :: String -> Application
+identityProviderApp vaulturl = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer vaulturl
