@@ -14,6 +14,8 @@ const ItemsProvider = ({ children }) => {
     message: null,
     serialNumbers:[],
     isSerialNumbersLoading: false,
+    ownershipHistory:[],
+    isOwnershipHistoryLoading: false,
     rawMaterials:[],
     isRawMaterialsLoading: false,
     actualRawMaterials: []
