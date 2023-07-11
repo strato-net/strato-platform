@@ -48,12 +48,7 @@ xabiToContract contractName' parents' userDefinedTypes xabi = do
   _events = Xabi._xabiEvents xabi,
   _functions = Xabi._xabiFuncs xabi,
   _modifiers = Xabi._xabiModifiers xabi,
-  _usings = Xabi._xabiUsing xabi,
   _constructor = constr,
-  _contractType = case (Xabi._xabiKind xabi) of
-    Xabi.ContractKind -> ContractType
-    Xabi.LibraryKind  -> LibraryType
-    Xabi.InterfaceKind -> InterfaceType,
   _contractContext = Xabi._xabiContext xabi
   }
 

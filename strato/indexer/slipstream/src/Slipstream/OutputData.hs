@@ -14,7 +14,7 @@ module Slipstream.OutputData (
   outputData',
   OutputM,
   ProcessedMappingRow(..),
-  insertEventTables,
+  insertExpandEventTables,
   insertIndexTable,
   insertForeignKeys,
   insertMappingTable,
@@ -22,7 +22,7 @@ module Slipstream.OutputData (
   createMappingTable,
   createHistoryTable,
   insertHistoryTable,
-  createExpandEventTables,
+  createEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
   notifyPostgREST,
@@ -36,11 +36,10 @@ import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
 import           Data.Aeson                      (encode)
-import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
-import qualified Data.Map.Strict                 as Map
+import qualified Data.Map                        as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
@@ -52,7 +51,6 @@ import qualified Data.ByteString.Base16          as Base16
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
-import           Text.Format
 import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
@@ -60,29 +58,21 @@ import           UnliftIO.Exception              (handle, catch, SomeException)
 
 import           Bloc.Server.Utils   (partitionWith)
 import           BlockApps.Logging
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import qualified BlockApps.Solidity.Value as V
 
-import           Slipstream.Data.Action
 import qualified Slipstream.Events as E
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
-import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
 
-import           SolidVM.Model.CodeCollection              hiding (contractName, contracts)
+import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
-
-newtype First b a = First { unFirst :: (a,b) }
-
-instance Functor (First b) where
-  fmap f (First (a,b)) = First (f a, b)
 
 data ProcessedMappingRow = ProcessedMappingRow
   { address           :: Address
@@ -104,17 +94,53 @@ data ProcessedMappingRow = ProcessedMappingRow
 crashOnSQLError :: Bool
 crashOnSQLError = False
 
+
+tableSeparator :: Text
+tableSeparator = "-"
+
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
-fillEmptyEntries :: Functor f => [f Text] -> [f Text]
-fillEmptyEntries = zipWith go [(1 :: Int)..]
-  where go i = fmap (\t -> if T.null t then "val_" <> tshow i else t)
+tshow :: Show a => a -> Text
+tshow = T.pack . show
 
-fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
-fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First 
+csv :: [Text] -> Text
+csv = T.intercalate ",\n    "
 
-tableColumns :: [(Text, SVMType.Type)] -> TableColumns
-tableColumns = mapMaybe go . fillFirstEmptyEntries
+wrap :: Text -> Text -> Text -> Text
+wrap b e x = T.concat [b, x, e]
+
+wrap1 :: Text -> Text -> Text
+wrap1 t = wrap t t
+
+wrapSingleQuotes :: Text -> Text
+wrapSingleQuotes = wrap1 "\'"
+
+wrapDoubleQuotes :: Text -> Text
+wrapDoubleQuotes = wrap1 "\""
+
+wrapParens :: Text -> Text
+wrapParens = wrap "(" ")"
+
+wrapAndEscape :: [Text] -> Text
+wrapAndEscape = wrapParens . csv
+
+wrapAndEscapeDouble :: [Text] -> Text
+wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
+
+unwrapDoubleQuotes :: Text -> Text
+unwrapDoubleQuotes = T.dropAround (== '"')
+
+escapeSingleQuotes :: Text -> Text
+escapeSingleQuotes = T.replace "\'" "\'\'"
+
+escapeDoubleQuotes :: Text -> Text
+escapeDoubleQuotes = T.replace "\"" "\\\""
+
+escapeQuotes :: Text -> Text
+escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
+
+tableColumns :: [(Text, VariableDeclF a)] -> TableColumns
+tableColumns = mapMaybe go
   where go (x,y) =
           case solidityTypeToSQLType y of
             Nothing -> Nothing
@@ -125,9 +151,9 @@ tableColumns = mapMaybe go . fillFirstEmptyEntries
 partialParseTableColumns :: TableColumns -> [Text]
 partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe . T.words)
 
-makeAccount :: Text -> Address -> Text
-makeAccount "" addr = tshow $ addr
-makeAccount chain addr = T.concat [
+makeAccount :: E.ProcessedContract -> Text
+makeAccount E.ProcessedContract{chain="", address=addr} = tshow $ addr
+makeAccount E.ProcessedContract{chain=chain, address=addr} = T.concat [
   tshow $ addr,
   ":",
   chain
@@ -251,8 +277,8 @@ constructMappingTableNameParameters org app contract mapping=
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
-uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry4 f (v, x, y, z) = f v x y z
+uncurry3' :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+uncurry3' f (v, x, y, z) = f v x y z
 
 historyTableName :: Text -> Text -> Text -> TableName
 historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
@@ -261,8 +287,44 @@ indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
+mappingTableName o a n m = uncurry3' MappingTableName $ constructMappingTableNameParameters o a n m
 
+-- sometimes we need the unwrapped tablename
+tableNameToDoubleQuoteText :: TableName -> Text
+tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+
+
+tableNameToText :: TableName -> Text
+tableNameToText (IndexTableName o a c) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+  in prefix <> c
+tableNameToText (MappingTableName o a c m ) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndMapping = c <> "." <> m
+  in "mapping@" <> prefix <> contractAndMapping
+tableNameToText (HistoryTableName o a c) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+  in "history@" <> prefix <> c
+tableNameToText (EventTableName o a c e) =
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = c <> "." <> e
+  in prefix <> contractAndEvent
 
 createExpandIndexTable
   :: OutputM m
@@ -337,7 +399,7 @@ createIndexTable globalsIORef contract (o, a, n) = do
   else do
     incNumTables
     yield $ createIndexTableQuery contract (o, a, n)
-    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
 
@@ -374,7 +436,7 @@ createHistoryTable' globalsIORef contract (o, a, n) = do
     incNumHistoryTables
     yield $ ((createHistoryTableQuery contract (o, a, n)), Nothing)
     yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (o, a, n))
-    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -395,7 +457,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
     yieldMany $ addHistoryUnique (o, a, n)
-    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -435,7 +497,7 @@ expandContractTable' globalsIORef contract tableName = do
           ]
       return []
     Just cols -> do
-      let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
+      let list = Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = difference list (partialParseTableColumns cols)
           extraTableColumns = tableColumns extras
@@ -453,7 +515,7 @@ expandContractTable' globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras] $ \(colName, foreignName) ->
+            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) ->
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
@@ -479,7 +541,7 @@ expandContractTable globalsIORef contract tableName = do
           ]
       return []
     Just cols -> do
-      let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
+      let list = Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = difference list (partialParseTableColumns cols)
           extraTableColumns = tableColumns extras
@@ -497,7 +559,7 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras] $ \(colName, foreignName) ->
+            [(colName, foreignName) | (colName, VariableDecl{_varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) ->
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
@@ -555,7 +617,7 @@ insertForeignKeys conn contracts = do
             "=" <>
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <>
             " WHERE record_id=" <>
-            wrapSingleQuotes (makeAccount (E.chain c) (E.address c)) <>
+            wrapSingleQuotes (makeAccount c)  <>
             ";"
       `catch` \(e :: SomeException) -> do
             $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
@@ -565,7 +627,7 @@ insertForeignKeys conn contracts = do
               " SET " <>
               wrapDoubleQuotes theName <>
               "=null WHERE record_id=" <>
-              wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
+              wrapSingleQuotes (makeAccount c)
 
 insertHistoryTable :: OutputM m
                    => [E.ProcessedContract]
@@ -586,7 +648,7 @@ createIndexTableQuery contract (o, a, n) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
+               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y)) list)
         , ",\n  PRIMARY KEY (record_id) );"
         ]
 
@@ -608,7 +670,7 @@ createHistoryTableQuery contract (o, a, n) =
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
-                 ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
+                 ++ tableColumns (map (\(x, y) -> (labelToText x, y)) list)
         , ");"
         ]
 
@@ -641,7 +703,7 @@ insertIndexTableQuery cs = concat $
                   (E.application x)
                   (E.contractName x)
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-              baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
+              baseVals = [ makeAccount
                          , tshow . E.address
                          , E.chain
                          , T.pack . keccak256ToHex . E.blockHash
@@ -687,7 +749,7 @@ insertMappingTableQuery ms = concat $
                   (application x)
                   (contractname x)
                   (mapname x)
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst list
               baseVals = [ makeAccountM
                          , tshow . address
                          , chain
@@ -736,8 +798,8 @@ insertHistoryTableQuery cs = concat $
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
-              baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+              baseVals = [ makeAccount
                          , tshow . E.address
                          , E.chain
                          , T.pack . keccak256ToHex . E.blockHash
@@ -763,53 +825,73 @@ insertHistoryTableQuery cs = concat $
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
-createExpandEventTables :: OutputM m
-                        => IORef Globals
-                        -> Contract
-                        -> (Text, Text, Text)
-                        -> ConduitM () Text m ()
-createExpandEventTables globalsIORef c nameParts = mapM_ go . Map.toList $ c ^. events
-  where go (evName, ev) = do
-          createEventTable globalsIORef nameParts evName ev
-          expandEventTable globalsIORef nameParts evName ev
-          
+createEventTables :: OutputM m
+                  => IORef Globals
+                  -> [E.EventTable]
+                  -> ConduitM () Text m ()
+createEventTables globalsIORef events = do
+  yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
 
 createEventTable :: OutputM m
                  => IORef Globals
-                 -> (Text, Text, Text)
-                 -> SolidString
-                 -> Event
-                 -> ConduitM () Text m ()
-createEventTable globalsIORef (o, a, n) evName ev = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      eventTable = EventTableName org app cname (escapeQuotes $ labelToText evName)
+                 -> E.EventTable
+                 -> m (Maybe Text)
+createEventTable globalsIORef ev = do
+  let (org, app, cname) = constructTableNameParameters
+          (E.eventOrganization ev)
+          (E.eventApplication ev)
+          (E.eventContractName ev)
+      eventTable = EventTableName org app cname (escapeQuotes $ E.eventName ev)
 
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
-    yield $ createEventTableQuery eventTable ev
+  if eventAlreadyCreated then
+    return Nothing
+  else do
+    setTableCreated globalsIORef eventTable $ E.eventFields ev
+    return (Just $ createEventTableQuery ev)
 
-createEventTableQuery :: TableName -> Event -> Text
-createEventTableQuery tableName ev =
-  let cols = ev ^. eventLogs
+createEventTableQuery :: E.EventTable -> Text
+createEventTableQuery ev =
+  let (org, app, cname) = constructTableNameParameters
+          (E.eventOrganization ev)
+          (E.eventApplication ev)
+          (E.eventContractName ev)
+      tableName = EventTableName org app cname (escapeQuotes $ E.eventName ev)
+
+      cols = csv $ ["id SERIAL NOT NULL", "address text"] ++
+                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ E.eventFields ev)
   in T.concat
       [ "CREATE TABLE IF NOT EXISTS "
       , tableNameToDoubleQuoteText tableName
       ," ("
-      , csv $ ["id SERIAL NOT NULL", "record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (x, indexedTypeType y)) cols)
+      , cols
       , ");"
       ]
 
-expandEventTable :: OutputM m
-                 => IORef Globals
-                 -> (Text, Text, Text)
-                 -> SolidString
-                 -> Event
-                 -> ConduitM () Text m ()
-expandEventTable globalsIORef (o, a, n) evName ev = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = EventTableName org app cname (escapeQuotes $ labelToText evName)
+-- Inserts rows for all event emissions into their respective tables, expands tables if necessary
+--   Though this function checks that the tables exist before
+--   generating the insert query, the VM should prevent undeclared
+--   events from being emitted (it should also do an argument check)
+insertExpandEventTables :: OutputM m
+                        => IORef Globals
+                        -> [Action.Event]
+                        -> ConduitM () Text m ()
+insertExpandEventTables _ [] = return ()
+insertExpandEventTables globalsIORef events = do
+  expandEventTables globalsIORef events
+  insertEventTables globalsIORef events
+
+expandEventTables :: OutputM m
+                  => IORef Globals
+                  -> [Action.Event]
+                  -> ConduitM () Text m ()
+expandEventTables _ [] = return ()
+expandEventTables globalsIORef (x:xs) = do
+  let (org, app, cname) = constructTableNameParameters
+          (T.pack $ Action.evContractOrganization x)
+          (T.pack $ Action.evContractApplication x)
+          (T.pack $ Action.evContractName x)
+      tableName = EventTableName org app cname ( escapeQuotes $ T.pack $ Action.evName x)
 
   columns <- getTableColumns globalsIORef tableName
   case columns of
@@ -819,33 +901,34 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
-      pure ()
+      expandEventTables globalsIORef xs
     Just cols -> do
-      let allTableCols = tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
-          extrasWithType = filter (`notElem` cols) allTableCols
-      unless (null extrasWithType) $ do
+      let extras = filter (not . flip elem cols) (map (T.pack . fst) $ Action.evArgs x)
+      unless (null extras) $ do
         $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        setTableCreated globalsIORef tableName allTableCols
         $logInfoS "expandEventTable" $ T.concat
             [ "Adding columns to "
             , (tableNameToText tableName)
             , " for the following new fields: "
-            , T.intercalate ", " extrasWithType
+            , T.intercalate ", " extras
             ]
+        setTableCreated globalsIORef tableName $ cols ++ extras
+        let extrasWithType = map (\t -> T.concat [wrapDoubleQuotes t, " text"]) extras
         yield $ expandTableQuery tableName extrasWithType
+      expandEventTables globalsIORef xs
 
 insertEventTables :: OutputM m
                   => IORef Globals
-                  -> [AggregateEvent]
+                  -> [Action.Event]
                   -> ConduitM () Text m ()
-insertEventTables globalsIORef evs = do
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) evs)
+insertEventTables globalsIORef events = do
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) events)
 
 insertEventTable :: OutputM m
                  => IORef Globals
-                 -> AggregateEvent
+                 -> Action.Event
                  -> m (Maybe Text)
-insertEventTable globalsIORef agEv@AggregateEvent { eventEvent = ev } = do
+insertEventTable globalsIORef ev = do
   let (org, app, cname) = constructTableNameParameters
           (T.pack $ Action.evContractOrganization ev)
           (T.pack $ Action.evContractApplication ev)
@@ -853,62 +936,56 @@ insertEventTable globalsIORef agEv@AggregateEvent { eventEvent = ev } = do
       eventTable = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
   eventExists <- isTableCreated globalsIORef eventTable
-  let q = insertEventTableQuery agEv
-  $logInfoS "insertEventTable" q
-  if eventExists then return (Just q)
+  if eventExists then return (Just $ insertEventTableQuery ev)
   else return Nothing
 
-insertEventTableQuery :: AggregateEvent -> Text
-insertEventTableQuery agEv@AggregateEvent{ eventEvent = ev } =
+insertEventTableQuery :: Action.Event -> Text
+insertEventTableQuery ev =
  let (org, app, cname) = constructTableNameParameters
           (T.pack $ Action.evContractOrganization ev)
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
      tableName = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
-     filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
-     keySt  = wrapAndEscapeDouble . map escapeQuotes $ ("id":baseTableColumns) ++ filledArgs
-     baseVals = [ \e -> makeAccount (T.pack . maybe "" format $ (Action.evContractAccount $ eventEvent e) ^. accountChainId) ((Action.evContractAccount $ eventEvent e) ^. accountAddress)
-                , tshow . _accountAddress . Action.evContractAccount . eventEvent
-                , T.pack . maybe "" format . _accountChainId . Action.evContractAccount . eventEvent
-                , T.pack . keccak256ToHex . eventBlockHash
-                , tshow . eventBlockTimestamp
-                , tshow . eventBlockNumber
-                , T.pack . keccak256ToHex . eventTxHash
-                , tshow . eventTxSender
-                ]
-     vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . T.pack . snd) (Action.evArgs ev)
-  in T.concat $
-       [ "INSERT INTO "
-       , tableNameToDoubleQuoteText tableName
-       , " "
-       , keySt
-       , "\n  VALUES ( DEFAULT,\n"
-       , vals
-       , " )\n  ON CONFLICT DO NOTHING;"
-       ]
+
+     cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
+     vals = csv $ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) $ Action.evArgs ev
+ in T.concat
+        [ "INSERT INTO "
+        , tableNameToDoubleQuoteText tableName
+        , " "
+        , cols
+        , " VALUES "
+        , "( DEFAULT,\n" -- id, set by Postgres
+        , wrapSingleQuotes $ tshow $ Action.evContractAccount ev
+        , ",\n"
+        , vals
+        ,  " );"
+        , "\n"--  ON CONFLICT DO NOTHING;"
+        ]
+
 
 
 ------------------
 
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-solidityTypeToSQLType :: SVMType.Type -> Maybe Text
-solidityTypeToSQLType SVMType.Bool = Just "bool"
-solidityTypeToSQLType (SVMType.Int _ _) = Just "decimal"
-solidityTypeToSQLType (SVMType.String _) = Just "text"
-solidityTypeToSQLType (SVMType.Bytes _ _) = Just "text"
-solidityTypeToSQLType (SVMType.UserDefined _ _) = Just "text"
-solidityTypeToSQLType (SVMType.Fixed _ _) = Just "fixed"
-solidityTypeToSQLType (SVMType.Address _) = Just "text"
-solidityTypeToSQLType (SVMType.Account _) = Just "text"
-solidityTypeToSQLType (SVMType.Array _ _) = Nothing -- Just "jsonb"
-solidityTypeToSQLType (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
-solidityTypeToSQLType (SVMType.UnknownLabel _ _) = Just "text"
---solidityTypeToSQLType (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType (SVMType.Struct _ _) = Just "jsonb"
-solidityTypeToSQLType (SVMType.Enum _ _ _) = Just "text"
-solidityTypeToSQLType (SVMType.Contract _) = Just "text"
-solidityTypeToSQLType (SVMType.Error _ _) = Just "text"
+solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Int _ _} = Just "decimal"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.UserDefined _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Fixed _ _ } = Just "fixed"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Address _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Account _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.UnknownLabel _ _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Error _ _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 

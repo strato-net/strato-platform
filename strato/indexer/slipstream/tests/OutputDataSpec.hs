@@ -60,8 +60,6 @@ createInserts globalsIORef contracts = do
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
 
-fakeCirrusHandle :: CirrusHandle
-fakeCirrusHandle = FakeCirrusHandle
 
 spec :: Spec
 spec = do
@@ -93,7 +91,7 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals fakeHandle fakeCirrusHandle
+      g <- newGlobals M.empty fakeHandle
       [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
@@ -157,7 +155,7 @@ spec = do
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals fakeHandle fakeCirrusHandle
+      g <- newGlobals M.empty fakeHandle
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g input .| sinkList
@@ -258,7 +256,7 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals fakeHandle fakeCirrusHandle
+      g <- newGlobals M.empty fakeHandle
       [vehicleCreate, _, _, _, vehicleInsert, _] <-
           runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate `shouldBe`
@@ -344,7 +342,7 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+    g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
@@ -472,7 +470,7 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals fakeHandle fakeCirrusHandle
+    g <- newGlobals M.empty fakeHandle
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
@@ -523,7 +521,7 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+    g <- newGlobals M.empty fakeHandle
     [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
@@ -592,6 +590,42 @@ spec = do
     "strukt" = excluded."strukt";|]
 
 
+  describe "Cirrus scrape tests" $ do
+    it "uses values in non-empty cache to remember tables from before a restart" $ do
+      let testAdd = Address 0x98eaddede
+          input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "SwissArmy",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 124,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.fromList [("str", bytes "Hello, World!")]
+            }, createDummyContract [("str", SVMType.String Nothing)])]
+          cache = M.singleton (IndexTableName "" "" "SwissArmy") ["str"]
+
+      g <- newGlobals cache fakeHandle
+
+      queries <- runLoggingT . runConduit $ createInserts g input .| sinkList
+
+      -- should not attempt to create new table
+      elem [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
+      address text,
+      "chainId" text,
+      block_hash text,
+      block_timestamp text,
+      block_number text,
+      transaction_hash text,
+      transaction_sender text,
+      "str" text,
+      PRIMARY KEY (record_id) );|] queries  `shouldNotBe` True
+
+
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
@@ -616,7 +650,5 @@ createDummyContract v =
       _functions=undefined,
       _constructor=undefined,
       _modifiers=undefined,
-      _usings=undefined,
-      _contractContext=undefined,
-      _contractType=undefined
+      _contractContext=undefined
     }

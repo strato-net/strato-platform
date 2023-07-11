@@ -46,7 +46,7 @@ Some extra reading on memory analysis: https://github.com/well-typed/memory-usag
 
 -}
 
--- Functions that output files will ouput to the /tmp directory inside the strato-strato-1 container.
+-- Functions that output files will ouput to the /tmp directory inside the strato_strato_1 container.
 -- Note: It is also suggested to add your own debug functions if these do not fulfill your needs.
 main :: IO ()
 main = withDebuggeeConnect "/tmp/ghc-debug" $ \d -> do 

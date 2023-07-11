@@ -20,7 +20,6 @@ import           Blockchain.RLPx
 import           Conduit
 import           Control.Lens                          ((^.))
 import           Control.Monad
-import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Either.Combinators
@@ -80,7 +79,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                   $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                  disErr <- storeDisableException p (T.pack "WrongGenesisBlock")
                  whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                 A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                  lengthenPeerDisable p
                 e' | Just HeadMacIncorrect  <- fromException e' -> do
                   disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
@@ -92,7 +90,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                   $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                  disErr <- storeDisableException p (T.pack "NetworkIDMismatch")
                  whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                 A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                  lengthenPeerDisable p
                 e' | Just PeerDisconnected <- fromException e' -> do
                   disErr <- storeDisableException p (T.pack "PeerDisconnected")

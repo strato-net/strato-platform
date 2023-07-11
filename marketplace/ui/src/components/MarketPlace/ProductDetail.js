@@ -328,7 +328,7 @@ const ProductDetails = ({ user, users }) => {
         };
       },
       render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]" id={`Ownership-Item-Number-${serialNumber}`}>
+        <Button type="link" className="text-primary text-[17px]">
           {serialNumber}
         </Button>
       ),
@@ -381,14 +381,14 @@ const ProductDetails = ({ user, users }) => {
 
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px] ownership">SELLER</Text>,
+      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
       dataIndex: "seller",
       key: "seller",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px] ownership">OWNER</Text>,
+      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
       dataIndex: "newOwner",
       key: "newOwner",
       align: "center",
@@ -396,7 +396,7 @@ const ProductDetails = ({ user, users }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px] ownership">
+        <Text className="text-primaryC text-[13px]">
           OWNERSHIP START DATE
         </Text>
       ),
@@ -409,7 +409,7 @@ const ProductDetails = ({ user, users }) => {
 
   const transformationColumn = [
     {
-      title: <Text className="text-primaryC text-[13px] transformation">SERIAL NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
       dataIndex: "serialNumber",
       key: "serialNumber",
       align: "center",
@@ -436,7 +436,7 @@ const ProductDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px] transformation">ITEM NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
       dataIndex: "itemNumber",
       key: "itemNumber",
       align: "center",
@@ -459,7 +459,9 @@ const ProductDetails = ({ user, users }) => {
         <Button
           type="link"
           className="text-primary text-[17px]"
-          id={`Transformation-Item-Number-${text}`}
+          onClick={() => {
+
+          }}
         >
           {text}
         </Button>
@@ -772,7 +774,7 @@ const ProductDetails = ({ user, users }) => {
 
           {isSerialNumberSelected ? (
             <Card className="mb-12 mx-16">
-              <Text className="font-semibold text-lg ownership">Ownership History</Text>
+              <Text className="font-semibold text-lg">Ownership History</Text>
               <Row className="my-6">
                 <EventDetailsComponent
                   title="SERIAL NUMBER"
@@ -796,7 +798,7 @@ const ProductDetails = ({ user, users }) => {
 
           {isTransformationSelected ? (
             <Card className="mb-12 mx-16" id="transformation">
-              <Text className="font-semibold text-lg transformation">Transformation</Text>
+              <Text className="font-semibold text-lg">Transformation</Text>
               <Row className="my-6">
                 <EventDetailsComponent title="SERIAL NUMBER" value={serialNumber} id="trans-serial" />
               </Row>

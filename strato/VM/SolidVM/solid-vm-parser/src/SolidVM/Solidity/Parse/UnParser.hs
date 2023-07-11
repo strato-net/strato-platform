@@ -65,7 +65,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ _xabiTypes contract)
   <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ _xabiModifiers contract)
   <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ _xabiEvents contract)
-  <> concatMap (("\n    " <>) . unparseUsing) (concat . map snd . Map.toList $ _xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ _xabiUsing contract)
   <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ _xabiConstr contract)
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ _xabiFuncs contract)
   <> "\n}"
@@ -371,8 +371,8 @@ unparseEvent (name, Event{..}) = Text.unpack $
   <> (if _eventAnonymous then "anonymous" else "")
   <> ";"
 
-unparseUsing :: UsingF a -> String
-unparseUsing (Using lib typ _) = mconcat ["using ", lib, " for ", typ, ";\n"]
+unparseUsing :: (Text, UsingF a) -> String
+unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
 unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names=names'}) =

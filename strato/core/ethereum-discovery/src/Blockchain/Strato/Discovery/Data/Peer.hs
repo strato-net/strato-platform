@@ -143,11 +143,6 @@ instance (A.Replaceable (IPAsText, UDPPort) PeerBondingState) IO where
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerIp SQL.==. ip, PPeerUdpPort SQL.==. port] [PPeerBondState SQL.=. state]
 
-instance (A.Replaceable (IPAsText, TCPPort) PeerBondingState) IO where
-  replace _ (IPAsText ip, TCPPort port) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
-    flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port] [PPeerBondState SQL.=. state]
-
 instance Mod.Accessible BondedPeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime

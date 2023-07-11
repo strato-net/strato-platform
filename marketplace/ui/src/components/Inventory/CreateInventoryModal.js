@@ -93,7 +93,7 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
-    if(formik.values.subCategory && formik.values.category.name){
+    if(formik.values.subCategory){
       productActions.fetchCategoryBasedProduct(
         productDispatch,
         formik.values.category.name,
@@ -103,7 +103,6 @@ const CreateInventoryModal = ({
   }, [
     productDispatch,
     formik.values.subCategory,
-    formik.values.subCategory.name
   ]);
 
   const handleCreateFormSubmit = async (values) => {

@@ -73,13 +73,13 @@ data TypeF' a = Top { topName :: (S.Set SolidString)
 type Type' = Annotated TypeF'
 
 showType :: Type -> Text
-showType (SVMType.Int s b) = (if fromMaybe False s then "" else "u")
+showType (SVMType.Int s b) = (if fromMaybe False s then "u" else "")
                   <> "int"
                   <> (maybe "" (T.pack . show) b)
 showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) = "bytes"
                     <> (maybe "" (T.pack . show) b)
-showType (SVMType.Fixed s b) = (if fromMaybe False s then "" else "u")
+showType (SVMType.Fixed s b) = (if fromMaybe False s then "u" else "")
                   <> "fixed"
                   <> maybe "" (T.pack . show) b
 showType SVMType.Bool = "bool"
@@ -670,26 +670,6 @@ typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
             t -> pure t
         t -> pure t
     t -> pure t
-typecheckMember t@(Static svmType x) n = do
-  let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
-  c <- asks contract
-  case c ^. usings . at (T.unpack $ showType svmType) of
-    Nothing -> unknownMember
-    Just [] -> unknownMember
-    Just us -> do
-      results <- forM us $ \(Using c' _ _) -> do
-        ~CodeCollection{..} <- asks codeCollection
-        case M.lookup c' _contracts of
-          Nothing -> unknownMember
-          Just c'' -> do
-            r <- ask
-            s <- get
-            let fType' = flip runReader r{contract = c''} . flip evalStateT s $ getVarTypeByName' n x
-            case fType' of
-              Function (Product (a:as) x') rs x'' ovs names ->
-                typecheck a t !> (pure $ Function (Product as x') rs x'' ovs names)
-              _ -> unknownMember
-      pure $ pickType' x results
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'

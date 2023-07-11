@@ -33,6 +33,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set                              as S
+import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import           Debugger
@@ -547,7 +548,9 @@ logEventSummaries events = do
 
 sendOutEvent :: VmOutEvent ->  ConduitT VmOutEvent TransactionResult ContextM ()
 sendOutEvent (OutAction act) =
-  let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
+  let filterOutEvents :: Action -> Action
+      filterOutEvents x = x{Action._events=Seq.empty}
+      extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
         case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
               join $ fmap (M.lookup "name") $ a^.Action.metadata,
@@ -570,8 +573,9 @@ sendOutEvent (OutAction act) =
             }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-      actionEvents = [NewAction act]
-   in void . produceVMEvents $ ccEvents ++ actionEvents
+      eventEvents = map EventEmitted . toList $ Action._events act
+      actionEvents = [NewAction $ filterOutEvents act]
+   in void . produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff

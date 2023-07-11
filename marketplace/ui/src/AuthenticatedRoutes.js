@@ -9,7 +9,6 @@ import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
 import Item from "./components/Item";
-import ItemDetails from "./components/Item/ItemDetails";
 import { ItemsProvider } from "./contexts/item";
 import Order from "./components/Order";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
@@ -18,11 +17,6 @@ import BoughtOrderItemDetail from "./components/Order/BoughtOrderItemDetail";
 import SoldOrderItemDetail from "./components/Order/SoldOrderItemDetail";
 import OrderItemEventsList from "./components/Order/OrderItemEventsList";
 import { OrdersProvider } from "./contexts/order";
-import OrderLineItem from "./components/OrderLineItem";
-import OrderLineItemDetails from "./components/OrderLineItem/OrderLineItemDetails";
-import { OrderLineItemsProvider } from "./contexts/orderLineItem";
-import EventType from "./components/EventType";
-import EventTypeDetails from "./components/EventType/EventTypeDetails";
 import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
@@ -271,17 +265,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.ItemDetail.url}
-        element={
-          <UsersProvider>
-            <ItemsProvider>
-              <ItemDetails user={user} users={users} />
-            </ItemsProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
         path={routes.Orders.url}
         element={
           <UsersProvider>
@@ -345,50 +328,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <OrderItemEventsList user={user} users={users} />
               </EventsProvider>
             </OrdersProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.OrderLineItems.url}
-        element={
-          <UsersProvider>
-            <OrderLineItemsProvider>
-              <OrderLineItem user={user} users={users} />
-            </OrderLineItemsProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.OrderLineItemDetail.url}
-        element={
-          <UsersProvider>
-            <OrderLineItemsProvider>
-              <OrderLineItemDetails user={user} users={users} />
-            </OrderLineItemsProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.EventTypes.url}
-        element={
-          <UsersProvider>
-            <EventTypesProvider>
-              <EventType user={user} users={users} />
-            </EventTypesProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.EventTypeDetail.url}
-        element={
-          <UsersProvider>
-            <EventTypesProvider>
-              <EventTypeDetails user={user} users={users} />
-            </EventTypesProvider>
           </UsersProvider>
         }
       />

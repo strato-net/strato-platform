@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "test-compose-v2"
+    label "test"
   }
   stages {
     stage('Prepare') {
@@ -16,9 +16,7 @@ pipeline {
           }
         }
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true
-          docker system prune -f || true
-          docker volume prune -fa || true
+          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
         '''
       }
     }
@@ -42,7 +40,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b master
+          git clone https://github.com/blockapps/strato-getting-started
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
         '''
@@ -154,8 +152,8 @@ pipeline {
             check_availability
             
             echo "Restarting docker containers to simulate computer restart..."
-            docker compose -p strato stop
-            docker compose -p strato start
+            docker-compose -p strato --log-level ERROR stop
+            docker-compose -p strato --log-level ERROR start
             
             check_availability
           '''
@@ -173,7 +171,7 @@ pipeline {
               '1234'
           )
           // Unlock the marketplace deploy script:
-          sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          sh 'docker exec strato_marketplace-backend_1 rm -f _deploy_blocked_while_I_exist'
         }
 
       }
@@ -192,11 +190,11 @@ pipeline {
               sh '''#!/bin/bash -le
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                docker compose -f docker-compose.push.yml push 2>&1
-                docker compose -f docker-compose.vault.push.yml push 2>&1
+                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+                docker-compose --log-level ERROR -f docker-compose.vault.push.yml push 2>&1
                 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                docker compose -f docker-compose.push.ecr.yml push 2>&1
-                docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
+                docker-compose --log-level ERROR -f docker-compose.push.ecr.yml push 2>&1
+                docker-compose --log-level ERROR -f docker-compose.vault.push.ecr.yml push 2>&1
               '''
             }
           },

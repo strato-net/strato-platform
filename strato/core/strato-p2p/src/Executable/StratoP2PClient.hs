@@ -18,8 +18,8 @@ module Executable.StratoP2PClient
   ) where
 
 import           Blockchain.RLPx
-import qualified Control.Monad.Change.Alter            as A
 import           Control.Concurrent                    hiding (yield)
+import           Control.Concurrent.Async              as Async
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
@@ -33,7 +33,7 @@ import           Data.Conduit
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
--- import           Data.Traversable                      (for)
+import           Data.Traversable                      (for)
 import           GHC.IO.Exception                      
 import           UnliftIO
 
@@ -125,17 +125,17 @@ runPeerInList :: ( MonadP2P m
                  )
               => PPeer
               -> ConduitM () P2pEvent m ()
-              -> m (Either SomeException ())
+              -> m ()
 runPeerInList thePeer sSource = do
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
-  withAsync (runPeer thePeer sSource) $ \res -> waitCatch res
+  runPeer thePeer sSource
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \sSource -> do
+stratoP2PClient runner = runner $ \_ -> do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
@@ -147,21 +147,21 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource)
+        multiThreadedClient peers activePeersSem
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
     where
-      multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
-      multiThreadedClient [] _ _ = do
+      multiThreadedClient :: MonadP2P m => [PPeer] -> SSem -> m ()
+      multiThreadedClient [] _ = do
         $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
         liftIO $ threadDelay 10000000
-      multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
+      multiThreadedClient peers sem = void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> do
-              result <- runPeerInList p sSource
+            Just _  -> void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
+              result <- try $ liftIO $ Async.withAsync (runLoggingT . runner $ \sSource -> runPeerInList p sSource) $ \res -> Async.waitCatch res
               handleRunPeerResult p result
               liftIO (SSem.signal sem)
 
@@ -178,7 +178,6 @@ stratoP2PClient runner = runner $ \sSource -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                     disErr <- storeDisableException thePeer (T.pack "WrongGenesisBlock")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, TCPPort $ pPeerTcpPort thePeer) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                     lengthenPeerDisable thePeer
                    e' | Just HeadMacIncorrect  <- fromException e' -> do
                     disErr <- storeDisableException thePeer (T.pack "HeadMacIncorrect")
@@ -190,7 +189,6 @@ stratoP2PClient runner = runner $ \sSource -> do
                       $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                     disErr <- storeDisableException thePeer (T.pack "NetworkIDMismatch")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, TCPPort $ pPeerTcpPort thePeer) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                     lengthenPeerDisable thePeer
                    e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")

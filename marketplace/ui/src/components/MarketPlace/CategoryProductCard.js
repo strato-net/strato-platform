@@ -193,7 +193,7 @@ const CategoryProductCard = ({ product, category }) => {
             </Button>
             <Button
               type="primary"
-              id={`${product.name.replace(/ /g,"_")}-buy-now`}
+              id="buy-now-button"
               className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
               onClick={() => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
