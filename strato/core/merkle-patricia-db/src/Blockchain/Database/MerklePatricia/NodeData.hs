@@ -121,17 +121,6 @@ instance Pretty a => Pretty (NodeDataF a) where
       showChoice (v, Left p)  = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
       showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
 
-instance RLPSerializable1 Proof where
-  liftRlpEncode f (Proof (sr, a))      = RLPArray [rlpEncode sr, liftRlpEncode f a]
-  liftRlpDecode f (RLPArray [sr', a']) = let !sr = rlpDecode sr'
-                                             !a  = liftRlpDecode f a'
-                                          in Proof (sr, a)
-  liftRlpDecode _ o = error $ "rlpDecode Proof: Expected RLPArray [sr, a], got " ++ show o
-
-instance RLPSerializable a => RLPSerializable (Proof a) where
-  rlpEncode = rlpEncode1
-  rlpDecode = rlpDecode1
-
 instance RLPSerializable1 NodeDataF where
   liftRlpEncode _ EmptyNodeData = RLPString ""
   liftRlpEncode f (FullNodeData {choices=cs, nodeVal=val}) = RLPArray ((encodeChoice f <$> cs) ++ [encodeVal val])
@@ -220,6 +209,17 @@ instance Foldable Proof where
 
 instance Traversable Proof where
   traverse f (Proof (sr, a)) = Proof . (sr,) <$> traverse f a
+
+instance RLPSerializable1 Proof where
+  liftRlpEncode f (Proof (sr, a))      = RLPArray [rlpEncode sr, liftRlpEncode f a]
+  liftRlpDecode f (RLPArray [sr', a']) = let !sr = rlpDecode sr'
+                                             !a  = liftRlpDecode f a'
+                                          in Proof (sr, a)
+  liftRlpDecode _ o = error $ "rlpDecode Proof: Expected RLPArray [sr, a], got " ++ show o
+
+instance RLPSerializable a => RLPSerializable (Proof a) where
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
 
 type NodeData = NodeDataF StateRoot
 type NodeDataProofF = Compose Proof NodeDataF
