@@ -1,8 +1,7 @@
 def cleanNode(wipeVault = null) {
   // Cleanup STRATO and volumes
   sh 'sudo docker rm -f $(sudo docker ps -aq) || true'
-  sh 'sudo docker system prune -f || true'
-  sh 'sudo docker volume prune -fa || true'
+  sh 'sudo docker system prune -f --volumes || true'
 }
 
 def deployStrato(nodeData) {
@@ -80,7 +79,7 @@ def deployStrato(nodeData) {
     // Save node's public key into file (for future reference)
     def nodePubKey = sh(
         returnStdout: true,
-        script: "sudo docker exec strato-strato-1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
     ).trim()
     writeFile file: "nodePublicKey", text: "${nodePubKey}"
 
@@ -244,7 +243,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
       script {
         def publicKey = sh(
             returnStdout: true,
-            script: "sudo docker exec strato-strato-1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
         ).trim()
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
@@ -286,7 +285,7 @@ export requireCerts=false
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL
 
-  docker compose up -d --build
+docker-compose up -d --build
           """
         } else {
           writeFile file: "run-app.sh", text: """#!/bin/bash
@@ -316,7 +315,7 @@ export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
 export INT_SERVER_OAUTH_SCOPE='openid email'
 export requireCerts=false
 
-  docker compose up -d --build
+docker-compose up -d --build
           """
         }
         if (postgresViewsPrefix) {
@@ -324,7 +323,7 @@ export requireCerts=false
         }
         if (wipeApp) {
           //sh 'sudo docker volume rm beanstalk_config || true'
-          sh 'sudo   docker compose down -v -t 0 --remove-orphans'
+          sh 'sudo docker-compose down -v -t 0 --remove-orphans'
         }
         sh 'sudo bash run-app.sh'
 
@@ -375,7 +374,7 @@ def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsP
       script {
         def publicKey = sh(
             returnStdout: true,
-            script: "sudo docker exec strato-strato-1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+            script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://localhost:8013/strato/v2.3/key | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
         ).trim()
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
@@ -412,7 +411,7 @@ export requireCerts=false
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL
 
-  docker compose up -d --build
+docker-compose up -d --build
         """
 
         if (postgresViewsPrefix) {
@@ -421,7 +420,7 @@ export requireCerts=false
 
         if (wipeApp) {
           //sh 'sudo docker volume rm beanstalk_config || true'
-          sh 'sudo   docker compose down -v -t 0 --remove-orphans'
+          sh 'sudo docker-compose down -v -t 0 --remove-orphans'
         }
 
         // Unstash deploy file:
@@ -483,7 +482,7 @@ def waitForHealthyBeanstalkContainers() {
   script {
     echo "Waiting for the 4 beanstalk containers to become healthy..."
     for (int i = 0; i < 50; i++) {
-      if (sh(returnStdout: true, script: "sudo   docker compose ps | grep '(healthy)' | wc -l").trim() == "4") {
+      if (sh(returnStdout: true, script: "sudo docker-compose --log-level ERROR ps | grep '(healthy)' | wc -l").trim() == "4") {
         return true
       } else {
         sleep 2
@@ -539,7 +538,7 @@ def runMonitor(nodeData, nodeConfig) {
     sh "rm -rf monitor"
     sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
     dir ("monitor") {
-      sh 'sudo   docker compose down -v -t 0 --remove-orphans'
+      sh 'sudo docker-compose down -v -t 0 --remove-orphans'
     }
     clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
     clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
@@ -551,7 +550,7 @@ def runMonitor(nodeData, nodeConfig) {
         OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration \\
         OAUTH_CLIENT_ID=${clientID} \\
         OAUTH_CLIENT_SECRET=${clientSecret} \\
-          docker compose up -d"""
+        docker-compose up -d"""
 
     dir("monitor") {
       writeFile file:"run.sh", text: """${runCommand}"""
@@ -935,7 +934,7 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         // Restart strato container once sync is done or every 30 mins (USED FOR MEMORY LEAK ISSUE)
         // if ( (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60 ) || restartEveryHour == 1800) {
-        //     sh "sudo docker restart strato-strato-1"
+        //     sh "sudo docker restart strato_strato_1"
         // }
         // if(counter != 60) {
         //     counter = counter + 1
@@ -1068,7 +1067,7 @@ def waitForHealthyNetwork() {
 
 def removeBeanstalkApp() {
   dir("beanstalk") {
-    sh 'sudo   docker compose down -v -t 0 --remove-orphans'
+    sh 'sudo docker-compose down -v -t 0 --remove-orphans'
   }
 }
 
@@ -1091,25 +1090,25 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       cd $(<_stratogs_path_tmp)
       myPub=$(./strato --get-pubkey)
       cd ..
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
+      sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
           --output=/x509-generator/OutputCert.pem
       echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
-      sudo docker cp reformat-cert.sh strato-strato-1:/genesis-builder/
-      sudo docker exec strato-strato-1 bash /genesis-builder/reformat-cert.sh
-      sudo docker exec strato-strato-1 genesis-builder \\
+      sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
+      sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
+      sudo docker exec strato_strato_1 genesis-builder \\
           --input=/genesis-builder/genesis-block.tpl.json \\
           --faucets=/genesis-builder/faucets.json \\
           --validators=/genesis-builder/validators.json \\
           --admins=/genesis-builder/admins.json \\
           --certs=/genesis-builder/certs.json \\
           --output=/genesis-builder/genesis-block.json
-      sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
+      sudo docker cp strato_strato_1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
     '''
   }
   else{
@@ -1123,35 +1122,35 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       token=$(curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/beanstalk/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic YmVhbnN0YWxrLWludGVybmFsLW5vZGVzOjViOTEzMGUwLTAxYzctNGM4Yy1iMjgxLTg4MmUxNDNhMjQ0Yg==' --data-urlencode 'grant_type=password' --data-urlencode 'username=admin' --data-urlencode 'password=1234' | jq -r .access_token)
       userPub=$(curl -X POST -H "Authorization: Bearer $token" -H "Accept: application/json" "https://multinode101.ci.blockapps.net:8080/strato/v2.3/key" | jq -r .pubkey)
       cd ..
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
+      sudo docker exec -e pubkey="${myPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
           --output=/x509-generator/OutputCert.pem
-      sudo docker exec -e pubkey="${userPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/Engineering/Marketing/g" /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/BlockApps/AppsBlock/g"   /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/Test/User/g"             /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
+      sudo docker exec -e pubkey="${userPub}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 bash -c 'sed -i "s/Engineering/Marketing/g" /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 bash -c 'sed -i "s/BlockApps/AppsBlock/g"   /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 bash -c 'sed -i "s/Test/User/g"             /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
           --output=/x509-generator/OutputCertUser.pem
       echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; myUserCert=\\$(cat /x509-generator/OutputCertUser.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\",\\\\\\"\\$(echo \\$myUserCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
       echo "[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"},{"orgName":"AppsBlock","orgUnit":"Marketing","commonName":"User"}]" > admins.json
-      sudo docker cp reformat-cert.sh strato-strato-1:/genesis-builder/
-      sudo docker exec strato-strato-1 bash /genesis-builder/reformat-cert.sh
-      sudo docker exec strato-strato-1 genesis-builder \\
+      sudo docker cp reformat-cert.sh strato_strato_1:/genesis-builder/
+      sudo docker exec strato_strato_1 bash /genesis-builder/reformat-cert.sh
+      sudo docker exec strato_strato_1 genesis-builder \\
           --input=/genesis-builder/genesis-block.tpl.json \\
           --faucets=/genesis-builder/faucets.json \\
           --validators=/genesis-builder/validators.json \\
           --admins=/genesis-builder/admins.json \\
           --certs=/genesis-builder/certs.json \\
           --output=/genesis-builder/genesis-block.json
-      sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
+      sudo docker cp strato_strato_1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
     '''
     */
   }
@@ -1179,26 +1178,26 @@ def registerTestUserCert(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       OAUTH_TOKEN_ENDPOINT=$(curl --fail -s $(<_oauth_discovery_url_tmp) | jq -r .token_endpoint)
       USER_TOKEN=$(curl --fail -s -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
-      docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
-      userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $USER_TOKEN" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
+      docker exec strato_nginx_1 curl --fail -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
+      userPubKey=$(docker exec strato_nginx_1 curl --fail -s -H "Authorization: Bearer $USER_TOKEN" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
       
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec -e pubkey="${userPubKey}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato_strato_1:/
+      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato_strato_1:/
+      sudo docker exec -e pubkey="${userPubKey}" strato_strato_1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
+      sudo docker exec strato_strato_1 x509-generator \\
           --issuer=/x509-generator/rootCert.pem \\
           --subject=/x509-generator/subject.json \\
           --key=/x509-generator/rootPriv.pem \\
           --output=/x509-generator/OutputCert.pem
       echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /x509-generator/certs.json""" > reformat-cert.sh
-      sudo docker cp reformat-cert.sh strato-strato-1:/x509-generator/
-      sudo docker exec strato-strato-1 bash /x509-generator/reformat-cert.sh
+      sudo docker cp reformat-cert.sh strato_strato_1:/x509-generator/
+      sudo docker exec strato_strato_1 bash /x509-generator/reformat-cert.sh
       # escaped cert is now saved as /x509-generator/certs.json inside the container
-      CERT_ESCAPED=$(sudo docker exec strato-strato-1 cat /x509-generator/certs.json)
+      CERT_ESCAPED=$(sudo docker exec strato_strato_1 cat /x509-generator/certs.json)
       CERT_ESCAPED=$(echo "${CERT_ESCAPED:2: -2}")
       ADMIN_TOKEN=$(curl --fail -L -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
       
-      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
+      docker exec strato_nginx_1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
         -H 'Accept: application/json' \\
         -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
         -H 'Content-Type: application/json' \\

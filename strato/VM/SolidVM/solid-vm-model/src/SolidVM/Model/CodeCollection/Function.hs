@@ -16,8 +16,6 @@ module SolidVM.Model.CodeCollection.Function (
   Visibility(..),
   ModifierF(..),
   Modifier,
-  UsingF(..),
-  Using,
   tShow,
   tShow',
   tRead,
@@ -34,10 +32,7 @@ module SolidVM.Model.CodeCollection.Function (
   modifierArgs,
   modifierSelector,
   modifierContents,
-  modifierContext,
-  usingContract,
-  usingType,
-  usingContext
+  modifierContext
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~), makeLenses)
@@ -171,41 +166,6 @@ instance FromJSON a => FromJSON (ModifierF a) where
 
 instance Arbitrary a => Arbitrary (ModifierF a) where
   arbitrary = GR.genericArbitrary GR.uniform
-
-data UsingF a = Using
-  { _usingContract :: SolidString
-  , _usingType     :: SolidString -- TODO: Use Type here
-  , _usingContext  :: a
-  } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
-
-makeLenses ''UsingF
-
-type Using = Positioned UsingF
-
-instance ToJSON a => ToJSON (UsingF a) where
-  toJSON (Using dec typ ctx) = object
-    [ "using" .= dec
-    , "for" .= typ
-    , "context" .= ctx
-    ]
-
-instance FromJSON a => FromJSON (UsingF a) where
-  parseJSON (Object o) = Using
-                     <$> (o .: "using")
-                     <*> (o .: "for")
-                     <*> (o .: "context")
-  parseJSON o = fail $ "SolidVM.Using: Expected Object, got " ++ show o
-
-instance Arbitrary a => Arbitrary (UsingF a) where
-  arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary
-
-instance ToSchema Using where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-     & mapped.name ?~ "Using schema"
-     & mapped.schema.description ?~ "Xabi of a `using` declaration"
-     & mapped.schema.example ?~ toJSON sampleUsing
-     where sampleUsing :: UsingF ()
-           sampleUsing = Using "SafeMath" "uint256" ()
 
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform

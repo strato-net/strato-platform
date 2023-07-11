@@ -5,10 +5,7 @@
 ## Prerequisites to build
 
 ### Docker
-Install the latest docker from https://www.docker.com/
-
-- Docker Engine v.20.10+
-- Docker Compose V2
+Install the latest docker from https://www.docker.com/community-edition
 
 ### Stack
 Stack v1.7.1 is required to build strato-platform with docker env enabled

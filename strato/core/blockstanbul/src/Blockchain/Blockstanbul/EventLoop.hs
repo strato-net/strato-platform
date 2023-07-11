@@ -75,15 +75,15 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   doAuthn <- use productionAuth
   authenticated <- lift $ authenticate iev    --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
   let raiseInProd reason = when doAuthn $ do
-        $logWarnS "blockstanbul/auth" . T.pack $ reason
+        $logWarnS "blockstanbul/auth" . T.pack $ reason 
         throwE reason                  --debug statement?
-  unless authenticated $ do
+  unless authenticated $ do               
     raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorize iev
   case iev of                         -- cases of valid and non valid input (for approval of messages and tx's?)
     -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
     -- but with incorrect extraData.
-    IMsg _ (Preprepare _ pp) -> do
+    IMsg _ (Preprepare _ pp) -> do     
       vals <- use validators            -- this is _validators from bloctanbul context?
       let valSet = unChainMembers vals
       let payloadVals = getValidatorList pp  -- getvalslsit::Block -> [Address] to word256 x 2
@@ -165,8 +165,8 @@ nextRound nt = do
         v <- use view
         valB <- use validatorBehavior
         when (valB) $ do
-          msg <- signMessage (Preprepare v lb)
-          yieldR msg
+          msg <- signMessage (Preprepare v lb) 
+          yieldR msg 
 
   prepared .= M.empty
   committed .= M.empty
@@ -176,8 +176,6 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
-
-  isValidator .= (self `elem` vals)
 
   yieldR . NewCheckpoint =<< liftA2 Checkpoint (use view)
                                                (uses validators (S.toList . unChainMembers))
@@ -249,7 +247,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         vs <- use validators
         let blockWithVs = addValidators vs blk
-        pseal <- proposerSeal blockWithVs
+        pseal <- proposerSeal blockWithVs 
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
@@ -422,9 +420,6 @@ sendMessages' wms = do
                            .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
-
-      recordValidator (_isValidator ctx') (_validatorBehavior ctx')
-
       return evs
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
@@ -433,7 +428,7 @@ sendMessages = fmap (map fromE) . sendMessages'
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
-  let out = fromE <$> eout
+  let out = fromE <$> eout 
   $logDebugS "sendAllMessages" . T.pack $ format out
   case mapMaybe loopback eout of
              [] -> return out
@@ -459,7 +454,7 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    ForcedConfigChange{} -> inc "forced_config_change"
    ValidatorBehaviorChange{} -> inc "validator_behavior_change"
    ValidatorChange{} -> inc "validator_change"
-
+   
 
 recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
 recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter

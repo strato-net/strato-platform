@@ -40,7 +40,7 @@ waitOnVault action = do
   putStrLn "asking vault-proxy for the node address"
   res <- action
   case res of
-    Left err -> do
+    Left err -> do 
       putStrLn $ "failed to get node address from vault-proxy... got this error: " ++ show err
       threadDelay 2000000 -- 2 seconds
       waitOnVault action
@@ -71,7 +71,7 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-
+  
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl

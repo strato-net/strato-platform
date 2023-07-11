@@ -9,7 +9,6 @@ module Bloc.XabiHelper
 import           BlockApps.Solidity.Parse.Parser
 
 
-import           Control.Arrow                             ((***))
 import           Data.Int                                  (Int32)
 import qualified Data.Map                                  as M
 import qualified Data.Text                                 as T
@@ -60,7 +59,7 @@ transFormXabi SVMXabi.Xabi{..} =
              , xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers
              , xabiEvents    = M.map tFormEv      $ M.mapKeysMonotonic T.pack _xabiEvents
              , xabiKind      = case _xabiKind of SVMXabi.ContractKind -> EVMXabi.ContractKind ; SVMXabi.InterfaceKind-> EVMXabi.InterfaceKind; SVMXabi.LibraryKind ->  EVMXabi.LibraryKind;
-             , xabiUsing     = M.fromList . map (T.pack *** tFormUs) $ M.toList _xabiUsing
+             , xabiUsing     = M.map tFormUs _xabiUsing
            }
 
 
@@ -136,9 +135,8 @@ tFormEv SolidEv.Event{..}= EVMXabi.Event {
 }
 
 
-tFormUs:: [SVMXabi.Using] ->  EVMXabi.Using
-tFormUs [] = EVMXabi.Using $ "for nothing, apparently"
-tFormUs (SVMXabi.Using _ t _ : _) = EVMXabi.Using $ "for " ++ t -- weird legacy code
+tFormUs:: SVMXabi.Using ->  EVMXabi.Using
+tFormUs (SVMXabi.Using a _) = EVMXabi.Using a
 
 
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType

@@ -24,7 +24,6 @@ import           Data.Time
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action (Action)
@@ -44,15 +43,6 @@ data AggregateAction = AggregateAction
   , actionStorage        :: Action.DataDiff
   , actionType           :: Action.CallType
   , actionMetadata       :: Map Text Text
-  } deriving (Show, Generic, NFData)
-
-data AggregateEvent = AggregateEvent
-  { eventBlockHash      :: Keccak256
-  , eventBlockTimestamp :: UTCTime
-  , eventBlockNumber    :: Integer
-  , eventTxHash         :: Keccak256
-  , eventTxSender       :: Account
-  , eventEvent          :: Event
   } deriving (Show, Generic, NFData)
 
 

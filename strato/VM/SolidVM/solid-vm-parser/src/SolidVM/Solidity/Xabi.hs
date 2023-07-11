@@ -38,9 +38,11 @@ import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Aeson.Types
 import           Data.Map.Strict              (Map)
 import           Data.Source
 import           Data.Swagger
+import           Data.Text                    (Text)
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -77,11 +79,38 @@ data XabiF a = Xabi
   , _xabiModifiers :: Map SolidString (ModifierF a)
   , _xabiEvents    :: Map SolidString (EventF a)
   , _xabiKind      :: XabiKind
-  , _xabiUsing     :: Map SolidString [UsingF a]
+  , _xabiUsing     :: Map Text (UsingF a)
   , _xabiContext   :: a
   } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
 
 type Xabi = Positioned XabiF
+
+data UsingF a = Using String a deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
+
+type Using = Positioned UsingF
+
+instance ToJSON a => ToJSON (UsingF a) where
+  toJSON (Using dec ctx) = object
+    [ "using" .= dec
+    , "context" .= ctx
+    ]
+
+instance FromJSON a => FromJSON (UsingF a) where
+  parseJSON (Object o) = Using
+                     <$> (o .: "using")
+                     <*> (o .: "context")
+  parseJSON o = typeMismatch "SolidVM.Using" o
+
+instance Arbitrary a => Arbitrary (UsingF a) where
+  arbitrary = Using <$> arbitrary <*> arbitrary
+
+instance ToSchema Using where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+     & mapped.name ?~ "Using schema"
+     & mapped.schema.description ?~ "Xabi of a `using` declaration"
+     & mapped.schema.example ?~ toJSON sampleUsing
+     where sampleUsing :: UsingF ()
+           sampleUsing = Using "for uint[]" ()
 
 --------------------------------------------------------------------------------
 
