@@ -1,6 +1,6 @@
 import "cypress-file-upload";
-import { productData, inventoryData } from '../fixtures/data.js'
-import dayjs from "dayjs";
+import {productData, inventoryData} from '../fixtures/data.js'
+
 
 // ***********************************************
 // This example commands.js shows you how to
@@ -34,18 +34,20 @@ Cypress.on(
 
 
 Cypress.on('uncaught:exception', (err) => {
-  /* returning false here prevents Cypress from failing the test */
-  if (err.message.includes("ResizeObserver loop limit exceeded")) {
-    return false
-  }
+    /* returning false here prevents Cypress from failing the test */
+    if (err.message.includes("ResizeObserver loop limit exceeded")) {
+        return false
+    }
 })
 
 Cypress.Commands.add("login", (username, password) => {
-  let un = username ? username : Cypress.env("email");
-  let pwd = password ? password : Cypress.env("password")
+  cy.clearCookies();
+  cy.visit("/");
+  let un = username ? username :  Cypress.env("email");
+  let pwd = password ? password :  Cypress.env("password")
 
-  cy.origin(Cypress.env("login_url"), { args: { un, pwd } }, ({ un, pwd }) => {
-    cy.get("input[name=username]").type(
+  cy.origin(Cypress.env("login_url"), {args: {un, pwd}}, ({un, pwd}) => {
+    cy.get("input[name=username]", { timeout: 10000 }).type(
       un
     );
     cy.get("input[name=password]").type(pwd);
@@ -54,8 +56,10 @@ Cypress.Commands.add("login", (username, password) => {
 });
 
 Cypress.Commands.add("loginAsSeller", () => {
+  cy.clearCookies();
+  cy.visit("/");
   cy.origin(Cypress.env("login_url"), () => {
-    cy.get("input[name=username]").type(
+    cy.get("input[name=username]", { timeout: 10000 }).type(
       Cypress.env("sellerEmail")
     );
     cy.get("input[name=password]").type(Cypress.env("sellerPassword"));
@@ -67,7 +71,7 @@ Cypress.Commands.add("loginAsCertifier", () => {
   cy.clearCookies();
   cy.visit("/");
   cy.origin(Cypress.env("login_url"), () => {
-    cy.get("input[name=username]").type(
+    cy.get("input[name=username]", { timeout: 10000 }).type(
       Cypress.env("certifierEmail")
     );
     cy.get("input[name=password]").type(Cypress.env("certifierPassword"));
@@ -75,16 +79,17 @@ Cypress.Commands.add("loginAsCertifier", () => {
   });
 });
 
-Cypress.Commands.add("createProduct", (productName) => {
+Cypress.Commands.add("createProduct", () => {
   cy.get("#Products").should("exist");
   cy.get("#Products").click();
   cy.url().should("include", "/products");
+  cy.wait(20000);
   cy.get("#add-product-button").should("exist");
   cy.get("#add-product-button").click();
   cy.get("#modal-title").contains("Add Product");
-  cy.get('input[placeholder="Enter Name"]').type(productName);
-  cy.get("#category").type("Art{enter}");
-  cy.get("#subCategory").type("Art{enter}");
+  cy.get('input[placeholder="Enter Name"]').type("Corn Seeds");
+  cy.get("#category").type("Agriculture{enter}");
+  cy.get("#subCategory").type("Cotton products{enter}");
   cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
   cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
   cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
@@ -95,57 +100,47 @@ Cypress.Commands.add("createProduct", (productName) => {
   cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
   cy.get("#create-product-button").should("exist");
   cy.get("#create-product-button").click();
-  cy.contains("Product created successfully").should("be.visible");
+  cy.contains("Product created successfully", {timeout: 25000}).should("be.visible");
 });
-
-Cypress.Commands.add("createInventory", (productName) => {
-  cy.get("#Inventory").should("exist");
-  cy.get("#Inventory").click();
-  cy.url().should("include", "/inventories");
-  cy.get("#Inventory").should("exist");
-  cy.get("#Inventory").click();
-  cy.url().should("include", "/inventories");
-  cy.get("button").contains("Add Inventory").should("exist");
-  cy.get("button").contains("Add Inventory").click();
-  cy.get(".ant-modal-content").should("exist").and("be.visible");
-  cy.contains("Add Inventory").should("be.visible");
-  cy.get("#category").type("Art{enter}");
-  cy.get("#subCategory").type("Art{enter}");
-  cy.get('input[placeholder="Enter Quantity"]').type("1");
-  cy.get('input[placeholder="Enter Price"]').type("1000");
-  cy.get('input[placeholder="Enter Batch ID"]').type("ABC123");
-  cy.get(".ant-upload").contains("Upload CSV").should("exist")
-  cy.get('input[type="file"]').selectFile('cypress/fixtures/base_seed.csv', { force: true })
-  cy.get("#product").should("be.enabled");
-
-  cy.get("#product").click()
-  cy.wait('@productNameCall')
-    .its('response.body')
-    .then((body) => {
-      console.log(body);
-      cy.wait(500);
-      cy
-        .get('.ant-select-dropdown :not(.ant-select-dropdown-hidden)')
-        .find('.ant-select-item-option')
-        .each(el => {
-          if (el.text() === productName) {
-            cy.wait(500)
-            cy.wrap(el).click();
-            cy.wait(500)
-          }
-        })
-    })
-  cy.get("button").contains("Create Inventory").should("be.visible");
-  cy.get("button").contains("Create Inventory").click();
-  cy.contains("Inventory created successfully").should("be.visible");
-})
 
 Cypress.Commands.add("checkCategory", () => {
   cy.request({
     method: "GET",
     url: "/api/v1/category",
   }).then(({ status, body }) => {
+    const categoryBody = body;
     expect(status).to.eq(200);
+    if (categoryBody.data.length == 0) {
+      cy.request({
+        method: "POST",
+        url: "/api/v1/category",
+        body: { name: "seeds", description: "plant of seeds" },
+      }).then(({ status }) => {
+        expect(status).to.eq(200);
+      });
+    } else {
+      cy.request({
+        method: "GET",
+        url: "/api/v1/subcategory",
+      }).then(({ status, body }) => {
+        const subCategoryBody = body;
+        expect(status).to.eq(200);
+        if (subCategoryBody.data.length == 0) {
+          const address = categoryBody.data[0].address;
+          cy.request({
+            method: "POST",
+            url: "/api/v1/subcategory",
+            body: {
+              categoryAddress: address,
+              name: "pumpkin seeds",
+              description: "seeds of pumpkin",
+            },
+          }).then(({ status }) => {
+            expect(status).to.eq(200);
+          });
+        }
+      });
+    }
   });
 });
 

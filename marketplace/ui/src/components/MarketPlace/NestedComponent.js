@@ -121,10 +121,10 @@ const NestedComponent = () => {
         <>
             <Row className="flex items-center">
                 <div className="flex-auto text-center">
-                    <Text className="text-primaryC text-sm ml-4 transformation">RAW MATERIALS</Text>
+                    <Text className="text-primaryC text-sm ml-4">RAW MATERIALS</Text>
                 </div>
                 <div className="flex-auto text-center">
-                    <Text className="text-primaryC text-sm ml-4 transformation">SERIAL NUMBER</Text>
+                    <Text className="text-primaryC text-sm ml-4">SERIAL NUMBER</Text>
                 </div>
             </Row>
             <Divider className="mx-0 my-3" />

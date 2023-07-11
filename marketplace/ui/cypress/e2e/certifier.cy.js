@@ -1,11 +1,8 @@
 describe("Renders Certifier Page", () => {
 
     it("it should render certifier homepage for certifier login", () => {
-        cy.visit('/')
-        cy.get("#Login").click();
         cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"));
-
-        cy.wait(20000);
+        cy.wait(1000);
         cy.request({
             method: "GET",
             url: "/api/v1/users/me",
@@ -31,11 +28,8 @@ describe("Renders Certifier Page", () => {
 
 
     it.only("it should check certifier flow for user with certifier & trading entity roles", () => {
-        cy.visit('/')
-        cy.get("#Login").click();
-        
         cy.login(Cypress.env("dualRoleEmail"), Cypress.env("dualRolePassword"));
-        cy.wait(20000);
+        cy.wait(1000);
         cy.request({
             method: "GET",
             url: "/api/v1/users/me",
