@@ -46,6 +46,8 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           BlockApps.Logging
 
+import           SelectAccessible                ()
+
 newtype AccessToken = AccessToken {access_token :: Text} deriving (Show, Generic)
 instance FromJSON AccessToken
 instance ToJSON AccessToken
@@ -109,8 +111,10 @@ runContextM' :: MonadUnliftIO m
             -> m ()
 runContextM' r = void . runResourceT . flip runReaderT r     
 
-type IDServerM = (ReaderT VaultData (LoggingT IO)) 
-deriving instance HasVault IDServerM 
+-- type IDServerM = (ReaderT VaultData (LoggingT IO)) 
+
+-- deriving instance HasVault   (ReaderT VaultData (LoggingT IO)))-- IDServerM
+
 server :: (MonadIO m, MonadLogger m, HasVault m) => ServerT IdentityProviderAPI m
 server = putIdentity
 
