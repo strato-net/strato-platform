@@ -152,7 +152,7 @@ const CategoryProductCard = ({ product, category }) => {
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
             </Title>
-            {(product.category !== 'Carbon' || category !== 'Carbon' )?
+            {product.availableQuantity !== 0 ?
               (
                 <div>
                   <div className="flex items-center my-2" id="prod-quantity">
@@ -211,7 +211,33 @@ const CategoryProductCard = ({ product, category }) => {
                   </Button>
                 </div>)
               :
-              <h1><b>{`THIS IS A CARBON ITEM WITH ${product.availableQuantity} CREDITS AVAILABLE FOR SALE`}</b></h1>
+              /* When there isnt avalialable quantity for the item */
+              <div>
+                <div className="flex items-center my-2" id="prod-quantity">
+                  <Text className="text-primaryB text-base">Quantity</Text>
+                  <div className="ml-5 flex items-center my-2" id="prod-quantity">
+                    <InputNumber
+                      className="ml-0.5 h-[32px] w-[100px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
+                      // value={product.availableQuantity}
+                      controls={false}
+                      disabled
+                    />
+                  </div>
+                </div>
+                <Button
+                disabled
+                  className="group w-40 h-9 border border-primary">
+                  <div>Add To Cart</div>
+                </Button>
+                <Button
+                disabled
+                  type="primary"
+                  id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                  className="w-40 h-9 m-3"
+                >
+                  Buy Now
+                </Button>
+              </div>
             }
           </div>
         </div>

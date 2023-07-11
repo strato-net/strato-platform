@@ -533,8 +533,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       }
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
-
-    if(productDetail.category === 'Carbon') {
+    
+    /* hacky hacky hacky - temporary, only way to do it without a contract change */
+    if(args.quantity === 0) {
       return [
         createInventoryStatus,
         createdInventoryAddress,
