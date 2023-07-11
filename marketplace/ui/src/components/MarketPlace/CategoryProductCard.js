@@ -152,60 +152,67 @@ const CategoryProductCard = ({ product, category }) => {
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
             </Title>
-            <div className="flex items-center my-2" id="prod-quantity">
-              <Text className="text-primaryB text-base">Quantity</Text>
-              <div className="ml-5 flex items-center my-2" id="prod-quantity">
-                <div
-                  onClick={subtract}
-                  className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <MinusOutlined className="text-xs text-secondryD" />
-                </div>
-                <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                  onChange={e => {
-                    if (e < product.availableQuantity) {
-                      setQty(e)
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      setQty(product.availableQuantity)
-                    }
-                  }} />
-                <div
-                  onClick={add}
-                  className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <PlusOutlined className="text-xs text-secondryC" />
-                </div>
-              </div>
-            </div>
-            <Button
-              className="group w-40 h-9 border border-primary hover:bg-primary"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                }
-              }}>
-              <div className="text-primary group-hover:text-white">Add To Cart</div>
-            </Button>
-            <Button
-              type="primary"
-              id={`${product.name.replace(/ /g,"_")}-buy-now`}
-              className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                  navigate("/checkout");
-                }
-              }}
-            >
-              Buy Now
-            </Button>
+            {(product.category !== 'Carbon' || category !== 'Carbon' )?
+              (
+                <div>
+                  <div className="flex items-center my-2" id="prod-quantity">
+                    <Text className="text-primaryB text-base">Quantity</Text>
+                    <div className="ml-5 flex items-center my-2" id="prod-quantity">
+                      <div
+                        onClick={subtract}
+                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                        <MinusOutlined className="text-xs text-secondryD" />
+                      </div>
+                      <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                        onChange={e => {
+                          if (e < product.availableQuantity) {
+                            setQty(e)
+                          } else {
+                            openToast(
+                              "bottom",
+                              true,
+                              "Cannot add more than available quantity"
+                            );
+                            setQty(product.availableQuantity)
+                          }
+                        }} />
+                      <div
+                        onClick={add}
+                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                        <PlusOutlined className="text-xs text-secondryC" />
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    className="group w-40 h-9 border border-primary hover:bg-primary"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                      }
+                    }}>
+                    <div className="text-primary group-hover:text-white">Add To Cart</div>
+                  </Button>
+                  <Button
+                    type="primary"
+                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                    className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                        navigate("/checkout");
+                      }
+                    }}
+                  >
+                    Buy Now
+                  </Button>
+                </div>)
+              :
+              <h1><b>{`THIS IS A CARBON ITEM WITH ${product.availableQuantity} CREDITS AVAILABLE FOR SALE`}</b></h1>
+            }
           </div>
         </div>
       </Card >

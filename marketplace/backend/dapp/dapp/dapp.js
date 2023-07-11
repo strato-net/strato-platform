@@ -534,6 +534,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
+    if(productDetail.category === 'Carbon') {
+      return [
+        createInventoryStatus,
+        createdInventoryAddress,
+      ]
+    }
+
     const itemParams = {
       itemObject: transformedArray,
       createdDate,
@@ -552,7 +559,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       itemAddress.slice(0, -1),
       repeatedSerialNumbers.slice(0, -1),
     ];
-
   };
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { inventory: inventoryId } = args;
