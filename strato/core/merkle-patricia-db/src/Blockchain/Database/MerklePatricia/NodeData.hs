@@ -105,57 +105,6 @@ instance Monad m => (StateRoot `A.Alters` NodeData) (StateT (Map StateRoot NodeD
   insert _ k v = modify' $ M.insert k v
   delete _ k   = modify' $ M.delete k
 
-runMP :: Monad m => StateT (M.Map StateRoot NodeData) m a -> m a
-runMP f = evalStateT (initializeBlank >> f) M.empty
-
--- | Initialize the DB by adding a blank stateroot.
-initializeBlank :: (StateRoot `A.Alters` NodeData) m
-                => m ()
-initializeBlank = A.insert A.Proxy emptyTriePtr (EmptyNodeData :: NodeData)
-
-newtype Proof a = Proof { unProof :: (StateRoot, Maybe a) } deriving (Eq, Show, Functor)
-
-instance Foldable Proof where
-  foldMap f (Proof (_, Just a)) = f a
-  foldMap _ _                   = mempty
-
-instance Traversable Proof where
-  traverse f (Proof (sr, a)) = Proof . (sr,) <$> traverse f a
-
-type NodeData = NodeDataF StateRoot
-type NodeDataProofF = Compose Proof NodeDataF
-type NodeDataProof  = NodeDataProofF StateRoot
-
-proveNodeData :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m NodeDataProof
-proveNodeData sr = Compose . Proof . (sr,) <$> A.lookup A.Proxy sr
-
-proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m (Fix NodeDataProofF)
-proveMP = unfoldFixM proveNodeData
-
-unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
-unproofNodeData EmptyNodeData = EmptyNodeData
-unproofNodeData (FullNodeData cs v) = FullNodeData (fmap fst <$> cs) v
-unproofNodeData (ShortcutNodeData k v) = ShortcutNodeData k $ first (fmap fst) v
-
-valid :: Either a (b, Bool) -> Bool
-valid (Right (_, b)) = b
-valid _              = True
-
-verifyNodeData :: NodeDataProofF (StateRoot, Bool) -> (StateRoot, Bool)
-verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
-  where verifyInner (Just nd@(FullNodeData cs _)) =
-          let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
-              b = all valid cs
-           in s == sr && b
-        verifyInner (Just nd@(ShortcutNodeData _ (Left c))) =
-          let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
-              b = valid c
-           in s == sr && b
-        verifyInner _ = True
-
-verifyMP :: Fix NodeDataProofF -> Bool
-verifyMP = snd . foldFix verifyNodeData
-
 formatVal::Maybe RLPObject->Doc
 formatVal Nothing  = red $ text "NULL"
 formatVal (Just x) = green $ pretty x
@@ -167,7 +116,7 @@ instance Pretty a => Pretty (NodeDataF a) where
   pretty (ShortcutNodeData s (Right val)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green $ pretty val)
   pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (showChoice <$> zip ([0..]::[Int]) cs)
     where
-      showChoice :: Pretty a => (Int, Either B.ByteString a) -> Doc
+      showChoice :: Pretty a => (Int, NodeRefF a) -> Doc
       showChoice (v, Left "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
       showChoice (v, Left p)  = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
       showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
@@ -187,7 +136,7 @@ instance RLPSerializable1 NodeDataF where
   liftRlpEncode _ EmptyNodeData = RLPString ""
   liftRlpEncode f (FullNodeData {choices=cs, nodeVal=val}) = RLPArray ((encodeChoice f <$> cs) ++ [encodeVal val])
     where
-      encodeChoice :: (b -> RLPObject) -> Either B.ByteString b -> RLPObject
+      encodeChoice :: (b -> RLPObject) -> NodeRefF b -> RLPObject
       encodeChoice _ (Left "") = rlpEncode (0::Integer)
       encodeChoice g (Right x) = g x
       encodeChoice _ (Left o)  = rlpDeserialize o
@@ -254,3 +203,54 @@ termNibbleString2String terminator s =
     extraNibble =
         (if terminator then 2 else 0) +
         (if odd $ N.length s then 1 else 0)
+
+runMP :: Monad m => StateT (M.Map StateRoot NodeData) m a -> m a
+runMP f = evalStateT (initializeBlank >> f) M.empty
+
+-- | Initialize the DB by adding a blank stateroot.
+initializeBlank :: (StateRoot `A.Alters` NodeData) m
+                => m ()
+initializeBlank = A.insert A.Proxy emptyTriePtr (EmptyNodeData :: NodeData)
+
+newtype Proof a = Proof { unProof :: (StateRoot, Maybe a) } deriving (Eq, Show, Functor)
+
+instance Foldable Proof where
+  foldMap f (Proof (_, Just a)) = f a
+  foldMap _ _                   = mempty
+
+instance Traversable Proof where
+  traverse f (Proof (sr, a)) = Proof . (sr,) <$> traverse f a
+
+type NodeData = NodeDataF StateRoot
+type NodeDataProofF = Compose Proof NodeDataF
+type NodeDataProof  = NodeDataProofF StateRoot
+
+proveNodeData :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m NodeDataProof
+proveNodeData sr = Compose . Proof . (sr,) <$> A.lookup A.Proxy sr
+
+proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m (Fix NodeDataProofF)
+proveMP = unfoldFixM proveNodeData
+
+unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
+unproofNodeData EmptyNodeData = EmptyNodeData
+unproofNodeData (FullNodeData cs v) = FullNodeData (fmap fst <$> cs) v
+unproofNodeData (ShortcutNodeData k v) = ShortcutNodeData k $ first (fmap fst) v
+
+verifyNodeData :: NodeDataProofF (StateRoot, Bool) -> (StateRoot, Bool)
+verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
+  where verifyInner (Just nd@(FullNodeData cs _)) =
+          let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
+              b = all valid cs
+           in s == sr && b
+        verifyInner (Just nd@(ShortcutNodeData _ (Left c))) =
+          let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
+              b = valid c
+           in s == sr && b
+        verifyInner _ = True
+
+        valid :: Either a (b, Bool) -> Bool
+        valid (Right (_, b)) = b
+        valid _              = True
+
+verifyMP :: Fix NodeDataProofF -> Bool
+verifyMP = snd . foldFix verifyNodeData
