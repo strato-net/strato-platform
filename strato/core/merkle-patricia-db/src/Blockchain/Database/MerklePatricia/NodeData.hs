@@ -1,9 +1,11 @@
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -12,6 +14,7 @@ module Blockchain.Database.MerklePatricia.NodeData (
   Val,
   NodeDataF(..),
   NodeData,
+  NodeDataProofF,
   NodeDataProof,
   NodeRefF,
   NodeRef,
@@ -20,13 +23,14 @@ module Blockchain.Database.MerklePatricia.NodeData (
   smallRef,
   ptrRef,
   emptyRef,
-  verifyNodeDataProof,
+  proveMP,
   verifyMP
   ) where
 
 import qualified Control.Monad.Change.Alter                   as A
 import           Control.Monad.State
 import           Data.Bifunctor                               (first)
+import           Data.Bitraversable                           (bitraverse)
 import           Data.Bits
 import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
@@ -86,6 +90,16 @@ instance Functor NodeDataF where
   fmap f (FullNodeData cs v) = FullNodeData (fmap f <$> cs) v
   fmap f (ShortcutNodeData k v) = ShortcutNodeData k (first (fmap f) v)
 
+instance Foldable NodeDataF where
+  foldMap _ EmptyNodeData = mempty
+  foldMap f (FullNodeData cs _) = mconcat $ either (const mempty) f <$> cs
+  foldMap f (ShortcutNodeData _ v) = either (either (const mempty) f) (const mempty) v
+
+instance Traversable NodeDataF where
+  traverse _ EmptyNodeData = pure EmptyNodeData
+  traverse f (FullNodeData cs v) = flip FullNodeData v <$> traverse (traverse f) cs
+  traverse f (ShortcutNodeData k v) = ShortcutNodeData k <$> bitraverse (traverse f) pure v
+
 instance Monad m => (StateRoot `A.Alters` NodeData) (StateT (Map StateRoot NodeData) m) where
   lookup _ k   = M.lookup k <$> get
   insert _ k v = modify' $ M.insert k v
@@ -101,8 +115,22 @@ initializeBlank = A.insert A.Proxy emptyTriePtr (EmptyNodeData :: NodeData)
 
 newtype Proof a = Proof { unProof :: (StateRoot, Maybe a) } deriving (Eq, Show, Functor)
 
+instance Foldable Proof where
+  foldMap f (Proof (_, Just a)) = f a
+  foldMap _ _                   = mempty
+
+instance Traversable Proof where
+  traverse f (Proof (sr, a)) = Proof . (sr,) <$> traverse f a
+
 type NodeData = NodeDataF StateRoot
-type NodeDataProof = Compose Proof NodeDataF
+type NodeDataProofF = Compose Proof NodeDataF
+type NodeDataProof  = NodeDataProofF StateRoot
+
+proveNodeData :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m NodeDataProof
+proveNodeData sr = Compose . Proof . (sr,) <$> A.lookup A.Proxy sr
+
+proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m (Fix NodeDataProofF)
+proveMP = unfoldFixM proveNodeData
 
 unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
 unproofNodeData EmptyNodeData = EmptyNodeData
@@ -113,8 +141,8 @@ valid :: Either a (b, Bool) -> Bool
 valid (Right (_, b)) = b
 valid _              = True
 
-verifyNodeDataProof :: NodeDataProof (StateRoot, Bool) -> (StateRoot, Bool)
-verifyNodeDataProof (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
+verifyNodeData :: NodeDataProofF (StateRoot, Bool) -> (StateRoot, Bool)
+verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
   where verifyInner (Just nd@(FullNodeData cs _)) =
           let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
               b = all valid cs
@@ -125,8 +153,8 @@ verifyNodeDataProof (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
            in s == sr && b
         verifyInner _ = True
 
-verifyMP :: Fix NodeDataProof -> Bool
-verifyMP = snd . foldFix verifyNodeDataProof
+verifyMP :: Fix NodeDataProofF -> Bool
+verifyMP = snd . foldFix verifyNodeData
 
 formatVal::Maybe RLPObject->Doc
 formatVal Nothing  = red $ text "NULL"
@@ -144,52 +172,67 @@ instance Pretty a => Pretty (NodeDataF a) where
       showChoice (v, Left p)  = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
       showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
 
-instance RLPSerializable a => RLPSerializable (NodeDataF a) where
-  rlpEncode EmptyNodeData = RLPString ""
-  rlpEncode (FullNodeData {choices=cs, nodeVal=val}) = RLPArray ((encodeChoice <$> cs) ++ [encodeVal val])
+instance RLPSerializable1 Proof where
+  liftRlpEncode f (Proof (sr, a))      = RLPArray [rlpEncode sr, liftRlpEncode f a]
+  liftRlpDecode f (RLPArray [sr', a']) = let !sr = rlpDecode sr'
+                                             !a  = liftRlpDecode f a'
+                                          in Proof (sr, a)
+  liftRlpDecode _ o = error $ "rlpDecode Proof: Expected RLPArray [sr, a], got " ++ show o
+
+instance RLPSerializable a => RLPSerializable (Proof a) where
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance RLPSerializable1 NodeDataF where
+  liftRlpEncode _ EmptyNodeData = RLPString ""
+  liftRlpEncode f (FullNodeData {choices=cs, nodeVal=val}) = RLPArray ((encodeChoice f <$> cs) ++ [encodeVal val])
     where
-      encodeChoice :: RLPSerializable a => Either B.ByteString a -> RLPObject
-      encodeChoice (Left "") = rlpEncode (0::Integer)
-      encodeChoice (Right x) = rlpEncode x
-      encodeChoice (Left o)  = rlpDeserialize o
+      encodeChoice :: (b -> RLPObject) -> Either B.ByteString b -> RLPObject
+      encodeChoice _ (Left "") = rlpEncode (0::Integer)
+      encodeChoice g (Right x) = g x
+      encodeChoice _ (Left o)  = rlpDeserialize o
       encodeVal :: Maybe Val -> RLPObject
       encodeVal Nothing  = rlpEncode (0::Integer)
       encodeVal (Just x) = x
-  rlpEncode (ShortcutNodeData {nextNibbleString=s, nextVal=val}) =
-    RLPArray[rlpEncode $ termNibbleString2String terminator s, encodeVal val]
+  liftRlpEncode f (ShortcutNodeData {nextNibbleString=s, nextVal=val}) =
+    RLPArray[rlpEncode $ termNibbleString2String terminator s, encodeVal f val]
     where
       terminator =
         case val of
           Left _  -> False
           Right _ -> True
-      encodeVal :: RLPSerializable a => Either (NodeRefF a) Val -> RLPObject
-      encodeVal (Left (Right x)) = rlpEncode x
-      encodeVal (Left (Left x))  = rlpDeserialize x
-      encodeVal (Right x)        = x
+      encodeVal :: (b -> RLPObject) -> Either (NodeRefF b) Val -> RLPObject
+      encodeVal g (Left (Right x)) = g x
+      encodeVal _ (Left (Left x))  = rlpDeserialize x
+      encodeVal _ (Right x)        = x
 
-  rlpDecode (RLPString "") = EmptyNodeData
-  rlpDecode (RLPScalar 0) = EmptyNodeData
-  rlpDecode (RLPArray [a, val])
+  liftRlpDecode _ (RLPString "") = EmptyNodeData
+  liftRlpDecode _ (RLPScalar 0) = EmptyNodeData
+  liftRlpDecode f (RLPArray [a, val])
       | terminator = ShortcutNodeData s $ Right val
       | B.length (rlpSerialize val) >= 32 =
-          ShortcutNodeData s (Left $ Right $ rlpDecode val)
+          ShortcutNodeData s (Left $ Right $ f val)
       | otherwise =
           ShortcutNodeData s (Left $ Left $ rlpSerialize val)
     where
       (terminator, s) = byteString2TermNibbleString . rlpDecode $ a
-  rlpDecode (RLPArray x) | length x == 17 =
-    FullNodeData (getPtr <$> childPointers) val
+  liftRlpDecode f (RLPArray x) | length x == 17 =
+    FullNodeData (getPtr f <$> childPointers) val
     where
       childPointers = init x
       val = case last x of
         RLPScalar 0  -> Nothing
         RLPString "" -> Nothing
         x'           -> Just x'
-      getPtr :: RLPSerializable a => RLPObject -> NodeRefF a
-      getPtr o | B.length (rlpSerialize o) < 32 = Left $ rlpSerialize o
+      getPtr :: (RLPObject -> b) -> RLPObject -> NodeRefF b
+      getPtr _ o | B.length (rlpSerialize o) < 32 = Left $ rlpSerialize o
       --getPtr o@(RLPArray [_, _]) = SmallRef $ rlpSerialize o
-      getPtr p = Right $ rlpDecode p
-  rlpDecode x = error ("Missing case in rlpDecode for NodeData: " ++ show x)
+      getPtr g p = Right $ g p
+  liftRlpDecode _ x = error ("Missing case in rlpDecode for NodeData: " ++ show x)
+
+instance RLPSerializable a => RLPSerializable (NodeDataF a) where
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
 
 byteString2TermNibbleString :: B.ByteString -> (Bool, N.NibbleString)
 byteString2TermNibbleString bs | B.null bs   = error "string2TermNibbleString called with empty String"
