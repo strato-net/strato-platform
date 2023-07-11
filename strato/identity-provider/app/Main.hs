@@ -13,7 +13,7 @@ import           HFlags
 -- import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Network.Wai.Handler.Warp (run)
 import           Lib
-import           Options (flags_vaulturl)
+import           Options (flags_vaultproxyurl)
 
 -- type IDServerM m = (MonadLogger m, MonadIO m, MonadReader IDServerVaultConn m )--  ReaderT IDServerVaultConn (LoggingT IO)
 main :: IO ()
@@ -36,4 +36,4 @@ main = do
     --     Nothing -> return $ Left "no token"
     -- print eUser
     putStrLn "Initializing identity server..."
-    run 8081 $ identityProviderApp flags_vaulturl
+    run 8081 $ identityProviderApp flags_vaultproxyurl

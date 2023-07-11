@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Options (flags_vaulturl) where 
+module Options (flags_vaultproxyurl) where 
 
 import HFlags
 
-defineFlag "vaulturl" ("http://localhost:8088" :: String) "URL to Vault"
+defineFlag "vaultproxyurl" ("http://localhost:8013/strato/v2.3" :: String) "URL to Vault"

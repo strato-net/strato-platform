@@ -21,7 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - common-log
-- slipstream
+- slipstream # TODO: switch from slipstream dep to strato-api
 
 ghc-options:
 - -Wall
