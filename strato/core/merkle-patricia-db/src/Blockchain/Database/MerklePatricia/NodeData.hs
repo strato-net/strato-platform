@@ -16,6 +16,7 @@ module Blockchain.Database.MerklePatricia.NodeData (
   NodeData,
   NodeDataProofF,
   NodeDataProof,
+  MPProof,
   NodeRefF,
   NodeRef,
   runMP,
@@ -149,9 +150,9 @@ instance RLPSerializable1 NodeDataF where
   liftRlpDecode f (RLPArray [a, val])
       | terminator = ShortcutNodeData s $ Right val
       | B.length (rlpSerialize val) >= 32 =
-          ShortcutNodeData s (Left $ Right $ f val)
+          ShortcutNodeData s (Left . ptrRef $ f val)
       | otherwise =
-          ShortcutNodeData s (Left $ Left $ rlpSerialize val)
+          ShortcutNodeData s (Left . smallRef $ rlpSerialize val)
     where
       (terminator, s) = byteString2TermNibbleString . rlpDecode $ a
   liftRlpDecode f (RLPArray x) | length x == 17 =
@@ -224,11 +225,12 @@ instance RLPSerializable a => RLPSerializable (Proof a) where
 type NodeData = NodeDataF StateRoot
 type NodeDataProofF = Compose Proof NodeDataF
 type NodeDataProof  = NodeDataProofF StateRoot
+type MPProof = Fix NodeDataProofF
 
 proveNodeData :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m NodeDataProof
 proveNodeData sr = Compose . Proof . (sr,) <$> A.lookup A.Proxy sr
 
-proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m (Fix NodeDataProofF)
+proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m MPProof
 proveMP = unfoldFixM proveNodeData
 
 unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
@@ -252,5 +254,5 @@ verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
         valid (Right (_, b)) = b
         valid _              = True
 
-verifyMP :: Fix NodeDataProofF -> Bool
+verifyMP :: MPProof -> Bool
 verifyMP = snd . foldFix verifyNodeData
