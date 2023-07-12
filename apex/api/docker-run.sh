@@ -42,4 +42,7 @@ do
 done
 echo 'postgres is available'
 
-NODE_HOST=${NODE_HOST} npm run start:prod
+# Commenting out only for testing
+#NODE_HOST=${NODE_HOST} npm run start:prod
+touch /tmp/test.log
+tail -f /tmp/test.log

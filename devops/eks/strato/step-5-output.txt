@@ -1,0 +1,442 @@
+step 5.
+kubectl describe pod <application_podname> -n <namespace>
+
+imaad.ghouri strato % kubectl describe pod deployment-strato-cd6689fd6-mn67t -n strato-platform
+
+Name:             deployment-strato-cd6689fd6-mn67t
+Namespace:        strato-platform
+Priority:         0
+Service Account:  default
+Node:             ip-192-168-45-74.ec2.internal/192.168.45.74
+Start Time:       Wed, 28 Jun 2023 18:06:01 -0400
+Labels:           app.kubernetes.io/name=strato-platform
+                  pod-template-hash=cd6689fd6
+Annotations:      <none>
+Status:           Running
+IP:               192.168.63.28
+IPs:
+  IP:           192.168.63.28
+Controlled By:  ReplicaSet/deployment-strato-cd6689fd6
+Containers:
+  smd:
+    Container ID:   containerd://04bda46405686a270cdca7986ef5ddc03c8bd0150ee8372834e109d25d15b691
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/smd@sha256:24a5122b61f15b2210cb04d9ef5ac4da9e4d9a289b2b6e69b8ab33740c458a68
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:06:25 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      NODE_HOST:  localhost
+      NODE_NAME:  localhost
+      ssl:        false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  apex:
+    Container ID:   containerd://40329b18a21a61d551531844978e029fe10d4bf1720f3f1bf5c0483aea577969
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/apex@sha256:fa6751c64f8b5ec6ad334720873a375673407dbc6d5982ff8044e32bf614b513
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:06:38 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      NODE_HOST:                localhost
+      postgres_host:            postgres
+      postgres_password:        api
+      postgres_port:            5432
+      postgres_user:            postgres
+      PROMETHEUS_HOST:          localhost:9090
+      STRATO_HOSTNAME:          localhost
+      STRATO_PORT_API:          
+      STRATO_PORT_VAULT_PROXY:  
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  marketplace-backend:
+    Container ID:   containerd://fc707840aa39888fae025925bf2c6a14d8f9c26ce61febed4d0163217ccf67d7
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/marketplace-backend:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/marketplace-backend@sha256:344762d7dbb64efc504a4d5e2f09267a82577769b798e55bdba9da420bc0ee24
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:06:58 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      EXT_STORAGE_S3_BUCKET:                       mercata-testnet2
+      EXT_STORAGE_S3_ACCESS_KEY_ID:                AKIAV5NMROVZIZQY4OAE
+      EXT_STORAGE_S3_SECRET_ACCESS_KEY:            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
+      GLOBAL_ADMIN_NAME:                           user1
+      GLOBAL_ADMIN_PASSWORD:                       1234
+      MP_IS_BOOTNODE:                              true
+      MP_DAPP_ADDRESS:                             ec4deef60caaa5209790539abbb0f45e3d691c63
+      MP_API_DEBUG:                                false
+      MP_DELAY_DEPLOYMENT:                         true
+      MP_SERVER_HOST:                              localhost
+      MP_SERVER_SSL:                               false
+      NODE_LABEL:                                  
+      ORG_NAME:                                    BlockApps
+      ORG_DEPLOY_FILE_NAME:                        org.deploy.yaml
+      OAUTH_APP_TOKEN_COOKIE_NAME:                 stratomp_session
+      OAUTH_OPENID_DISCOVERY_URL:                  https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
+      OAUTH_CLIENT_ID:                             localhost
+      OAUTH_CLIENT_SECRET:                         ab85bdf6-9715-441f-b3e5-c8be53c3a55e
+      OAUTH_VAULT_PROXY_ALT_CLIENT_ID:             
+      OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:         
+      OAUTH_SCOPE:                                 email openid
+      OAUTH_SERVICE_OAUTH_FLOW:                    client-credential
+      OAUTH_TOKEN_FIELD:                           access_token
+      OAUTH_TOKEN_USERNAME_PROPERTY:               email
+      OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:  sub
+      STRIPE_PUBLISHABLE_KEY:                      pk_test_51Ma27ZKRjQhi20SKEfR6ganfwqianD3pSEJaQP2dhdXmQEVdlAmtTuybS52tFogwHuZGGs4psbhQwLGT7tGSZoCe00wJpwJ6bA
+      STRIPE_SECRET_KEY:                           sk_test_51Ma27ZKRjQhi20SKQjDdtwqQwhxo3eCdkViAq9qNITH2RLtiPaDUFn1CHISFtculuFlr2nxL7ocD8evYFXiMM0Nu00mDDtGpYF
+      STRATO_NODE_PROTOCOL:                        
+      STRATO_NODE_HOST:                            
+    Mounts:
+      /config from marketplace-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  marketplace-ui:
+    Container ID:   containerd://917e4d91303feb366499c06b0648f88a6d5e7a861275d3cb81b04e9aadbe7586
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/marketplace-ui:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/marketplace-ui@sha256:c95bbd1050775d0be5e2306bffcef20f828fadcad82f0f0b63a0c5f33af97967
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:07:35 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      NODE_ENV:  production
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  redis:
+    Container ID:  containerd://63ed71977cd8702067703697f82ce72c8b6128fb66ca34e1c8870f4382cac3cc
+    Image:         redis:3.2
+    Image ID:      docker.io/library/redis@sha256:7b0a40301bc1567205e6461c5bf94c38e1e1ad0169709e49132cafc47f6b51f3
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      redis-server
+    Args:
+      --appendonly
+      yes
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:07:37 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /data from redis-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  strato:
+    Container ID:   containerd://f9ef1840bfe79c77f086dbf0f385b86faa6e378fe5f8ee2df95fa69f2293a4fe
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato@sha256:33bc13217eadae9d828cbbb97790f6500b47c1f0aced17e3df789ed7aeb6c1b8
+    Ports:          30303/TCP, 30303/UDP
+    Host Ports:     0/TCP, 0/UDP
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:53 -0400
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Wed, 28 Jun 2023 18:08:13 -0400
+      Finished:     Wed, 28 Jun 2023 18:08:49 -0400
+    Ready:          True
+    Restart Count:  1
+    Environment:
+      accountNonceLimit:                    
+      addBootnodes:                         
+      appFetchLimit:                        
+      averageTxsPerBlock:                   
+      blockstanbul:                         true
+      blockstanbulBlockPeriodMs:            
+      blockstanbulRoundPeriodS:             
+      blockTime:                            
+      bootnode:                             
+      brokenRefundReenable:                 
+      cacheTransactionResults:              
+      certInfo:                             
+      connectionTimeout:                    
+      debugFail:                            
+      debugPort:                            
+      debugWSPort:                          
+      evmDebugMode:                         
+      evmTraceMode:                         
+      faucetEnabled:                        
+      gasLimit:                             
+      gasOn:                                false
+      generateKey:                          true
+      genesis:                              
+      indexEVM:                             false
+      kafkaHost:                            localhost
+      kafkaPort:                            9092
+      lazyBlocks:                           
+      maxConn:                              
+      maxReturnedHeaders:                   
+      maxTxsPerBlock:                       
+      minBlockDifficulty:                   
+      mineBlocks:                           true
+      miningAlgorithm:                      
+      miningThreads:                        
+      network:                              mercata-hydrogen
+      networkID:                            
+      numMinPeers:                          
+      OAUTH_DISCOVERY_URL:                  https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
+      OAUTH_CLIENT_ID:                      localhost
+      OAUTH_CLIENT_SECRET:                  ab85bdf6-9715-441f-b3e5-c8be53c3a55e
+      OAUTH_VAULT_PROXY_ALT_CLIENT_ID:      
+      OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:  
+      OAUTH_RESERVE_SECONDS:                
+      postgres_host:                        localhost
+      postgres_password:                    api
+      postgres_port:                        5432
+      postgres_slipstream_db:               cirrus
+      postgres_user:                        postgres
+      PROCESS_MONITORING:                   
+      redisHost:                            localhost
+      redisPort:                            6379
+      redisBDBNumber:                       
+      requireCerts:                         true
+      seqDebugMode:                         
+      seqEventsBatchSize:                   
+      seqEventsCostHeuristic:               
+      seqMaxEventsPerIter:                  
+      seqMaxUsPerIter:                      
+      seqRTSOPTs:                           
+      SLIPSTREAM_DEBUG:                     
+      SLIPSTREAM_OPTIONAL:                  
+      splitinit:                            true
+      stratoHost:                           localhost:3000
+      svmTrace:                             
+      sqlDiff:                              
+      svmDev:                               
+      txSizeLimit:                          
+      useSyncMode:                          
+      VAULT_URL:                            https://vault.blockapps.net:8093/
+      VAULT_PROXY_DEBUG:                    
+      validatorBehavior:                    true
+      vmDebug:                              
+      vmRunnerRTSOPTs:                      
+      wireMessageCacheSize:                 
+      wsDebug:                              
+      zkHost:                               localhost
+    Mounts:
+      /var/lib/strato from strato-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  postgrest:
+    Container ID:   containerd://3bac7e2ccf34c43c11697e6d3f6eb8135600643d71aed91eb47779d32242bc9a
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/postgrest@sha256:c58e7e05783c3f622b3bddd0b2d505e13a68f57a552a613657b3d127efa608d5
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:19 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      blocHost:                  localhost:3000
+      PG_ENV_POSTGRES_DB:        cirrus
+      PG_ENV_POSTGRES_HOST:      localhost
+      PG_ENV_POSTGRES_PASSWORD:  api
+      PG_ENV_POSTGRES_USER:      postgres
+      PG_PORT_5432_TCP_PORT:     5432
+      POSTGREST_LOG_LEVEL:       error
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  postgres:
+    Container ID:  containerd://cbc38f2213b25117dbf5ca83e277399da9a632a48010940a1302cf49aa92ce76
+    Image:         postgres:9.6
+    Image ID:      docker.io/library/postgres@sha256:caddd35b05cdd56c614ab1f674e63be778e0abdf54e71a7507ff3e28d4902698
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      docker-entrypoint.sh
+    Args:
+      -c
+      max_connections=300
+      -c
+      shared_buffers=512MB
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:23 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      POSTGRES_PASSWORD:  api
+      PGDATA:             /var/lib/postgresql/data/pgdata
+    Mounts:
+      /var/lib/postgresql/data/ from postgres-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  nginx:
+    Container ID:   containerd://4d03444fa91dcb7ab3f20a3cd803604fb2eff67396602148bfdfc9766c4acb41
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/nginx@sha256:aa4e759f25c92eea4abdaecb21a60c22b5ee211d58e685e675071cbc4e60d51a
+    Ports:          80/TCP, 443/TCP
+    Host Ports:     0/TCP, 0/TCP
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:29 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      APEX_HOST:                      localhost:3009
+      blockstanbul:                   
+      blockTime:                      
+      debugPort:                      
+      debugWSPort:                    
+      DOCS_HOST:                      localhost:8080
+      MARKETPLACE_BACKEND_HOST:       
+      MARKETPLACE_UI_HOST:            
+      OAUTH_CLIENT_ID:                localhost
+      OAUTH_CLIENT_SECRET:            ab85bdf6-9715-441f-b3e5-c8be53c3a55e
+      OAUTH_DISCOVERY_URL:            https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
+      OAUTH_SCOPE:                    
+      POSTGREST_HOST:                 localhost:3001
+      PROMETHEUS_HOST:                localhost:9090
+      SERVE_LOGS:                     
+      SMD_DEV_MODE:                   
+      SMD_DEV_MODE_HOST_IP:           
+      SMD_HOST:                       localhost:3002
+      ssl:                            false
+      sslCertFileType:                
+      STATS_ENABLED:                  
+      STRATO_HOSTNAME:                localhost
+      STRATO_PORT_API:                
+      STRATO_PORT_API2:               
+      STRATO_PORT_BLOCKSTANBUL_VOTE:  
+      STRATO_PORT_LOGS:               
+      STRATO_PORT_VAULT_PROXY:        
+      vmDebug:                        
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  docs:
+    Container ID:   containerd://c30d00f840eab1e04713125d327f88484d8796a327d915542c75007b0469dd16
+    Image:          swaggerapi/swagger-ui:v3.22.1
+    Image ID:       docker.io/swaggerapi/swagger-ui@sha256:6b592f2e0cd94b7816dff99874be479a1bed65c8b821d6ca86f9cce5a6069780
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:31 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      API_URL:  /strato-api/eth/v1.2/swagger.json
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  zookeeper:
+    Container ID:   containerd://bbc1099363ce762a058be02b3813442bc369f68a0329429d0aa07ce8abe95715
+    Image:          zookeeper:3.4.14
+    Image ID:       docker.io/library/zookeeper@sha256:3882d9493d387ba77b7b69e2a031b9396477ec29483d51ceaed645c1389182e5
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:35 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      ZOO_DATA_LOG_DIR:  /data
+    Mounts:
+      /data from zookeeper-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  kafka:
+    Container ID:   containerd://abd3581f6cef47dea4ab4d2667d2754126fb120fb02953468fe89a2512924c84
+    Image:          wurstmeister/kafka:1.1.0
+    Image ID:       docker.io/wurstmeister/kafka@sha256:3a63b48894bce633fb2f0d2579e162163367113d79ea12ca296120e90952b463
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:40 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      KAFKA_ADVERTISED_HOST_NAME:       localhost
+      KAFKA_ADVERTISED_PORT:            9092
+      KAFKA_ZOOKEEPER_CONNECT:          localhost:2181
+      KAFKA_DELETE_TOPIC_ENABLE:        true
+      KAFKA_LOG_CLEANER_ENABLE:         false
+      KAFKA_LOG_DIRS:                   /kafka/kafka-logs
+      KAFKA_OFFSET_METADATA_MAX_BYTES:  1048576
+      KAFKA_OFFSETS_RETENTION_MINUTES:  2147483647
+      KAFKA_MAX_REQUEST_SIZE:           100663296
+      KAFKA_MESSAGE_MAX_BYTES:          100663296
+    Mounts:
+      /kafka from kafka-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+  prometheus:
+    Container ID:   containerd://87e649827528dde327246f8057f2a270716a1607e5c330518ebe2ad86c99cbd2
+    Image:          406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus:9.0.0-f043df138
+    Image ID:       406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/prometheus@sha256:b1feafe39fbf76fa6b3716d6bfddf317ae32db4c41c3d23b4cb40a8f7ca06a61
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Wed, 28 Jun 2023 18:08:47 -0400
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      NODE_HOST:  localhost
+    Mounts:
+      /prometheus from prometheus-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjfc (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  marketplace-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-010a0925f5e0b2833
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  postgres-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-0a5c04b368b765447
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  prometheus-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-00def41e973042bd7
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  kafka-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-0d3e6c8fff227730c
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  redis-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-0092839fe3c100b4b
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  strato-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-00df2d49bd1404a51
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  zookeeper-data:
+    Type:       AWSElasticBlockStore (a Persistent Disk resource in AWS)
+    VolumeID:   vol-08ebb8227e58c0fa3
+    FSType:     ext4
+    Partition:  0
+    ReadOnly:   false
+  kube-api-access-7wjfc:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+imaad.ghouri strato % 
