@@ -40,6 +40,7 @@ library:
   dependencies:
   - aeson
   - blockapps-vault-wrapper-client
+  - blockapps-vault-wrapper-api
   - hflags
   - http-client
   - http-types
@@ -52,6 +53,7 @@ library:
   - text
   - unliftio
   - vault-monad
+  - x509-certs
 
 executables:
   identity-provider-exe:
@@ -64,10 +66,12 @@ executables:
     dependencies:
     - aeson
     - blockapps-identity-provider
+    - bytestring
     - hflags
     - http-client
     - transformers
     - warp
+    - x509-certs
 
 tests:
   identity-provider-test:
