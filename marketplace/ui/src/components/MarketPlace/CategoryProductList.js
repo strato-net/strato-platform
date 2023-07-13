@@ -126,7 +126,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMinPrice,
           debouncedMaxPrice
         );
-    } else {
+    } else if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
