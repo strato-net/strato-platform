@@ -75,7 +75,8 @@ varTypeToVariableDecl x =
   _varIsPublic=False,
   _varInitialVal=Nothing,
   _varContext=dummyAnnotation,
-  _isImmutable=False
+  _isImmutable=False,
+  _isRecord=False
   }
 
 dummyAnnotation :: SourceAnnotation ()

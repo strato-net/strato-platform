@@ -21,7 +21,6 @@ export default {
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
-  ItemDetail: { label: "Item Detail", url: "/items/:id" },
   Orders: { label: "Order", url: "/orders" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },
   BoughtOrderDetails: {
@@ -40,13 +39,6 @@ export default {
     label: "Order Item Event List",
     url: "/orders/events/:itemId",
   },
-  OrderLineItems: { label: "OrderLineItem", url: "/orderLineItems" },
-  OrderLineItemDetail: {
-    label: "OrderLineItem Detail",
-    url: "/orderLineItems/:id",
-  },
-  EventTypes: { label: "EventType", url: "/eventTypes" },
-  EventTypeDetail: { label: "EventType Detail", url: "/eventTypes/:id" },
   Events: { label: "Event", url: "/events" },
   EventDetail: { label: "Event Detail", url: "/events/:id" },
   EventList: { label: "Event List", url: "/inventories/events/:id" },

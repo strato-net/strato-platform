@@ -20,7 +20,6 @@ import           DumpKafkaVMEvents
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
-import           DumpKafkaUnminedBlocks
 import           DumpKafkaUnSequencer
 import           DumpRedis
 import           FRawMP
@@ -61,7 +60,6 @@ data Options = State{root::String, db::String}
              | DumpKafkaSequencerVM{startingBlock::Int}
              | DumpKafkaSequencerP2P{startingBlock::Int}
              | DumpKafkaUnSequencer{startingBlock::Int}
-             | DumpKafkaUnminedBlocks{startingBlock::Int}
              | DumpKafkaRaw{streamName::String, startingBlock::Int}
              | DumpKafkaStateDiff{startingBlock::Int}
              | DumpRedis{databaseNumber::Integer}
@@ -198,12 +196,6 @@ dumpKafkaBlocksOptions =
 dumpKafkaVMEventsOptions::Annotate Ann
 dumpKafkaVMEventsOptions =
   record DumpKafkaVMEvents{startingBlock=undefined} [
-    startingBlock := 0 += typ "INT"
-    ]
-
-dumpKafkaUnminedBlocksOptions::Annotate Ann
-dumpKafkaUnminedBlocksOptions =
-  record DumpKafkaUnminedBlocks{startingBlock=undefined} [
     startingBlock := 0 += typ "INT"
     ]
 
@@ -367,7 +359,6 @@ options = modes_ [blockGoOptions
                 , dumpKafkaSequencerP2pOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
-                , dumpKafkaUnminedBlocksOptions
                 , dumpRedisOptions
                 , fRawMPOptions
                 , hashOptions
@@ -426,7 +417,6 @@ run DumpKafkaSequencerP2P{..}  = dumpKafkaSequencerP2P (fromIntegral startingBlo
 run DumpKafkaUnSequencer{..}   = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents{..}      = dumpKafkaVMEvents (fromIntegral startingBlock)
-run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
 run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql

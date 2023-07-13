@@ -26,6 +26,7 @@
     "test:api:order": "yarn mocha-babel test/v1/order.test.js -b",
     "test:api:orderLine": "yarn mocha-babel test/v1/orderLine.test.js -b",
     "test:api:orderLineItem": "yarn mocha-babel test/v1/orderLineItem.test.js -b",
+    "test:api:anonymousUser": "yarn mocha-babel test/v1/anonymousUser.test.js -b",
     "test:api:eventType": "yarn mocha-babel test/v1/eventType.test.js -b",
     "test:api:event": "yarn mocha-babel test/v1/event.test.js -b",
     "test:api:image": "yarn mocha-babel test/v1/image.test.js -b",

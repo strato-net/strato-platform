@@ -51,8 +51,7 @@ createKafkaTopic topic = do
    _        -> return ()
 
 topics  ::  [String]
-topics = [ "unminedblock"
-         , "statediff"
+topics = ["statediff"
          , "seq_vm_events"
          , "seq_p2p_events"
          , "unseqevents"

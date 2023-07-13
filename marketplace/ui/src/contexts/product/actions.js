@@ -12,8 +12,7 @@ const actionDescriptors = {
   fetchProductsForFilterSuccessful: "fetch_products_for_filter_successful",
   fetchProductsForFilterFailed: "fetch_products_for_filter_failed",
   fetchCategoryBasedProduct: "fetch_category_based_products",
-  fetchCategoryBasedProductSuccessful:
-    "fetch_category_based_product_successful",
+  fetchCategoryBasedProductSuccessful: "fetch_category_based_product_successful",
   fetchCategoryBasedProductFailed: "fetch_category_based_product_failed",
   fetchProductDetails: "fetch_product_details",
   fetchProductDetailsSuccessful: "fetch_product_details_successful",
@@ -247,7 +246,7 @@ const actions = {
         type: actionDescriptors.updateProductFailed,
         error: body.error,
       });
-      actions.setMessage(dispatch, body.error);
+      actions.setMessage(dispatch, "Error while updating Product");
       return false;
     } catch (err) {
       dispatch({
@@ -394,7 +393,7 @@ const actions = {
       actions.setMessage(dispatch, "Error while updating Image");
     }
   },
-
+  
   fetchProductsForFilter: async (dispatch, categorys, subCategorys) => {
     dispatch({ type: actionDescriptors.fetchProductsForFilter });
 

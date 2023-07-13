@@ -56,7 +56,9 @@ contract Inventory is InventoryStatus{
     ,   InventoryStatus _status
     ,   uint _scheme
     ) returns (uint) {
-      if (tx.origin != owner) { return RestStatus.FORBIDDEN; }
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
 
       if (_scheme == 0) {
         return RestStatus.OK;
@@ -79,5 +81,12 @@ contract Inventory is InventoryStatus{
       // }
       availableQuantity = _quantity;
       return RestStatus.OK;
+    }
+
+    // Get the userOrganization
+    function getUserOrganization(address caller) public returns (string) {
+      mapping(string => string) ownerCert = getUserCert(caller);
+      string userOrganization = ownerCert["organization"];
+      return userOrganization;
     }
 }

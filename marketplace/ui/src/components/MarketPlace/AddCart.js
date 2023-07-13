@@ -4,7 +4,9 @@ import {
   notification,
   Spin,
   Image,
+  InputNumber
 } from "antd";
+import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
@@ -14,12 +16,11 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
@@ -53,11 +54,11 @@ const Checkout = ({ user }) => {
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
   }, []);
-  
+
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
-  
+
   useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
@@ -176,7 +177,7 @@ const Checkout = ({ user }) => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -187,7 +188,7 @@ const Checkout = ({ user }) => {
       render: (text) => (
         <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
       ),
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -236,9 +237,23 @@ const Checkout = ({ user }) => {
               className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
               <MinusOutlined className="text-xs text-secondryD" />
             </div>
-            <div className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center">
-              {qty}
-            </div>
+            <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
+                min={1} value={qty} defaultValue={qty} controls={false}
+                onChange={e => {
+                  let items = [...cartList];
+                  cartList.forEach((element, index) => {
+                    if (element.product.address === product.address) {
+                      if (e <= product?.availableQuantity) {
+                        items[index].qty = e;
+                        actions.addItemToCart(marketplaceDispatch, items);
+                      } else {
+                        openToast("bottom", true, "Cannot add more than available quantity");
+                        items[index].qty = product?.availableQuantity;
+                        actions.addItemToCart(marketplaceDispatch, items);
+                      }
+                    }
+                  });
+                }} />
             <div
               onClick={() => {
                 let items = [...cartList];
@@ -331,10 +346,6 @@ const Checkout = ({ user }) => {
     }
   };
 
-
-
-
-
   return (
     <div className="h-screen mx-14  mt-14">
       {contextHolder}
@@ -345,7 +356,7 @@ const Checkout = ({ user }) => {
       ) : (
         <div>
           <Breadcrumb>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>

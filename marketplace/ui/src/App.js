@@ -1,26 +1,21 @@
 import React, { useEffect } from "react";
 import {
-  useAuthenticateState,
-  useAuthenticateDispatch,
+  useAuthenticateState
 } from "./contexts/authentication";
 import AuthenticatedRoutes from "./AuthenticatedRoutes";
 import "@shopify/polaris/build/esm/styles.css";
-import { actions } from "./contexts/authentication/actions";
 import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
-import { Layout, Card, Spin } from "antd";
+import { Layout } from "antd";
 import HeaderComponent from "./components/Header/Header";
 
 import { UsersProvider } from "./contexts/users";
-import { useNavigate } from "react-router-dom";
 
 const { Content } = Layout;
 
 const App = () => {
 
-  const dispatch = useAuthenticateDispatch();
-
-  const { isAuthenticated, hasChecked, user, loginUrl, users } =
+  const {user, loginUrl, users } =
     useAuthenticateState();
     
     

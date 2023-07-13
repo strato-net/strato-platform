@@ -5,6 +5,7 @@ module Slipstream.Metrics
   , recordAction
   , recordCombinedAction
   , incNumTables
+  , incNumMappingTables
   , incNumHistoryTables
   , incNumBloomWrites
   , recordStackDepth
@@ -96,6 +97,9 @@ recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter
+
+incNumMappingTables :: MonadIO m => m ()
+incNumMappingTables = liftIO $ withLabel tablesCreated "mapping" incCounter
 
 incNumHistoryTables :: MonadIO m => m ()
 incNumHistoryTables = liftIO $ withLabel tablesCreated "history" incCounter

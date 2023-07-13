@@ -20,11 +20,7 @@ import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 //subcategories
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
+
 //product
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
@@ -85,9 +81,6 @@ const CreateEventModal = ({
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
 
-  //Sub-categories
-  const subCategoryDispatch = useSubCategoryDispatch();
-
   //product
   const productDispatch = useProductDispatch();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
@@ -143,7 +136,7 @@ const CreateEventModal = ({
     },
   });
 
-  const [eventQueryValue, setEventQueryValue] = useState("");
+  const eventQueryValue = "";
   const debouncedEventSearchTerm = useDebounce(eventQueryValue, 1000);
 
   const handleFormSubmit = async (values) => {

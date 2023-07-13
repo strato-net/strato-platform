@@ -7083,3 +7083,17 @@ contract qq {
     return;
   }
 }   |]) `shouldThrow` anyTooMuchGasError
+
+  it "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
+    runBS [r|
+contract qq {
+  string x;
+  mapping(string => uint) record myMap;
+  constructor() {
+    x = this.chainIdString;
+    myMap["seven"] = 7;
+  }
+}
+|] 
+    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
+

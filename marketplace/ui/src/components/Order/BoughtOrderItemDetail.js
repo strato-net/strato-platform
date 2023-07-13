@@ -65,9 +65,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
 
   useEffect(() => {
     if (Id !== undefined) {
-      actions.fetchOrderLineItemDetails(dispatch, Id);
-    
-      // actions.fetchOrderAudit(dispatch, Id, chainId);
+      actions.fetchOrderLineItemDetails(dispatch, Id);    
     }
   }, [Id, dispatch]);
 

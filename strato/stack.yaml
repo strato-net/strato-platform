@@ -17,7 +17,6 @@ packages:
 - core/miner-ethash
 - core/privacy
 - core/seqevents
-- core/strato-adit
 - core/strato-conf
 - core/strato-genesis
 - core/strato-init
@@ -114,6 +113,12 @@ flags:
   secp256k1-haskell:
     ecdh: true
     recovery: true
+
+nix:
+  enable: true
+  pure: false
+  # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
+  shell-file: nix/stack-integration.nix
 
 resolver: lts-20.10 #also duplicated in docker section below
 compiler-check: newer-minor

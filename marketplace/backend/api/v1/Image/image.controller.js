@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import moment from "moment";
 import crypto from "crypto";
-import { uploadFileToS3, getFileStreamFromS3, getFileFromS3, deleteFileFromS3 } from "../../../helpers/s3";
+import { uploadFileToS3, deleteFileFromS3 } from "../../../helpers/s3";
 import constants from '../../../helpers/constants';
 const options = { config, cacheNonce: true }
 import aws from 'aws-sdk'
@@ -50,11 +50,6 @@ class ImageController {
       rest.response.status400(res, "Missing file key");
     }
     try {
-      const oldFileKey=req.params.fileKey;
-      const isDeleted=await deleteFileFromS3(oldFileKey,req.app.get(constants.s3ParamName))
-      if(!isDeleted){
-        rest.response.status400(res,"Image is failed to update")
-      }
       
       const fileKey = `${moment()
         .utc()
@@ -76,9 +71,6 @@ class ImageController {
       return next(e);
     }
   }
-
-
-
 
 }
 

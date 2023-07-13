@@ -116,23 +116,6 @@ const reducer = (state, action) => {
         error: action.error,
         iseventDetailsLoading: false
       };
-    case actionDescriptors.transferEventOwnership:
-      return {
-        ...state,
-        isOwnershipeventTransferring: true
-      };
-    case actionDescriptors.transferEventOwnershipSuccessful:
-      return {
-        ...state,
-        eventOwnership: action.payload,
-        isOwnershipeventTransferring: false
-      };
-    case actionDescriptors.transferEventOwnershipFailed:
-      return {
-        ...state,
-        error: action.error,
-        isOwnershipeventTransferring: false
-      };
     case actionDescriptors.updateEvent:
       return {
         ...state,
@@ -167,46 +150,6 @@ const reducer = (state, action) => {
         error: action.error,
         iseventsAuditLoading: false
       };
-    case actionDescriptors.importAssetRequest:
-      return {
-        ...state,
-        isAssetImportInProgress: true,
-        assetsUploaded: 0,
-        assetsUploadedErrors: []
-      }
-    case actionDescriptors.importAssetSuccess:
-      return {
-        ...state,
-        isAssetImportInProgress: false,
-        error: null
-      }
-    case actionDescriptors.importAssetFailure:
-      return {
-        ...state,
-        error: action.error,
-        isAssetImportInProgress: false,
-        isImportAssetsModalOpen: true
-      }
-    case actionDescriptors.updateAssetImportCount:
-      return {
-        ...state,
-        assetsUploaded: action.count
-      }
-    case actionDescriptors.updateAssetUploadError:
-      return {
-        ...state,
-        assetsUploadedErrors: action.errors
-      }
-    case actionDescriptors.openImportCSVModal:
-      return {
-        ...state,
-        isImportAssetsModalOpen: true
-      }
-    case actionDescriptors.closeImportCSVModal:
-      return {
-        ...state,
-        isImportAssetsModalOpen: false
-      }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

@@ -8,7 +8,6 @@ import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import {
-  useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
 
