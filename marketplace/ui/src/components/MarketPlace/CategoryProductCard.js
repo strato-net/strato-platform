@@ -214,11 +214,14 @@ const CategoryProductCard = ({ product, category }) => {
               /* When there isnt avalialable quantity for the item */
               <div>
                 <Button
-                type="primary" 
-                className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-                href={`mailto:sales@blockapps.net`}>
-                Contact to Buy
+                  type="primary"
+                  className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
+                  href={`mailto:sales@blockapps.net`}>
+                  Contact to Buy
                 </Button>
+                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                </Paragraph>
               </div>
             }
           </div>

@@ -659,7 +659,7 @@ const ProductDetails = ({ user, users }) => {
               <Title level={4} className="!mt-0">
                 $ {details.pricePerUnit}
               </Title>
-              {details.availableQuantity !== 0 &&
+              {details.availableQuantity !== 0 ?
                 <Space>
                   <Text className="text-primaryB text-base">Quantity</Text>
                   <div className="flex items-center my-2 ml-5" id="quantity">
@@ -688,6 +688,10 @@ const ProductDetails = ({ user, users }) => {
                     </div>
                   </div>
                 </Space>
+                :
+                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+              </Paragraph>
               }
               <Tabs
                 defaultActiveKey="1"
