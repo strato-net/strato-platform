@@ -48,6 +48,23 @@ const reducer = (state, action) => {
           error: action.error,
           isSerialNumbersLoading: false,
         };
+      case actionDescriptors.fetchItemOwnershipHistory:
+        return {
+          ...state,
+          isOwnershipHistoryLoading: true,
+        };
+      case actionDescriptors.fetchItemOwnershipHistorySuccessful:
+        return {
+          ...state,
+          ownershipHistory: action.payload,
+          isOwnershipHistoryLoading: false,
+        };
+      case actionDescriptors.fetchItemOwnershipHistoryFailed:
+        return {
+          ...state,
+          error: action.error,
+          isOwnershipHistoryLoading: false,
+        };
       case actionDescriptors.fetchItemRawMaterials:
         return {
           ...state,
