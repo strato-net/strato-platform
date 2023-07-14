@@ -31,18 +31,6 @@ bigTest=
     ("00000000000000000000000000000002ffffffffffffffff0000000000000003", "84548123a8")
   ]
 
-addAllKVs::RLPSerializable obj=>MonadIO m=>MPDB->[(N.NibbleString, obj)]->m MPDB
-addAllKVs x [] = return x
-addAllKVs mpdb (x:rest) = do
-  mpdb' <- unsafePutKeyVal mpdb (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVs mpdb' rest
-
-addAllKVsMem :: (RLPSerializable obj, (StateRoot `Alters` NodeData) m) => StateRoot -> [(N.NibbleString, obj)] -> m StateRoot
-addAllKVsMem x [] = return x
-addAllKVsMem mpdb (x:rest) = do
-  mpdb' <- unsafePutKeyVal mpdb (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVsMem mpdb' rest
-
 testGetPut :: Test
 testGetPut = TestCase $ do
   res <- runMP $ do
@@ -63,7 +51,7 @@ testGetPutRepeated = TestCase $ do
 testGetPutRepeatedII :: Test
 testGetPutRepeatedII = TestCase $ do
   res <- runMP $ do
-    db <- addAllKVsMem blank bigTest
+    db <- addAllKVs blank bigTest
     getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
@@ -79,7 +67,7 @@ testSingleInsert = TestCase $ do
 
       addAllKVs ldb' [head bigTest]
 
-  sr2 <- runMP $ addAllKVsMem emptyTriePtr [head bigTest]
+  sr2 <- runMP $ addAllKVs emptyTriePtr [head bigTest]
 
   assertEqual "disk - mem single insert" (stateRoot sr) sr2
 
@@ -95,7 +83,7 @@ testMultipleInserts = TestCase $ do
 
       addAllKVs ldb' bigTest
 
-  sr2 <- runMP $ addAllKVsMem emptyTriePtr bigTest
+  sr2 <- runMP $ addAllKVs emptyTriePtr bigTest
 
   assertEqual "disk - mem multiple insert" (stateRoot sr) sr2
 
