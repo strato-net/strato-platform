@@ -14,13 +14,14 @@ import           Blockchain.Strato.Model.Util
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                                as B
 import qualified Data.NibbleString                              as N
 import qualified Database.LevelDB                               as LD
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit                       (fromHUnitTest)
 import           Test.HUnit
 
-bigTest :: [(Key,String)]
+bigTest :: [(B.ByteString,String)]
 bigTest=
   [
     ("00000000000000000000000000000000ffffffffffffffff0000000000000000", "90467269656e647320262046616d696c79"),
@@ -35,19 +36,6 @@ bigTest=
     ("0000000000000000000000000000000000000000000000010000000000000002", "83555344"),
     ("00000000000000000000000000000002ffffffffffffffff0000000000000003", "84548123a8")
   ]
-
-addAllKVs :: (RLPSerializable obj, (StateRoot `Alters` NodeData) m)
-          => StateRoot -> [(N.NibbleString, obj)] -> m StateRoot
-addAllKVs x [] = return x
-addAllKVs sr (x:rest) = do
-  sr' <- unsafePutKeyVal sr (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVs sr' rest
-
-addAllKVsMem :: (RLPSerializable obj, (StateRoot `Alters` NodeData) m) => StateRoot -> [(N.NibbleString, obj)] -> m StateRoot
-addAllKVsMem x [] = return x
-addAllKVsMem sr (x:rest) = do
-  sr' <- unsafePutKeyVal sr (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVsMem sr' rest
 
 testGetPut :: Test
 testGetPut = TestCase $ do
@@ -70,7 +58,7 @@ testGetPutRepeated = TestCase $ do
 testGetPutRepeatedII :: Test
 testGetPutRepeatedII = TestCase $ do
   res <- runMP $ do
-    db <- addAllKVsMem emptyTriePtr bigTest
+    db <- addAllKVs emptyTriePtr bigTest
     getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
@@ -83,7 +71,7 @@ testSingleInsert = TestCase $ do
       initializeBlank
       addAllKVs emptyTriePtr [head bigTest]
 
-  sr2 <- runMP $ addAllKVsMem emptyTriePtr [head bigTest]
+  sr2 <- runMP $ addAllKVs emptyTriePtr [head bigTest]
 
   assertEqual "disk - mem single insert" sr sr2
 
@@ -95,7 +83,7 @@ testMultipleInserts = TestCase $ do
       initializeBlank
       addAllKVs emptyTriePtr bigTest
 
-  sr2 <- runMP $ addAllKVsMem emptyTriePtr bigTest
+  sr2 <- runMP $ addAllKVs emptyTriePtr bigTest
 
   assertEqual "disk - mem multiple insert" sr sr2
 

@@ -10,6 +10,7 @@ description:
 
 dependencies:
   - base
+  - bytestring
   - containers
   - data-fix
   - ethereum-rlp
@@ -27,11 +28,11 @@ library:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
-  - bytestring
   - conduit
   - data-default
   - deepseq
   - format
+  - Ranged-sets
 
 
 tests:
@@ -52,7 +53,6 @@ benchmarks:
     source-dirs: bench/
     ghc-options: -dynamic
     dependencies:
-      - bytestring
       - criterion
       - deepseq
       - directory

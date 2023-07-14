@@ -14,7 +14,6 @@ module Blockchain.Database.MerklePatricia.NodeData (
   Val,
   NodeDataF(..),
   NodeData,
-  NodeDataProofF,
   NodeDataProof,
   NodeRefF,
   NodeRef,
@@ -24,7 +23,8 @@ module Blockchain.Database.MerklePatricia.NodeData (
   ptrRef,
   emptyRef,
   proveMP,
-  verifyMP
+  verifyMP,
+  module Data.Ranged
   ) where
 
 import qualified Control.Monad.Change.Alter                   as A
@@ -40,6 +40,7 @@ import           Data.Functor.Compose
 import           Data.Map.Strict                              (Map)
 import qualified Data.Map.Strict                              as M
 import qualified Data.NibbleString                            as N
+import           Data.Ranged
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
@@ -51,6 +52,8 @@ import           Blockchain.Strato.Model.Keccak256
 
 -- | The type of the database key
 type Key = N.NibbleString
+
+type KeyRange = RSet Key
 
 -- | The type of the values in the database
 type Val = RLPObject
@@ -222,21 +225,43 @@ instance RLPSerializable a => RLPSerializable (Proof a) where
   rlpDecode = rlpDecode1
 
 type NodeData = NodeDataF StateRoot
-type NodeDataProofF = Compose Proof NodeDataF
-type NodeDataProof  = NodeDataProofF StateRoot
+type NodeDataProof = Compose Proof NodeDataF
 
-proveNodeData :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m NodeDataProof
-proveNodeData sr = Compose . Proof . (sr,) <$> A.lookup A.Proxy sr
+padKey :: N.NibbleString -> N.NibbleString
+padKey (N.EvenNibbleString n) = N.EvenNibbleString $ B.take 32 $ n `B.append` B.replicate 32 0
+padKey n                      = N.pack . take 64 . (++ repeat 0) $ N.unpack n
 
-proveMP :: (StateRoot `A.Alters` NodeData) m => StateRoot -> m (Fix NodeDataProofF)
-proveMP = unfoldFixM proveNodeData
+proveNodeData :: (StateRoot `A.Alters` NodeData) m => KeyRange -> (Key, StateRoot) -> m (NodeDataProof (Either (Fix NodeDataProof) (Key, StateRoot)))
+proveNodeData range (key, sr) = Compose . Proof . (sr,) . fmap appendKey <$> A.lookup A.Proxy sr
+  where appendKey EmptyNodeData = EmptyNodeData
+        appendKey (FullNodeData cs v) =
+          let cs' = zipWith zipRight [0..] cs
+              zipRight k (Right r) = let kn = N.append key $ N.pack [k]
+                                      in ptrRef $ if range `rSetHas` padKey kn
+                                                     then Right (kn, r)
+                                                     else Left . Fix . Compose $ Proof (r, Nothing)
+              zipRight _ (Left l)  = smallRef l
+           in FullNodeData cs' v
+        appendKey (ShortcutNodeData k (Left (Right r))) =
+          let kn = key `N.append` k
+           in ShortcutNodeData k . Left . ptrRef $ if range `rSetHas` padKey kn
+                then Right (kn, r)
+                else Left . Fix . Compose $ Proof (r, Nothing)
+        appendKey (ShortcutNodeData k (Left (Left v))) = ShortcutNodeData k (Left $ smallRef v)
+        appendKey (ShortcutNodeData k (Right v)) = ShortcutNodeData k (Right v)
+
+apoM :: (Monad m, Traversable t) => (a -> m (t (Either (Fix t) a))) -> a -> m (Fix t)
+apoM f = go where go = liftM Fix . (traverse (either pure go) =<<) . f
+
+proveMP :: (StateRoot `A.Alters` NodeData) m => KeyRange -> StateRoot -> m (Fix NodeDataProof)
+proveMP range = apoM (proveNodeData range) . (N.empty,)
 
 unproofNodeData :: NodeDataF (StateRoot, a) -> NodeData
 unproofNodeData EmptyNodeData = EmptyNodeData
 unproofNodeData (FullNodeData cs v) = FullNodeData (fmap fst <$> cs) v
 unproofNodeData (ShortcutNodeData k v) = ShortcutNodeData k $ first (fmap fst) v
 
-verifyNodeData :: NodeDataProofF (StateRoot, Bool) -> (StateRoot, Bool)
+verifyNodeData :: NodeDataProof (StateRoot, Bool) -> (StateRoot, Bool)
 verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
   where verifyInner (Just nd@(FullNodeData cs _)) =
           let s = StateRoot . keccak256ToByteString . rlpHash $ unproofNodeData nd
@@ -252,5 +277,5 @@ verifyNodeData (Compose (Proof (sr, inner))) = (sr, verifyInner inner)
         valid (Right (_, b)) = b
         valid _              = True
 
-verifyMP :: Fix NodeDataProofF -> Bool
+verifyMP :: Fix NodeDataProof -> Bool
 verifyMP = snd . foldFix verifyNodeData
