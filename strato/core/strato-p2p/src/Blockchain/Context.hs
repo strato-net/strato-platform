@@ -528,6 +528,9 @@ instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
 instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
@@ -591,6 +594,7 @@ type MonadP2P m = ( MonadIO m
                        , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
                        , '(PPeer, T.Text)
+                       , '((IPAsText, TCPPort), PeerBondingState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)

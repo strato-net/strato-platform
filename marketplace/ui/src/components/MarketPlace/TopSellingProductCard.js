@@ -169,6 +169,7 @@ const TopSellingProductCard = () => {
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button
+                          id={`${topSellingProduct.name.replace(/ /g,"_")}-buy-now`}
                           className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {

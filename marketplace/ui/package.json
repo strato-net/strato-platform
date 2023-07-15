@@ -7,7 +7,7 @@
     "develop": "REACT_APP_URL=http://localhost yarn start",
     "test:ci": "CI=true react-scripts test --env=jsdom --passWithNoTests",
     "cy:run": "cypress run",
-    "test:e2e" : "yarn cy:run 'cypress/e2e/*.cy.js' --browser chrome"
+    "test:e2e": "yarn cy:run 'cypress/e2e/*.cy.js' --browser chrome"
   },
   "eslintConfig": {
     "extends": [
@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.13",
-    "cypress": "^12.2.0",
+    "cypress": "12.16.0",
     "postcss": "^8.4.20",
     "tailwindcss": "^3.2.4"
   }

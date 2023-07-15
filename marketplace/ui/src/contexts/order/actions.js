@@ -21,15 +21,8 @@ const actionDescriptors = {
   fetchOrderDetailsSuccessful: "fetch_order_details_successful",
   fetchOrderDetailsFailed: "fetch_order_details_failed",
   fetchOrderLineItemDetails: "fetch_order_line_item_details",
-  fetchOrderLineItemDetailsSuccessful:
-    "fetch_order_line_item_details_successful",
+  fetchOrderLineItemDetailsSuccessful: "fetch_order_line_item_details_successful",
   fetchOrderLineItemDetailsFailed: "fetch_order_line_item_details_failed",
-  transferOrderOwnership: "transfer_order_ownership",
-  transferOrderOwnershipSuccessful: "transfer_order_ownership_successful",
-  transferOrderOwnershipFailed: "transfer_order_ownership_failed",
-  updateOrder: "update_order",
-  updateOrderSuccessful: "update_order_successful",
-  updateOrderFailed: "update_order_failed",
   updateBuyerDetails: "update_buyer_details",
   updateBuyerDetailsSuccessful: "update_buyer_details_successful",
   updateBuyerDetailsFailed: "update_buyer_details_failed",
@@ -38,16 +31,6 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  fetchOrderAudit: "fetch_order_audit",
-  fetchOrderAuditSuccessful: "fetch_order_audit_successful",
-  fetchOrderAuditFailed: "fetch_order_audit_failed",
-  importAssetRequest: "import_asset_request",
-  importAssetSuccess: "import_asset_success",
-  importAssetFailure: "import_asset_failure",
-  updateAssetImportCount: "update_asset_import_count",
-  updateAssetUploadError: "update_asset_upload_error",
-  openImportCSVModal: "open_import_csv_modal",
-  closeImportCSVModal: "close_import_csv_modal",
 };
 
 const actions = {
@@ -57,14 +40,6 @@ const actions = {
 
   setMessage: (dispatch, message, success = false) => {
     dispatch({ type: actionDescriptors.setMessage, message, success });
-  },
-
-  openImportCSVmodal: (dispatch) => {
-    dispatch({ type: actionDescriptors.openImportCSVModal });
-  },
-
-  closeImportCSVmodal: (dispatch) => {
-    dispatch({ type: actionDescriptors.closeImportCSVModal });
   },
 
   createOrder: async (dispatch, payload) => {
@@ -313,46 +288,6 @@ const actions = {
     }
   },
 
-  transferOrderOwnership: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.transferOrderOwnership });
-
-    try {
-      const response = await fetch(`${apiUrl}/order/transferOwnership`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.transferOrderOwnershipSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Product has been transferred", true);
-        return true;
-      }
-
-      dispatch({
-        type: actionDescriptors.transferOrderOwnershipFailed,
-        error: "Error while transfer ownership Order",
-      });
-      actions.setMessage(dispatch, "Error while transfer ownership Order");
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.transferOrderOwnershipFailed,
-        error: "Error while transfer ownership Order",
-      });
-      actions.setMessage(dispatch, "Error while transfer ownership Order");
-    }
-  },
-
   updateBuyerDetails: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateBuyerDetails });
 
@@ -431,119 +366,7 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while updating Order");
     }
-  },
-
-  updateOrder: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.updateOrder });
-
-    try {
-      const response = await fetch(`${apiUrl}/order/update`, {
-        method: HTTP_METHODS.PUT,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.updateOrderSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Product has been updated", true);
-        return true;
-      }
-
-      dispatch({
-        type: actionDescriptors.updateOrderFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.updateOrderFailed,
-        error: "Error while updating Order",
-      });
-      actions.setMessage(dispatch, "Error while updating Order");
-    }
-  },
-  fetchOrderAudit: async (dispatch, address, chainId) => {
-    dispatch({ type: actionDescriptors.fetchOrderDetails });
-
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/${address}/${chainId}/audit`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchOrderAuditSuccessful,
-          payload: body.data,
-        });
-
-        return true;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchOrderAuditFailed,
-        error: "Error while fetching audit",
-      });
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchOrderAuditFailed,
-        error: "Error while fetching audit",
-      });
-    }
-  },
-  importAssets: async (dispatch, assets) => {
-    dispatch({ type: actionDescriptors.importAssetRequest });
-    const errors = [];
-
-    for (let i = 0; i < assets.length; i++) {
-      try {
-        const response = await fetch(`${apiUrl}/order`, {
-          method: HTTP_METHODS.POST,
-          credentials: "same-origin",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(assets[i]),
-        });
-
-
-        if (response.status === RestStatus.OK) {
-          dispatch({
-            type: actionDescriptors.updateAssetImportCount,
-            count: i + 1,
-          });
-        } else {
-          errors.push({
-            status: response.error.status,
-            error: response.error.data.method,
-            id: i,
-          });
-        }
-      } catch (err) {
-        //  nothing
-      }
-    }
-
-    dispatch({ type: actionDescriptors.importAssetSuccess });
-    dispatch({ type: actionDescriptors.updateAssetUploadError, errors });
-    actions.setMessage(dispatch, `Imported ${assets.length} records`, true);
-  },
+  }
 };
 
 export { actionDescriptors, actions };

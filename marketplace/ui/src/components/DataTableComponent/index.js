@@ -17,7 +17,7 @@ const DataTableComponent = ({
   selectedRowObj,
   rowSelection,
   pagination,
-  scrollX,
+  scrollX
 }) => {
   const navigate = useNavigate();
 

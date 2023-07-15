@@ -48,7 +48,7 @@ import           Text.Printf
 -- this tool makes transactions to send to the transaction/raw endpoint
 
 --  try it out in your nearest strato docker container!
---      $ docker exec -it strato_strato_1 bash
+--      $ docker exec -it strato-strato-1 bash
 --      $ post-raw-transaction
 
 

@@ -20,9 +20,6 @@ const actionDescriptors = {
   fetchEventDetails: "fetch_event_details",
   fetchEventDetailsSuccessful: "fetch_event_details_successful",
   fetchEventDetailsFailed: "fetch_event_details_failed",
-  transferEventOwnership: "transfer_event_ownership",
-  transferEventOwnershipSuccessful: "transfer_event_ownership_successful",
-  transferEventOwnershipFailed: "transfer_event_ownership_failed",
   updateEvent: "update_event",
   updateEventSuccessful: "update_event_successful",
   updateEventFailed: "update_event_failed",
@@ -31,13 +28,6 @@ const actionDescriptors = {
   fetchEventAudit: "fetch_event_audit",
   fetchEventAuditSuccessful: "fetch_event_audit_successful",
   fetchEventAuditFailed: "fetch_event_audit_failed",
-  importAssetRequest: "import_asset_request",
-  importAssetSuccess: "import_asset_success",
-  importAssetFailure: "import_asset_failure",
-  updateAssetImportCount: "update_asset_import_count",
-  updateAssetUploadError: "update_asset_upload_error",
-  openImportCSVModal: "open_import_csv_modal",
-  closeImportCSVModal: "close_import_csv_modal"
 };
 
 const actions = {
@@ -47,14 +37,6 @@ const actions = {
 
   setMessage: (dispatch, message, success = false) => {
     dispatch({ type: actionDescriptors.setMessage, message, success });
-  },
-
-  openImportCSVmodal: (dispatch) => {
-    dispatch({ type: actionDescriptors.openImportCSVModal });
-  },
-
-  closeImportCSVmodal: (dispatch) => {
-    dispatch({ type: actionDescriptors.closeImportCSVModal });
   },
 
   createEvent: async (dispatch, payload) => {
@@ -245,40 +227,6 @@ const actions = {
     }
   },
 
-  transferEventOwnership: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.transferEventOwnership });
-
-    try {
-      const response = await fetch(`${apiUrl}/event/transferOwnership`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.transferEventOwnershipSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Product has been transferred", true);
-        return true;
-      }
-
-      dispatch({ type: actionDescriptors.transferEventOwnershipFailed, error: 'Error while transfer ownership Event' });
-      actions.setMessage(dispatch, "Error while transfer ownership Event")
-      return false;
-
-    } catch (err) {
-      dispatch({ type: actionDescriptors.transferEventOwnershipFailed, error: "Error while transfer ownership Event" });
-      actions.setMessage(dispatch, "Error while transfer ownership Event")
-    }
-  },
   updateEvent: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateEvent });
 
@@ -341,40 +289,7 @@ const actions = {
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchEventAuditFailed, error: "Error while fetching audit" });
     }
-  },
-  importAssets: async (dispatch, assets) => {
-    dispatch({ type: actionDescriptors.importAssetRequest });
-    const errors = [];
-
-    for (let i = 0; i < assets.length; i++) {
-      try {
-        const response = await fetch(`${apiUrl}/event`, {
-          method: HTTP_METHODS.POST,
-          credentials: "same-origin",
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(assets[i])
-        });
-
-        if (response.status === RestStatus.OK) {
-          dispatch({
-            type: actionDescriptors.updateAssetImportCount,
-            count: i + 1,
-          });
-        } else {
-          errors.push({ status: response.error.status, error: response.error.data.method, id: i })
-        }
-      } catch (err) {
-        //  nothing
-      }
-    }
-
-    dispatch({ type: actionDescriptors.importAssetSuccess });
-    dispatch({ type: actionDescriptors.updateAssetUploadError, errors });
-    actions.setMessage(dispatch, `Imported ${assets.length} records`, true)
-  },
+  }
 };
 
 export { actionDescriptors, actions };
