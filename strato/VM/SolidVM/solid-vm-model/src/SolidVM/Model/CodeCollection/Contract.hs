@@ -89,7 +89,9 @@ instance Default a => Default (ContractF a) where
     _functions = empty,
     _constructor = Nothing,
     _modifiers = empty,
-    _contractContext = def
+    _contractContext = def,
+    _usings = empty,
+    _contractType = ContractType
   }
 
 type Contract = Positioned ContractF

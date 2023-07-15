@@ -141,7 +141,9 @@ instance ToSample Contract where
     _functions = Map.empty,
     _constructor = Nothing,
     _modifiers = Map.empty,
-    _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) ()
+    _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) (),
+    _usings = Map.empty,
+    _contractType = ContractType
   }
 --------------------------------------------------------------------------------
 type GetContractsState = "contracts"
