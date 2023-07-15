@@ -66,8 +66,6 @@ const SoldOrderItemDetail = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchOrderLineItemDetails(dispatch, Id);
-    
-      // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
   }, [Id, dispatch]);
 

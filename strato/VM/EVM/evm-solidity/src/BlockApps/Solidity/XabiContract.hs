@@ -39,7 +39,9 @@ xabiToPartialContract xabi =
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
     _modifiers=error "_modifiers undefined",
-    _contractContext=error "_contractContext undefined"
+    _usings=error "_usings undefined",
+    _contractContext = error "_contractContext undefined",
+    _contractType = error "_contractType undefined"
     }
 
 evmEventToEvent :: OLDXABI.Event -> Event

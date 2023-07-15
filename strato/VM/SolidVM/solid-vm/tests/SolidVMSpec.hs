@@ -39,7 +39,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import qualified Numeric (readHex, showHex)
-import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -7077,7 +7077,7 @@ contract A {
 }
 
 contract qq {
-  constructor() public returns () {
+  constructor() public returns () { 
     A a = new A();
     a.f();
     return;
@@ -7096,4 +7096,42 @@ contract qq {
 }
 |] 
     getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
+
+  it "can use using statement" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq {
+  using SafeMath for uint;
+  function useUsing(uint _x) returns (uint) {
+    return _x.add(1);
+  }
+  uint x = useUsing(3);
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
+  it "can use libraries" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq is SafeMath {
+  function useUsing(uint _x) returns (uint) {
+    return add(_x,1);
+  }
+  uint x = useUsing(3);
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
 

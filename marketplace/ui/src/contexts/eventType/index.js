@@ -10,21 +10,9 @@ const EventTypesProvider = ({ children }) => {
     isCreateEventTypeSubmitting: false,
     eventTypes: [],
     iseventTypesLoading: false,
-    eventTypeDetails: null,
-    iseventTypeDetailsLoading: false,
-    eventTypeOwnership: null,
-    isOwnershipeventTypeTransferring: false,
-    eventTypeUpdateObject: null,
-    iseventTypeUpdating: false,
-    eventTypesAudit: [],
-    iseventTypesAuditLoading: false,
     error: undefined,
     success: false,
-    message: null,
-    isAssetImportInProgress: false,
-    assetsUploaded: 0,
-    assetsUploadedErrors: [],
-    isImportAssetsModalOpen: false
+    message: null
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

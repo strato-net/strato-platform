@@ -1,8 +1,13 @@
+import dayjs from "dayjs";
+
 describe("Renders Products Page", () => {
   beforeEach(function () {
-    cy.login();
+    cy.visit('/')
+    cy.get("#Login").click();
+    cy.login()
+
     cy.checkCategory();
-    cy.wait(1000);
+
     cy.get("#Products").should("exist");
     cy.get("#Products").click();
     cy.url().should("include", "/products");
@@ -23,13 +28,15 @@ describe("Renders Products Page", () => {
   });
 
   it("it should add a product", () => {
-    cy.wait(10000);
+    cy.url().should("include", "/products");
+
     cy.get("#add-product-button").should("exist");
     cy.get("#add-product-button").click();
     cy.get("#modal-title").contains("Add Product");
-    cy.get('input[placeholder="Enter Name"]').type("Corn Seeds");
-    cy.get("#category").type("Agriculture{enter}");
-    cy.get("#subCategory").type("Cotton products{enter}");
+
+    cy.get('input[placeholder="Enter Name"]').type(`Corn Seeds ${dayjs().unix()}`);
+    cy.get("#category").type("Art{enter}");
+    cy.get("#subCategory").type("Art{enter}");
     cy.get('input[placeholder="Enter Manufacturer"]').type("Manufacturer A");
     cy.get("#unitofmeasurement").click().type("{enter}", { force: true });
     cy.get('input[placeholder="Enter Least Sellable Unit"]').type("100");
@@ -40,13 +47,14 @@ describe("Renders Products Page", () => {
     cy.get('input[placeholder="Enter Unique Product Code"]').type("x_103");
     cy.get("#create-product-button").should("exist");
     cy.get("#create-product-button").click();
-    cy.wait(15000);
+
     cy.contains("Product created successfully").should("be.visible");
   });
 
   it("it should delete a product", () => {
-    cy.createProduct();
-    cy.wait(10000);
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+
     cy.request({
       method: "GET",
       url: "/api/v1/product",
@@ -65,14 +73,16 @@ describe("Renders Products Page", () => {
         cy.contains("Are you sure you want to delete?").should("be.visible");
         cy.get("#delete-product-yes").should("exist");
         cy.get("#delete-product-yes").click();
-        cy.wait(5000);
+
         cy.contains("Product has been deleted").should("be.visible");
       }
     });
   });
+  
   it("it should edit a product", () => {
-    cy.createProduct();
-    cy.wait(10000);
+    const productName = `Corn-Seeds-${dayjs().unix()}`;
+    cy.createProduct(productName);
+
     cy.request({
       method: "GET",
       url: "/api/v1/product",
@@ -93,7 +103,38 @@ describe("Renders Products Page", () => {
         );
         cy.get("#update-product-button").should("exist");
         cy.get("#update-product-button").click();
-        cy.wait(5000);
+
+        cy.contains("Product has been updated").should("be.visible");
+      }
+    });
+  });
+
+  it("it should edit and change a product picture", () => {
+    const productName = `Corn Seeds ${dayjs().unix()}`;
+    cy.createProduct(productName);
+
+    cy.request({
+      method: "GET",
+      url: "/api/v1/product",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+      if (body.data.length != 0) {
+        cy.get("#product")
+          .first()
+          .within(() => {
+            cy.get(".anticon svg").should("exist");
+            cy.get(".anticon svg").click();
+          });
+        cy.get("#edit-button").should("exist");
+        cy.get("#edit-button").click();
+        cy.get("#modal-title").contains("Edit Product");
+        cy.get("input[type=file]").attachFile("straw.jpg");
+        cy.get('textarea[placeholder="Enter Description"]').type(
+          " Editing this description"
+        );
+        cy.get("#update-product-button").should("exist");
+        cy.get("#update-product-button").click();
+
         cy.contains("Product has been updated").should("be.visible");
       }
     });

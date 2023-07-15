@@ -20,4 +20,4 @@ Example: `GHC_DEBUG_SOCKET="/tmp/ghc-debug" runBackgroundProcess strato-api  --m
 Note: This does not work when built with profiling. `-hT` and `hi` will still work.
 
 To use debugger-tools in a docker container, run the following commands:
-`docker exec -it strato_strato_1 ghc-debug`
+`docker exec -it strato-strato-1 ghc-debug`
