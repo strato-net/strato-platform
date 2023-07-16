@@ -16,6 +16,7 @@ import {
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -81,6 +82,14 @@ const CategoryProductCard = ({ product, category }) => {
       }
     }
     let items = [];
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'add_to_cart_from_marketplace',
+        ecommerce: {
+          product: product,
+        },
+      },
+    });
     if (!found) {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
