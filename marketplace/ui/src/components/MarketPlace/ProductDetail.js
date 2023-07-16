@@ -47,6 +47,7 @@ import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -601,6 +602,13 @@ const ProductDetails = ({ user, users }) => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
                     } else {
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'add_to_cart_from_product_details',
+                          product_name: details.name,
+                          category: details.category
+                        },
+                      });
                       addItemToCart();
                     }
                   }}
@@ -616,6 +624,13 @@ const ProductDetails = ({ user, users }) => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
                     } else {
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'buy_now_from_product_details',
+                          product_name: details.name,
+                          category: details.category
+                        },
+                      });
                       addItemToCart();
                       navigate("/checkout");
                     }

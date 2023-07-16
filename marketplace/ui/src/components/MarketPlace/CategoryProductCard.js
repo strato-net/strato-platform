@@ -82,13 +82,6 @@ const CategoryProductCard = ({ product, category }) => {
       }
     }
     let items = [];
-    TagManager.dataLayer({
-      dataLayer: {
-        event: 'add_to_cart_from_marketplace',
-        product_name: product.name,
-        category: product.category
-      },
-    });
     if (!found) {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
@@ -194,6 +187,13 @@ const CategoryProductCard = ({ product, category }) => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
                 } else {
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'add_to_cart_from_marketplace',
+                      product_name: product.name,
+                      category: product.category
+                    },
+                  });
                   addItemToCart();
                 }
               }}>
@@ -207,6 +207,13 @@ const CategoryProductCard = ({ product, category }) => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
                 } else {
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'buy_now_from_marketplace',
+                      product_name: product.name,
+                      category: product.category
+                    },
+                  });
                   addItemToCart();
                   navigate("/checkout");
                 }
