@@ -85,9 +85,8 @@ const CategoryProductCard = ({ product, category }) => {
     TagManager.dataLayer({
       dataLayer: {
         event: 'add_to_cart_from_marketplace',
-        ecommerce: {
-          product: product,
-        },
+        product_name: product.name,
+        category: product.category
       },
     });
     if (!found) {
