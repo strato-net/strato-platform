@@ -26,12 +26,14 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import UploadPhotosModal from "./UploadPhotosModal";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Product = () => {
   const [open, setOpen] = useState(false);
+  const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const dispatch = useProductDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [queryValue, setQueryValue] = useState("");
@@ -177,6 +179,11 @@ const Product = () => {
                   >
                     Add Product
                   </Button>
+                  <Button type="primary" className="w-48"
+                    onClick={() => setUploadPhotosModal(true)}
+                  >
+                    Upload Photos
+                  </Button>
                 </div>
               </div>
               <>
@@ -217,6 +224,12 @@ const Product = () => {
           resetPage={onPageChange}
           page={page}
           debouncedSearchTerm={debouncedSearchTerm}
+        />
+      )}
+      {isUploadPhotosModalOpen && (
+        <UploadPhotosModal
+          isOpen={isUploadPhotosModalOpen}
+          handleModal={setUploadPhotosModal}
         />
       )}
       {message && openToast("bottom")}
