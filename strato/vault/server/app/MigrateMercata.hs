@@ -46,15 +46,6 @@ main = do
   let indexToStartAt = (fromIntegral flags_indexToStartAt) :: Int32
 
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQueryAll
-  -- <<<<<<< HEAD
-  --   -- let [(_, _, _), (globaOldSalt, _, _)] = mMsgLst -- make this a case statement that throws an error if not two tripules
-  --   let globaOldSalt = case mMsgLst of
-  --         [] -> error "message table is empty, so the password must not be set. Aborting..."
-  --         [(_, _, _), (globaOldSalt',_,_)] -> globaOldSalt'
-  --         _ -> error ("Not right number of  rows in message table, something is not right" ++ (show  $ length mMsgLst ))
-  -- =======
-
-  -- >>>>>>> 981604e9536c3af74e1fdd2c800d25cb80fffdb3
   pwKey <- case mMsgLst of
     [] -> error "message table is empty, so the password must not be set. Aborting..."
     [(msgSalt, msgNonce, ciphertext), (_, _, _)] -> do

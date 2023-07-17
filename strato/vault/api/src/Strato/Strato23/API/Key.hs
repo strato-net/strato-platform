@@ -13,47 +13,24 @@ import Strato.Strato23.API.Types
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type GetKey =
-  "key"
-    :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
-    :> QueryParam "username" Text
-    :> Get '[JSON] AddressAndKey
+type GetKey r hs = "key"
+                :> ApiEmbed r hs
+                 ( QueryParam "username" Text
+                :> Get '[JSON] AddressAndKey
+                 )
 
-type PostKey =
-  "key"
-    :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
-    :> Post '[JSON] AddressAndKey
+type GetKeys r hs = "key"
+                 :> ApiEmbed r hs
+                  ( QueryParam "username" Text
+                 :> Get '[JSON] [AddressAndKey]
+                  )
 
-type GetSharedKey =
-  "sharedkey"
-    :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
-    :> ReqBody '[JSON] PublicKey
-    :> Get '[JSON] SharedKey
+type PostKey r hs = "key"
+                 :> ApiEmbed r hs
+                   ( Post '[JSON] AddressAndKey )
 
---------------------------------------------------------------------------------
-type GetKey' =
-  "key"
-    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-    :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
-    :> QueryParam "username" Text
-    :> Get '[JSON] AddressAndKey
-
-type GetKeys' =
-  "key"
-    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-    :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
-    :> QueryParam "username" Text
-    :> Get '[JSON] [AddressAndKey]
-
-type PostKey' =
-  "key"
-    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-    :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
-    :> Post '[JSON] AddressAndKey
-
-type GetSharedKey' =
-  "sharedkey"
-    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-    :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
-    :> ReqBody '[JSON] PublicKey
-    :> Get '[JSON] SharedKey
+type GetSharedKey r hs = "sharedkey"
+                      :> ApiEmbed r hs
+                        ( ReqBody '[JSON] PublicKey
+                      :> Get '[JSON] SharedKey
+                        )

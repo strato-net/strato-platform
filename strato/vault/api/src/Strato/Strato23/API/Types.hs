@@ -3,33 +3,65 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE PolyKinds         #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Strato.Strato23.API.Types
-  ( module Strato.Strato23.API.Types,
-    Address (..),
-    Signature (..), -- TODO: remove, ideally
-    PublicKey (..), --       same
-    SharedKey (..), --       same
-    Version (..),
-  )
-where
+  ( module Strato.Strato23.API.Types
+  , Address(..)
+  , Signature(..) -- TODO: remove, ideally
+  , PublicKey(..) --       same
+  , SharedKey(..) --       same
+  , Version(..)
+  ) where
 
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Secp256k1
-import Control.Lens ((&), (?~))
-import Data.Aeson.Casing
-import Data.Aeson.Casing.Internal (dropFPrefix)
-import Data.Aeson.Types hiding (fieldLabelModifier)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
-import Data.Swagger
-import Data.Swagger.Internal.Schema (named)
-import qualified Data.Text as T
-import GHC.Generics
+
+import           Control.Lens                 ((&), (?~))
+import           Data.Aeson.Casing
+import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Aeson.Types             hiding (fieldLabelModifier)
+import qualified Data.ByteString              as B
+import qualified Data.ByteString.Base16       as B16
+import qualified Data.ByteString.Char8        as C8
+import           Data.Kind
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import           Data.Swagger
+import           Data.Swagger.Internal.Schema (named)
+
+import           GHC.Generics
+import           GHC.TypeLits
+import           Servant.API
+
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 import qualified LabeledError
+
+data APIP
+data ClientP
+data ServerP
+
+type family Embed (d :: Type) (hs :: [Type]) (ns :: [Symbol]) (r :: Type) :: Type where
+  Embed APIP r '[x] rest = Header' r x Text :> rest
+  Embed ClientP '[Required, Strict] '[x] rest = Text -> rest
+  Embed ClientP r '[x] rest = Maybe Text -> rest
+  Embed ServerP '[Required, Strict] '[x] rest = Text -> rest
+  Embed ServerP r '[x] rest = Maybe Text -> rest
+  Embed APIP r (x ': ns) rest = Header' r x Text :> Embed APIP r ns rest
+  Embed ClientP '[Required, Strict] (x ': ns) rest = Text -> Embed ClientP '[Required, Strict] ns rest
+  Embed ClientP r (x ': ns) rest = Maybe Text -> Embed ClientP r ns rest
+  Embed ServerP '[Required, Strict] (x ': ns) rest = Text -> Embed ServerP '[Required, Strict] ns rest
+  Embed ServerP r (x ': ns) rest = Maybe Text -> Embed ServerP r ns rest
+
+type ApiEmbed            r xs rest = Embed APIP    r                   xs rest
+type ClientEmbedRequired   xs rest = Embed ClientP '[Required, Strict] xs rest
+type ClientEmbedOptional   xs rest = Embed ClientP '[Optional, Strict] xs rest
+type ServerEmbed           xs rest = Embed ServerP '[Required, Strict] xs rest
+
+type VaultHeaders = '["X-USER-UNIQUE-NAME", "X-IDENTITY-PROVIDER-ID"]
+type ClientHeaders = '["X-USER-ACCESS-TOKEN"]
+type ProxyHeaders = '["Authorization"]
 
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}

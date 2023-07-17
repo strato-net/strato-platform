@@ -1,39 +1,48 @@
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE PolyKinds           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Strato.Strato23.Client
-  ( getPing,
-    getKey,
-    postKey,
-    getSharedKey,
-    getUsers,
-    postSignature,
-    postPassword,
-    verifyPassword,
-  )
-where
+  ( getPing
+  , getKey
+  , getKeys
+  , postKey
+  , getSharedKey
+  , getUsers
+  , postSignature
+  , postPassword
+  , verifyPassword
+  ) where
 
-import Data.Proxy
-import Data.Text
-import Servant.Client
-import Strato.Strato23.API
+import           Servant.API
+import           Servant.Client
+import           Data.Proxy
+import           Data.Text
+import           Strato.Strato23.API
 
 getPing :: ClientM Version
 getPing = client (Proxy @GetPing)
 
-getKey :: Maybe Text -> Maybe Text -> ClientM AddressAndKey
-getKey = client (Proxy @GetKey)
+getKey :: ClientEmbedOptional ClientHeaders (Maybe Text -> ClientM AddressAndKey)
+getKey = client (Proxy @(GetKey '[Optional, Strict] ClientHeaders))
 
-postKey :: Maybe Text -> ClientM AddressAndKey
-postKey = client (Proxy @PostKey)
+getKeys :: ClientEmbedOptional ClientHeaders (Maybe Text -> ClientM [AddressAndKey])
+getKeys = client (Proxy @(GetKeys '[Optional, Strict] ClientHeaders))
 
-getSharedKey :: Maybe Text -> PublicKey -> ClientM SharedKey
-getSharedKey = client (Proxy @GetSharedKey)
+postKey :: ClientEmbedOptional ClientHeaders (ClientM AddressAndKey)
+postKey = client (Proxy @(PostKey '[Optional, Strict] ClientHeaders))
 
-getUsers :: Maybe Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
-getUsers = client (Proxy @GetUsers)
+getSharedKey :: ClientEmbedOptional ClientHeaders (PublicKey -> ClientM SharedKey)
+getSharedKey = client (Proxy @(GetSharedKey '[Optional, Strict] ClientHeaders))
 
-postSignature :: Maybe Text -> MsgHash -> ClientM Signature
-postSignature = client (Proxy @PostSignature)
+getUsers :: ClientEmbedOptional ClientHeaders (Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]) -- External Vault
+getUsers = client (Proxy @(GetUsers '[Optional, Strict] ClientHeaders))
+
+postSignature :: ClientEmbedOptional ClientHeaders (MsgHash -> ClientM Signature)
+postSignature = client (Proxy @(PostSignature '[Optional, Strict] ClientHeaders))
 
 postPassword :: Text -> ClientM ()
 postPassword = client (Proxy @PostPassword)
