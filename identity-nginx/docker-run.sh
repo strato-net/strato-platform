@@ -4,35 +4,27 @@ set -e
 
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL:-NULL}
-INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER:-NULL}
-INITIAL_OAUTH_JWT_USER_ID_CLAIM=${INITIAL_OAUTH_JWT_USER_ID_CLAIM:-sub}
-IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST:-identity-provider:8000}
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
+OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
+OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
+OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
+IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST:-identity-provider}
+IDENTITY_PORT=${IDENTITY_PORT:-8081}
+IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY:-8013}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [ ! -f /config/config.json ]; then
-    if [[ ${INITIAL_OAUTH_DISCOVERY_URL} = NULL || ${INITIAL_OAUTH_ISSUER} = NULL ]]; then
-      echo 'INITIAL_OAUTH_DISCOVERY_URL and INITIAL_OAUTH_ISSUER are required env vars when no config file exists. Exit'
-      exit 5
-    fi
-    if ! curl --silent --output /dev/null --fail --location "${INITIAL_OAUTH_DISCOVERY_URL}"
-    then
-      echo "OAuth OpenID Connect Discovery URL is unreachable: ${INITIAL_OAUTH_DISCOVERY_URL}. Exit"
-      exit 6
-    fi
-    echo "{
-  \"identity_providers\": [
-    {
-      \"ISSUER\": \"${INITIAL_OAUTH_ISSUER}\",
-      \"DISCOVERY_URL\": \"${INITIAL_OAUTH_DISCOVERY_URL}\",
-      \"USER_ID_CLAIM\": \"${INITIAL_OAUTH_JWT_USER_ID_CLAIM}\"
-    }
-  ]
-}" > /config/config.json
+  if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+    echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+    exit 5
+  fi
+  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+  then
+    echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
+    exit 6
   fi
 
   ########
@@ -48,13 +40,22 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /tmp/nginx.conf
   fi
 
+  if [ "$SERVE_LOGS" != true ]; then
+    sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
+  fi
+
   # Replacing HOST NAME PLACEHOLDERS
-  sed -i 's/__IDENTITY_PROVIDER_HOST__/'"$IDENTITY_PROVIDER_HOST"'/g' /tmp/nginx.conf
+  sed -i "s/__IDENTITY_PROVIER_HOST__/$IDENTITY_PROVIER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__IDENTITY_PORT_VAULT_PROXY__/$IDENTITY_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
+  sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
+  sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
+  sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
@@ -76,7 +77,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 fi
 
-echo 'Identity-Provider is available'
+echo 'Waiting for VaultProxy to be available with node key added to Vault...'
+until curl --silent --output /dev/null --fail --location http://${IDENTITY_PROVIDER_HOST}:${IDENTITY_PORT_VAULT_PROXY}/strato/v2.3/key
+do
+  sleep 0.5
+done
+echo 'VaultProxy is available'
 
 echo  'nginx is now running. See the logs below...'
 openresty -g "daemon off;"

@@ -37,4 +37,4 @@ main = do
             Right privk -> return privk
 
         putStrLn "Initializing identity server..."
-        run 8081 $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_masterClientId flags_masterClientSecret flags_realmName
+        run flags_port $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_masterClientId flags_masterClientSecret flags_realmName

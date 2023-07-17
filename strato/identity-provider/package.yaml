@@ -20,8 +20,9 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
+- base64
+- bytestring
 - common-log
-- slipstream # TODO: switch from slipstream dep to strato-api
 
 ghc-options:
 - -Wall
@@ -57,6 +58,7 @@ library:
   - servant-server
   - strato-model
   - text
+  - transformers
   - unliftio
   - utf8-string
   - vault-monad
