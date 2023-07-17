@@ -654,7 +654,12 @@ const ProductDetails = ({ user, users }) => {
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details.description)}
+                {decodeURIComponent(details.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
                 $ {details.pricePerUnit}

@@ -45,7 +45,6 @@ const ProductCard = ({
     setState(product);
   }, [product]);
 
-
   return (
     <>
       {state === null ? (
@@ -100,7 +99,12 @@ const ProductCard = ({
                 </Popover>
               </div>
               <p className="text-sm text-secondryB mt-1.5">
-                {decodeURIComponent(state.description)}
+                {decodeURIComponent(state.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
               </p>
               <div className="flex mt-1.5 items-center">
                 <p className="text-primaryC text-sm w-40">Sub Category</p>

@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Card,
   Image,
@@ -147,7 +148,12 @@ const CategoryProductCard = ({ product, category }) => {
               className="text-primaryC text-xs mt-2"
               id="prod-desc"
             >
-              {decodeURIComponent(product.description)}
+              {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
