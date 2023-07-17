@@ -21,6 +21,8 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
+
 
 const { Header } = Layout;
 
@@ -70,6 +72,11 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const logout = () => {
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'logout',
+      },
+    });
     userActions.logout(userDispatch);
   };
 
@@ -174,7 +181,14 @@ const HeaderComponent = ({ user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
-          onClick={() => navigate("/checkout")}
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_shopping_cart',
+              },
+            });
+            navigate("/checkout");
+          }}
         >
           <Avatar
             style={{
