@@ -20,6 +20,7 @@ module Bloc.Client
     , getBlocTransactionResult
     , postBlocTransactionResults
     , postBlocTransaction
+    , postBlocTransactionExternal
     , postChainInfo
     , getSingleChainInfo
     , postChainInfos
@@ -182,3 +183,10 @@ postBlocTransaction :: Maybe Text
                     -> PostBlocTransactionRequest
                     -> ClientM [BlocChainOrTransactionResult]
 postBlocTransaction = client (Proxy @PostBlocTransaction)
+
+postBlocTransactionExternal :: Maybe Text 
+                            -> Maybe ChainId 
+                            -> Bool 
+                            -> PostBlocTransactionRequest
+                            -> ClientM [BlocChainOrTransactionResult]
+postBlocTransactionExternal = client(Proxy @PostBlocTransactionExternal)

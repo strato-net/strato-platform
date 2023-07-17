@@ -34,18 +34,7 @@ main = do
     privBS <- B.readFile flags_issuerPrivKeyPath
     privk <- case bsToPriv privBS of
         Left err -> error $ "Error parsing issuer private key: " <> err
-        Right privk -> do 
-            putStrLn $ "Succuessfully parsed issuer private key: " ++ show privk --TODO: delete this line
-            return privk
-    
-    -- putStrLn "Getting master token"
-    -- mToken <- getAccessToken
-    -- print mToken
-    -- eUser <- case mToken of 
-    --     Just token -> do
-    --         putStrLn "now for the user"
-    --         getUserByUUID token "fdc2a8c1-a598-415d-b854-25c0236dcf31"
-    --     Nothing -> return $ Left "no token"
-    -- print eUser
+        Right privk -> return privk
+
     putStrLn "Initializing identity server..."
-    run 8081 $ identityProviderApp flags_vaultProxyUrl iss crt privk
+    run 8081 $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk

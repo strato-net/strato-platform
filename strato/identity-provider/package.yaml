@@ -39,10 +39,15 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - bloc2api
+  - bloc2client
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
+  - containers
+  - evm-solidity
   - hflags
   - http-client
+  - http-client-tls
   - http-types
   - monad-alter
   - mtl
