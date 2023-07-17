@@ -108,12 +108,18 @@ getUserByUUID token uuid = do
     response <- httpLbs request manager
     return $ eitherDecode $ responseBody response
 
+
 data IdentityServerData = IdentityServerData 
     { issuer        :: Issuer          -- issuer of signing cert
     , issuerCert    :: X509Certificate -- the signing cert
     , issuerPrivKey :: PrivateKey      -- the signing private key
     , blocAPIUrl       :: BaseUrl      -- strato node where will register cert
-    }
+}
+type GetPingIdentity = "_ping" :> Get '[JSON] Int
+
+getPingIdentity ::  (MonadIO m) => m Int
+getPingIdentity = return $ 1
+
 
 runIdentityM :: MonadIO m => String -> Issuer -> X509Certificate -> PrivateKey -> ReaderT IdentityServerData m a -> m a
 runIdentityM nodeurl iss cert privk r = do 
@@ -137,7 +143,8 @@ type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
                 :> Put '[JSON] Address --should return cert address
 
-type IdentityProviderAPI =  PutIdentity --only 1 endpoint
+type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
+
 
 putIdentity :: ( MonadIO m
                , MonadLogger m
@@ -199,7 +206,7 @@ registerCert cert accessToken = do
 -- note to self: what if error is serious?
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe Address)
 getVaultKey accessToken = do 
-    VaultData url mgr <- access Proxy
+    VaultData url mgr <- access Proxy   
     eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
     $logInfoS "getVaultKey" $ T.pack $ "response is " <> show eAddressNKey
     case eAddressNKey of 
@@ -227,7 +234,7 @@ server :: ( MonadIO m
           , Accessible PrivateKey m
           , Accessible BaseUrl m
           ) => ServerT IdentityProviderAPI m
-server = putIdentity
+server = getPingIdentity :<|> putIdentity
 
 hoistCoreServer :: String -> String -> Issuer -> X509Certificate -> PrivateKey -> Server IdentityProviderAPI
 hoistCoreServer nodeurl vaulturl iss cert privk = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server

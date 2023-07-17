@@ -1,0 +1,43 @@
+#vault-version:<VERSION>
+#strato-getting-started-min-version:4.0
+version: "3"
+volumes:
+  idpconfig:
+      driver: local
+services:
+  identity-provider:
+    environment:
+    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
+    - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
+    build: .
+    image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - identity-provider
+    environment:
+    - INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL}
+    - INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER}
+    - INITIAL_OAUTH_JWT_USER_ID_CLAIM=${INITIAL_OAUTH_JWT_USER_ID_CLAIM}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    - IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST}
+    build: .
+    image: ${IDENTITYNGINX_IMAGE:-<REPO_URL>identity-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-8090}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-8093}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    - idpconfig:/config
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
