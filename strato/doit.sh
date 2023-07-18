@@ -359,11 +359,6 @@ function doInit {
     fi
   fi
 
-  if [ "${USE_OLD_STRATO_API}" != "true" ]; then
-      echo "initializing bloc database"
-      strato-api-init
-  fi
-
   #we need to create the private key for the faucet
   mkdir config
 

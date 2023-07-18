@@ -31,8 +31,10 @@ module SolidVM.Model.CodeCollection.Contract (
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
+import Data.Default
 import Data.Map (Map, empty, fromList)
 import Data.Source
+import Data.Swagger
 import GHC.Generics
 
 
@@ -73,12 +75,30 @@ data ContractF a =
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)
 
+instance Default a => Default (ContractF a) where
+  def = Contract {
+    _contractName = "",
+    _parents = [],
+    _constants = empty,
+    _storageDefs = empty,
+    _userDefined = empty,
+    _enums = empty,
+    _structs = empty,
+    _errors = empty,
+    _events = empty,
+    _functions = empty,
+    _constructor = Nothing,
+    _modifiers = empty,
+    _contractContext = def,
+    _usings = empty,
+    _contractType = ContractType
+  }
+
 type Contract = Positioned ContractF
 
 makeLenses ''ContractF
 
-
-instance Arbitrary Contract  where
+instance Arbitrary Contract where
   arbitrary = do 
     a <- arbitrary
     varName <- vectorOf 7 $ Test.QuickCheck.elements ['a'..'z'] --There is a chance this won't be unique
@@ -101,3 +121,7 @@ instance Arbitrary Contract  where
     _contractContext = a
   }]
 
+instance ToSchema Contract where
+  declareNamedSchema = pure . pure $ NamedSchema (Just "Contract") $ mempty
+      & description ?~ "A Solidity contract parsed for SolidVM"
+      & example ?~ toJSON (def :: Contract)

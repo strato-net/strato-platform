@@ -30,7 +30,6 @@ import Bloc.Monad (BlocEnv(..))
 import BlockApps.Init
 import BlockApps.Logging
 
-import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 
@@ -93,7 +92,5 @@ main = do
 
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
-    
-    sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
 
-    getAndProcessMessages env sqlEnv conn gref
+    getAndProcessMessages env conn gref
