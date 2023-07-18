@@ -38,10 +38,11 @@ import Servant.Client
 import Data.Proxy
 import Data.Text
 import BlockApps.X509.Certificate
-import BlockApps.Solidity.Xabi
+-- import BlockApps.Solidity.Xabi
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
+import SolidVM.Model.CodeCollection.Contract
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @GetGitInfo)
@@ -55,7 +56,8 @@ createCertificate :: Text -> CreateCertEndpoint -> ClientM X509Certificate
 createCertificate = client (Proxy @CreateCertificate)
 
 ------------- /contracts endpoints -------------
-getContracts :: Maybe Integer 
+getContracts :: Maybe Text
+             -> Maybe Integer 
              -> Maybe Integer 
              -> Maybe ChainId 
              -> ClientM GetContractsResponse
@@ -71,7 +73,7 @@ getContractsData = client (Proxy @GetContractsData)
 getContractsContract :: ContractName
                      -> Address
                      -> Maybe ChainId 
-                     -> ClientM ContractDetails
+                     -> ClientM Contract 
 getContractsContract = client (Proxy @GetContractsContract)
 
 getContractsState :: ContractName
@@ -84,7 +86,7 @@ getContractsState :: ContractName
                   -> ClientM GetContractsStateResponses
 getContractsState = client (Proxy @GetContractsState)
 
-getContractsDetails :: Address -> Maybe ChainId -> ClientM ContractDetails
+getContractsDetails :: Address -> Maybe ChainId -> ClientM Contract
 getContractsDetails = client (Proxy @GetContractsDetails)
 
 getContractsFunctions :: ContractName

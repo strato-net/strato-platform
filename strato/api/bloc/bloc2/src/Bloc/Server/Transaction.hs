@@ -508,11 +508,10 @@ postBlocTransaction :: ( MonadLogger m
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransactionExternal :: ( MonadLogger m
-                              , A.Selectable Account ContractDetails m
+                              , A.Selectable Account Contract m
                               , A.Selectable Account AddressState m
-                              , (Keccak256 `A.Alters` SourceMap) m
+                              , (Keccak256 `A.Selectable` SourceMap) m
                               , HasBlocEnv m
-                              , HasBlocSQL m
                               , HasVault m
                               , HasSQL m
                               )
