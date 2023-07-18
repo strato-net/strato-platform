@@ -54,10 +54,10 @@ const ProductDetails = ({ user, users }) => {
 
   let isCalledFromInventory = false;
 
-  if (state !== null && state!== undefined) { 
+  if (state !== null && state !== undefined) {
     isCalledFromInventory = state.isCalledFromInventory
-  } 
-  else if (pathname.includes("inventories") ) {
+  }
+  else if (pathname.includes("inventories")) {
     isCalledFromInventory = true
   }
 
@@ -206,9 +206,9 @@ const ProductDetails = ({ user, users }) => {
     setEventDetailList(temp);
   }, [eventDetails])
 
-  const ownerSameAsUser = () => { 
-    
-    if(user && user.organization === inventoryDetails?.ownerOrganization)  {
+  const ownerSameAsUser = () => {
+
+    if (user && user.organization === inventoryDetails?.ownerOrganization) {
       return true;
     }
 
@@ -561,16 +561,16 @@ const ProductDetails = ({ user, users }) => {
                 </ClickableCell>
               </Breadcrumb.Item>
               {
-                isCalledFromInventory ? 
-                <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                  <ClickableCell href={routes.Inventories.url}>
-                    <p
-                      className="text-primaryB hover:bg-transparent"
-                    >
-                      Inventory
-                    </p>
-                  </ClickableCell>
-                </Breadcrumb.Item> : null
+                isCalledFromInventory ?
+                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                    <ClickableCell href={routes.Inventories.url}>
+                      <p
+                        className="text-primaryB hover:bg-transparent"
+                      >
+                        Inventory
+                      </p>
+                    </ClickableCell>
+                  </Breadcrumb.Item> : null
               }
               <Breadcrumb.Item className="text-primary">
                 {decodeURIComponent(details.name)}
@@ -583,51 +583,62 @@ const ProductDetails = ({ user, users }) => {
               <div className="h-96 flex items-center justify-center border border-grayLight">
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
               </div>
-              <Row className="justify-center my-7">
-                {ownerSameAsUser() ? <Button
-                  className="group w-1/3 h-9 border border-primary"
-                  disabled={true}
-                  id="addToCart"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      addItemToCart();
-                    }
-                  }}
-                >
-                  Add To Cart
-                </Button> : <Button
-                  className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      addItemToCart();
-                    }
-                  }}
-                >
-                  <div className="text-primary group-hover:text-white">
+              {details.availableQuantity !== 0 ?
+                <Row className="justify-center my-7">
+                  {ownerSameAsUser() ? <Button
+                    className="group w-1/3 h-9 border border-primary"
+                    disabled={true}
+                    id="addToCart"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                      }
+                    }}
+                  >
                     Add To Cart
-                  </div>
-                </Button>}
-                <Button
-                  type="primary"
-                  className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      addItemToCart();
-                      navigate("/checkout");
-                    }
-                  }}
-                  disabled={ownerSameAsUser() }
-                  id="buyNow"
-                >
-                  Buy Now
-                </Button>
-              </Row>
+                  </Button> : <Button
+                    className="group w-1/3 h-9 border border-primary hover:bg-primary"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                      }
+                    }}
+                  >
+                    <div className="text-primary group-hover:text-white">
+                      Add To Cart
+                    </div>
+                  </Button>}
+                  <Button
+                    type="primary"
+                    className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                        navigate("/checkout");
+                      }
+                    }}
+                    disabled={ownerSameAsUser()}
+                    id="buyNow"
+                  >
+                    Buy Now
+                  </Button>
+                </Row>
+                :
+                <div className="flex justify-center">
+                  <Button
+                    type="primary"
+                    className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
+                    href={`mailto:sales@blockapps.net`}>
+                    Contact to Buy
+                  </Button>
+                </div>
+              }
             </div>
 
             <div className="w-1/2 ml-8  mb-6" id="details">
@@ -643,39 +654,50 @@ const ProductDetails = ({ user, users }) => {
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details.description)}
+                {decodeURIComponent(details.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
                 $ {details.pricePerUnit}
               </Title>
-              <Space>
-              <Text className="text-primaryB text-base">Quantity</Text>
-              <div className="flex items-center my-2 ml-5" id="quantity">
-                <div
-                  onClick={subtract}
-                  className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <MinusOutlined className="text-xs text-secondryD" />
-                </div>
-                <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                onChange={e => {
-                  if (e < details.availableQuantity) {
-                    setQty(e)
-                  } else {
-                    openToast(
-                      "bottom",
-                      true,
-                      "Cannot add more than available quantity"
-                      );
-                      setQty(details.availableQuantity)
-                  }
-                }} />                
-                <div
-                  onClick={add}
-                  className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <PlusOutlined className="text-xs text-secondryC" />
-                </div>
-              </div>
-              </Space>
+              {details.availableQuantity !== 0 ?
+                <Space>
+                  <Text className="text-primaryB text-base">Quantity</Text>
+                  <div className="flex items-center my-2 ml-5" id="quantity">
+                    <div
+                      onClick={subtract}
+                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                      <MinusOutlined className="text-xs text-secondryD" />
+                    </div>
+                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                      onChange={e => {
+                        if (e < details.availableQuantity) {
+                          setQty(e)
+                        } else {
+                          openToast(
+                            "bottom",
+                            true,
+                            "Cannot add more than available quantity"
+                          );
+                          setQty(details.availableQuantity)
+                        }
+                      }} />
+                    <div
+                      onClick={add}
+                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                      <PlusOutlined className="text-xs text-secondryC" />
+                    </div>
+                  </div>
+                </Space>
+                :
+                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+              </Paragraph>
+              }
               <Tabs
                 defaultActiveKey="1"
                 onChange={onTabChange}

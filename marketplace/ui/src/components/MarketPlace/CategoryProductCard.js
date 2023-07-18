@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Card,
   Image,
@@ -147,65 +148,88 @@ const CategoryProductCard = ({ product, category }) => {
               className="text-primaryC text-xs mt-2"
               id="prod-desc"
             >
-              {decodeURIComponent(product.description)}
+              {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
             </Title>
-            <div className="flex items-center my-2" id="prod-quantity">
-              <Text className="text-primaryB text-base">Quantity</Text>
-              <div className="ml-5 flex items-center my-2" id="prod-quantity">
-                <div
-                  onClick={subtract}
-                  className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <MinusOutlined className="text-xs text-secondryD" />
-                </div>
-                <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                  onChange={e => {
-                    if (e < product.availableQuantity) {
-                      setQty(e)
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      setQty(product.availableQuantity)
-                    }
-                  }} />
-                <div
-                  onClick={add}
-                  className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                  <PlusOutlined className="text-xs text-secondryC" />
-                </div>
+            {product.availableQuantity !== 0 ?
+              (
+                <div>
+                  <div className="flex items-center my-2" id="prod-quantity">
+                    <Text className="text-primaryB text-base">Quantity</Text>
+                    <div className="ml-5 flex items-center my-2" id="prod-quantity">
+                      <div
+                        onClick={subtract}
+                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                        <MinusOutlined className="text-xs text-secondryD" />
+                      </div>
+                      <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                        onChange={e => {
+                          if (e < product.availableQuantity) {
+                            setQty(e)
+                          } else {
+                            openToast(
+                              "bottom",
+                              true,
+                              "Cannot add more than available quantity"
+                            );
+                            setQty(product.availableQuantity)
+                          }
+                        }} />
+                      <div
+                        onClick={add}
+                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+                        <PlusOutlined className="text-xs text-secondryC" />
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    className="group w-40 h-9 border border-primary hover:bg-primary"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                      }
+                    }}>
+                    <div className="text-primary group-hover:text-white">Add To Cart</div>
+                  </Button>
+                  <Button
+                    type="primary"
+                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                    className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        addItemToCart();
+                        navigate("/checkout");
+                      }
+                    }}
+                  >
+                    Buy Now
+                  </Button>
+                </div>)
+              :
+              /* When there isnt avalialable quantity for the item */
+              <div>
+                <Button
+                  type="primary"
+                  className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
+                  href={`mailto:sales@blockapps.net`}>
+                  Contact to Buy
+                </Button>
+                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                </Paragraph>
               </div>
-            </div>
-            <Button
-              className="group w-40 h-9 border border-primary hover:bg-primary"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                }
-              }}>
-              <div className="text-primary group-hover:text-white">Add To Cart</div>
-            </Button>
-            <Button
-              type="primary"
-              id="buy-now-button"
-              className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  addItemToCart();
-                  navigate("/checkout");
-                }
-              }}
-            >
-              Buy Now
-            </Button>
+            }
           </div>
         </div>
       </Card >

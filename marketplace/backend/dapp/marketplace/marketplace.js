@@ -55,7 +55,7 @@ function marshalOut(_args) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { quantity, pricePerUnit, productId, range = [], ...restArgs } = args
+    const { quantity, pricePerUnit, productId, range = [], ...restArgs } = args;
     const products = await productJs.getAll(admin, {
         isActive: true,
         isDeleted: false,
@@ -63,16 +63,42 @@ async function getAll(admin, args = {}, options) {
         ...restArgs
     }, options);
 
-    let productIds
-    productIds = products.map(product => product.address)
+    const productIds = products.map(product => product.address);
+    const batchSize = 200; // Set the desired batch size. Can adjust to optimize performance (max 374)
+    const inventoryPromises = [];
 
-    const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, productId: productIds, range, gteField: 'availableQuantity', gteValue: 1 }, options);
+    // Break up the productIds into batches, and get the inventory for each batch
+    for (let i = 0; i < productIds.length; i += batchSize) {
+        const batchProductIds = productIds.slice(i, i + batchSize);
 
-    let inventoriesWithProductInfo = inventory.filter(inventory => productIds.includes(inventory.productId)).map(inventory => ({
-        ...products.find(product => product.address == inventory.productId), ...inventory
-    }));
+        const inventoryPromise = inventoryJs.getAll(admin, {
+            appChainId: args.appChainId,
+            status: inventoryStatus.PUBLISHED,
+            productId: batchProductIds,
+            range,
+            gteField: 'availableQuantity',
+            gteValue: 0
+        }, options);
 
-    return inventoriesWithProductInfo.map((inventory) => marshalOut(inventory))
+        inventoryPromises.push(inventoryPromise);
+    }
+
+    // Wait for all inventory promises to resolve
+    const inventoryResults = await Promise.all(inventoryPromises);
+    const inventoriesWithProductInfo = [];
+
+    // Loop through each inventory result and add the product info to the inventory
+    inventoryResults.forEach(inventory => {
+        inventory.forEach(item => {
+            const product = products.find(p => p.address === item.productId);
+            if (product) {
+                const inventoryWithProductInfo = { ...product, ...item };
+                inventoriesWithProductInfo.push(inventoryWithProductInfo);
+            }
+        });
+    });
+
+    return inventoriesWithProductInfo.map(inventory => marshalOut(inventory));
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
@@ -86,7 +112,17 @@ async function getTopSellingProducts(admin, args = {}, options) {
     }, options);
 
     const productIds = products.map(product => product.address);
-    const inventory = await inventoryJs.getAll(admin, { appChainId: args.appChainId, status: inventoryStatus.PUBLISHED, productId: productIds, range, gteField: 'availableQuantity', gteValue: 1, sort: '-createdDate', offset: args.offset, limit: constants.TOP_SELLING_GET_LIMIT }, options);
+    const inventory = await inventoryJs.getAll(admin, { 
+        appChainId: args.appChainId, 
+        status: inventoryStatus.PUBLISHED, 
+        productId: productIds, 
+        range, 
+        gteField: 'availableQuantity', 
+        gteValue: 1, 
+        sort: '-createdDate', 
+        offset: args.offset, 
+        limit: constants.TOP_SELLING_GET_LIMIT 
+    }, options);
 
     let inventoriesWithProductInfo = inventory.filter(inventory => productIds.includes(inventory.productId)).map(inventory => ({
         ...products.find(product => product.address == inventory.productId), ...inventory
