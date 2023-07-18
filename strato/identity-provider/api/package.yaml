@@ -1,0 +1,32 @@
+name:                blockapps-identity-provider-api
+version:             0.1.0.0
+github:              "githubuser/api"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2023 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+
+ghc-options: -Wall -Werror -dynamic
+
+dependencies:
+- base
+
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - aeson-casing
+  - bytestring
+  - labeled-error
+  - servant
+  - servant-server
+  - strato-model
+  - text
+
+
