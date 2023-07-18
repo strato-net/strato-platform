@@ -86,12 +86,18 @@ type PostBlocTransactionRaw = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRawRequest
   :> Post '[JSON] BlocChainOrTransactionResult
 
-type PostBlocTransaction = "transaction"
-  :> S.Header "X-USER-ACCESS-TOKEN" Text
-  :> QueryParam "chainid" ChainId
+type PostBlocTransactionCommon = QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
+
+type PostBlocTransaction = "transaction"
+  :> S.Header "X-USER-ACCESS-TOKEN" Text
+  :> PostBlocTransactionCommon
+  
+type PostBlocTransactionExternal = "transaction" -- only to be used for external api client bindings
+  :> S.Header "Authorization" Text
+  :> PostBlocTransactionCommon
 
 -- | PostBlocTransactionBody should return a list of signed transaction hashes,
 -- using the caller's JWT, and their respective raw transaction bodies without

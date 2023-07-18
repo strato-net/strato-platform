@@ -33,13 +33,19 @@ import           UnliftIO                                hiding (Handler)
 import           Servant
 import           Servant.Client                          hiding (responseBody, manager)
 import           Network.HTTP.Client                     hiding (Proxy)
+import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
 
 import           Data.Aeson
+import           Data.List                               (isSuffixOf)
+import qualified Data.Map as M
 import           Data.Text as T                          (Text, unpack, pack, take)
-import           Data.Text.Encoding                      (encodeUtf8)
+import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
--- import           Blockchain.Strato.Model.Address ()
+
+import           Bloc.API.Transaction
+import           Bloc.Client
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.X509
 import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
 import           Strato.Strato23.API
@@ -48,7 +54,6 @@ import           Strato.Strato23.Client
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
--- import           Control.Monad.Trans.Resource
 import           BlockApps.Logging
 
 import           SelectAccessible                () --TODO: fix this import because it comes from slipstream (see note in package.yml)
@@ -103,35 +108,43 @@ getUserByUUID token uuid = do
     response <- httpLbs request manager
     return $ eitherDecode $ responseBody response
 
+
+data IdentityServerData = IdentityServerData 
+    { issuer        :: Issuer          -- issuer of signing cert
+    , issuerCert    :: X509Certificate -- the signing cert
+    , issuerPrivKey :: PrivateKey      -- the signing private key
+    , blocAPIUrl       :: BaseUrl      -- strato node where will register cert
+}
 type GetPingIdentity = "_ping" :> Get '[JSON] Int
 
 getPingIdentity ::  (MonadIO m) => m Int
 getPingIdentity = return $ 1
 
-data CertIssuer = CertIssuer 
-    { issuer        :: Issuer
-    , issuerCert    :: X509Certificate
-    , issuerPrivKey :: PrivateKey
-    }
-instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT CertIssuer m) where 
+
+runIdentityM :: MonadIO m => String -> Issuer -> X509Certificate -> PrivateKey -> ReaderT IdentityServerData m a -> m a
+runIdentityM nodeurl iss cert privk r = do 
+    url <- liftIO $ parseBaseUrl nodeurl
+    let path' = baseUrlPath url
+    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> "bloc/v2.2" -- surely there is a better way to do this?
+    runReaderT r $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi}
+
+instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
     access _ = asks issuer
-instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT CertIssuer m) where 
+instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
     access _ = asks issuerCert
-instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT CertIssuer m) where 
+instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where 
     access _ = asks issuerPrivKey
+instance {-# OVERLAPPING #-} Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
+    access _ = asks blocAPIUrl
 
 
 type PutIdentity = "identity"
-                -- :> Header' '[Required, Strict] "Authorization" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
-                -- maybe in the future we can support "X-IDENTITY-PROVIDER" header too
                 :> Put '[JSON] Address --should return cert address
---realm name should be flag
---node url should also be a flag
---add client binding to tx endpoint (then call it)
 
 type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
+
 
 putIdentity :: ( MonadIO m
                , MonadLogger m
@@ -139,6 +152,7 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
+               , Accessible BaseUrl m
                ) => T.Text -> T.Text -> m Address
 putIdentity accessToken uuid = do
     $logInfoS "putIdentity" "someone called PUT /identity"
@@ -162,9 +176,32 @@ putIdentity accessToken uuid = do
                                     c <- access (Proxy @X509Certificate)
                                     iK <- access (Proxy @PrivateKey)
                                     let signWIssuerPrivKey bs = return $ signMsg iK bs
-                                    _ <- makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
+                                    mNewCert <- makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
+                                    case mNewCert of 
+                                        Just newCert -> registerCert newCert accessToken
+                                        Nothing -> $logErrorS "putIdentity" "Error signing new cert"
                                     return ()
             return $ Address 0x509
+
+registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> T.Text -> m ()
+registerCert cert accessToken = do 
+    url <- access (Proxy @BaseUrl)
+    mgr <- liftIO $ case baseUrlScheme url of
+        Http -> newManager defaultManagerSettings
+        Https -> newManager tlsManagerSettings
+    let clientEnv = mkClientEnv mgr url
+        txPayload = BlocFunction FunctionPayload{
+            functionpayloadContractAddress = 0x509,
+            functionpayloadMethod = "registerCertificate",
+            functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
+            functionpayloadValue = Nothing,
+            functionpayloadTxParams = Nothing,
+            functionpayloadChainid = Nothing,
+            functionpayloadMetadata = Nothing
+        }
+        txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> accessToken) Nothing True txRequest) clientEnv
+    $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse 
 
 -- note to self: what if error is serious?
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe Address)
@@ -195,16 +232,17 @@ server :: ( MonadIO m
           , Accessible Issuer m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
+          , Accessible BaseUrl m
           ) => ServerT IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity
 
-hoistCoreServer :: String -> CertIssuer -> Server IdentityProviderAPI
-hoistCoreServer vaulturl ci = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer :: String -> String -> Issuer -> X509Certificate -> PrivateKey -> Server IdentityProviderAPI
+hoistCoreServer nodeurl vaulturl iss cert privk = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
   where
     -- convertErrors :: LoggingT IO a -> Handler a
     convertErrors r x = Handler $ liftIO $ r x
-    runM' :: ReaderT CertIssuer (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runReaderT x ci
+    runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk x
 
-identityProviderApp :: String -> Issuer -> X509Certificate -> PrivateKey -> Application
-identityProviderApp vaulturl iss cert privk = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer vaulturl (CertIssuer iss cert privk)
+identityProviderApp :: String -> String -> Issuer -> X509Certificate -> PrivateKey -> Application
+identityProviderApp nodeurl vaulturl iss cert privk = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer nodeurl vaulturl iss cert privk
