@@ -22,7 +22,6 @@ import BlockApps.Logging
 import Blockchain.MilenaTools
 import Blockchain.Stream.VMEvent
 
-import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 
@@ -66,21 +65,21 @@ putStatediffOffset off = do
       Right () -> return ()
 
 getAndProcessMessages :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                         BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> m ()
-getAndProcessMessages env sqlEnv conn cache = do
+                         BlocEnv -> PGConnection -> IORef Globals -> m ()
+getAndProcessMessages env conn cache = do
   let errorCount = 0
   offset <- getStatediffOffset
-  getAndProcessMessages' env sqlEnv conn cache offset errorCount
+  getAndProcessMessages' env conn cache offset errorCount
 
 getAndProcessMessages' :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                          BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
-getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
+                          BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
+getAndProcessMessages' env conn cache offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
   messages <- execKafka $ fetchVMEvents offset
   recordKafkaMessages messages
   forceGlobalEval cache
-  processTheMessages env sqlEnv conn cache messages
+  processTheMessages env conn cache messages
   let newOffset = offset + fromIntegral (length messages)
   currentOffset <- getStatediffOffset
   offset' <- if currentOffset /= offset
@@ -92,4 +91,4 @@ getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
                putStatediffOffset newOffset
                return newOffset
 
-  getAndProcessMessages' env sqlEnv conn cache offset' errorCounter
+  getAndProcessMessages' env conn cache offset' errorCounter

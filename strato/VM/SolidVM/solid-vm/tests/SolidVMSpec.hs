@@ -97,7 +97,6 @@ import Blockchain.DB.ChainDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.BlockSummary
 import Data.Foldable (for_)
-import Blockchain.Database.MerklePatricia.InternalMem (mpMap)
 import Blockchain.Bagger (processNewBestBlock)
 import Blockchain.Sequencer.Event
 import qualified Control.Monad.State                   as State

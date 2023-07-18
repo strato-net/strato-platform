@@ -54,6 +54,7 @@ library:
   - ansi-wl-pprint
   - base16-bytestring
   - containers
+  - data-fix
   - deepseq
   - text
 

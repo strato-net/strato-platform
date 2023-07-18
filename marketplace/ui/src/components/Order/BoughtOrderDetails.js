@@ -85,7 +85,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       getData();
-      // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
   }, [Id, dispatch]);
 

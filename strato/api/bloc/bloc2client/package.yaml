@@ -24,6 +24,7 @@ dependencies:
 - bloc2api
 - evm-solidity
 - servant-client
+- solid-vm-model
 - strato-model
 - text
 - x509-certs

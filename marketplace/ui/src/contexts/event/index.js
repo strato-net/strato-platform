@@ -18,8 +18,6 @@ const EventsProvider = ({ children }) => {
     iseventDetailsLoading: false,
     certifyEvents: [],
     isCertifyEventsLoading: false,
-    eventOwnership: null,
-    isOwnershipeventTransferring: false,
     eventUpdateObject: null,
     iseventUpdating: false,
     eventsAudit: [],
@@ -27,10 +25,6 @@ const EventsProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    isAssetImportInProgress: false,
-    assetsUploaded: 0,
-    assetsUploadedErrors: [],
-    isImportAssetsModalOpen: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

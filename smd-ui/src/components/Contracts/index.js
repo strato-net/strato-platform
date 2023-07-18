@@ -56,13 +56,13 @@ class Contracts extends Component {
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
-      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset);
-
+      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset, this.props.filter);
     }
   }
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
+    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
   }
 
   onChainSearch = () => {
@@ -73,7 +73,7 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = offset + limit;
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
     });
   };
 
@@ -81,7 +81,7 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = Math.max(0, offset - limit);
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
     });
   };
 
@@ -113,7 +113,6 @@ class Contracts extends Component {
 
   render() {
     const contracts = this.props.contracts;
-    const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
 
     const returnedInstances = contracts && contractNames.length > 0 ? Object.values(contracts).reduce((prev, cur) => {
@@ -121,12 +120,6 @@ class Contracts extends Component {
     }, 0) : 0
 
     const cards = contractNames.length === 0 ? [] : contractNames
-      .filter(function (contract) {
-        if (!filter) {
-          return true;
-        }
-        return contract.toLowerCase().indexOf(filter) > -1;
-      })
       .map((value, i) => {
         return (
           <div className="row pt-dark" key={'contract-card-' + i}>
@@ -230,7 +223,7 @@ class Contracts extends Component {
                 className="pt-input"
                 type="search"
                 placeholder="Search contracts"
-                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                onChange={e => this.updateFilter(e.target.value)}
                 dir="auto" />
             </div>
           </div>

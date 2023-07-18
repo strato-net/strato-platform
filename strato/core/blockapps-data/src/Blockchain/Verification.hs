@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Verification (
   transactionsVerificationValue,
@@ -8,15 +10,11 @@ module Blockchain.Verification (
 
 import           Prelude.Unicode
 
-
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia             as MP
-import           Blockchain.Database.MerklePatricia.InternalMem
-import           Blockchain.Database.MerklePatriciaMem
+import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util
 
 import           Data.Functor.Identity
 
@@ -26,19 +24,8 @@ transactionsVerificationValue = MP.sha2StateRoot . listToRLPVerificationValue
 -}
 
 
-addAllKVsMem::RLPSerializable obj=>Monad m=>MPMem->[(Integer, obj)]->m MPMem
-addAllKVsMem x [] = return x
-addAllKVsMem mpdb (x:rest) = do
-  mpdb' <- unsafePutKeyValMem mpdb (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVsMem mpdb' rest
-
-blank :: MPMem
-blank = initializeBlankMem { mpStateRoot = MP.emptyTriePtr }
-
-transactionsVerificationValue::[Transaction]->MP.StateRoot
-transactionsVerificationValue theList = runIdentity $ do
-    mp <- addAllKVsMem blank $ zip [0..] $ theList
-    return (mpStateRoot mp)
+transactionsVerificationValue :: [Transaction] -> MP.StateRoot
+transactionsVerificationValue theList = runIdentity . MP.runMP . MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer)..] theList
 
 ommersVerificationValue::[BlockData]->Keccak256
 ommersVerificationValue = listToRLPVerificationValue

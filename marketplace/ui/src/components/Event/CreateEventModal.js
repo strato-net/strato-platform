@@ -81,9 +81,6 @@ const CreateEventModal = ({
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
 
-  //Sub-categories
-
-
   //product
   const productDispatch = useProductDispatch();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =

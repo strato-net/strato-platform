@@ -228,7 +228,7 @@ function newnode {
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
-                         --debugPort=$debugPort --debugWSPort=$debugWSPort \
+                         --debugPort=$debugPort --debugWSHost=$debugWSHost --debugWSPort=$debugWSPort \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" "${aclFlag}" "${txsFlag}" "${gasFlag}" \
@@ -359,11 +359,6 @@ function doInit {
     fi
   fi
 
-  if [ "${USE_OLD_STRATO_API}" != "true" ]; then
-      echo "initializing bloc database"
-      strato-api-init
-  fi
-
   #we need to create the private key for the faucet
   mkdir config
 
@@ -448,6 +443,7 @@ setEnv evmTraceMode false
 setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
+setEnv debugWSHost ${debugWSHost:-strato}
 setEnv debugWSPort ${debugWSPort:-8052}
 setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
