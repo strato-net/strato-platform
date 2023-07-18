@@ -172,7 +172,37 @@ const HeaderComponent = ({ user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "4") navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          if (item.key === "0") {    
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_marketplace_page',
+            },
+          });}
+          if (item.key === "1") {  
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_orders_page',
+            },
+          });}
+          if (item.key === "2") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_inventory_page',
+            },
+          });}
+          if (item.key === "3") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_products_page',
+            },
+          });}
+          if (item.key === "4") {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_events_page',
+              },
+            });
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
           else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}
