@@ -107,3 +107,11 @@
 :where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
 }
+
+.ant-carousel .slick-prev,
+.ant-carousel .slick-next,
+.ant-carousel .slick-prev:hover,
+.ant-carousel .slick-next:hover {
+  font-size: inherit;
+  color: currentColor;
+}
