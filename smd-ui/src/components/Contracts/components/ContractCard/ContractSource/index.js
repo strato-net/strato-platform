@@ -19,11 +19,11 @@ export default class ContractSource extends Component {
 
     render() {
 
-        const contractSource = this.props.contract.bin || ''
+        const contractSource = '' // TODO: Fetch contract source
         const contractName = this.props.contract.name || ''
         const address = this.props.contract.address || ''
         const codeHash = this.props.contract.codeHash ? this.props.contract.codeHash.digest : ''
-        const vm = this.props.contract.codeHash.kind || ''
+        const vm = 'SolidVM'
         return (
             <Button 
                 intent='intent'

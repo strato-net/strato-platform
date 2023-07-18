@@ -14,35 +14,27 @@
 
 module Bloc.Server.Chain where
 
+import           Control.Arrow                     ((***))
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (join, when, unless)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Composable.Vault
 import           Crypto.Random.Entropy
--- import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
 import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
--- import qualified Data.Set                         as S
-import           Data.Text.Encoding                (encodeUtf8)
--- import qualified Data.Vector                       as V
 import qualified Database.Esqueleto.Legacy as E
 
 import           Bloc.API.Chain
 import           Bloc.Monad
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
--- import           BlockApps.Solidity.ArgValue
-import           BlockApps.Solidity.Contract
--- import           BlockApps.Solidity.Struct
--- import           BlockApps.Solidity.Type
-import           BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.XabiContract
 import           Bloc.Database.Queries
 import           Bloc.Server.TransactionResult  (constructArgValuesAndSource)
 import           Bloc.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
-import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -55,10 +47,10 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
-import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           Handlers.Chain
-import qualified LabeledError
+import           SolidVM.Model.CodeCollection.Contract hiding (errors)
+import           SolidVM.Model.CodeCollection.Function
 import           SQLM
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
@@ -89,9 +81,8 @@ governanceAddress = Address 0x100
 --           _ -> m
 
 createChainInfo :: ( A.Selectable Account AddressState m
-                   , (Keccak256 `A.Alters` SourceMap) m
+                   , (Keccak256 `A.Selectable` SourceMap) m
                    , MonadLogger m
-                   , HasBlocSQL m
                    , HasVault m
                    , HasSQL m
                    )
@@ -101,48 +92,28 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
   let md = fromMaybe Map.empty mmd
-      theVM = fromMaybe "EVM" $ Map.lookup "VM" md
   mContract <-
     if src /= mempty
-      then fmap snd <$> getContractDetailsForContract theVM src cname
+      then getContractDetailsForContract src cname
       else case mCodePtr of
         Just codePtr -> either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
-        Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
+        Nothing -> getContractDetailsForContract mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
-      Just ContractDetails{..} -> do
-          contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
-          -- let argValues = replaceMembers
-          --                   (mainStruct contract)
-          --                   (members)
-          --                   chaininputArgs
-          storage <- case theVM of
-            "EVM" -> fmap Map.toList . either (throwIO . UserError) return $ encodeValues
-                       (typeDefs contract)
-                       (mainStruct contract)
-                       0
-                       (Map.toList chaininputArgs)
-            _ -> pure []
+      Just (resolvedCodePtr, contract) -> do
           let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
-          (contractHash, b) <-
-            case theVM of
-              "EVM" -> return (fromMaybe contractdetailsCodeHash mCodePtr, contractdetailsBinRuntime)
-              "SolidVM" -> do
-                return (fromMaybe contractdetailsCodeHash mCodePtr, "")
-              _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
+          let contractHash = fromMaybe resolvedCodePtr mCodePtr
 
-          let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
-              b' = LabeledError.b16Decode "createChainInfo" $ encodeUtf8 b
+          let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash []
               jsrc = serializeSourceMap src
-              codeInfo' = [CodeInfo b' jsrc $ Just contractdetailsName]
-          md' <- case theVM of
-              "SolidVM" -> do
-                let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-                (_, argsAsSource) <- constructArgValuesAndSource (Just chaininputArgs) xabiArgs
-                pure $ (at "args" ?~ argsAsSource) md
-              _ -> pure md
+              codeInfo' = [CodeInfo "" jsrc $ Just . Text.pack $ _contractName contract]
+          md' <- do
+            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
+            (_, argsAsSource) <- constructArgValuesAndSource (Just chaininputArgs) xabiArgs
+            pure $ (at "args" ?~ argsAsSource) md
           return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
@@ -185,9 +156,8 @@ getLastBlockHash = do
 
 
 postChainInfo :: ( A.Selectable Account AddressState m
-                 , (Keccak256 `A.Alters` SourceMap) m
+                 , (Keccak256 `A.Selectable` SourceMap) m
                  , MonadLogger m
-                 , HasBlocSQL m
                  , HasBlocEnv m
                  , HasSQL m
                  , HasVault m
@@ -214,9 +184,8 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
         pure chainId
 
 postChainInfos :: ( A.Selectable Account AddressState m
-                  , (Keccak256 `A.Alters` SourceMap) m
+                  , (Keccak256 `A.Selectable` SourceMap) m
                   , MonadLogger m
-                  , HasBlocSQL m
                   , HasSQL m
                   , HasVault m
                   )

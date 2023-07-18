@@ -15,17 +15,21 @@ module Executable.EthereumVM (
   writeBlockSummary
 ) where
 
-import           Conduit
+import           Conduit                               hiding (Flush)
 import           Control.Applicative                   ((<|>))
 import           Control.Arrow                         ((&&&), (***))
+
+import           Control.Concurrent.STM                (TQueue, atomically, readTQueue, writeTQueue)
 import           Control.Lens                          hiding (Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader                  (ask, runReaderT)           
 import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BC
+import qualified Data.DList                            as DL
 import           Data.Foldable                         hiding (fold)
 import           Data.List
 --import           Data.List.Split                       (chunksOf)
@@ -95,14 +99,15 @@ import           Blockchain.Timing
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 import           Text.Tools
+import           UnliftIO                              (race_)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
 --   deriving (Eq, Ord, Show)
 
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
-ethereumVM d = void . execContextM d $ do
-
-
+ethereumVM d = runResourceT $ do
+  ctx <- initContext d
+  race_ (deployCommitsSqlDiffs ctx) . execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR ) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
@@ -122,11 +127,11 @@ ethereumVM d = void . execContextM d $ do
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        trs <- runConduit $ yield vmInEventBatch
+        void . runConduit $ yield vmInEventBatch
                          .| handleVmEvents flags_useSyncMode
-                         .| awaitForever sendOutEvent
-                         .| sinkList
-        void . produceVMEvents $ NewTransactionResult <$> trs
+                         .| mapM_C sendOutEvent
+        contx <- ask
+        void . liftIO $ enqueue (_stateDiffQueue contx) Flush
         
         loopTimeit "compactContextM" $ compactContextM
 
@@ -545,7 +550,7 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: VmOutEvent ->  ConduitT VmOutEvent TransactionResult ContextM ()
+sendOutEvent :: VmOutEvent -> ContextM ()
 sendOutEvent (OutAction act) =
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
@@ -573,14 +578,18 @@ sendOutEvent (OutAction act) =
       actionEvents = [NewAction act]
    in void . produceVMEvents $ ccEvents ++ actionEvents
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash org app) = lift . withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = lift $ commitSqlDiffs diff
+sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+sendOutEvent (OutStateDiff diff) = do
+  contx <- ask
+  void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
-sendOutEvent (OutTXR tr) = yield tr
+sendOutEvent (OutTXR tr) = do
+  contx <- ask
+  void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
 sendOutEvent (OutASM asm) = when (not flags_sqlDiff) $
   timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-    lift . updateSQLBalanceAndNonce $
+    updateSQLBalanceAndNonce $
       [ (theAccount,
          (addressStateBalance asMod, addressStateNonce asMod))
       | (theAccount, Mem.ASModification asMod) <- M.toList asm
@@ -740,3 +749,25 @@ getUnprocessedKafkaEvents offset = do
 
         !ret' = eventLimit . countLimit $ ret
     return ret'
+
+-- This function lives on its own thread
+checkQueueAndCommitsSqlDiffsForever :: DL.DList TransactionResult -> ContextM ()
+checkQueueAndCommitsSqlDiffsForever txResults = do
+  context' <- ask
+  let que = _stateDiffQueue context'
+  msg <- liftIO . atomically $ readTQueue que
+  case msg of 
+    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ txResults `DL.snoc` txResult
+    SD !stateDiff' -> do
+      commitSqlDiffs stateDiff'
+      checkQueueAndCommitsSqlDiffsForever txResults
+    Flush -> do
+      void . produceVMEvents $ NewTransactionResult <$> toList txResults
+      checkQueueAndCommitsSqlDiffsForever DL.empty
+
+deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
+deployCommitsSqlDiffs = runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty)
+
+-- Add an element to the end of the queue
+enqueue :: TQueue a -> a -> IO ()
+enqueue queue item = atomically $ writeTQueue queue item

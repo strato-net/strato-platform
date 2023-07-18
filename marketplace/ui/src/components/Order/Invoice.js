@@ -31,7 +31,6 @@ const Invoice = () => {
   useEffect(() => {
     if (Id !== undefined ) {
       actions.fetchOrderDetails(dispatch, Id);
-      // actions.fetchOrderAudit(dispatch, Id, chainId);
     }
   }, [Id, dispatch]);
 
