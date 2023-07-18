@@ -54,12 +54,13 @@ import           SolidVM.Model.SolidString
 
 data XabiKind = ContractKind
               | InterfaceKind
+              | AbstractKind
               | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
 instance Arbitrary XabiKind where
-  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+  arbitrary = elements [ContractKind, InterfaceKind, AbstractKind, LibraryKind]
 
 
 instance ToSchema XabiKind where

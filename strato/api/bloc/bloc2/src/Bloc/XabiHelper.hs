@@ -59,7 +59,7 @@ transFormXabi SVMXabi.Xabi{..} =
              , xabiTypes     = M.map tFormDef     $ M.mapKeysMonotonic T.pack _xabiTypes
              , xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers
              , xabiEvents    = M.map tFormEv      $ M.mapKeysMonotonic T.pack _xabiEvents
-             , xabiKind      = case _xabiKind of SVMXabi.ContractKind -> EVMXabi.ContractKind ; SVMXabi.InterfaceKind-> EVMXabi.InterfaceKind; SVMXabi.LibraryKind ->  EVMXabi.LibraryKind;
+             , xabiKind      = case _xabiKind of SVMXabi.ContractKind -> EVMXabi.ContractKind ; SVMXabi.InterfaceKind-> EVMXabi.InterfaceKind; SVMXabi.AbstractKind-> EVMXabi.AbstractKind; SVMXabi.LibraryKind ->  EVMXabi.LibraryKind;
              , xabiUsing     = M.fromList . map (T.pack *** tFormUs) $ M.toList _xabiUsing
            }
 

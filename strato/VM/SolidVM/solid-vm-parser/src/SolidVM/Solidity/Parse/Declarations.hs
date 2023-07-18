@@ -64,6 +64,7 @@ solidityContract = do
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
+          <|> (reserved "abstract" >> return Xabi.AbstractKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     contractName' <- fmap stringToLabel identifier
     --Throw an error if 'account' is used.

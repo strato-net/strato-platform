@@ -31,17 +31,18 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
 data XabiKind = ContractKind
               | InterfaceKind
+              | AbstractKind
               | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
 instance Arbitrary XabiKind where
-  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+  arbitrary = elements [ContractKind, AbstractKind, InterfaceKind, LibraryKind]
 
 instance ToSchema XabiKind where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Xabi Kind Schema"
-    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, or an interface"
+    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, an abstract contract or an interface"
     & mapped.schema.example ?~ toJSON ContractKind
 
 data Xabi = Xabi
