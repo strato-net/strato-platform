@@ -4,11 +4,109 @@ kind: Namespace
 metadata:
   name: strato-platform
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-marketplace-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-postgres-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-prometheus-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-kafka-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-redis-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-zookeeper-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: strato-platform
+  name: ebs-claim-strato-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 4Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: strato-platform
-  name: deployment-strato
+  name: deployment-strato-platform
 spec:
   replicas: 1
   selector:
@@ -430,33 +528,26 @@ spec:
           runAsUser: 0
       volumes:
         - name: marketplace-data
-          awsElasticBlockStore:
-            volumeID: <marketplace-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-marketplace-data
         - name: postgres-data
-          awsElasticBlockStore:
-            volumeID: <postgres-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-postgres-data
         - name: prometheus-data
-          awsElasticBlockStore:
-            volumeID: <prometheus-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-prometheus-data
         - name: kafka-data
-          awsElasticBlockStore:
-            volumeID: <kafka-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-kafka-data
         - name: redis-data
-          awsElasticBlockStore:
-            volumeID: <redis-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-redis-data
         - name: strato-data
-          awsElasticBlockStore:
-            volumeID: <strato-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-strato-data
         - name: zookeeper-data
-          awsElasticBlockStore:
-            volumeID: <zookeeper-data-volume-id>
-            fsType: ext4
+          persistentVolumeClaim:
+            claimName: ebs-claim-zookeeper-data
 ---
 apiVersion: v1
 kind: Service

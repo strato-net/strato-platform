@@ -14,22 +14,12 @@ kubectl delete -f eks-strato-deployment.yaml
 # Create New Deployment
 **Note:**
 Replace below place holders with valid values:
-* *REPO_URL*
-* *VERSION*
 * *REPLACE_WITH_OAUTH_CLIENT_ID*
 * *REPLACE_WITH_OAUTH_CLIENT_SECRET*
 * *REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID*
 * *REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY*
 * *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
 * *REPLACE_WITH_STRIPE_SECRET_KEY*
-Replace volume id place holders
-* *marketplace-data-volume-id* as *vol-0aa510a5f480aa1d5*
-* *postgres-data-volume-id* as *vol-08394fee773a9660f*
-* *prometheus-data-volume-id* as *vol-04734f12079c0404e*
-* *kafka-data-volume-id* as *vol-01d480c9ce93ae37c*
-* *redis-data-volume-id* as *vol-02a7a22c73d4f0559*
-* *strato-data-volume-id* as *vol-04684544f53b8bc33*
-* *zookeeper-data-volume-id* as *vol-08f019c9882a97b60*
 
 Rename the template file
 cp eks-strato-deployment.tpl.yaml eks-strato-deployment.yaml
