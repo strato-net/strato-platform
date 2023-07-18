@@ -180,7 +180,8 @@ const TopSellingProductCard = () => {
                                 dataLayer: {
                                   event: 'buy_now_from_top_selling_product',
                                   product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
                                 },
                               });
                               addItemToCart(topSellingProduct);
@@ -199,7 +200,8 @@ const TopSellingProductCard = () => {
                                 dataLayer: {
                                   event: 'add_to_cart_from_top_selling_product',
                                   product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
                                 },
                               });
                               addItemToCart(topSellingProduct);

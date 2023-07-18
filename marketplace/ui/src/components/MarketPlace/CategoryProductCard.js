@@ -191,7 +191,8 @@ const CategoryProductCard = ({ product, category }) => {
                     dataLayer: {
                       event: 'add_to_cart_from_marketplace',
                       product_name: product.name,
-                      category: product.category
+                      category: product.category,
+                      productId: product.productId
                     },
                   });
                   addItemToCart();
@@ -211,7 +212,8 @@ const CategoryProductCard = ({ product, category }) => {
                     dataLayer: {
                       event: 'buy_now_from_marketplace',
                       product_name: product.name,
-                      category: product.category
+                      category: product.category,
+                      productId: product.productId
                     },
                   });
                   addItemToCart();

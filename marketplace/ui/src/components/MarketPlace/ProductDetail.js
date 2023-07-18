@@ -606,7 +606,8 @@ const ProductDetails = ({ user, users }) => {
                         dataLayer: {
                           event: 'add_to_cart_from_product_details',
                           product_name: details.name,
-                          category: details.category
+                          category: details.category,
+                          productId: details.productId
                         },
                       });
                       addItemToCart();
@@ -628,7 +629,8 @@ const ProductDetails = ({ user, users }) => {
                         dataLayer: {
                           event: 'buy_now_from_product_details',
                           product_name: details.name,
-                          category: details.category
+                          category: details.category,
+                          productId: details.productId
                         },
                       });
                       addItemToCart();
