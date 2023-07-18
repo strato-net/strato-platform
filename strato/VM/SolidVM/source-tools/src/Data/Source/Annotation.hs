@@ -16,6 +16,7 @@ module Data.Source.Annotation
   , withAnnotation
   , withPosition
   , position
+  , emptySourceAnnotation
   , typeErrorToAnnotation
   , sourceAnnotationStart
   , sourceAnnotationEnd
@@ -92,6 +93,9 @@ instance Show a => Show (SourceAnnotation a) where
 
 type Positioned f = f (SourceAnnotation ())
 type Annotated f = f (SourceAnnotation Text)
+
+emptySourceAnnotation :: SourceAnnotation ()
+emptySourceAnnotation = SourceAnnotation (initialPosition "") (initialPosition "") ()
 
 parseErrorToAnnotation :: ParseError -> SourceAnnotation Text
 parseErrorToAnnotation pe =
