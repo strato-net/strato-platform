@@ -37,6 +37,8 @@ import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
 
 import           Data.Aeson
+import           Data.ByteString.Base64
+import qualified Data.ByteString.UTF8 as B                    (fromString)
 import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
 import           Data.Text as T                          (Text, unpack, pack, take)
@@ -62,14 +64,20 @@ newtype AccessToken = AccessToken {access_token :: T.Text} deriving (Show, Gener
 instance FromJSON AccessToken
 instance ToJSON AccessToken
 
-getAccessToken :: IO (Maybe AccessToken)
+getAccessToken :: ( MonadIO m
+                  , Accessible MasterClientId m
+                  , Accessible MasterClientSecret m
+                  ) => m (Maybe AccessToken)
 getAccessToken = do
-    manager <- newManager defaultManagerSettings
-    templateRequest <- parseRequest "POST http://localhost:8080/realms/master/protocol/openid-connect/token" -- todo: make these into flags
-    let rBody = RequestBodyLBS "grant_type=password&username=admin&password=admin"
-        rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic YWRtaW4tY2xpOlBrbnRGaGxjS3E0RWE5UzhPNlI5RW0xSjhpdFRaVmZY")]
-        request = templateRequest{requestHeaders=rHead, requestBody = rBody}
-    response <- httpLbs request manager
+    manager <- liftIO $ newManager tlsManagerSettings
+    MasterClientId mcid <- access Proxy
+    MasterClientSecret msec <- access Proxy
+    let creds64 = encodeBase64' . B.fromString $ mcid <> ":" <> msec
+    templateRequest <- liftIO $ parseRequest "POST https://keycloak.blockapps.net/auth/realms/master/protocol/openid-connect/token" -- todo: make these into flags
+    let rBody = RequestBodyLBS "grant_type=password"
+        rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
+        request = templateRequest{requestHeaders = rHead, requestBody = rBody}
+    response <- liftIO $ httpLbs request manager
     return $ decode $ responseBody response
 
 newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [T.Text]} deriving (Show, Generic)
@@ -79,7 +87,7 @@ data OAuthUser = OAuthUser {
     id          :: T.Text, --untested
     firstName   :: T.Text,
     lastName    :: T.Text,
-    attributes  :: Maybe OAuthUserAttributes -- Maybe (Map T.Text [T.Text])
+    attributes  :: Maybe OAuthUserAttributes
 } deriving (Show, Generic)
 instance FromJSON OAuthUser
 instance ToJSON OAuthUser
@@ -99,35 +107,32 @@ oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
     subPub = pk
 }
 
-getUserByUUID :: AccessToken -> T.Text -> IO (Either String OAuthUser)
+getUserByUUID :: ( MonadIO m
+                 , Accessible RealmName m
+                 ) => AccessToken -> T.Text -> m (Either String OAuthUser)
 getUserByUUID token uuid = do
-    manager <- newManager defaultManagerSettings
-    templateRequest <- parseRequest $ T.unpack $ "http://localhost:8080/admin/realms/myrealm/users/" <> uuid
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> (access_token token))]
+    manager <- liftIO $ newManager tlsManagerSettings
+    RealmName realm <- access Proxy
+    let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> T.pack realm <> "/users/" <> uuid
+    templateRequest <- liftIO $ parseRequest $ T.unpack url
+    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
         request = templateRequest{requestHeaders=rHead}
-    response <- httpLbs request manager
+    response <- liftIO $ httpLbs request manager
     return $ eitherDecode $ responseBody response
 
 
+newtype MasterClientId = MasterClientId String 
+newtype MasterClientSecret = MasterClientSecret String
+newtype RealmName = RealmName String
 data IdentityServerData = IdentityServerData 
-    { issuer        :: Issuer          -- issuer of signing cert
-    , issuerCert    :: X509Certificate -- the signing cert
-    , issuerPrivKey :: PrivateKey      -- the signing private key
-    , blocAPIUrl       :: BaseUrl      -- strato node where will register cert
+    { issuer             :: Issuer          -- issuer of signing cert
+    , issuerCert         :: X509Certificate -- the signing cert
+    , issuerPrivKey      :: PrivateKey      -- the signing private key
+    , blocAPIUrl         :: BaseUrl -- strato node where will register cert
+    , masterClientId     :: MasterClientId
+    , masterClientSecret :: MasterClientSecret
+    , realmName          :: RealmName
 }
-type GetPingIdentity = "_ping" :> Get '[JSON] Int
-
-getPingIdentity ::  (MonadIO m) => m Int
-getPingIdentity = return $ 1
-
-
-runIdentityM :: MonadIO m => String -> Issuer -> X509Certificate -> PrivateKey -> ReaderT IdentityServerData m a -> m a
-runIdentityM nodeurl iss cert privk r = do 
-    url <- liftIO $ parseBaseUrl nodeurl
-    let path' = baseUrlPath url
-    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> "bloc/v2.2" -- surely there is a better way to do this?
-    runReaderT r $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi}
-
 instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
     access _ = asks issuer
 instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
@@ -136,15 +141,23 @@ instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityS
     access _ = asks issuerPrivKey
 instance {-# OVERLAPPING #-} Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
     access _ = asks blocAPIUrl
-
+instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
+    access _ = asks masterClientId
+instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
+    access _ = asks masterClientSecret
+instance {-# OVERLAPPING #-} Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
+    access _ = asks realmName
 
 type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
-                :> Put '[JSON] Address --should return cert address
+                :> Put '[JSON] Address --should return user address
+type GetPingIdentity = "_ping" :> Get '[JSON] Int
 
 type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
 
+getPingIdentity :: (MonadIO m) => m Int
+getPingIdentity = return 1
 
 putIdentity :: ( MonadIO m
                , MonadLogger m
@@ -152,7 +165,10 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
-               , Accessible BaseUrl m
+               , Accessible BaseUrl m 
+               , Accessible MasterClientId m
+               , Accessible MasterClientSecret m
+               , Accessible RealmName m
                ) => T.Text -> T.Text -> m Address
 putIdentity accessToken uuid = do
     $logInfoS "putIdentity" "someone called PUT /identity"
@@ -161,14 +177,18 @@ putIdentity accessToken uuid = do
         Just a -> return a
         Nothing -> do -- no vault key, so make key and register cert
             mAddressNKey <- postVaultKey accessToken
-            _ <- case mAddressNKey of 
-                Nothing -> $logErrorS "putIdentity" $ "error occurred while trying to create vault key for user with uuid " <> uuid
-                Just (AddressAndKey _ k) -> do
-                    mToken <- liftIO getAccessToken
+            case mAddressNKey of 
+                Nothing -> do
+                    $logErrorS "putIdentity" $ "error occurred while trying to create vault key for user with uuid " <> uuid
+                    -- TODO: should throw error in nothing case, not return dummy val
+                    return $ Address 0x509
+                Just (AddressAndKey a k) -> do
+                    mToken <- getAccessToken
                     case mToken of 
-                        Nothing -> error "uh oh! We couldn't get our access token" -- TODO: better error handling than this
+                        Nothing -> do
+                            error "uh oh! We couldn't get our access token" -- TODO: better error handling than this
                         Just token -> do
-                            eUser <- liftIO $ getUserByUUID token uuid
+                            eUser <- getUserByUUID token uuid
                             case eUser of
                                 Left err -> $logErrorS "putIdentity" $ "Error occurred while trying to get user with uuid " <> uuid <> ": " <> T.pack err
                                 Right user -> do 
@@ -180,8 +200,7 @@ putIdentity accessToken uuid = do
                                     case mNewCert of 
                                         Just newCert -> registerCert newCert accessToken
                                         Nothing -> $logErrorS "putIdentity" "Error signing new cert"
-                                    return ()
-            return $ Address 0x509
+                    return a
 
 registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> T.Text -> m ()
 registerCert cert accessToken = do 
@@ -233,16 +252,50 @@ server :: ( MonadIO m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
           , Accessible BaseUrl m
+          , Accessible MasterClientId m
+          , Accessible MasterClientSecret m
+          , Accessible RealmName m
           ) => ServerT IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity
 
-hoistCoreServer :: String -> String -> Issuer -> X509Certificate -> PrivateKey -> Server IdentityProviderAPI
-hoistCoreServer nodeurl vaulturl iss cert privk = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer :: String 
+                -> String 
+                -> Issuer 
+                -> X509Certificate 
+                -> PrivateKey
+                -> String
+                -> String
+                -> String
+                -> Server IdentityProviderAPI
+hoistCoreServer nodeurl vaulturl iss cert privk mid ms rn = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
   where
     -- convertErrors :: LoggingT IO a -> Handler a
     convertErrors r x = Handler $ liftIO $ r x
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk mid ms rn x
 
-identityProviderApp :: String -> String -> Issuer -> X509Certificate -> PrivateKey -> Application
-identityProviderApp nodeurl vaulturl iss cert privk = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer nodeurl vaulturl iss cert privk
+runIdentityM :: MonadIO m
+             => String 
+             -> Issuer 
+             -> X509Certificate 
+             -> PrivateKey
+             -> String
+             -> String
+             -> String
+             -> ReaderT IdentityServerData m a -> m a
+runIdentityM nodeurl iss cert privk mid ms rn x = do 
+    url <- liftIO $ parseBaseUrl nodeurl
+    let path' = baseUrlPath url
+    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> "bloc/v2.2" -- surely there is a better way to do this?
+    runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (MasterClientId mid) (MasterClientSecret ms) (RealmName rn)
+
+identityProviderApp :: String 
+                    -> String 
+                    -> Issuer 
+                    -> X509Certificate 
+                    -> PrivateKey
+                    -> String
+                    -> String
+                    -> String
+                    -> Application
+identityProviderApp nurl vurl iss cert pk mid ms rn = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk mid ms rn

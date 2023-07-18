@@ -39,6 +39,7 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - base64
   - bloc2api
   - bloc2client
   - blockapps-vault-wrapper-client
@@ -57,6 +58,7 @@ library:
   - strato-model
   - text
   - unliftio
+  - utf8-string
   - vault-monad
   - x509-certs
 
