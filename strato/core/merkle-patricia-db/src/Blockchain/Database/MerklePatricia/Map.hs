@@ -27,7 +27,7 @@ map :: (StateRoot `Alters` NodeData) m
     => (Key -> RLPObject -> m ())
     -> StateRoot
     -> m ()
-map f = mapNodeRef "" f . PtrRef
+map f = mapNodeRef "" f . ptrRef
 
 mapNodeData :: (StateRoot `Alters` NodeData) m
             => Key -> (Key->RLPObject->m ()) -> NodeData -> m ()
@@ -45,7 +45,7 @@ mapNodeData partialKey f ShortcutNodeData {nextNibbleString=remainingKey, nextVa
 
 mapNodeRef :: (StateRoot `Alters` NodeData) m
            => Key -> (Key -> RLPObject -> m ()) -> NodeRef -> m ()
-mapNodeRef partialKey f (PtrRef sr) = do
-  nodeData <- getNodeData (PtrRef sr)
+mapNodeRef partialKey f (Right sr) = do
+  nodeData <- getNodeData (ptrRef sr)
   mapNodeData partialKey f nodeData
-mapNodeRef _ _ (SmallRef _) = return () --TODO I might have to deal with this also
+mapNodeRef _ _ (Left _) = return () --TODO I might have to deal with this also

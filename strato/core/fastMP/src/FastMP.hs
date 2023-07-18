@@ -13,6 +13,7 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Base16 as B16
 import Data.List
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
@@ -21,6 +22,7 @@ import qualified Database.LevelDB as LDB
 import BlockApps.Logging
 import Blockchain.Data.RLP
 import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
+import Text.Format
 
 import           Blockchain.Database.MerklePatricia          ()
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
@@ -42,8 +44,8 @@ createMPFast db rOrderedKVs = do
     MP.nodeData2NodeRef nd
 
   case nr of
-    MP.PtrRef sr -> return sr
-    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
+    Right sr -> return sr
+    Left v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
 
 
 createMPFast_NodeData :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
@@ -136,7 +138,7 @@ processNext (input, ((prefix, partialNode):partialrest)) = do
   when debug $
     $logDebugS "processNext" . T.pack $ concat
       [ "#### Flush Partial("
-      , show (pretty nodePtr)
+      , show (green . text $ either (BC.unpack . B16.encode) format nodePtr)
       , "):\n"
       , show (pretty node)
       ]
@@ -157,8 +159,8 @@ nodeData2NodeRef :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
                  => MP.NodeData -> m MP.NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
-    bytes | BC.length bytes < 32 -> return $ MP.SmallRef bytes
-    _     -> MP.PtrRef <$> putNodeData nodeData
+    bytes | BC.length bytes < 32 -> return $ MP.smallRef bytes
+    _     -> MP.ptrRef <$> putNodeData nodeData
 
 
 
@@ -193,7 +195,7 @@ addToPartial partialNode (KV x@(_:rest) val) = do
   when debug $
     $logDebugS "addToPartial" . T.pack $ concat
       [ "####addToPartial ("
-      , show (pretty nodePtr)
+      , show (green . text $ either (BC.unpack . B16.encode) format nodePtr)
       , "):\n"
       , show (pretty node)
       ]

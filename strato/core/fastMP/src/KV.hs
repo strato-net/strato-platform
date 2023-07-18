@@ -32,8 +32,8 @@ data Value = StringValue String | NodePtrValue MP.NodeRef deriving Show
 
 formatKV :: KV -> String
 formatKV (KV key (Right v)) = map n2c key ++ " " ++ show v
-formatKV (KV key (Left (MP.PtrRef np))) = map n2c key ++ " node:(" ++ show np ++ ")"
-formatKV (KV key (Left (MP.SmallRef np))) = map n2c key ++ " small:(" ++ show np ++ ")"
+formatKV (KV key (Left (Right np))) = map n2c key ++ " node:(" ++ show np ++ ")"
+formatKV (KV key (Left (Left np)))  = map n2c key ++ " small:(" ++ show np ++ ")"
 
 
 
