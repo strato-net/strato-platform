@@ -11,7 +11,6 @@ extra-source-files:
 - CHANGELOG.md
 
 
-ghc-options: -Wall -Werror -dynamic
 
 dependencies:
 - base

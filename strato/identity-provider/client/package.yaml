@@ -9,9 +9,6 @@ extra-source-files:
 - README.md
 - CHANGELOG.md
 
-
-ghc-options: -Wall -Werror -dynamic
-
 dependencies:
 - base
 - servant-client

@@ -39,6 +39,7 @@ data ApiError
   | StratoError ClientError
   | CirrusError SERVANT.ServerError
   | VaultWrapperError ClientError
+  | IdentitytWrapperError ClientError
   | DBError Text
   | UserError Text
   | TxSizeError Text
@@ -105,6 +106,15 @@ apiErrorToServantErr = \case
                      "Connection Error!",
                      "Bloc can not connect to the Vault Wrapper.",
                      "This probably is a configuration error, but can also mean the Strato peer is down.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the strato-api logs.)"
+                   ]}
+  IdentitytWrapperError _ ->
+            err500{errBody = JSON.encode $ unlines
+                   [
+                     "Vault-Wrapper Error!",
+                     "Bloc recieved a malformed response from Vault-Wrapper.",
+                     "This is probably a backend configuration problem.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the strato-api logs.)"
                    ]}

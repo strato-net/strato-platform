@@ -36,6 +36,7 @@ library:
   - process
   - QuickCheck
   - seqevents
+  - servant
   - servant-client
   - servant-multipart
   - servant-multipart-client  
@@ -52,6 +53,7 @@ library:
   - unordered-containers
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - blockapps-identity-provider-client
   - vault-monad
   - blockapps-vault-wrapper-server
   - strato-redis-blockdb

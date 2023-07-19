@@ -30,3 +30,22 @@ runVaultM url f = do
 
   runReaderT f $ VaultData vaultWrapperUrl mgr
 
+data IdentityData =
+  IdentityData {
+    urlIdentityServer :: BaseUrl,
+    httpManager' :: Manager
+  }
+
+
+type IdentityM = ReaderT IdentityData
+
+type HasIdentity m = Accessible IdentityData m
+
+runIdentitytM :: MonadIO m => String -> IdentityM m a -> m a
+runIdentitytM url f = do
+  mgr <- liftIO $ newManager defaultManagerSettings
+  identityUrl <- liftIO $ parseBaseUrl url
+
+  runReaderT f $ IdentityData identityUrl mgr
+
+
