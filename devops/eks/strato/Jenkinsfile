@@ -4,6 +4,7 @@ pipeline {
         stage('Stage 1') {
             steps {
                 sh 'whoami'
+                sh 'kubectl version --short --client'
             }
         }
     }
