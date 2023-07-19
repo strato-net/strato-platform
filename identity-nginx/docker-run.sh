@@ -4,10 +4,10 @@ set -e
 
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
-OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
-OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
-OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
+# OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
+# OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
+# OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
+# OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST:-identity-provider}
 IDENTITY_PORT=${IDENTITY_PORT:-8081}
 IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY:-8013}
@@ -45,7 +45,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   # Replacing HOST NAME PLACEHOLDERS
-  sed -i "s/__IDENTITY_PROVIER_HOST__/$IDENTITY_PROVIER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__IDENTITY_PROVIDER_HOST__/$IDENTITY_PROVIDER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__IDENTITY_PORT__/$IDENTITY_PORT/g" /tmp/nginx.conf
   sed -i "s/__IDENTITY_PORT_VAULT_PROXY__/$IDENTITY_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
   ########
@@ -76,13 +77,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     cp -r /tmp/ssl/* /etc/ssl/
   fi
 fi
-
-echo 'Waiting for VaultProxy to be available with node key added to Vault...'
-until curl --silent --output /dev/null --fail --location http://${IDENTITY_PROVIDER_HOST}:${IDENTITY_PORT_VAULT_PROXY}/strato/v2.3/key
-do
-  sleep 0.5
-done
-echo 'VaultProxy is available'
 
 echo  'nginx is now running. See the logs below...'
 openresty -g "daemon off;"

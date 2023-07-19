@@ -39,15 +39,11 @@ import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
 
 import           Data.Aeson
-<<<<<<< HEAD
 import           Data.ByteString.Base64
-import qualified Data.ByteString.UTF8 as B                    (fromString)
+import qualified Data.ByteString.Lazy                    as BL
+import qualified Data.ByteString.UTF8 as B               (fromString)
 import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
-=======
-import qualified Data.ByteString.Base64                  as B64
-import qualified Data.ByteString.Lazy                    as BL
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
 import           Data.Text as T                          (Text, unpack, pack, take)
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
@@ -63,12 +59,8 @@ import           Strato.Strato23.Client
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
-<<<<<<< HEAD
-=======
 import           Control.Monad.Trans.Except
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
 import           BlockApps.Logging
-import           Options
 
 data IdentityError
   = UserError Text
@@ -83,7 +75,6 @@ getAccessToken :: ( MonadIO m
                   , Accessible MasterClientSecret m
                   ) => m (Maybe AccessToken)
 getAccessToken = do
-<<<<<<< HEAD
     manager <- liftIO $ newManager tlsManagerSettings
     MasterClientId mcid <- access Proxy
     MasterClientSecret msec <- access Proxy
@@ -93,20 +84,6 @@ getAccessToken = do
         rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
         request = templateRequest{requestHeaders = rHead, requestBody = rBody}
     response <- liftIO $ httpLbs request manager
-=======
-    manager <- newManager defaultManagerSettings
-    templateRequest <- parseRequest $ concat ["POST ", flags_OAUTH_PROVIDER_URL, flags_OAUTH_TOKEN_ENDPOINT]
-    let rBody = RequestBodyLBS . BL.fromStrict . encodeUtf8 . T.pack $
-          concat [ "grant_type=password&username="
-                 , flags_OAUTH_ADMIN_USERNAME
-                 , "&password="
-                 , flags_OAUTH_ADMIN_PASSWORD
-                 ]-- TODO: Use client-credential flow if possible
-        authString = B64.encodeBase64 . encodeUtf8 . T.pack $ concat [flags_OAUTH_CLIENT_ID, ":", flags_OAUTH_CLIENT_SECRET]
-        rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, encodeUtf8 $ "Basic " <> authString)]
-        request = templateRequest{requestHeaders=rHead, requestBody = rBody}
-    response <- httpLbs request manager
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
     return $ decode $ responseBody response
 
 newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [T.Text]} deriving (Show, Generic)
@@ -140,23 +117,15 @@ getUserByUUID :: ( MonadIO m
                  , Accessible RealmName m
                  ) => AccessToken -> T.Text -> m (Either String OAuthUser)
 getUserByUUID token uuid = do
-<<<<<<< HEAD
     manager <- liftIO $ newManager tlsManagerSettings
     RealmName realm <- access Proxy
     let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> T.pack realm <> "/users/" <> uuid
     templateRequest <- liftIO $ parseRequest $ T.unpack url
     let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
-=======
-    manager <- newManager defaultManagerSettings
-    templateRequest <- parseRequest $ concat [flags_OAUTH_PROVIDER_URL, flags_OAUTH_USER_ENDPOINT, "/", T.unpack uuid]
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> (access_token token))]
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
         request = templateRequest{requestHeaders=rHead}
     response <- liftIO $ httpLbs request manager
     return $ eitherDecode $ responseBody response
 
-
-<<<<<<< HEAD
 newtype MasterClientId = MasterClientId String 
 newtype MasterClientSecret = MasterClientSecret String
 newtype RealmName = RealmName String
@@ -169,41 +138,27 @@ data IdentityServerData = IdentityServerData
     , masterClientSecret :: MasterClientSecret
     , realmName          :: RealmName
 }
-instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
     access _ = asks issuer
-instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
     access _ = asks issuerCert
-instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where 
     access _ = asks issuerPrivKey
-instance {-# OVERLAPPING #-} Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
     access _ = asks blocAPIUrl
-instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
     access _ = asks masterClientId
-instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
     access _ = asks masterClientSecret
-instance {-# OVERLAPPING #-} Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
     access _ = asks realmName
-=======
-data CertIssuer = CertIssuer 
-    { issuer        :: Issuer
-    , issuerCert    :: X509Certificate
-    , issuerPrivKey :: PrivateKey
-    }
-instance Monad m => Accessible Issuer (ReaderT CertIssuer m) where 
-    access _ = asks issuer
-instance Monad m => Accessible X509Certificate (ReaderT CertIssuer m) where 
-    access _ = asks issuerCert
-instance Monad m => Accessible PrivateKey (ReaderT CertIssuer m) where 
-    access _ = asks issuerPrivKey
 instance Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
-instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT CertIssuer m) where 
+instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where 
     access = lift . access
 
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
-
 type PutIdentity = "identity"
-                :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
+                :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
                 :> Put '[JSON] Address --should return user address
 type GetPingIdentity = "_ping" :> Get '[JSON] Int
@@ -231,25 +186,12 @@ putIdentity accessToken uuid = do
         Just a -> return a
         Nothing -> do -- no vault key, so make key and register cert
             mAddressNKey <- postVaultKey accessToken
-<<<<<<< HEAD
             case mAddressNKey of 
-                Nothing -> do
-                    $logErrorS "putIdentity" $ "error occurred while trying to create vault key for user with uuid " <> uuid
-                    -- TODO: should throw error in nothing case, not return dummy val
-                    return $ Address 0x509
+                Nothing -> throwIO . UserError $ "error occurred while trying to create vault key for user with uuid " <> uuid
                 Just (AddressAndKey a k) -> do
                     mToken <- getAccessToken
                     case mToken of 
-                        Nothing -> do
-                            error "uh oh! We couldn't get our access token" -- TODO: better error handling than this
-=======
-            addr <- case mAddressNKey of 
-                Nothing -> throwIO . UserError $ "error occurred while trying to create vault key for user with uuid " <> uuid
-                Just (AddressAndKey a k) -> do
-                    mToken <- liftIO getAccessToken
-                    case mToken of 
                         Nothing -> throwIO . UserError $ "uh oh! We couldn't get our access token"
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
                         Just token -> do
                             eUser <- getUserByUUID token uuid
                             case eUser of
@@ -259,7 +201,6 @@ putIdentity accessToken uuid = do
                                     c <- access (Proxy @X509Certificate)
                                     iK <- access (Proxy @PrivateKey)
                                     let signWIssuerPrivKey bs = return $ signMsg iK bs
-<<<<<<< HEAD
                                     mNewCert <- makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
                                     case mNewCert of 
                                         Just newCert -> registerCert newCert accessToken
@@ -285,11 +226,6 @@ registerCert cert accessToken = do
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
     eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> accessToken) Nothing True txRequest) clientEnv
     $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse 
-=======
-                                    _ <- makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
-                                    return a
-            return addr
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
 
 -- note to self: what if error is serious?
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe Address)
@@ -300,7 +236,7 @@ getVaultKey accessToken = do
     case eAddressNKey of 
         Right (AddressAndKey a _) -> return $ Just a
         Left err -> do 
-            $logErrorS "getVaultKey" $ T.pack $ "error fetching user's pubkey: " <> show err
+            $logInfoS "getVaultKey" $ T.pack $ "User key not found in vault: " <> show err
             return Nothing
 
 postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
@@ -338,11 +274,17 @@ hoistCoreServer :: String
                 -> Server IdentityProviderAPI
 hoistCoreServer nodeurl vaulturl iss cert privk mid ms rn = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
   where
-<<<<<<< HEAD
-    -- convertErrors :: LoggingT IO a -> Handler a
-    convertErrors r x = Handler $ liftIO $ r x
+    convertErrors r x = Handler $ do
+      eRes <- liftIO . try $ r x
+      case eRes of
+        Right a -> return a
+        Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
     runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk mid ms rn x
+    reThrowError :: IdentityError -> ServerError
+    reThrowError
+      = \case
+          UserError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
 
 runIdentityM :: MonadIO m
              => String 
@@ -358,19 +300,6 @@ runIdentityM nodeurl iss cert privk mid ms rn x = do
     let path' = baseUrlPath url
     let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> "bloc/v2.2" -- surely there is a better way to do this?
     runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (MasterClientId mid) (MasterClientSecret ms) (RealmName rn)
-=======
-    convertErrors r x = Handler $ do
-      eRes <- liftIO . try $ r x
-      case eRes of
-        Right a -> return a
-        Left e -> throwE $ reThrowError e
-    runM' :: ReaderT CertIssuer (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runReaderT x ci
-    reThrowError :: IdentityError -> ServerError
-    reThrowError
-      = \case
-          UserError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
->>>>>>> 08fb920... Began refactoring identity-provider code to pass everything in as flags
 
 identityProviderApp :: String 
                     -> String 
