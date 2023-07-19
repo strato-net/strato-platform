@@ -5,6 +5,7 @@ pipeline {
             steps {
                 sh 'whoami'
                 sh 'ls -l /home/ubuntu/bin/kubectl'
+                sh '/home/ubuntu/bin/kubectl version --short --client'
             }
         }
     }
