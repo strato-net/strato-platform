@@ -659,17 +659,21 @@ getNewAddress account = do
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
-getNewAddressWithSalt :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> Value -> String -> Keccak256 -> m Account
-getNewAddressWithSalt account salt cname hsh = do
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
+getNewAddressWithSalt account salt hsh args = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
-  let rlpEncodedSalt = case salt of
-          (SInteger i) -> rlpEncode i
-          (SString s) -> rlpEncode s
+  let saltAsString = case salt of
+          (SString s) -> s
           _ -> invalidArguments "big major bad" salt
-  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) rlpEncodedSalt cname $ keccak256ToByteString hsh
-  incrementNonce account
-  return $ (accountAddress .~ newAddress) account
+  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) saltAsString (keccak256ToByteString hsh) args
+  $logDebugS "getNewAddressWithSalt" $ T.pack $ (show $ account ^. accountAddress) ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
+  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress (_accountChainId account)
+  case doesAddressAlreadyExist of
+    Just _ -> duplicateContract $ "The address " ++ (show newAddress) ++ " already exists. Try using a different salt or constructor arguments."
+    Nothing ->  do
+      incrementNonce account
+      return $ (accountAddress .~ newAddress) account
 
 purgeStorageMap :: HasMemStorageDB m => Account -> m ()
 purgeStorageMap account = do

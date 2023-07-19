@@ -14,6 +14,7 @@ module Blockchain.VM.SolidException
   , customError
   , missingType
   , duplicateDefinition
+  , duplicateContract
   , parseError
   , require
   , assert
@@ -61,6 +62,7 @@ data SolidException = TypeError String String
                     | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
+                    | DuplicateContract String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
@@ -102,6 +104,7 @@ showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
 showSolidException (RevertError m v) = printf "revert: %s %s:" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
+showSolidException (DuplicateContract a) = printf "duplicate salted contract address: %s" a
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
 showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
@@ -165,6 +168,9 @@ missingType = toThrower MissingType
 
 duplicateDefinition :: (Show v) => String -> v -> a
 duplicateDefinition = toThrower DuplicateDefinition
+
+duplicateContract :: (Show v) => v -> a 
+duplicateContract x = throw $ DuplicateContract (show x)
 
 checkArity :: (MonadIO m) => String -> Int -> Int -> m ()
 checkArity msg got want = when (got /= want) . liftIO . throwIO $ ArityMismatch msg got want
