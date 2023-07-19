@@ -177,7 +177,7 @@ type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
 coreServer :: ( MonadLogger m
                , HasSQL m
-              -- , Accessible IdentityData m
+              , Accessible IdentityData m
               , Accessible VaultData m
               , Selectable Keccak256 SourceMap m
               )
@@ -206,7 +206,7 @@ coreServer = Account.server
 fullServer :: ( MonadLogger m
               , HasSQL m
               , HasBlocEnv m
-              -- , HasIdentity m
+              , HasIdentity m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
