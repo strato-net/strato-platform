@@ -48,14 +48,14 @@ const Product = () => {
   const imglist=[
     'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1607154818od-w1024_h768_x2.webp',
     'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3497275450od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3180059059od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1194456964od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2512788875od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2935903856od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m210456744od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1069665804od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2999610083od-w1024_h768_x2.webp',
-    // 'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m876342709od-w1024_h768_x2.webp'
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3180059059od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1194456964od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2512788875od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2935903856od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m210456744od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1069665804od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2999610083od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m876342709od-w1024_h768_x2.webp'
   ]
 
   //Categories

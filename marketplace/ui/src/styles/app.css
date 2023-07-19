@@ -115,3 +115,17 @@
   font-size: inherit;
   color: currentColor;
 }
+
+.slick-prev {
+  left: 2% !important;
+  z-index: 1;
+  font-size: 35px !important;
+  color: white !important;
+}
+
+.slick-next {
+  right: 4% !important;
+  z-index: 1;
+  font-size: 35px !important;
+  color: white !important;
+}
