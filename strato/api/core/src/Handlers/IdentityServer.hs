@@ -14,7 +14,7 @@
 {-# LANGUAGE LambdaCase             #-}
 
 
-module Handlers.IdentityServer (API, server) where
+module Handlers.IdentityServer (API, server, getCertAddress) where
 
 import GHC.TypeLits
 -- import Network.Wai.Handler.Warp
@@ -25,6 +25,8 @@ import Data.Text
 
 import           Blockchain.Strato.Model.Address
 import           Control.Monad.Composable.Vault
+import           Control.Monad.Change.Modify        (access)
+
 import           Servant.Client
 import           UnliftIO
 import           BlockApps.Logging
@@ -76,4 +78,4 @@ identitytWrapper client' = do
   either (blocError . IdentitytWrapperError) return resultEither
 
 getCertAddress ::  (MonadLogger m, MonadUnliftIO m, HasIdentity m) => m Address
-getCertAddress = identitytWrapper $ putIdentity Nothing Nothing
+getCertAddress = identitytWrapper $ putIdentity "" "Nothing"
