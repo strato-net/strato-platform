@@ -45,6 +45,7 @@ library:
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
   - containers
+  - core-api2
   - evm-solidity
   - hflags
   - http-client
@@ -57,6 +58,7 @@ library:
   - servant-server
   - strato-model
   - text
+  - transformers
   - unliftio
   - utf8-string
   - vault-monad

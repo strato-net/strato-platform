@@ -15,6 +15,7 @@
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module Lib
     ( AccessToken
@@ -35,6 +36,7 @@ import           Servant.Client                          hiding (responseBody, m
 import           Network.HTTP.Client                     hiding (Proxy)
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
+import           Network.HTTP.Types.Status
 
 import           Data.Aeson
 import           Data.ByteString.Base64
@@ -52,10 +54,12 @@ import           BlockApps.X509                          hiding (isValid)
 import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
+import           SQLM
 
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
 import           SelectAccessible                () --TODO: fix this import because it comes from slipstream (see note in package.yml)
@@ -206,16 +210,9 @@ putIdentity accessToken uuid = do
             unless hasCert $ createAndRegisterCert uuid k
             return a
         Nothing -> do -- no vault key, so make key and register cert
-            postVaultKey accessToken >>= \case
-                Nothing -> do
-                    $logErrorS "putIdentity" $ "error occurred while trying to create vault key for user with uuid " <> uuid
-                    -- TODO: should throw error in nothing case, not return dummy val
-                    -- refactor so either throw error or return AddressAndKey (no Maybe wrapper)
-                    -- throwIO $ ServerError "Could not create vault keys" 
-                    return $ Address 0x509
-                Just (AddressAndKey a k) -> do
-                    createAndRegisterCert uuid k
-                    return a
+            AddressAndKey a k <- postVaultKey accessToken
+            createAndRegisterCert uuid k
+            return a
 
 blocEndpoint :: String
 blocEndpoint = "bloc/v2.2"
@@ -305,7 +302,6 @@ registerCert cert token = do
     eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest) clientEnv
     $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse 
 
--- note to self: what if error is serious?
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do 
     VaultData url mgr <- access Proxy   
@@ -313,22 +309,23 @@ getVaultKey accessToken = do
     $logInfoS "getVaultKey" $ T.pack $ "response is " <> show eAddressNKey
     case eAddressNKey of 
         Right a -> return $ Just a
-        -- Left ClientError FailureResponse; maybe use responseStatusCode to figure out which vault error (no user or incorrect pw?)
-        -- ideally w/o hard coding though :(
+        -- only errors from GET /key are user doesn't exist (400) or incorrect pw (503)
+        -- beware if the error behavior for /key changes
+        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
         Left err -> do 
             $logErrorS "getVaultKey" $ T.pack $ "error fetching user's pubkey: " <> show err
-            return Nothing
+            throwIO $ VaultWrapperError err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
+postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
 postVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)
     $logInfoS "postVaultKey" $ T.pack $ "response is " <> show eAddressNKey
     case eAddressNKey of 
-        Right a -> return $ Just a
+        Right a -> return a
         Left err -> do 
             $logErrorS "postVaultKey" $ T.pack $ "error posting user's pubkey: " <> show err
-            return Nothing
+            throwIO $ VaultWrapperError err
 
 server :: ( MonadIO m
           , MonadLogger m
@@ -359,7 +356,11 @@ hoistCoreServer :: String
 hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
   where
     -- convertErrors :: LoggingT IO a -> Handler a
-    convertErrors r x = Handler $ liftIO $ r x
+    convertErrors r x = Handler $ do 
+        y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+        case y of 
+            Right a -> pure a 
+            Left e -> throwE $ apiErrorToServantErr e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
     runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk cid cs mid ms rn x
 
