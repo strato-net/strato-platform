@@ -26,8 +26,8 @@ pipeline {
                 sh "sed -i 's/<REPLACE_WITH_STRIPE_PUBLISHABLE_KEY>/$STRIPE_PUBLISHABLE_KEY/g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<REPLACE_WITH_STRIPE_SECRET_KEY>/$STRIPE_SECRET_KEY/g' strato-platform-manifest.yaml"
                 sh 'cat strato-platform-manifest.yaml'
-                //sh '$KUBECTL delete -f strato-platform-manifest.yaml'
-                //sh '$KUBECTL apply -f strato-platform-manifest.yaml'
+                sh '$KUBECTL delete -f strato-platform-manifest.yaml'
+                sh '$KUBECTL apply -f strato-platform-manifest.yaml'
             }
         }
     }
