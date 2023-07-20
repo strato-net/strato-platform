@@ -2,7 +2,8 @@
 
 module IdentityProviderClient 
     ( getPing,
-      putIdentity
+      putIdentity,
+      putIdentityExternal
     ) where
 
 import           Servant.Client
@@ -18,3 +19,5 @@ getPing = client (Proxy @GetPingIdentity)
 putIdentity :: Text -> Text -> ClientM Address
 putIdentity = client (Proxy @PutIdentity)
 
+putIdentityExternal :: Text -> Text -> ClientM Address
+putIdentityExternal = client (Proxy @PutIdentityExternal)
