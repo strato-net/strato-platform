@@ -112,11 +112,8 @@ apiErrorToServantErr = \case
   IdentitytWrapperError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Vault-Wrapper Error!",
-                     "Bloc recieved a malformed response from Vault-Wrapper.",
-                     "This is probably a backend configuration problem.",
+                     "Identity Server Error!",
                      "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the strato-api logs.)"
                    ]}
   VaultWrapperError _ ->
             err500{errBody = JSON.encode $ unlines

@@ -231,7 +231,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         runSQLM .
         flip runReaderT blocEnv .
         runVaultM "http://localhost:8013/strato/v2.3" . 
-        runIdentitytM "http://localhost:8019/identity" $ f
+        runIdentitytM flags_indetityServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
