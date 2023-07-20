@@ -118,7 +118,7 @@ spec:
         app.kubernetes.io/name: strato-platform
     spec:
       containers:
-      - image: <REPO_URL>smd:<VERSION>
+      - image: <REPO_URL>/smd:<VERSION>
         name: smd
         env:
         - name: NODE_HOST
@@ -127,7 +127,7 @@ spec:
           value: "localhost"
         - name: ssl
           value: "false"
-      - image: <REPO_URL>apex:<VERSION>
+      - image: <REPO_URL>/apex:<VERSION>
         name: apex
         env:
         - name: NODE_HOST
@@ -148,7 +148,7 @@ spec:
           value: ""
         - name: STRATO_PORT_VAULT_PROXY
           value: ""
-      - image: <REPO_URL>marketplace-backend:<VERSION>
+      - image: <REPO_URL>/marketplace-backend:<VERSION>
         name: marketplace-backend
         env:
         - name: EXT_STORAGE_S3_BUCKET
@@ -212,7 +212,7 @@ spec:
         volumeMounts:
           - mountPath: /config
             name: marketplace-data
-      - image: <REPO_URL>marketplace-ui:<VERSION>
+      - image: <REPO_URL>/marketplace-ui:<VERSION>
         name: marketplace-ui
         env:
         - name: NODE_ENV
@@ -224,7 +224,7 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: redis-data
-      - image: <REPO_URL>strato:<VERSION>
+      - image: <REPO_URL>/strato:<VERSION>
         name: strato
         ports:
           - containerPort: 30303
@@ -386,7 +386,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
-      - image: <REPO_URL>postgrest:<VERSION>
+      - image: <REPO_URL>/postgrest:<VERSION>
         name: postgrest
         env:
         - name: blocHost
@@ -415,7 +415,7 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
             name: postgres-data
-      - image: <REPO_URL>nginx:<VERSION>
+      - image: <REPO_URL>/nginx:<VERSION>
         name: nginx
         ports:
           - containerPort: 80
@@ -516,7 +516,7 @@ spec:
         volumeMounts:
           - mountPath: /kafka
             name: kafka-data
-      - image: <REPO_URL>prometheus:<VERSION>
+      - image: <REPO_URL>/prometheus:<VERSION>
         name: prometheus
         env:
         - name: NODE_HOST
