@@ -36,9 +36,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx  identity-provider identity-nginx
+build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx  identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -115,6 +115,8 @@ vault-nginx:
 identity-provider: build_common
 	@echo Now building Identity Server...
 	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
+	cp strato/identity-provider/rootCert.pem ${IDENTITYDIR}
+	cp strato/identity-provider/rootPriv.pem ${IDENTITYDIR}
 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
 

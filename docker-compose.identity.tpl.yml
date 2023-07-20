@@ -7,8 +7,22 @@ volumes:
 services:
   identity-provider:
     environment:
-    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
+    - identityProviderPort=${identityProviderPort:-8081}
+    - vaultProxyUrl=${vaulProxyUrl}
+    - issuerCertPath=${issuerCertPath}
+    - issuerPrivKeyPath=${issuerPrivKeyPath}
+    - OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}
+    - OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}
+    - OAUTH_USER_ENDPOINT=${OAUTH_USER_ENDPOINT}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_ADMIN_USERNAME=${OAUTH_ADMIN_USERNAME}
+    - OAUTH_ADMIN_PASSWORD=${OAUTH_ADMIN_PASSWORD}
+    - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
+    - VAULT_URL=${VAULT_URL}
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
@@ -21,17 +35,19 @@ services:
     depends_on:
     - identity-provider
     environment:
-    - INITIAL_OAUTH_DISCOVERY_URL=${INITIAL_OAUTH_DISCOVERY_URL}
-    - INITIAL_OAUTH_ISSUER=${INITIAL_OAUTH_ISSUER}
-    - INITIAL_OAUTH_JWT_USER_ID_CLAIM=${INITIAL_OAUTH_JWT_USER_ID_CLAIM}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST}
+    - IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY}
     build: .
     image: ${IDENTITYNGINX_IMAGE:-<REPO_URL>identity-nginx:<VERSION>}
     ports:
-    - ${HTTP_PORT:-8090}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
-    - ${HTTPS_PORT:-8093}:443 #TAG_REMOVE_WHEN_NO_SSL
+    - ${HTTP_PORT:-8000}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-8001}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
     - idpconfig:/config

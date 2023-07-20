@@ -18,7 +18,7 @@ import           Options
 main :: IO ()
 main = do
     _ <- $initHFlags "Identity Server"
-    if null flags_masterClientId || null flags_masterClientSecret
+    if null flags_OAUTH_CLIENT_ID || null flags_OAUTH_CLIENT_SECRET
     then error "You must provide both a client id and secret of the master realm for a functioning identity server"
     else do 
         putStrLn "parsing issuer cert and private key..."
@@ -37,4 +37,4 @@ main = do
             Right privk -> return privk
 
         putStrLn "Initializing identity server..."
-        run 8081 $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_clientId flags_clientSecret flags_masterClientId flags_masterClientSecret flags_realmName
+        run flags_port $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_realmName

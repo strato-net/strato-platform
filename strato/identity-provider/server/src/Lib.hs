@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE DeriveGeneric         #-}
@@ -16,6 +17,7 @@
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Lib
     ( AccessToken
@@ -41,7 +43,8 @@ import           Network.HTTP.Types.Status
 
 import           Data.Aeson
 import           Data.ByteString.Base64
-import qualified Data.ByteString.UTF8 as B                    (fromString)
+import qualified Data.ByteString.Lazy                    as BL
+import qualified Data.ByteString.UTF8 as B               (fromString)
 import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
 import qualified Data.Text as T                          (Text, unpack, pack, take, replace, null)
@@ -64,7 +67,9 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
-import           SelectAccessible                () --TODO: fix this import because it comes from slipstream (see note in package.yml)
+data IdentityError
+  = UserError Text
+  deriving (Show, Exception)
 
 newtype AccessToken = AccessToken {access_token :: T.Text} deriving (Show, Generic)
 instance FromJSON AccessToken
@@ -160,24 +165,36 @@ data IdentityServerData = IdentityServerData
     , masterClientSecret :: MasterClientSecret
     , realmName          :: RealmName
 }
-instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where 
     access _ = asks issuer
-instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where 
     access _ = asks issuerCert
-instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where 
     access _ = asks issuerPrivKey
-instance {-# OVERLAPPING #-} Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
     access _ = asks blocAPIUrl
-instance {-# OVERLAPPING #-} Monad m => Accessible ClientId (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible ClientId (ReaderT IdentityServerData m) where 
     access _ = asks clientId
-instance {-# OVERLAPPING #-} Monad m => Accessible ClientSecret (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible ClientSecret (ReaderT IdentityServerData m) where 
     access _ = asks clientSecret
-instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
     access _ = asks masterClientId
-instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
     access _ = asks masterClientSecret
-instance {-# OVERLAPPING #-} Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
+instance Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
     access _ = asks realmName
+instance Monad m => Accessible VaultData (VaultM m) where
+  access _ = ask
+instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where 
+    access = lift . access
+
+type PutIdentity = "identity"
+                :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" T.Text -- pass along for vault calls
+                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
+                :> Put '[JSON] Address --should return user address
+type GetPingIdentity = "_ping" :> Get '[JSON] Int
+
+type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
 
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
@@ -329,7 +346,7 @@ getVaultKey accessToken = do
         -- beware if the error behavior for /key changes
         Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
         Left err -> do 
-            $logErrorS "getVaultKey" $ T.pack $ "error fetching user's pubkey: " <> show err
+            $logInfoS "getVaultKey" $ T.pack $ "User key not found in vault: " <> show err
             throwIO $ VaultWrapperError err
 
 postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
@@ -371,14 +388,17 @@ hoistCoreServer :: String
                 -> Server IDAPI.IdentityProviderAPI
 hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
-    -- convertErrors :: LoggingT IO a -> Handler a
-    convertErrors r x = Handler $ do 
-        y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
-        case y of 
-            Right a -> pure a 
-            Left e -> throwE $ apiErrorToServantErr e
+    convertErrors r x = Handler $ do
+      eRes <- liftIO . try $ r x
+      case eRes of
+        Right a -> return a
+        Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk cid cs mid ms rn x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk mid ms rn x
+    reThrowError :: IdentityError -> ServerError
+    reThrowError
+      = \case
+          UserError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
 
 runIdentityM :: MonadIO m
              => String 

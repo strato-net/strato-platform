@@ -1,76 +1,21 @@
+-- for openid reference see https://github.com/zmartzone/lua-resty-openidc
+
+
+--TODO: update steps:
+
+-- This Lua script supports two request types:
+-- 1. access_token provided directly in Authorization header (OAuth2 authorization flow happens on the third-party application side) -
+--    the token is being verified and we either authorize the request or exit with 403
+-- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret):
+--    if no session provided in request OR session is expired OR access token in session is expired on invalid:
+--      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
+--      - if API call - return 401 Unauthorized with WWW-Authenticate header
+--    if valid session is in request and has valid access token - request is authorized
+--
+-- Note Access token has a "slack" time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
+
+
 local openidc = require("resty.openidc")
-local r_jwt = require("resty.jwt")
-local cjson_s = require("cjson.safe")
-local unb64 = ngx.decode_base64
-
-local config = require("cfg-loader")
-
-
-assert(type(config) == "table", "Config should be in the expected format.")
-
-local function get_bearer_access_token_from_header(header)
-  local err
-  local divider = header:find(' ')
-  if divider == 0 or string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
-    err = "no Bearer authorization header value found"
-    ngx.log(ngx.ERR, err)
-    return nil, err
-  end
-
-  local access_token = header:sub(divider + 1)
-  if access_token == nil then
-    err = "no Bearer access token value found"
-    ngx.log(ngx.ERR, err)
-    return nil, err
-  end
-
-  return access_token, err
-end
-
-
--- From lua-resty-openidc
-local function openidc_base64_url_decode(input)
-  local reminder = #input % 4
-  if reminder > 0 then
-    local padlen = 4 - reminder
-    input = input .. string.rep('=', padlen)
-  end
-  input = input:gsub('%-', '+'):gsub('_', '/')
-  return unb64(input)
-end
-
-
-local function get_access_token_issuer_unverified(header)
-  local access_token, err1 = get_bearer_access_token_from_header(header)
-  if err or not access_token then
-    ngx.status = 401
-    ngx.say("Wrong Authorization header format. Error: " .. (err or 'unknown error'))
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    return
-  end
-  local enc_hdr, enc_payload, enc_sign = string.match(header, '^(.+)%.(.+)%.(.*)$')
-  if not enc_hdr or not enc_payload or not enc_sign then
-    ngx.status = 401
-    ngx.say("Authorization error: Wrong JWT format")
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    return
-  end
-  local payload = cjson_s.decode(openidc_base64_url_decode(enc_payload))
-  if payload then
-    if not payload['iss'] then
-      ngx.status = 401
-      ngx.say("Authorization error: No 'iss' in JWT payload")
-      ngx.exit(ngx.HTTP_UNAUTHORIZED)
-      return
-    end
-    return payload['iss']
-  end
-  ngx.status = 401
-  ngx.say("Authorization error: Wrong access token format.")
-  ngx.exit(ngx.HTTP_UNAUTHORIZED)
-  return
-end
-
 
 local function isEmpty(s)
   return s == nil or s == ''
@@ -78,55 +23,84 @@ end
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
-local USER_ID
-local ISSUER
+local unique_name = ''
+local user_access_token = ''
+local verify_res = ''
+local verify_err = ''
 
+local verify_opts = {
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  accept_none_alg = false,
+  accept_unsupported_alg = false
+}
+
+local authenticate_opts = {
+  redirect_uri = "/auth/openidc/return",
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  client_id = "<CLIENT_ID_PLACEHOLDER>",
+  client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
+  scope = "<OAUTH_SCOPE_PLACEHOLDER>",
+  token_endpoint_auth_method = "client_secret_post",
+  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  renew_access_token_on_expiry = true,
+  access_token_expires_in = 300,
+  logout_path = "/auth/logout",
+  post_logout_redirect_uri = node_host_with_protocol,
+  -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
+  revoke_tokens_on_logout = true
+}
+
+-- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
 if ngx.req.get_headers()["Authorization"] then
-  
-  local auth_header = ngx.req.get_headers()["Authorization"]
-  local identity_providers = config["identity_providers_keyed"]
-  ISSUER = get_access_token_issuer_unverified(auth_header)
-  local PROVIDER_DATA = identity_providers[ISSUER]
-
-  if not PROVIDER_DATA then
-    ngx.status = 401
-    ngx.say("Authorization error: Unsupported access token issuer (unknown identity provider)")
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-  end
-
-  local verify_opts = {
-    discovery = PROVIDER_DATA['DISCOVERY_URL'],
-    ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
-    accept_none_alg = false,
-    accept_unsupported_alg = false
-  }
-
-  local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
+  verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
   if verify_err or not verify_res then
-    ngx.status = 401
-    ngx.say("Authorization header is provided but the bearer token is invalid or expired. Error: " .. (verify_err or 'unknown error'))
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    ngx.status = 403
+    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
+    ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
-  if not isEmpty(verify_res[PROVIDER_DATA['USER_ID_CLAIM']]) then
-    USER_ID = verify_res[PROVIDER_DATA['USER_ID_CLAIM']]
-  else 
+  -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
+  local header = ngx.req.get_headers()["Authorization"]
+  local divider = header:find(' ')
+  user_access_token = header:sub(divider + 1)
+else
+  -- Else - use the openidc authenticate flow
+
+  local authenticate_res, authenticate_err
+  -- if requested_uri is the UI page (like SMD) or the API call
+  if ngx.var.is_ui == "true" then
+    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow;
+    -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
+  else
+    -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
+    if (authenticate_res == authenticate_err and authenticate_res == nil and ngx.var.allow_optional_anon_access ~= "true") then
+      ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
+      ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    end
+  end
+
+  -- in case if authentication failed (case unhandled - server error)
+  if (authenticate_err) then
     ngx.status = 500
-    user_err_msg = 'Could not authenticate the request. Unexpected format of bearer token for that issuer.'
-    ngx.log(ngx.STDERR, user_err_msg .. ' Error details: Failed to find claim \''..PROVIDER_DATA['USER_ID_CLAIM']..'\' in payload of the token.')
-    ngx.say(user_err_msg..' Please contact STRATO Vault administrator.')
+    ngx.say(authenticate_err)
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
-else
-  ngx.status = 401
-  ngx.say("No Authorization header is provided with the request.")
-  ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  if authenticate_res ~= nil and authenticate_res.access_token then
+    user_access_token = authenticate_res.access_token
+  end
 end
 
--- set request headers to forward to APIs
-ngx.req.set_header("X-USER-UNIQUE-NAME", USER_ID)
-ngx.req.set_header("X-IDENTITY-PROVIDER-ID", ISSUER)
--- removing the Authorization header FROM REQUEST to prevent downstream services from using it by mistake.
+if user_access_token ~= '' then
+  ngx.req.set_header("X-USER-UNIQUE-NAME", verify_res['sub'])
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
+-- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")
