@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeOperators        #-}
 
-module IdentityProviderAPI (
+module IdentityProvider.API (
     IdentityProviderAPI,
     GetPingIdentity,
     PutIdentity,

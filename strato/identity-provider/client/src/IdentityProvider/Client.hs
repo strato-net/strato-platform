@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module IdentityProviderClient 
+module IdentityProvider.Client 
     ( getPing,
       putIdentity,
       putIdentityExternal
@@ -9,7 +9,7 @@ module IdentityProviderClient
 import           Servant.Client
 import           Data.Proxy
 import           Data.Text
-import           IdentityProviderAPI
+import           IdentityProvider.API
 import           Blockchain.Strato.Model.Address
 
 

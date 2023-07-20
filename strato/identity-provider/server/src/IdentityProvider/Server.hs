@@ -19,22 +19,13 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Lib
-    ( AccessToken
-    , OAuthUser
-    , identityProviderApp
-    , putIdentity
-    , getUserByUUID
-    , oAuthUserToSubject
-    , hoistCoreServer
-    , putIdentityExternal
-    , server
-    , getVaultKey
-    )
+module IdentityProvider.Server
+    ( identityProviderApp
+    , IdentityProviderAPI)
 where
 
 import           UnliftIO                                hiding (Handler)
-import           Servant                                 hiding (ServerError)
+import           Servant                                 
 import           Servant.Client                          hiding (responseBody, manager)
 import           Network.HTTP.Client                     hiding (Proxy)
 import           Network.HTTP.Client.TLS
@@ -56,10 +47,10 @@ import           Bloc.Client
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.X509                          hiding (isValid)
 import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
-import qualified IdentityProviderAPI                     as IDAPI
+import qualified IdentityProvider.API                    as IDAPI
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
-import           SQLM
+-- import           SQLM
 
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
@@ -68,7 +59,7 @@ import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
 data IdentityError
-  = UserError Text
+  = IdentityError T.Text
   deriving (Show, Exception)
 
 newtype AccessToken = AccessToken {access_token :: T.Text} deriving (Show, Generic)
@@ -347,7 +338,7 @@ getVaultKey accessToken = do
         Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
         Left err -> do 
             $logInfoS "getVaultKey" $ T.pack $ "User key not found in vault: " <> show err
-            throwIO $ VaultWrapperError err
+            throwIO $ IdentityError "User key not found in vault"
 
 postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
 postVaultKey accessToken = do
@@ -358,7 +349,7 @@ postVaultKey accessToken = do
         Right a -> return a
         Left err -> do 
             $logErrorS "postVaultKey" $ T.pack $ "error posting user's pubkey: " <> show err
-            throwIO $ VaultWrapperError err
+            throwIO $ IdentityError "Error occurred while trying to create vault key for user"
 
 server :: ( MonadIO m
           , MonadLogger m
@@ -394,11 +385,11 @@ hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk mid ms rn x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk cid cs mid ms rn x
     reThrowError :: IdentityError -> ServerError
     reThrowError
       = \case
-          UserError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
+          IdentityError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
 
 runIdentityM :: MonadIO m
              => String 

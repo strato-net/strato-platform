@@ -11,8 +11,8 @@ module Options
     , flags_OAUTH_USER_ENDPOINT
     , flags_OAUTH_CLIENT_ID
     , flags_OAUTH_CLIENT_SECRET
-    , flags_OAUTH_ADMIN_USERNAME
-    , flags_OAUTH_ADMIN_PASSWORD
+    , flags_OAUTH_MASTER_CLIENT_ID
+    , flags_OAUTH_MASTER_CLIENT_SECRET
     ) where 
 
 import HFlags
@@ -29,5 +29,5 @@ defineFlag "OAUTH_USER_ENDPOINT" ("/admin/realms/myrealm/users" :: String) "Endp
 defineFlag "OAUTH_DISCOVERY_URL" ("" :: String) "OAuth discovery URL"
 defineFlag "OAUTH_CLIENT_ID" ("" :: String) "OAuth client ID"
 defineFlag "OAUTH_CLIENT_SECRET" ("" :: String) "OAuth client secret"
-defineFlag "OAUTH_ADMIN_USERNAME" ("admin" :: String) "Admin password for connecting to OAuth provider's API"
-defineFlag "OAUTH_ADMIN_PASSWORD" ("admin" :: String) "Admin password for connecting to OAuth provider's API"
+defineFlag "OAUTH_MASTER_CLIENT_ID" ("admin" :: String) "OAuth client ID for master realm"
+defineFlag "OAUTH_MASTER_CLIENT_SECRET" ("admin" :: String) "OAuth client secret for master realm"

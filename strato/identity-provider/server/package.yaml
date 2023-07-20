@@ -21,7 +21,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - common-log
-- slipstream # TODO: switch from slipstream dep to strato-api
 
 
 library:
@@ -34,6 +33,7 @@ library:
   - blockapps-identity-provider-api
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
+  - bytestring
   - containers
   - core-api2
   - evm-solidity

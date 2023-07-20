@@ -12,7 +12,7 @@ import qualified Data.ByteString as B
 import           HFlags
 -- import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Network.Wai.Handler.Warp (run)
-import           Lib
+import           IdentityProvider.Server
 import           Options
 
 main :: IO ()
@@ -37,4 +37,4 @@ main = do
             Right privk -> return privk
 
         putStrLn "Initializing identity server..."
-        run flags_port $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_realmName
+        run flags_port $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_MASTER_CLIENT_ID flags_OAUTH_MASTER_CLIENT_SECRET flags_realmName

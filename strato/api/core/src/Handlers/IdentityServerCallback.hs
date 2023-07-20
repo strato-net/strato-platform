@@ -29,7 +29,7 @@ import           SQLM
 
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
-import           IdentityProviderClient
+import           IdentityProvider.Client
 
 type PostRedirect (code :: Nat) loc = Verb 'GET code '[JSON] (Headers '[Header "Location" loc] Address)
 
