@@ -15,10 +15,10 @@
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module Lib
     ( AccessToken
-    , getAccessToken
     , OAuthUser
     , identityProviderApp
     , putIdentity
@@ -27,37 +27,41 @@ module Lib
     , hoistCoreServer
     , putIdentityExternal
     , server
+    , getVaultKey
     )
 where
 
 import           UnliftIO                                hiding (Handler)
-import           Servant
+import           Servant                                 hiding (ServerError)
 import           Servant.Client                          hiding (responseBody, manager)
 import           Network.HTTP.Client                     hiding (Proxy)
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
+import           Network.HTTP.Types.Status
 
 import           Data.Aeson
 import           Data.ByteString.Base64
 import qualified Data.ByteString.UTF8 as B                    (fromString)
 import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
-import           Data.Text as T                          (Text, unpack, pack, take, replace)
+import qualified Data.Text as T                          (Text, unpack, pack, take, replace, null)
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
 
 import           Bloc.API.Transaction
 import           Bloc.Client
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.X509
+import           BlockApps.X509                          hiding (isValid)
 import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
+import qualified IdentityProviderAPI                     as IDAPI
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
-import qualified IdentityProviderAPI as IDAPI
+import           SQLM
 
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
 import           SelectAccessible                () --TODO: fix this import because it comes from slipstream (see note in package.yml)
@@ -66,21 +70,36 @@ newtype AccessToken = AccessToken {access_token :: T.Text} deriving (Show, Gener
 instance FromJSON AccessToken
 instance ToJSON AccessToken
 
-getAccessToken :: ( MonadIO m
-                  , Accessible MasterClientId m
-                  , Accessible MasterClientSecret m
-                  ) => m (Maybe AccessToken)
-getAccessToken = do
+getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
+getAccessToken id' sec realm = do
     manager <- liftIO $ newManager tlsManagerSettings
-    MasterClientId mcid <- access Proxy
-    MasterClientSecret msec <- access Proxy
-    let creds64 = encodeBase64' . B.fromString $ mcid <> ":" <> msec
-    templateRequest <- liftIO $ parseRequest "POST https://keycloak.blockapps.net/auth/realms/master/protocol/openid-connect/token" -- todo: make these into flags
-    let rBody = RequestBodyLBS "grant_type=password"
+    let creds64 = encodeBase64' . B.fromString $ id' <> ":" <> sec
+    templateRequest <- liftIO . parseRequest $ "POST https://keycloak.blockapps.net/auth/realms/" <> realm <> "/protocol/openid-connect/token"
+    let rBody = RequestBodyLBS "grant_type=client_credentials"
         rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
         request = templateRequest{requestHeaders = rHead, requestBody = rBody}
     response <- liftIO $ httpLbs request manager
     return $ decode $ responseBody response
+
+getMasterAccessToken :: ( MonadIO m
+                        , Accessible MasterClientId m
+                        , Accessible MasterClientSecret m
+                        ) => m (Maybe AccessToken)
+getMasterAccessToken = do
+    MasterClientId mcid <- access Proxy
+    MasterClientSecret msec <- access Proxy
+    getAccessToken mcid msec "master"
+
+getRealmAccessToken :: ( MonadIO m 
+                       , Accessible ClientId m 
+                       , Accessible ClientSecret m
+                       , Accessible RealmName m
+                       ) => m (Maybe AccessToken)
+getRealmAccessToken = do 
+    ClientId cid <- access Proxy 
+    ClientSecret csec <- access Proxy
+    RealmName realm <- access Proxy
+    getAccessToken cid csec realm
 
 newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [T.Text]} deriving (Show, Generic)
 instance FromJSON OAuthUserAttributes
@@ -101,7 +120,7 @@ oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
     in Subject {
     subCommonName =  firstN <> " " <> lastN,
     subOrg = case attr of
-        Just (OAuthUserAttributes (Just (org:_))) -> T.unpack org
+        Just (OAuthUserAttributes (Just (org:_))) | not (T.null org) -> T.unpack org
         _ -> head firstN : lastN ++ T.unpack (T.take 8 id')
     ,
     subUnit = Nothing,
@@ -110,19 +129,23 @@ oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
 }
 
 getUserByUUID :: ( MonadIO m
+                 , MonadLogger m
                  , Accessible RealmName m
                  ) => AccessToken -> T.Text -> m (Either String OAuthUser)
 getUserByUUID token uuid = do
     manager <- liftIO $ newManager tlsManagerSettings
     RealmName realm <- access Proxy
     let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> T.pack realm <> "/users/" <> uuid
+    $logInfoS "getUserByUUID" $ "url is " <> url
     templateRequest <- liftIO $ parseRequest $ T.unpack url
     let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
         request = templateRequest{requestHeaders=rHead}
     response <- liftIO $ httpLbs request manager
+    $logInfoS "getUserByUUIDResponse" $ T.pack $ show response
     return $ eitherDecode $ responseBody response
 
-
+newtype ClientId = ClientId String 
+newtype ClientSecret = ClientSecret String
 newtype MasterClientId = MasterClientId String 
 newtype MasterClientSecret = MasterClientSecret String
 newtype RealmName = RealmName String
@@ -131,6 +154,8 @@ data IdentityServerData = IdentityServerData
     , issuerCert         :: X509Certificate -- the signing cert
     , issuerPrivKey      :: PrivateKey      -- the signing private key
     , blocAPIUrl         :: BaseUrl -- strato node where will register cert
+    , clientId           :: ClientId
+    , clientSecret       :: ClientSecret
     , masterClientId     :: MasterClientId
     , masterClientSecret :: MasterClientSecret
     , realmName          :: RealmName
@@ -143,6 +168,10 @@ instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityS
     access _ = asks issuerPrivKey
 instance {-# OVERLAPPING #-} Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where 
     access _ = asks blocAPIUrl
+instance {-# OVERLAPPING #-} Monad m => Accessible ClientId (ReaderT IdentityServerData m) where 
+    access _ = asks clientId
+instance {-# OVERLAPPING #-} Monad m => Accessible ClientSecret (ReaderT IdentityServerData m) where 
+    access _ = asks clientSecret
 instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where 
     access _ = asks masterClientId
 instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where 
@@ -160,6 +189,8 @@ putIdentity :: ( MonadIO m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
                , Accessible BaseUrl m 
+               , Accessible ClientId m
+               , Accessible ClientSecret m
                , Accessible MasterClientId m
                , Accessible MasterClientSecret m
                , Accessible RealmName m
@@ -168,40 +199,21 @@ putIdentity accessToken uuid = do
     $logInfoS "putIdentity" "someone called PUT /identity"
     -- first check if a user exists in vault
     getVaultKey accessToken >>= \case
-        Just a -> return a
+        Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
+            hasCert <- certInCirrus accessToken a
+            unless hasCert $ createAndRegisterCert uuid k
+            return a
         Nothing -> do -- no vault key, so make key and register cert
-            mAddressNKey <- postVaultKey accessToken
-            case mAddressNKey of 
-                Nothing -> do
-                    $logErrorS "putIdentity" $ "error occurred while trying to create vault key for user with uuid " <> uuid
-                    -- TODO: should throw error in nothing case, not return dummy val
-                    return $ Address 0x509
-                Just (AddressAndKey a k) -> do
-                    mToken <- getAccessToken
-                    case mToken of 
-                        Nothing -> do
-                            error "uh oh! We couldn't get our access token" -- TODO: better error handling than this
-                        Just token -> do
-                            eUser <- getUserByUUID token uuid
-                            case eUser of
-                                Left err -> $logErrorS "putIdentity" $ "Error occurred while trying to get user with uuid " <> uuid <> ": " <> T.pack err
-                                Right user -> do 
-                                    i <- access (Proxy @Issuer) 
-                                    c <- access (Proxy @X509Certificate)
-                                    iK <- access (Proxy @PrivateKey)
-                                    let signWIssuerPrivKey bs = return $ signMsg iK bs
-                                    mNewCert <- makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
-                                    case mNewCert of 
-                                        Just newCert -> registerCert newCert accessToken
-                                        Nothing -> $logErrorS "putIdentity" "Error signing new cert"
-                    return a
+            AddressAndKey a k <- postVaultKey accessToken
+            createAndRegisterCert uuid k
+            return a
 
 -- This is just a dummy function
 -- This never gets called on the sevrvant backend
 -- This is created for the client binding
 -- which is used within the strato node to form a request
--- which Identity server's nginx transforms
--- and calls putIdentity instead
+-- which Identity server's nginx transforms the headers
+-- which patterns matches with putIdentity
 putIdentityExternal :: ( MonadIO m
                , MonadLogger m
                , HasVault m
@@ -209,6 +221,8 @@ putIdentityExternal :: ( MonadIO m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
                , Accessible BaseUrl m 
+               , Accessible ClientId m
+               , Accessible ClientSecret m
                , Accessible MasterClientId m
                , Accessible MasterClientSecret m
                , Accessible RealmName m
@@ -216,8 +230,76 @@ putIdentityExternal :: ( MonadIO m
 putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) ""
 
 
-registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> T.Text -> m ()
-registerCert cert accessToken = do 
+blocEndpoint :: String
+blocEndpoint = "bloc/v2.2"
+
+data CertificateInCirrus = CertificateInCirrus{
+    -- commonName :: Text,
+    -- organization :: Text,
+    isValid :: Bool
+} deriving (Show, Generic)
+instance FromJSON CertificateInCirrus
+instance ToJSON CertificateInCirrus
+
+certInCirrus :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => T.Text -> Address -> m Bool 
+certInCirrus token a = do 
+    url <- access (Proxy @BaseUrl)
+    let cirrusUrl = "cirrus/search/Certificate?userAddress=eq." <> show a
+        url' = T.unpack $ T.replace (T.pack blocEndpoint) (T.pack cirrusUrl) (T.pack $ showBaseUrl url)
+    mgr <- liftIO $ case baseUrlScheme url of
+        Http -> newManager defaultManagerSettings
+        Https -> newManager tlsManagerSettings
+    templateRequest <- liftIO $ parseRequest url'
+    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+        request = templateRequest{requestHeaders = rHead}
+    response <- liftIO $ httpLbs request mgr
+    let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
+    case mCerts of 
+        Just certs -> do
+            $logInfoS "certInCirrus" $ T.pack $ "Cirrus response was: " <> show certs
+            return . not $ null certs -- maybe can also check if cert is valid and matches user attributes
+        Nothing -> error "Unexpected response from cirrus query. This should never happen"
+
+createAndRegisterCert :: ( MonadIO m
+                         , MonadLogger m
+                         , Accessible Issuer m
+                         , Accessible X509Certificate m
+                         , Accessible PrivateKey m
+                         , Accessible ClientId m 
+                         , Accessible ClientSecret m 
+                         , Accessible MasterClientId m 
+                         , Accessible MasterClientSecret m 
+                         , Accessible BaseUrl m
+                         , Accessible RealmName m
+                         ) => T.Text -> PublicKey -> m ()
+createAndRegisterCert uuid k = do 
+    getMasterAccessToken >>= \case 
+        Nothing -> error "uh oh! We couldn't get an access token for the master realm" -- TODO: better error handling than this
+        Just masterToken -> do
+            getUserByUUID masterToken uuid >>= \case
+                Left err -> $logErrorS "createAndRegisterCert" $ "Error occurred while trying to get information on user with uuid " <> uuid <> ": " <> T.pack err
+                Right user -> do             
+                    createNewCert user k >>= \case 
+                        Just newCert -> do
+                            getRealmAccessToken >>= \case 
+                                Nothing -> error "uh oh! We couldn't an access token for our realm" -- TODO: better error handling than this
+                                Just realmToken -> registerCert newCert realmToken
+                        Nothing -> $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
+
+createNewCert :: ( MonadIO m
+                 , Accessible Issuer m
+                 , Accessible X509Certificate m
+                 , Accessible PrivateKey m
+                 ) => OAuthUser -> PublicKey -> m (Maybe X509Certificate)
+createNewCert user k = do 
+    i <- access (Proxy @Issuer) 
+    c <- access (Proxy @X509Certificate)
+    iK <- access (Proxy @PrivateKey)
+    let signWIssuerPrivKey bs = return $ signMsg iK bs
+    makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
+
+registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> AccessToken -> m ()
+registerCert cert token = do 
     url <- access (Proxy @BaseUrl)
     mgr <- liftIO $ case baseUrlScheme url of
         Http -> newManager defaultManagerSettings
@@ -233,31 +315,33 @@ registerCert cert accessToken = do
             functionpayloadMetadata = Nothing
         }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> accessToken) Nothing True txRequest) clientEnv
+    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest) clientEnv
     $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse 
 
--- note to self: what if error is serious?
-getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe Address)
+getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do 
     VaultData url mgr <- access Proxy   
     eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
     $logInfoS "getVaultKey" $ T.pack $ "response is " <> show eAddressNKey
     case eAddressNKey of 
-        Right (AddressAndKey a _) -> return $ Just a
+        Right a -> return $ Just a
+        -- only errors from GET /key are user doesn't exist (400) or incorrect pw (503)
+        -- beware if the error behavior for /key changes
+        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
         Left err -> do 
             $logErrorS "getVaultKey" $ T.pack $ "error fetching user's pubkey: " <> show err
-            return Nothing
+            throwIO $ VaultWrapperError err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
+postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
 postVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)
     $logInfoS "postVaultKey" $ T.pack $ "response is " <> show eAddressNKey
     case eAddressNKey of 
-        Right a -> return $ Just a
+        Right a -> return a
         Left err -> do 
             $logErrorS "postVaultKey" $ T.pack $ "error posting user's pubkey: " <> show err
-            return Nothing
+            throwIO $ VaultWrapperError err
 
 server :: ( MonadIO m
           , MonadLogger m
@@ -266,11 +350,13 @@ server :: ( MonadIO m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
           , Accessible BaseUrl m
+          , Accessible ClientId m
+          , Accessible ClientSecret m
           , Accessible MasterClientId m
           , Accessible MasterClientSecret m
           , Accessible RealmName m
           ) => ServerT IDAPI.IdentityProviderAPI m
-server =    getPingIdentity :<|> putIdentity :<|> putIdentityExternal
+server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer :: String 
                 -> String 
@@ -280,13 +366,19 @@ hoistCoreServer :: String
                 -> String
                 -> String
                 -> String
+                -> String
+                -> String
                 -> Server IDAPI.IdentityProviderAPI
-hoistCoreServer nodeurl vaulturl iss cert privk mid ms rn = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     -- convertErrors :: LoggingT IO a -> Handler a
-    convertErrors r x = Handler $ liftIO $ r x
+    convertErrors r x = Handler $ do 
+        y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+        case y of 
+            Right a -> pure a 
+            Left e -> throwE $ apiErrorToServantErr e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk mid ms rn x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk cid cs mid ms rn x
 
 runIdentityM :: MonadIO m
              => String 
@@ -296,12 +388,15 @@ runIdentityM :: MonadIO m
              -> String
              -> String
              -> String
+             -> String
+             -> String
              -> ReaderT IdentityServerData m a -> m a
-runIdentityM nodeurl iss cert privk mid ms rn x = do 
+runIdentityM nodeurl iss cert privk cid cs mid ms rn x = do 
     url <- liftIO $ parseBaseUrl nodeurl
     let path' = baseUrlPath url
-    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> "bloc/v2.2" -- surely there is a better way to do this?
-    runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (MasterClientId mid) (MasterClientSecret ms) (RealmName rn)
+    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> blocEndpoint -- surely there is a better way to do this?
+    runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (ClientId cid) (ClientSecret cs) (MasterClientId mid) (MasterClientSecret ms) (RealmName rn)
+
 
 identityProviderApp :: String 
                     -> String 
@@ -311,5 +406,7 @@ identityProviderApp :: String
                     -> String
                     -> String
                     -> String
+                    -> String
+                    -> String
                     -> Application
-identityProviderApp nurl vurl iss cert pk mid ms rn = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk mid ms rn
+identityProviderApp nurl vurl iss cert pk cid cs mid ms rn = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk cid cs mid ms rn
