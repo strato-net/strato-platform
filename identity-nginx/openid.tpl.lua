@@ -87,6 +87,9 @@ if ngx.req.get_headers()["Authorization"] then
   local identity_providers = config["identity_providers_keyed"]
   ISSUER = get_access_token_issuer_unverified(auth_header)
   local PROVIDER_DATA = identity_providers[ISSUER]
+  
+  local divider = auth_header:find(' ')
+  user_access_token = auth_header:sub(divider + 1)
 
   if not PROVIDER_DATA then
     ngx.status = 401
@@ -125,8 +128,13 @@ else
   ngx.exit(ngx.HTTP_UNAUTHORIZED)
 end
 
+ngx.req.clear_header("X-USER-ACCESS-TOKEN")
 -- set request headers to forward to APIs
+if user_access_token ~= '' then
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
+
 ngx.req.set_header("X-USER-UNIQUE-NAME", USER_ID)
-ngx.req.set_header("X-IDENTITY-PROVIDER-ID", ISSUER)
+-- ngx.req.set_header("X-IDENTITY-PROVIDER-ID", ISSUER)
 -- removing the Authorization header FROM REQUEST to prevent downstream services from using it by mistake.
 ngx.req.clear_header("Authorization")
