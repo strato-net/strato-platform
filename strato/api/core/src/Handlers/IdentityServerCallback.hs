@@ -13,7 +13,7 @@
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS -fno-warn-orphans       #-}
 
-module Handlers.IdentityServer (API, server, getCertAddress) where
+module Handlers.IdentityServerCallback (API, server) where
 
 
 import           Data.Text
@@ -42,7 +42,7 @@ redirect :: (ToHttpApiData loc, MonadIO m, MonadLogger m, HasIdentity m)
     -> Text
     ->  m (Headers '[Header "Location" loc] Address)
 redirect a accessToken = do
-  address <- getCertAddress accessToken
+  address <- getUserAddress accessToken
   return $ (addHeader a address)
 
 server :: (MonadIO m, MonadLogger m, HasIdentity m) => ServerT API m
@@ -57,5 +57,5 @@ identitytWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)-- Todo make a better error statement
   either (blocError . IdentitytWrapperError) return resultEither
 
-getCertAddress ::  (MonadIO m, MonadLogger m, HasIdentity m) => Text -> m Address
-getCertAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) 
+getUserAddress ::  (MonadIO m, MonadLogger m, HasIdentity m) => Text -> m Address
+getUserAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) 

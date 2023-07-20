@@ -11,6 +11,8 @@ import           Control.Monad.Change.Modify
 
 import           Network.HTTP.Client
 
+import           Network.HTTP.Client.TLS
+
 import           Servant.Client
 
 data VaultData =
@@ -43,8 +45,11 @@ type HasIdentity m = Accessible IdentityData m
 
 runIdentitytM :: MonadIO m => String -> IdentityM m a -> m a
 runIdentitytM url f = do
-  mgr <- liftIO $ newManager defaultManagerSettings
   identityUrl <- liftIO $ parseBaseUrl url
+  mgr <- liftIO $ case baseUrlScheme identityUrl of
+        Http -> newManager defaultManagerSettings
+        Https -> newManager tlsManagerSettings 
+  
 
   runReaderT f $ IdentityData identityUrl mgr
 

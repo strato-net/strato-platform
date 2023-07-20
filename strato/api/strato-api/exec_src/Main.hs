@@ -73,7 +73,7 @@ import qualified Handlers.Block                  as Block
 import qualified Handlers.Chain                  as Chain
 import qualified Handlers.Coinbase               as Coinbase
 import qualified Handlers.Faucet                 as Faucet
-import qualified Handlers.IdentityServer         as Identity
+import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Log                    as Log
 import qualified Handlers.Metadata               as Metadata
 import qualified Handlers.Peers                  as Peers
