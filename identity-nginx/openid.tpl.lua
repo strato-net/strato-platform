@@ -8,6 +8,8 @@ local config = require("cfg-loader")
 
 assert(type(config) == "table", "Config should be in the expected format.")
 
+local user_access_token = ''
+
 local function get_bearer_access_token_from_header(header)
   local err
   local divider = header:find(' ')
@@ -128,8 +130,11 @@ else
   ngx.exit(ngx.HTTP_UNAUTHORIZED)
 end
 
-ngx.req.clear_header("X-USER-ACCESS-TOKEN")
--- set request headers to forward to APIs
+
+-- removing this if the client binding from strato node is calling with this header
+if if ngx.req.get_headers()["X-USER-ACCESS-TOKEN"] then
+  ngx.req.clear_header("X-USER-ACCESS-TOKEN")
+end
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 end
