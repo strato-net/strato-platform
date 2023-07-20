@@ -149,14 +149,6 @@ instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT I
 instance {-# OVERLAPPING #-} Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
     access _ = asks realmName
 
--- type PutIdentity = "identity"
---                 :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
---                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
---                 :> Put '[JSON] Address --should return user address
--- type GetPingIdentity = "_ping" :> Get '[JSON] Int
-
--- type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
-
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
