@@ -73,6 +73,7 @@ import qualified Handlers.Block                  as Block
 import qualified Handlers.Chain                  as Chain
 import qualified Handlers.Coinbase               as Coinbase
 import qualified Handlers.Faucet                 as Faucet
+import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Log                    as Log
 import qualified Handlers.Metadata               as Metadata
 import qualified Handlers.Peers                  as Peers
@@ -105,11 +106,19 @@ instance Selectable Account Contract m => Selectable Account Contract (ReaderT B
 instance Selectable Account Contract m => Selectable Account Contract (VaultM m) where
   select p = lift . select p
 
+instance Selectable Account Contract m => Selectable Account Contract (IdentityM m) where
+  select p = lift . select p
+
+
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
+
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
+  select p = lift . select p
+
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
@@ -133,6 +142,9 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
 instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
   select p = lift . select p
 
+instance Selectable Account AddressState m => Selectable Account AddressState (IdentityM m) where
+  select p = lift . select p
+
 instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -147,6 +159,7 @@ type CoreAPI =
     :<|> Chain.API
     :<|> Coinbase.API
     :<|> Faucet.API
+    :<|> Identity.API
     :<|> Log.API
     :<|> Metadata.API
     :<|> Peers.API
@@ -163,7 +176,8 @@ type CoreAPI =
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
 coreServer :: ( MonadLogger m
-              , HasSQL m
+               , HasSQL m
+              , Accessible IdentityData m
               , Accessible VaultData m
               , Selectable Keccak256 SourceMap m
               )
@@ -176,6 +190,7 @@ coreServer = Account.server
   :<|> Chain.server
   :<|> Coinbase.server
   :<|> Faucet.server
+  :<|> Identity.server
   :<|> Log.server
   :<|> Metadata.server
   :<|> Peers.server
@@ -191,6 +206,7 @@ coreServer = Account.server
 fullServer :: ( MonadLogger m
               , HasSQL m
               , HasBlocEnv m
+              , HasIdentity m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
@@ -214,7 +230,8 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
       runLoggingT .
         runSQLM .
         flip runReaderT blocEnv .
-        runVaultM "http://localhost:8013/strato/v2.3" $ f
+        runVaultM "http://localhost:8013/strato/v2.3" . 
+        runIdentitytM flags_indetityServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy

@@ -25,6 +25,7 @@ module Lib
     , getUserByUUID
     , oAuthUserToSubject
     , hoistCoreServer
+    , putIdentityExternal
     , server
     , getVaultKey
     )
@@ -52,6 +53,7 @@ import           Bloc.Client
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.X509                          hiding (isValid)
 import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
+import qualified IdentityProviderAPI                     as IDAPI
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
 import           SQLM
@@ -177,14 +179,6 @@ instance {-# OVERLAPPING #-} Monad m => Accessible MasterClientSecret (ReaderT I
 instance {-# OVERLAPPING #-} Monad m => Accessible RealmName (ReaderT IdentityServerData m) where 
     access _ = asks realmName
 
-type PutIdentity = "identity"
-                :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
-                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
-                :> Put '[JSON] Address --should return user address
-type GetPingIdentity = "_ping" :> Get '[JSON] Int
-
-type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity 
-
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
@@ -213,6 +207,28 @@ putIdentity accessToken uuid = do
             AddressAndKey a k <- postVaultKey accessToken
             createAndRegisterCert uuid k
             return a
+
+-- This is just a dummy function
+-- This never gets called on the sevrvant backend
+-- This is created for the client binding
+-- which is used within the strato node to form a request
+-- which Identity server's nginx transforms the headers
+-- which patterns matches with putIdentity
+putIdentityExternal :: ( MonadIO m
+               , MonadLogger m
+               , HasVault m
+               , Accessible Issuer m
+               , Accessible X509Certificate m
+               , Accessible PrivateKey m
+               , Accessible BaseUrl m 
+               , Accessible ClientId m
+               , Accessible ClientSecret m
+               , Accessible MasterClientId m
+               , Accessible MasterClientSecret m
+               , Accessible RealmName m
+               ) => T.Text -> m Address
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) ""
+
 
 blocEndpoint :: String
 blocEndpoint = "bloc/v2.2"
@@ -339,8 +355,8 @@ server :: ( MonadIO m
           , Accessible MasterClientId m
           , Accessible MasterClientSecret m
           , Accessible RealmName m
-          ) => ServerT IdentityProviderAPI m
-server = getPingIdentity :<|> putIdentity
+          ) => ServerT IDAPI.IdentityProviderAPI m
+server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer :: String 
                 -> String 
@@ -352,8 +368,8 @@ hoistCoreServer :: String
                 -> String
                 -> String
                 -> String
-                -> Server IdentityProviderAPI
-hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (Proxy :: Proxy IdentityProviderAPI) (convertErrors runM') server
+                -> Server IDAPI.IdentityProviderAPI
+hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms rn = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     -- convertErrors :: LoggingT IO a -> Handler a
     convertErrors r x = Handler $ do 
@@ -381,6 +397,7 @@ runIdentityM nodeurl iss cert privk cid cs mid ms rn x = do
     let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> blocEndpoint -- surely there is a better way to do this?
     runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (ClientId cid) (ClientSecret cs) (MasterClientId mid) (MasterClientSecret ms) (RealmName rn)
 
+
 identityProviderApp :: String 
                     -> String 
                     -> Issuer 
@@ -392,4 +409,4 @@ identityProviderApp :: String
                     -> String
                     -> String
                     -> Application
-identityProviderApp nurl vurl iss cert pk cid cs mid ms rn = serve (Proxy :: Proxy IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk cid cs mid ms rn
+identityProviderApp nurl vurl iss cert pk cid cs mid ms rn = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk cid cs mid ms rn

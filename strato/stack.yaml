@@ -30,7 +30,9 @@ packages:
 - core/vm-runner/
 - core/vm-tools/
 
-- identity-provider/
+- identity-provider/api
+- identity-provider/server
+- identity-provider/client
 
 - indexer/slipstream
 - indexer/strato-index

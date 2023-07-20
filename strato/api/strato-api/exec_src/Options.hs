@@ -22,3 +22,5 @@ defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhanceme
 defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions an account can make"
 defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
+defineFlag "indetityServerUrl" ("http://localhost:8023" :: String) "The URL of the identity server"
+defineFlag "marketPlaceUrl" ("http://localhost:8080" :: String) "The URL of the marketplace"
