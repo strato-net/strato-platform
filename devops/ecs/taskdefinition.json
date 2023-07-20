@@ -212,7 +212,7 @@
                 },
                 {
                     "name": "postgres_slipstream_db",
-                    "value": "cirrus"
+                    "value": "strato"
                 },
                 {
                     "name": "postgres_user",
@@ -298,7 +298,7 @@
                 },
                 {
                     "name": "PG_ENV_POSTGRES_DB",
-                    "value": "cirrus"
+                    "value": "strato"
                 },
                 {
                     "name": "PG_ENV_POSTGRES_HOST",

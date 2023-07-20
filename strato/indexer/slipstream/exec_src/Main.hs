@@ -85,10 +85,9 @@ main = do
                       contract (id serial primary key, "codeHash" text, contract text, abi text)|]
     migrateCirrus [r|alter table contract add column if not exists "chainId" text|]
 
-    -- There are three permanent connections/pools to postgres:
+    -- There are two permanent connections/pools to postgres:
     -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background
     -- 2. `conn` connects slipstream to the cirrus database
-    -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
 
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)

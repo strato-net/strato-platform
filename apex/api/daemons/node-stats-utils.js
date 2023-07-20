@@ -19,7 +19,7 @@ class StatsDaemon {
   async init() {
     const pgClientVault = new Sequelize(`${sequelizeConnUriPrefix}/oauth`, {logging: (dbconfig.logging ? dbconfig.logging : undefined)})
     const [[ethNameResult], [nodeAddressResult]] = await Promise.all([
-      pgClientVault.query("SELECT datname FROM pg_database WHERE datname LIKE '%eth_%'"),
+      pgClientVault.query("SELECT datname FROM pg_database WHERE datname = 'strato'"),
       pgClientVault.query("SELECT address FROM users WHERE x_user_unique_name = 'nodekey'")
     ])
     await pgClientVault.close()

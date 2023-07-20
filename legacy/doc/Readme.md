@@ -74,7 +74,7 @@ Life of a Transaction (Zoomed in)
 ---------------------------------
 The strato container in someways operates like a collection of microservices
 itself.  There is some redis based communication from the VM to P2P, and shared
-tables as well in the eth_* database. Two global configuration files determine
+tables as well in the strato database. Two global configuration files determine
 connection parameters to other services, node identity, and topic names
 (/var/lib/strato/.ethereumH/{ethconf.yaml,topics.yaml}).  Almost always
 however, interprocess communication within the container is mediated by kafka.

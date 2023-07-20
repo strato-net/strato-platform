@@ -178,7 +178,7 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
-    - postgres_slipstream_db=cirrus
+    - postgres_slipstream_db=strato
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
@@ -228,7 +228,7 @@ services:
     - postgres
     environment:
     - blocHost=${blocHost:-strato:3000}
-    - PG_ENV_POSTGRES_DB=cirrus
+    - PG_ENV_POSTGRES_DB=strato
     - PG_ENV_POSTGRES_HOST=postgres
     - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres

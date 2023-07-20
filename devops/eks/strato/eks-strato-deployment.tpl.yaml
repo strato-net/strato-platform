@@ -83,7 +83,7 @@ spec:
         - name: postgres_port
           value: "5432"
         - name: postgres_slipstream_db
-          value: "cirrus"
+          value: "strato"
         - name: postgres_user
           value: "postgres"
         - name: redisHost
@@ -113,7 +113,7 @@ spec:
         - name: blocHost
           value: "localhost:3000"
         - name: PG_ENV_POSTGRES_DB
-          value: "cirrus"
+          value: "strato"
         - name: PG_ENV_POSTGRES_HOST
           value: "localhost"
         - name: PG_ENV_POSTGRES_PASSWORD

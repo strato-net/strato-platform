@@ -27,7 +27,7 @@ defaultSqlConfig =
       password = "api",
       host = "postgres",
       port = 5432,
-      database = "eth",
+      database = "strato",
       poolsize = 10
     }
 
@@ -184,15 +184,11 @@ genEthConf = do
                     }
                 }
   let uniqueString = C8.unpack . B16.encode $ bytes
-      pgCfg = sqlConfig cfg
-      db = database pgCfg
-      db' = db ++ "_" ++ uniqueString
-      pgCfg'' = pgCfg { database = db' }
       kafkaCfg = defaultKafkaConfig { kafkaHost = kafkaHostFlag }
 
 
   return cfg {
-                   sqlConfig = pgCfg'',
+                   sqlConfig = sqlConfig cfg,
                    kafkaConfig = kafkaCfg,
                    ethUniqueId = defaultEthUniqueId {
                      peerId = uniqueString

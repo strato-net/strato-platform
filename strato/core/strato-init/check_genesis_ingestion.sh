@@ -11,7 +11,7 @@ function check_timeout() {
 
 function query() {
   docker exec strato-postgres-1 \
-    psql -d cirrus -U postgres -h localhost -t -A '--field-separator=#' -c "${1}"
+    psql -d strato -U postgres -h localhost -t -A '--field-separator=#' -c "${1}"
 }
 
 function compare_strings() {

@@ -2,7 +2,7 @@
   "development": {
     "username": "postgres",
     "password": "api",
-    "database": "bloc22",
+    "database": "strato",
     "host": "localhost",
     "port": "15433",
     "dialect": "postgres"
@@ -10,7 +10,7 @@
   "test": {
     "username": "postgres",
     "password": "api",
-    "database": "bloc22",
+    "database": "strato",
     "host": "postgres",
     "port": "5432",
     "dialect": "postgres"
@@ -18,7 +18,7 @@
   "production": {
     "username": "__bloc_postgres_user__",
     "password": "__bloc_postgres_password__",
-    "database": "bloc22",
+    "database": "strato",
     "host": "__bloc_postgres_host__",
     "port": "__bloc_postgres_port__",
     "dialect": "postgres",

@@ -231,7 +231,7 @@ pipeline {
                 script {
                     int numOfPrivChains = sh(
                         returnStdout: true,
-                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d `sudo docker exec strato-postgres-1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
+                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d strato -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
                     echo "${numOfPrivChains}"
                     if(numOfPrivChains == 0) {
@@ -264,7 +264,7 @@ pipeline {
 
                     def privChainId = sh(
                         returnStdout: true,
-                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d `sudo docker exec strato-postgres-1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select chain_id from chain_info_ref limit 1;\""
+                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d strato -t -c \"select chain_id from chain_info_ref limit 1;\""
                     ).trim()
 
                     sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
@@ -296,7 +296,7 @@ pipeline {
                 script {
                     int numOfPrivChains = sh(
                         returnStdout: true,
-                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d `sudo docker exec strato-postgres-1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
+                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d strato -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
                     echo "${numOfPrivChains}"
                     if(numOfPrivChains == 0) {
@@ -381,7 +381,7 @@ pipeline {
                 script{
                     int numOfPrivChains = sh(
                         returnStdout: true,
-                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d `sudo docker exec strato-postgres-1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
+                        script: "sudo docker exec strato-postgres-1 psql -U postgres -d strato -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
                     echo "${numOfPrivChains}"
                     if(numOfPrivChains != 1) {
