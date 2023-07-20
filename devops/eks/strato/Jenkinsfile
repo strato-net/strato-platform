@@ -3,12 +3,19 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY')
+        KUBECTL='home/ubuntu/bin/kubectl'
+        AWS_CONFIG='AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=us-east-1'
     }
     stages {
         stage('Stage 1') {
             steps {
-                sh 'AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY aws eks update-kubeconfig --name ba-dev3 --region us-east-1'
-                sh 'AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION="us-east-1" /home/ubuntu/bin/kubectl get pods -n strato-platform'
+                sh '$AWS_CONFIG aws eks update-kubeconfig --name ba-dev3 --region us-east-1'
+                sh '$AWS_CONFIG $KUBECTL get pods -n strato-platform'
+                sh 'pwd'
+                sh 'cd $WORKSPACE/devops/eks/strato'
+                sh 'ls -l'
+                //sh '$KUBECTL delete -f strato-platform-manifest.yaml'
+                //sh '$KUBECTL apply -f strato-platform-manifest.yaml'
             }
         }
     }
