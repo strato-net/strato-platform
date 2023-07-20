@@ -27,7 +27,7 @@ type PutIdentity = "identity"
 
 type PutIdentityExternal = "identity" -- only to be used for external api client bindings
                 :> Header' '[Required, Strict]  "Authorization" T.Text
-                :> PutIdentityCommon
+                :> Put '[JSON] Address 
 
 
 type IdentityProviderAPI =  GetPingIdentity :<|> PutIdentity :<|> PutIdentityExternal

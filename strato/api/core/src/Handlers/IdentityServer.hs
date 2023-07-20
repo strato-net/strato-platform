@@ -58,4 +58,4 @@ identitytWrapper client' = do
   either (blocError . IdentitytWrapperError) return resultEither
 
 getCertAddress ::  (MonadIO m, MonadLogger m, HasIdentity m) => Text -> m Address
-getCertAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) "" -- I have a feeling Nikita will not approve of this and he is right
+getCertAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) 

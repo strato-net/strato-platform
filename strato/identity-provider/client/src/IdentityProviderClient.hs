@@ -19,5 +19,5 @@ getPing = client (Proxy @GetPingIdentity)
 putIdentity :: Text -> Text -> ClientM Address
 putIdentity = client (Proxy @PutIdentity)
 
-putIdentityExternal :: Text -> Text -> ClientM Address
+putIdentityExternal :: Text -> ClientM Address
 putIdentityExternal = client (Proxy @PutIdentityExternal)

@@ -196,6 +196,12 @@ putIdentity accessToken uuid = do
                                         Nothing -> $logErrorS "putIdentity" "Error signing new cert"
                     return a
 
+-- This is just a dummy function
+-- This never gets called on the sevrvant backend
+-- This is created for the client binding
+-- which is used within the strato node to form a request
+-- which Identity server's nginx transforms
+-- and calls putIdentity instead
 putIdentityExternal :: ( MonadIO m
                , MonadLogger m
                , HasVault m
@@ -206,8 +212,8 @@ putIdentityExternal :: ( MonadIO m
                , Accessible MasterClientId m
                , Accessible MasterClientSecret m
                , Accessible RealmName m
-               ) => T.Text -> T.Text-> m Address
-putIdentityExternal bearerToken = putIdentity $ (T.replace "Bearer " "" bearerToken)
+               ) => T.Text -> m Address
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) ""
 
 
 registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> T.Text -> m ()
