@@ -114,6 +114,7 @@ apiErrorToServantErr = \case
                    [
                      "Identity Server Error!",
                      "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the strato-api logs.)"
                    ]}
   VaultWrapperError _ ->
             err500{errBody = JSON.encode $ unlines
