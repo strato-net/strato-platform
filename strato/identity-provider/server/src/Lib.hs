@@ -25,6 +25,7 @@ module Lib
     , getUserByUUID
     , oAuthUserToSubject
     , hoistCoreServer
+    , putIdentityExternal
     , server
     )
 where
@@ -41,7 +42,7 @@ import           Data.ByteString.Base64
 import qualified Data.ByteString.UTF8 as B                    (fromString)
 import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
-import           Data.Text as T                          (Text, unpack, pack, take)
+import           Data.Text as T                          (Text, unpack, pack, take, replace)
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
 
@@ -195,6 +196,20 @@ putIdentity accessToken uuid = do
                                         Nothing -> $logErrorS "putIdentity" "Error signing new cert"
                     return a
 
+putIdentityExternal :: ( MonadIO m
+               , MonadLogger m
+               , HasVault m
+               , Accessible Issuer m
+               , Accessible X509Certificate m
+               , Accessible PrivateKey m
+               , Accessible BaseUrl m 
+               , Accessible MasterClientId m
+               , Accessible MasterClientSecret m
+               , Accessible RealmName m
+               ) => T.Text -> T.Text-> m Address
+putIdentityExternal bearerToken = putIdentity $ (T.replace "Bearer " "" bearerToken)
+
+
 registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> T.Text -> m ()
 registerCert cert accessToken = do 
     url <- access (Proxy @BaseUrl)
@@ -249,7 +264,7 @@ server :: ( MonadIO m
           , Accessible MasterClientSecret m
           , Accessible RealmName m
           ) => ServerT IDAPI.IdentityProviderAPI m
-server = getPingIdentity :<|> putIdentity
+server =    getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer :: String 
                 -> String 

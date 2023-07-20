@@ -31,25 +31,22 @@ import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import           IdentityProviderClient
 
-type PostRedirect (code :: Nat) loc = Verb 'GET code '[JSON] (Headers '[Header "Location" loc] NoContent)
-
+type PostRedirect (code :: Nat) loc = Verb 'GET code '[JSON] (Headers '[Header "Location" loc] Address)
 
 type API =  "identity" 
-          :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text 
+          :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
           :>  PostRedirect 301 String
 
 redirect :: (ToHttpApiData loc, MonadIO m, MonadLogger m, HasIdentity m)
     => loc --  what to put in the 'Location' header
     -> Text
-    ->  m (Headers '[Header "Location" loc] NoContent)
+    ->  m (Headers '[Header "Location" loc] Address)
 redirect a accessToken = do
-  --Shouldn't this be added in the response type?
-  (Address _) <- getCertAddress $ (replace "Bearer " "" accessToken)
-  return $ (addHeader a NoContent)
+  address <- getCertAddress accessToken
+  return $ (addHeader a address)
 
---TODO fix this port number to be an option
 server :: (MonadIO m, MonadLogger m, HasIdentity m) => ServerT API m
-server =  return =<< (redirect "http://localhost:8080")
+server =  return =<< (redirect "http://localhost:8080") -- TODO fix this port number to be an option
 
 identitytWrapper :: (MonadIO m, MonadLogger m, HasIdentity m, HasCallStack) =>
                     ClientM x -> m x
@@ -61,4 +58,4 @@ identitytWrapper client' = do
   either (blocError . IdentitytWrapperError) return resultEither
 
 getCertAddress ::  (MonadIO m, MonadLogger m, HasIdentity m) => Text -> m Address
-getCertAddress token = identitytWrapper $ putIdentity token "Nothing"
+getCertAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) "" -- I have a feeling Nikita will not approve of this and he is right
