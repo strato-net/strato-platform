@@ -22,7 +22,7 @@ pipeline {
                 sh "sed -i 's/<REPLACE_WITH_OAUTH_CLIENT_ID>/$OAUTH_CLIENT_ID/g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<REPLACE_WITH_OAUTH_CLIENT_SECRET>/$OAUTH_CLIENT_SECRET/g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID>/$EXT_STORAGE_S3_ACCESS_KEY_ID/g' strato-platform-manifest.yaml"
-                sh "sed -i 's/<REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY>/$EXT_STORAGE_S3_SECRET_ACCESS_KEY/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY>/${EXT_STORAGE_S3_SECRET_ACCESS_KEY}/g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<REPLACE_WITH_STRIPE_PUBLISHABLE_KEY>/$STRIPE_PUBLISHABLE_KEY/g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<REPLACE_WITH_STRIPE_SECRET_KEY>/$STRIPE_SECRET_KEY/g' strato-platform-manifest.yaml"
                 //sh '$KUBECTL delete -f strato-platform-manifest.yaml'
