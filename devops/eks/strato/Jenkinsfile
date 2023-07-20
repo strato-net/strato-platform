@@ -32,7 +32,7 @@ pipeline {
                 sh "sed -i 's/<REPO_URL>/406773134706.dkr.ecr.us-east-1.amazonaws.com/strato//g' strato-platform-manifest.yaml"
                 sh "sed -i 's/<VERSION>/${params.VERSION}/g' strato-platform-manifest.yaml"
                 sh 'cat strato-platform-manifest.yaml'
-                //sh '$KUBECTL delete -f strato-platform-manifest.yaml'
+                sh '$KUBECTL delete -f strato-platform-manifest.yaml'
                 //sh '$KUBECTL apply -f strato-platform-manifest.yaml'
             }
         }
