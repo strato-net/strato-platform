@@ -10,7 +10,7 @@ pipeline {
         STRIPE_PUBLISHABLE_KEY     = credentials('EKS_STRIPE_PUBLISHABLE_KEY')
         STRIPE_SECRET_KEY     = credentials('EKS_STRIPE_SECRET_KEY')
         KUBECTL='/home/ubuntu/bin/kubectl'
-        MANIFEST_PATH = './devops/eks/strato/strato-platform-manifest.yaml'
+        MANIFEST_PATH = './devops/eks/strato'
     }
     stages {
         stage('Stage 1') {
