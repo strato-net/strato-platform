@@ -1,13 +1,19 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Blockchain.Database.MerklePatricia.Internal (
   Key,
   Val,
   StateDB(..),
   StateRoot(..),
-  NodeData(..),
+  NodeDataF(..),
+  NodeData,
+  runMP,
+  initializeBlank,
   openMPDB,
   emptyTriePtr,
   sha2StateRoot,
@@ -27,9 +33,9 @@ module Blockchain.Database.MerklePatricia.Internal (
   ) where
 
 
-import           Control.Monad                                ((<=<))
 import           Control.Monad.Change.Alter                   (Alters)
 import qualified Control.Monad.Change.Alter                   as A
+import           Control.Monad.State
 import qualified Data.ByteString                              as B
 import           Data.Function
 import           Data.List
@@ -47,13 +53,13 @@ import           Text.Format
 unsafePutKeyVal :: (StateRoot `Alters` NodeData) m
                 => StateRoot -> Key -> Val -> m StateRoot
 unsafePutKeyVal sr key val = do
-  dbNodeData <- getNodeData $ PtrRef sr
+  dbNodeData <- getNodeData $ ptrRef sr
   dbPutNodeData <- putKV_NodeData key val dbNodeData
   putNodeData dbPutNodeData
 
 unsafeGetKeyVals :: (StateRoot `Alters` NodeData) m
                  => StateRoot -> Key -> m [(Key, Val)]
-unsafeGetKeyVals sr = getKeyVals_NodeRef $ PtrRef sr
+unsafeGetKeyVals sr = getKeyVals_NodeRef $ ptrRef sr
 
 unsafeGetAllKeyVals :: (StateRoot `Alters` NodeData) m
                     => StateRoot -> m [(Key, Val)]
@@ -62,7 +68,7 @@ unsafeGetAllKeyVals sr = unsafeGetKeyVals sr N.empty
 unsafeDeleteKey :: (StateRoot `Alters` NodeData) m
                 => StateRoot -> Key -> m StateRoot
 unsafeDeleteKey sr key = do
-  dbNodeData <- getNodeData (PtrRef sr)
+  dbNodeData <- getNodeData (ptrRef sr)
   dbDeleteNodeData <- deleteKey_NodeData key dbNodeData
   putNodeData dbDeleteNodeData
 
@@ -208,8 +214,8 @@ deleteKey_NodeRef key = nodeData2NodeRef <=< deleteKey_NodeData key <=< getNodeD
 -----
 
 getNodeData :: (StateRoot `Alters` NodeData) m => NodeRef -> m NodeData
-getNodeData (SmallRef x) = pure $ rlpDecode $ rlpDeserialize x
-getNodeData (PtrRef sr) =
+getNodeData (Left x) = pure $ rlpDecode $ rlpDeserialize x
+getNodeData (Right sr) =
   fromMaybe (error $ "Missing StateRoot in call to getNodeData: " ++ format sr) <$>
   A.lookup Proxy sr
 
@@ -251,13 +257,13 @@ simplify_NodeData x = return x
 
 newShortcut :: (StateRoot `Alters` NodeData) m => Key -> Either NodeRef Val -> m NodeRef
 newShortcut "" (Left ref) = return ref
-newShortcut key val      = nodeData2NodeRef $ ShortcutNodeData key val
+newShortcut key val       = nodeData2NodeRef $ ShortcutNodeData key val
 
 nodeData2NodeRef :: (StateRoot `Alters` NodeData) m => NodeData -> m NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
-    bytes | B.length bytes < 32 -> return $ SmallRef bytes
-    _     -> PtrRef <$> putNodeData nodeData
+    bytes | B.length bytes < 32 -> return $ smallRef bytes
+    _     -> ptrRef <$> putNodeData nodeData
 
 list2Options :: N.Nibble -> [(N.Nibble, NodeRef)] -> [NodeRef]
 list2Options start [] = replicate (fromIntegral $ 0x10 - start) emptyRef

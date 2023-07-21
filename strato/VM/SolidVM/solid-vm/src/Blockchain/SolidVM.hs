@@ -343,6 +343,7 @@ create' creator newAccount ch cc contractName' argExps = do
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName), "Org: " ++ (C.yellow org)]
 
+  solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
@@ -433,6 +434,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
 
     ((orgName, appName), returnVal) <- traverse (fmap Just . maybe (return "()") encodeForReturn)
                                    =<< callWrapper' sender' codeAddress Nothing Nothing funcName isRCC args
+
+    solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -921,7 +924,8 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
 --    revert customError(args);
     --    revert customError("error message") i.e. OrderedArgs 
     --    revert customError({x:"Message"}) i.e. NamedArgs 
-runStatement (CC.RevertStatement mString theArgs _) = do
+runStatement (CC.RevertStatement mString theArgs pos) = do
+  solidVMBreakpoint pos
   g <- getCurrentContract
   case mString of
     Just name -> do
@@ -1105,7 +1109,8 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
   return Nothing
 
 
-runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
+runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap pos) = do
+  solidVMBreakpoint pos
   -- currentCallInfo <- getCurrentCallInfo
 
   mRes <- EUnsafe.try $ do
@@ -1205,9 +1210,13 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (CC.Break _) = return $ Just SBreak
+runStatement (CC.Break pos) = do
+  solidVMBreakpoint pos
+  return $ Just SBreak
 
-runStatement (CC.Continue _) = return $ Just SContinue
+runStatement (CC.Continue pos) = do
+  solidVMBreakpoint pos
+  return $ Just SContinue
 
 runStatement (CC.Return maybeExpression pos) = do
   solidVMBreakpoint pos
@@ -1295,7 +1304,8 @@ runStatement (CC.UncheckedStatement code pos) = do
   withUncheckedCallInfo $ runStatementBlock code
 
 --runs the "_;" operator in a modifier statement
-runStatement (CC.ModifierExecutor _) = do
+runStatement (CC.ModifierExecutor pos) = do
+  solidVMBreakpoint pos
   return Nothing
 
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
@@ -1856,9 +1866,12 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
-  let contractNameString = labelToString contractName'
   salt <- saltTextToValue saltExpressionText
-  newAddress <- getNewAddressWithSalt creator salt contractNameString hsh
+  args' <- do
+        case args of
+                (CC.OrderedArgs oa) -> mapM (expToVar') oa
+                (CC.NamedArgs na) -> mapM (\(_, expr) -> (expToVar' expr)) na
+  newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)

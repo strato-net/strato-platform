@@ -53,6 +53,7 @@ xabiToContract contractName' parents' userDefinedTypes xabi = do
   _contractType = case (Xabi._xabiKind xabi) of
     Xabi.ContractKind -> ContractType
     Xabi.LibraryKind  -> LibraryType
+    Xabi.AbstractKind  -> AbstractType
     Xabi.InterfaceKind -> InterfaceType,
   _contractContext = Xabi._xabiContext xabi
   }

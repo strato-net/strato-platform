@@ -77,7 +77,7 @@ async function getAll(admin, args = {}, options) {
             productId: batchProductIds,
             range,
             gteField: 'availableQuantity',
-            gteValue: 1
+            gteValue: 0
         }, options);
 
         inventoryPromises.push(inventoryPromise);

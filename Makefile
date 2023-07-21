@@ -37,7 +37,7 @@ all: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx get_solcs build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -67,17 +67,6 @@ marketplace-ui:
 	@echo Now building marketplace-ui...
 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
 
-get_solcs:
-	@echo checking solcs and pulling them if required...
-	@if [ ! -f "${FAKEROOT}/usr/local/bin/solc" ]; then\
-		bash -c "\
-			mkdir -p ${FAKEROOT}/usr/local/bin ;\
-			strato/pull_solc.sh 0.4.25 ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/license-solc-0.4 ;\
-			strato/pull_solc.sh 0.5.2 ${FAKEROOT}/usr/local/bin/solc-0.5 ${FAKEROOT}/license-solc-0.5 ;\
-			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
-		" ;\
-	fi
-
 eks:
 	@echo Now generating eks-deployment.yaml file
 	cd devops/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-strato-deployment.tpl.yaml > eks-strato-deployment.yaml
@@ -87,7 +76,7 @@ build_buildbase:
 	@echo building buildbase...
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} - < Dockerfile.buildbase
 
-build_common: get_solcs build_buildbase
+build_common: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
@@ -95,7 +84,7 @@ build_common: get_solcs build_buildbase
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-build_common_profiled: get_solcs build_buildbase
+build_common_profiled: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}

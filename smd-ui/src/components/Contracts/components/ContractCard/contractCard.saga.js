@@ -145,7 +145,8 @@ export function* fetchAccount(action) {
 export function* fetchContractInfo(action) {
   try {
     const response = yield call(getContract, action.contractName, action.contractAddress, action.chainId);
-    yield put(fetchContractInfoSuccess(action.key, response));
+    const data = { contract: response, name: action.contractName, address: action.contractAddress, chainId: action.chainId };
+    yield put(fetchContractInfoSuccess(action.key, data));
   }
   catch (err) {
     yield put(fetchContractInfoFailure(action.key, err));

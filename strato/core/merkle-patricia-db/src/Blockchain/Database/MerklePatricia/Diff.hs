@@ -79,4 +79,4 @@ diff = recurse `on` Ref
 
 dbDiff :: (StateRoot `Alters` NodeData) m
        => StateRoot -> StateRoot -> ConduitT i DiffOp m ()
-dbDiff = diff `on` PtrRef
+dbDiff = diff `on` ptrRef
