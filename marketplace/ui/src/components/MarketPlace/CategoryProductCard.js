@@ -247,48 +247,6 @@ const CategoryProductCard = ({ product, category }) => {
                 </Paragraph>
               </div>
             }
-            <Button
-              className="group w-40 h-9 border border-primary hover:bg-primary"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: 'add_to_cart_from_marketplace',
-                      product_name: product.name,
-                      category: product.category,
-                      productId: product.productId
-                    },
-                  });
-                  addItemToCart();
-                }
-              }}>
-              <div className="text-primary group-hover:text-white">Add To Cart</div>
-            </Button>
-            <Button
-              type="primary"
-              id={`${product.name.replace(/ /g, "_")}-buy-now`}
-              className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: 'buy_now_from_marketplace',
-                      product_name: product.name,
-                      category: product.category,
-                      productId: product.productId
-                    },
-                  });
-                  addItemToCart();
-                  navigate("/checkout");
-                }
-              }}
-            >
-              Buy Now
-            </Button>
           </div>
         </div>
       </Card >
