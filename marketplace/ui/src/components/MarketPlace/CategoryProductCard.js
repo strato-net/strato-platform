@@ -239,7 +239,17 @@ const CategoryProductCard = ({ product, category }) => {
                 <Button
                   type="primary"
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-                  href={`mailto:sales@blockapps.net`}>
+                  href={`mailto:sales@blockapps.net`}
+                  onClick={() => {
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: 'contact_sales_from_category_card',
+                        product_name: product.name,
+                        category: product.category,
+                        productId: product.productId
+                      },
+                    });
+                  }}>
                   Contact to Buy
                 </Button>
                 <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">

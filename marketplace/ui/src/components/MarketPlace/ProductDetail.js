@@ -659,7 +659,17 @@ const ProductDetails = ({ user, users }) => {
                   <Button
                     type="primary"
                     className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}>
+                    href={`mailto:sales@blockapps.net`}
+                    onClick={() => {
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'contact_sales_from_produdct_details',
+                          product_name: details.name,
+                          category: details.category,
+                          productId: details.productId
+                        },
+                      });
+                    }}>
                     Contact to Buy
                   </Button>
                 </div>
