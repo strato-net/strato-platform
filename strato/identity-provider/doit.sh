@@ -32,8 +32,8 @@ function runIdentityServer {
   --OAUTH_USER_ENDPOINT="${OAUTH_USER_ENDPOINT}"
   --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}"
   --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}"
-  --OAUTH_ADMIN_USERNAME="${OAUTH_ADMIN_USERNAME}"
-  --OAUTH_ADMIN_PASSWORD="${OAUTH_ADMIN_PASSWORD}"
+  --OAUTH_MASTER_CLIENT_ID="${OAUTH_MASTER_CLIENT_ID}"
+  --OAUTH_MASTER_CLIENT_SECRET="${OAUTH_MASTER_CLIENT_SECRET}"
   "
   
   if [ -n "${identityProviderPort}" ]; then
@@ -57,11 +57,11 @@ function runIdentityServer {
   if [ -n "${OAUTH_USER_ENDPOINT}" ]; then
       ouFlag="--OAUTH_USER_ENDPOINT=${OAUTH_USER_ENDPOINT}"
   fi
-  if [ -n "${OAUTH_ADMIN_USERNAME}" ]; then
-      auFlag="--OAUTH_ADMIN_USERNAME=${OAUTH_ADMIN_USERNAME}"
+  if [ -n "${OAUTH_MASTER_CLIENT_ID}" ]; then
+      mciFlag="--OAUTH_MASTER_CLIENT_ID=${OAUTH_MASTER_CLIENT_ID}"
   fi
-  if [ -n "${OAUTH_ADMIN_PASSWORD}" ]; then
-      apFlag="--OAUTH_ADMIN_PASSWORD=${OAUTH_ADMIN_PASSWORD}"
+  if [ -n "${OAUTH_MASTER_CLIENT_SECRET}" ]; then
+      mcpFlag="--OAUTH_MASTER_CLIENT_SECRET=${OAUTH_MASTER_CLIENT_SECRET}"
   fi
   
   RED='\033[0;31m'
@@ -93,7 +93,7 @@ function runIdentityServer {
     --minLogLevel=${minLogLevel} \
     --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
     "${pFlag}" "${vpFlag}" "${icFlag}" "${ipFlag}" \
-    "${opFlag}" "${otFlag}" "${ouFlag}" "${auFlag}" "${apFlag}" &>> logs/identity-provider
+    "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" &>> logs/identity-provider
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

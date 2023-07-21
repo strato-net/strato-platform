@@ -18,8 +18,11 @@ import           Options
 main :: IO ()
 main = do
     _ <- $initHFlags "Identity Server"
-    if null flags_OAUTH_CLIENT_ID || null flags_OAUTH_CLIENT_SECRET
-    then error "You must provide both a client id and secret of the master realm for a functioning identity server"
+    if     null flags_OAUTH_MASTER_CLIENT_ID 
+        || null flags_OAUTH_MASTER_CLIENT_SECRET
+        || null flags_OAUTH_CLIENT_ID
+        || null flags_OAUTH_CLIENT_SECRET
+    then error "You must provide client ids and secrets for both the current realm and master realm to have a functioning identity server"
     else do 
         putStrLn "parsing issuer cert and private key..."
         certBS <- B.readFile flags_issuerCertPath

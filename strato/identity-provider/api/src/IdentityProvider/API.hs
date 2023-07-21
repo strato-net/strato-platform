@@ -17,7 +17,7 @@ import            Blockchain.Strato.Model.Address
 type GetPingIdentity = "_ping" :> Get '[JSON] Int
 
 type PutIdentity = "identity" 
-                :> Header' '[Required, Strict] "X-ACCESS-USER-TOKEN" T.Text -- pass along for vault calls
+                :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
                 :> Put '[JSON] Address --should return user address
 
