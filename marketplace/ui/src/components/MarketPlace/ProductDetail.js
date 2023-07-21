@@ -663,7 +663,7 @@ const ProductDetails = ({ user, users }) => {
                     onClick={() => {
                       TagManager.dataLayer({
                         dataLayer: {
-                          event: 'contact_sales_from_produdct_details',
+                          event: 'contact_sales_from_product_details',
                           product_name: details.name,
                           category: details.category,
                           productId: details.productId
