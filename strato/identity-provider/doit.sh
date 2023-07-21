@@ -88,8 +88,8 @@ function runIdentityServer {
   echo 'vault-proxy is available'
   set -x
   
-  echo "Running identity-provider-exe..."
-  runBackgroundProcess identity-provider-exe \
+  echo "Running identity-provider-server..."
+  runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} \
     --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
     "${pFlag}" "${vpFlag}" "${icFlag}" "${ipFlag}" \
