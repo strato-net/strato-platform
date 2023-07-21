@@ -49,7 +49,7 @@ import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
 
-data ContractType = ContractType | LibraryType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
+data ContractType = ContractType | LibraryType | AbstractType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
 
 
 -- Changes to this structure should also have changes in the Unparser :)
