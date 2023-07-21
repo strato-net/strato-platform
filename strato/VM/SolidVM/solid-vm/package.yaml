@@ -84,6 +84,7 @@ tests:
       - seqevents
       - mtl
       - crypto-api
+      - binary
       - blockapps-data
       - core-api2
       - strato-genesis
