@@ -376,7 +376,7 @@ processTheMessages env conn g messages = do
       case actionStorage row of
         Action.EVMDiff{} -> pure $ Left "EVM code indexing ignored"
         Action.SolidVMDiff{} -> do
-          let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+          let cid = maybe "0000000000000000000000000000000000000000000000000000000000000000" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               -- (SolidVMCode name _) = actionCodeHash row
               name = case actionCodeHash row of
                 SolidVMCode name' _ -> name'

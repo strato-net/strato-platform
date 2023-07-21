@@ -58,6 +58,7 @@ AddressStateRef
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot
     codeHash Keccak256 Maybe
+    codeRefId CodeRefId Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
     codePtrChainId Word256 Maybe
@@ -68,7 +69,7 @@ AddressStateRef
 
 CodeRef
     codeHash Keccak256
-    code BS.ByteString
+    code Text
     UniqueCodeHash codeHash
     deriving Eq Read Show
 
@@ -95,8 +96,11 @@ RawTransaction
 Storage json
     addressStateRefId AddressStateRefId
     kind CodeKind default='EVM'
-    key HexStorage
-    value HexStorage
+    hexKey HexStorage
+    hexValue HexStorage
+    key Text
+    type Text
+    value Text
     deriving Eq Read Show
 
 ContractDetailsRef

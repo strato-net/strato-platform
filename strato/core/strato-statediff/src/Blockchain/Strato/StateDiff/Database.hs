@@ -16,6 +16,7 @@ import qualified Database.Persist.Postgresql                 as SQL hiding (Upda
 
 import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.SQLDB
@@ -25,15 +26,19 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
+import           SolidVM.Model.Storable                      (BasicValue(..))
 
 import           Control.Lens ((^.))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
-import           Data.Foldable                               (for_, traverse_)
+import qualified Data.ByteString.Base16                      as B16
+import           Data.Char                                   (toLower)
+import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
 import           Data.Maybe
 import qualified Data.Text                                   as T
+import           Data.Text.Encoding                          (decodeUtf8, decodeUtf8')
 
 import           Blockchain.Strato.StateDiff
 
@@ -66,13 +71,17 @@ codePtrChainId :: CodePtr -> Maybe Word256
 codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
 codePtrChainId _ = Nothing
 
+decodeTextOrHex :: BS.ByteString -> T.Text
+decodeTextOrHex b = either (const . decodeUtf8 $ B16.encode b) id $ decodeUtf8' b
+
 createAccount :: (MonadUnliftIO m, MonadLogger m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
   catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
     tryCreates = do
-      let newAccounts = map (uncurry addrRef) accountDiffs
+      codeIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs)
+      let newAccounts = map (uncurry $ uncurry addrRef) $ zip accountDiffs codeIDs
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
       addrIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) newAccounts
 
@@ -80,26 +89,30 @@ createAccount blockNumber accountDiffs =
         forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
           let (_, diff) = accountDiff
           case storage diff of
-            EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
+            EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v) "" "" ""
                                 | (k, Value v) <- Map.toList m]
-            SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
-                                    | (k, Value v) <- Map.toList m]
+            SolidVMDiff m -> do
+              let mkStorage k v =
+                    let k' = decodeTextOrHex k
+                        (t, v') = getSolidTypeAndValue v
+                     in Storage addrID SolidVM (HexStorage k) (HexStorage v) k' t v'
+              return [mkStorage k v | (k, Value v) <- Map.toList m]
 
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
       SQL.insertMany_ (concat newStorage)
-      traverse_ (`SQL.upsert` []) $ uncurry codeRef <$> accountDiffs
     code' account diff = getField (theError account "code") $ code diff
     codeRef account diff = CodeRef {
       codeRefCodeHash = hash $ code' account diff,
-      codeRefCode     = code' account diff
+      codeRefCode     = decodeTextOrHex $ code' account diff
     }
-    addrRef account diff = AddressStateRef{
+    addrRef account diff codeID = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
       addressStateRefNonce = getField (theError account "nonce") $ nonce diff,
       addressStateRefBalance = getField (theError account "balance") $ balance diff,
       addressStateRefContractRoot = getField (theError account "contractRoot") $ contractRoot diff,
       -- addressStateRefCode = getField (theError account "code") $ code diff,
       addressStateRefCodeHash = codePtrHash $ codeHash diff,
+      addressStateRefCodeRefId = Just codeID,
       addressStateRefContractName = codePtrName $ codeHash diff,
       addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
       addressStateRefCodePtrChainId = codePtrChainId $ codeHash diff,
@@ -162,7 +175,7 @@ commitStorage addrID key v =
   let key' = word256ToHexStorage key
    in case v of
         Create{newValue} ->
-          SQL.insert_ $ Storage addrID EVM key' (word256ToHexStorage newValue)
+          SQL.insert_ $ Storage addrID EVM key' (word256ToHexStorage newValue) "" "" ""
         Delete{} -> do
           mStorageID <- getStorageKeySQL addrID key'
           for_ mStorageID SQL.delete
@@ -170,16 +183,31 @@ commitStorage addrID key v =
           let newValue' = word256ToHexStorage newValue
           mStorageID <- getStorageKeySQL addrID key'
           case mStorageID of
-            Nothing -> SQL.insert_ $ Storage addrID EVM key' newValue'
-            Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
+            Nothing -> SQL.insert_ $ Storage addrID EVM key' newValue' "" "" ""
+            Just storageID -> SQL.update storageID [ StorageHexValue =. newValue' ]
+
+getSolidTypeAndValue :: BS.ByteString -> (T.Text, T.Text)
+getSolidTypeAndValue val = case rlpDecode $ rlpDeserialize val of
+  BInteger i -> ("int", T.pack $ show i)
+  BString bs -> case decodeUtf8' bs of
+    Left _ -> ("bytes", decodeUtf8 $ B16.encode bs)
+    Right s -> ("string", s)
+  BBool b -> ("bool", T.pack $ toLower <$> show b)
+  BAccount a -> ("account", T.pack $ show a)
+  BEnumVal e v _ -> (T.pack e, T.pack v)
+  BContract c a -> (T.pack c, T.pack $ show a)
+  BMappingSentinel -> ("mapping", "sentinel") -- ¯\_(ツ)_/¯
+  BDefault -> ("default", "")
 
 commitSolidStorage :: MonadIO m =>
                       SQL.Key AddressStateRef -> BS.ByteString -> Diff BS.ByteString 'Incremental -> SqlDbM m ()
 commitSolidStorage addrID key v =
   let key' = HexStorage key
+      smKey = decodeTextOrHex key
    in case v of
-        Create{newValue} ->
-          SQL.insert_ $ Storage addrID SolidVM key' (HexStorage newValue)
+        Create{newValue} -> do
+          let (t, v') = getSolidTypeAndValue newValue
+          SQL.insert_ $ Storage addrID SolidVM key' (HexStorage newValue) smKey t v'
         Delete{} -> do
           mStorageID <- getStorageKeySQL addrID key'
           for_ mStorageID SQL.delete
@@ -187,8 +215,12 @@ commitSolidStorage addrID key v =
           let newValue' = HexStorage newValue
           mStorageID <- getStorageKeySQL addrID key'
           case mStorageID of
-            Nothing -> SQL.insert_ $ Storage addrID SolidVM key' newValue'
-            Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
+            Nothing -> do
+              let (t, v') = getSolidTypeAndValue newValue
+              SQL.insert_ $ Storage addrID SolidVM key' newValue' smKey t v'
+            Just storageID -> do
+              let (t, v') = getSolidTypeAndValue newValue
+              SQL.update storageID [ StorageHexValue =. newValue', StorageType =. t, StorageValue =. v' ]
 
 getAddressStateSQL :: MonadIO m
                    => Account
@@ -204,6 +236,6 @@ getStorageKeySQL :: MonadIO m
                  -> SqlDbM m (Maybe (SQL.Key Storage))
 getStorageKeySQL addrID storageKey' = do
   storageIDs <- SQL.selectKeysList
-              [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. storageKey' ]
+              [ StorageAddressStateRefId SQL.==. addrID, StorageHexKey SQL.==. storageKey' ]
               [ LimitTo 1 ]
   return $ listToMaybe storageIDs

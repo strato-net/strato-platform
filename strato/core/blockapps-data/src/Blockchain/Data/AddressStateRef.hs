@@ -39,6 +39,7 @@ updateSQLBalanceAndNonce vals = do
               addressStateRefContractRoot = MP.emptyTriePtr,
               -- addressStateRefCode = "",
               addressStateRefCodeHash = Just $ hash "",
+              addressStateRefCodeRefId = Nothing,
               addressStateRefContractName = Nothing,
               addressStateRefCodePtrAddress = Nothing,
               addressStateRefCodePtrChainId = Nothing,

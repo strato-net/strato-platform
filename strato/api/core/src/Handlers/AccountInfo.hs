@@ -21,7 +21,6 @@ import           Data.Maybe
 import           Data.Source.Map
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import           Data.Text.Encoding          (decodeUtf8)
 import qualified Database.Esqueleto.Legacy          as E
 import           Numeric.Natural
 import           Servant
@@ -243,7 +242,7 @@ codeServer cHash = select (Proxy @SourceMap) cHash >>= \case
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8 . codeRefCode . E.entityVal
+  let getSourceMap = deserializeSourceMap . codeRefCode . E.entityVal
    in fmap (listToMaybe . map getSourceMap) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do
         E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)

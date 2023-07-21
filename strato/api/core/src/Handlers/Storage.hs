@@ -106,7 +106,7 @@ instance FromJSON StorageAddress
 instance ToSchema StorageAddress
 
 storage2StorageAddress :: Storage -> Address -> StorageAddress
-storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
+storage2StorageAddress stor addr = (StorageAddress (storageHexKey stor) (storageHexValue stor) (storageKind stor) addr)
 
 instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
   select _ StorageFilterParams{..} = do
@@ -138,12 +138,12 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
 
             let criteria2 = catMaybes
                   [
-                    fmap (\v -> storage E.^. StorageKey E.==. E.val v) qsKey,
-                    fmap (\v -> storage E.^. StorageKey E.>=. E.val v) qsMinKey,
-                    fmap (\v -> storage E.^. StorageKey E.<=. E.val v) qsMaxKey,
-                    fmap (\v -> storage E.^. StorageValue E.==. E.val v) qsValue,
-                    fmap (\v -> storage E.^. StorageValue E.>=. E.val v) qsMinValue,
-                    fmap (\v -> storage E.^. StorageValue E.<=. E.val v) qsMaxValue,
+                    fmap (\v -> storage E.^. StorageHexKey E.==. E.val v) qsKey,
+                    fmap (\v -> storage E.^. StorageHexKey E.>=. E.val v) qsMinKey,
+                    fmap (\v -> storage E.^. StorageHexKey E.<=. E.val v) qsMaxKey,
+                    fmap (\v -> storage E.^. StorageHexValue E.==. E.val v) qsValue,
+                    fmap (\v -> storage E.^. StorageHexValue E.>=. E.val v) qsMinValue,
+                    fmap (\v -> storage E.^. StorageHexValue E.<=. E.val v) qsMaxValue,
                     -- Note: a join is done in StorageInfo
                     fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                   ]
@@ -153,7 +153,7 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
             E.offset . fromIntegral $ fromMaybe 0 qsOffset
             E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
 
-            E.orderBy [E.asc (storage E.^. StorageKey)]
+            E.orderBy [E.asc (storage E.^. StorageHexKey)]
 
             return (storage, addrStRef E.^. AddressStateRefAddress)
 

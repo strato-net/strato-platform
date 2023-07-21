@@ -587,7 +587,7 @@ createIndexTableQuery contract (o, a, n) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
-        , ",\n  PRIMARY KEY (record_id) );"
+        , ",\n  PRIMARY KEY (record_id), FOREIGN KEY (address, \"chainId\") REFERENCES address_state_ref (address, chain_id) );"
         ]
 
 createMappingTableQuery :: (Text, Text, Text, Text) -> Text

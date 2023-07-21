@@ -551,7 +551,7 @@ logEventSummaries events = do
 -- KAFKA
 
 sendOutEvent :: VmOutEvent -> ContextM ()
-sendOutEvent (OutAction act) =
+sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
         case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
@@ -576,7 +576,9 @@ sendOutEvent (OutAction act) =
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       actionEvents = [NewAction act]
-   in void . produceVMEvents $ ccEvents ++ actionEvents
+      evs = ccEvents ++ actionEvents
+  contx <- ask
+  void . liftIO $ enqueue (_stateDiffQueue contx) (VME evs)
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
@@ -751,18 +753,19 @@ getUnprocessedKafkaEvents offset = do
     return ret'
 
 -- This function lives on its own thread
-checkQueueAndCommitsSqlDiffsForever :: DL.DList TransactionResult -> ContextM ()
-checkQueueAndCommitsSqlDiffsForever txResults = do
+checkQueueAndCommitsSqlDiffsForever :: DL.DList VMEvent -> ContextM ()
+checkQueueAndCommitsSqlDiffsForever vmEvs = do
   context' <- ask
   let que = _stateDiffQueue context'
   msg <- liftIO . atomically $ readTQueue que
   case msg of 
-    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ txResults `DL.snoc` txResult
+    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvs `DL.snoc` NewTransactionResult txResult
     SD !stateDiff' -> do
       commitSqlDiffs stateDiff'
-      checkQueueAndCommitsSqlDiffsForever txResults
+      checkQueueAndCommitsSqlDiffsForever vmEvs
+    VME evs -> checkQueueAndCommitsSqlDiffsForever $ vmEvs <> DL.fromList evs
     Flush -> do
-      void . produceVMEvents $ NewTransactionResult <$> toList txResults
+      void . produceVMEvents $ toList vmEvs
       checkQueueAndCommitsSqlDiffsForever DL.empty
 
 deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()

@@ -8,6 +8,7 @@ library:
   source-dirs: src/
   dependencies:
     - base
+    - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
@@ -26,6 +27,7 @@ library:
     - persistent-postgresql
     - strato-conf
     - strato-model
+    - solid-vm-model
     - text
     - unliftio
   default-extensions:
