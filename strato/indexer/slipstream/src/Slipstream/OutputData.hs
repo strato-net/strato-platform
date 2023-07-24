@@ -588,7 +588,7 @@ createIndexTableQuery contract (o, a, n) =
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
         , ",\n  PRIMARY KEY (record_id)"
-        , if flags_database == "strato" then ", FOREIGN KEY (address, \"chainId\") REFERENCES address_state_ref (address, chain_id)" else ""
+        , if flags_database == "strato" then ",\n  FOREIGN KEY (address, \"chainId\") REFERENCES address_state_ref (address, chain_id)" else ""
         , " );"
         ]
 
