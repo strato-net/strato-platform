@@ -12,6 +12,8 @@ services:
     - vaultProxyUrl=${vaulProxyUrl}
     - issuerCertPath=${issuerCertPath}
     - issuerPrivKeyPath=${issuerPrivKeyPath}
+    - realmName=${realmName}
+    - nodeUrl=${nodeUrl}
     - OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}
     - OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}
     - OAUTH_USER_ENDPOINT=${OAUTH_USER_ENDPOINT}

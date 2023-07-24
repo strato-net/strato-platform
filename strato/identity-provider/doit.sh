@@ -27,6 +27,8 @@ function runIdentityServer {
   --vaultProxyUrl="${vaulProxyUrl}"
   --issuerCertPath="${issuerCertPath}"
   --issuerPrivKeyPath="${issuerPrivKeyPath}"
+  --realmName="${realmName}"
+  --nodeUrl="${nodeUrl}"
   --OAUTH_PROVIDER_URL="${OAUTH_PROVIDER_URL}"
   --OAUTH_TOKEN_ENDPOINT="${OAUTH_TOKEN_ENDPOINT}"
   --OAUTH_USER_ENDPOINT="${OAUTH_USER_ENDPOINT}"
@@ -63,6 +65,12 @@ function runIdentityServer {
   if [ -n "${OAUTH_MASTER_CLIENT_SECRET}" ]; then
       mcpFlag="--OAUTH_MASTER_CLIENT_SECRET=${OAUTH_MASTER_CLIENT_SECRET}"
   fi
+  if [ -n "${realmName}" ]; then
+      rnFlag="--realmName=${realmName}"
+  fi
+  if [ -n "${nodeUrl}" ]; then
+      nuFlag="--nodeUrl=${nodeUrl}"
+  fi
   
   RED='\033[0;31m'
   NC='\033[0m' # No Color
@@ -93,7 +101,8 @@ function runIdentityServer {
     --minLogLevel=${minLogLevel} \
     --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
     "${pFlag}" "${vpFlag}" "${icFlag}" "${ipFlag}" \
-    "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" &>> logs/identity-provider
+    "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" \
+    "${rnFlag}" "${nuFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

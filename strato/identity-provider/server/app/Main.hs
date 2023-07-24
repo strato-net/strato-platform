@@ -9,14 +9,15 @@ module Main (main) where
 
 import           BlockApps.X509
 import qualified Data.ByteString as B
-import           HFlags
--- import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Network.Wai.Handler.Warp (run)
 import           IdentityProvider.Server
+import           HFlags
 import           Options
+import           BlockApps.Logging () -- Import the --minLogLevel flag
 
 main :: IO ()
 main = do
+    putStrLn "************ STARTING UP IDENTITY SERVER ************"
     _ <- $initHFlags "Identity Server"
     if     null flags_OAUTH_MASTER_CLIENT_ID 
         || null flags_OAUTH_MASTER_CLIENT_SECRET
@@ -40,4 +41,12 @@ main = do
             Right privk -> return privk
 
         putStrLn "Initializing identity server..."
-        run flags_port $ identityProviderApp flags_nodeUrl flags_vaultProxyUrl iss crt privk flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET flags_OAUTH_MASTER_CLIENT_ID flags_OAUTH_MASTER_CLIENT_SECRET flags_realmName
+        let p = flags_port 
+            n = flags_nodeUrl
+            vp = flags_vaultProxyUrl
+            cid = flags_OAUTH_CLIENT_ID
+            cs = flags_OAUTH_CLIENT_SECRET
+            mid = flags_OAUTH_MASTER_CLIENT_ID
+            ms = flags_OAUTH_MASTER_CLIENT_SECRET
+            rn = flags_realmName
+        run p $ identityProviderApp n vp iss crt privk cid cs mid ms rn
