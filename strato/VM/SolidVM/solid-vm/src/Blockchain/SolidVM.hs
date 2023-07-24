@@ -1866,9 +1866,12 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
-  let contractNameString = labelToString contractName'
   salt <- saltTextToValue saltExpressionText
-  newAddress <- getNewAddressWithSalt creator salt contractNameString hsh
+  args' <- do
+        case args of
+                (CC.OrderedArgs oa) -> mapM (expToVar') oa
+                (CC.NamedArgs na) -> mapM (\(_, expr) -> (expToVar' expr)) na
+  newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)

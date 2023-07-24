@@ -31,6 +31,7 @@ solidityContract :: SolidityParser SourceUnit
 solidityContract = do
   kind <- (reserved "contract" >> return Xabi.ContractKind)
         <|> (reserved "interface" >> return Xabi.InterfaceKind)
+        <|> (reserved "abstract" >> return Xabi.AbstractKind)
         <|> (reserved "library" >> return Xabi.LibraryKind)
   contractName' <- identifier
   setContractName contractName'
