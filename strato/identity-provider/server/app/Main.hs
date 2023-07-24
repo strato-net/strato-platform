@@ -48,5 +48,4 @@ main = do
             cs = flags_OAUTH_CLIENT_SECRET
             mid = flags_OAUTH_MASTER_CLIENT_ID
             ms = flags_OAUTH_MASTER_CLIENT_SECRET
-            rn = flags_realmName
-        run p $ identityProviderApp n vp iss crt privk cid cs mid ms rn
+        run p $ identityProviderApp n vp iss crt privk cid cs mid ms

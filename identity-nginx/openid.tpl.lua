@@ -100,6 +100,7 @@ end
 
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-UNIQUE-NAME", verify_res['sub'])
+  ngx.req.set_header("X-IDENTITY-PROVIDER-ID", verify_res['iss'])
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
