@@ -78,6 +78,9 @@ tableNameToText (EventTableName o a c e) =
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
 
+tableNameToText (AssetTableName n) = n
+
+
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 

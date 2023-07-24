@@ -21,6 +21,7 @@ module Slipstream.OutputData (
   createIndexTable,
   createMappingTable,
   createHistoryTable,
+  createAssetTable,
   insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
@@ -263,6 +264,8 @@ indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
 
+assetTableName :: Text -> TableName
+assetTableName n = AssetTableName n
 
 createExpandIndexTable
   :: OutputM m
@@ -340,6 +343,18 @@ createIndexTable globalsIORef contract (o, a, n) = do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
+
+createAssetTable :: OutputM m
+                 => IORef Globals
+                 -> ConduitM () Text m ()
+createAssetTable globalsIORef = do
+  let tableName = assetTableName "Asset"
+  tableExists <- isTableCreated globalsIORef tableName
+  when (not tableExists) $ do
+    yield $ createAssetTableQuery
+    let list = ["data"]
+    setTableCreated globalsIORef tableName list
+
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable :: OutputM m
@@ -597,6 +612,16 @@ createMappingTableQuery (o, a, n, m) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "mapname text","key text", "value text"]
+        , ",\n  PRIMARY KEY (address, key));"
+        ]
+
+createAssetTableQuery :: Text
+createAssetTableQuery =
+  let tableName = assetTableName "Asset"
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
         , ",\n  PRIMARY KEY (address, key));"
         ]
 

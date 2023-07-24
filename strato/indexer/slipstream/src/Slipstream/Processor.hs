@@ -20,6 +20,7 @@
 module Slipstream.Processor
   ( processTheMessages
   , parseActions
+  , generateAssetTable
   ) where
 
 import Prelude hiding (lookup)
@@ -353,6 +354,8 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
+                -- ifoutputData conn $ insertIntoAssetTable g c nameParts 
+
                 return deferredForeignKeys
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
@@ -427,4 +430,8 @@ processTheMessages env conn g messages = do
 
   flushPendingWrites g
 
+generateAssetTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateAssetTable conn g = do
+  outputData conn $ createAssetTable g
 
