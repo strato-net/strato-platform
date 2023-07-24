@@ -622,7 +622,7 @@ createAssetTableQuery =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
-        , ",\n  PRIMARY KEY (address, key));"
+        , ",\n  PRIMARY KEY (address));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
