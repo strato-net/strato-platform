@@ -23,7 +23,7 @@ class ProductController {
       }
 
       const product = await dapp.getProduct(args, chainOptions)
-      const productImageUrl = getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+      const productImageUrl = rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
       const result = { ...product, imageUrl: productImageUrl }
       rest.response.status200(res, result)
 
@@ -40,7 +40,7 @@ class ProductController {
       const products = await dapp.getProducts({ ...query })
       const productsWithImageUrl = products.map(product => ({
         ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        imageUrl: rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
         )
       }))
 
@@ -95,7 +95,7 @@ class ProductController {
 
         const fileKey = req.body.updates.oldImageKey
 
-        const isDeleted = await deleteFileFromS3(fileKey, req.app.get(constants.s3ParamName))
+        const isDeleted = await rest.deleteFileFromS3(fileKey, req.app.get(constants.s3ParamName))
         if (!isDeleted) {
           rest.response.status400(res, "Image is failed to delete")
         }

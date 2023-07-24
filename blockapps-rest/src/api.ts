@@ -10,7 +10,8 @@ import {
   postue,
   httpDelete,
   getNodeUrl,
-  setAuthHeaders
+  setAuthHeaders,
+  getExternalServerApi
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
 import {
@@ -23,6 +24,20 @@ import {
   CallArgs,
   SendTx
 } from "./types";
+import AWS_lib_storage = require("@aws-sdk/lib-storage");
+
+const {
+  Upload
+} = AWS_lib_storage;
+
+import AWS_S3 = require("@aws-sdk/client-s3");
+const {
+  S3
+} = AWS_S3;
+
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+
 
 
 async function createUser(user:StratoUser, options:Options) {
@@ -501,6 +516,83 @@ async function debugPostFuzz(user:OAuthUser, args, options:Options) {
   return postRaw(url, endpoint, args, setAuthHeaders(user, options));
 }
 
+async function uploadFileToS3(fileKey, fileBuffer, s3Options, options:Options) {
+  // const url = getExternalServerApi(options);
+  // // put fileKey, fileBuffer, s3Options inside args object
+  // const args = {
+  //   fileKey,
+  //   fileBuffer,
+  //   s3Options
+  // };
+  // // TODO: change endpoint
+  // const endpoint = constructEndpoint(Endpoint.DEBUG_FUZZ, options);
+  // return post(url, endpoint, args, options);
+  const s3 = new S3(s3Options)
+  
+  try {
+    const data = await new Upload({
+      client: s3,
+
+      params: {
+        Bucket: s3Options.bucket.Bucket,
+        Key: fileKey,
+        Body: fileBuffer,
+      }
+    }).done();
+    return data;
+  } catch (err) {
+    throw err;
+  }
+  
+  // return new Promise((resolve, reject) => {
+  //   // S3 ManagedUpload with callbacks are not supported in AWS SDK for JavaScript (v3).
+  //   // Please convert to `await client.upload(params, options).promise()`, and re-run aws-sdk-js-codemod.
+  //   s3.upload({
+  //     Bucket: s3Options.bucket.Bucket,
+  //     Key: fileKey,
+  //     Body: fileBuffer,
+  //   }, (err, data) => {
+  //     if (err) {
+  //       return reject(err)
+  //     }
+  //     return resolve(data)
+  //   })
+  // });
+}
+
+async function getSignedUrlFromS3(fileKey, s3Options) {
+  const s3 = new S3(s3Options);
+
+  try {
+    const signedUrl = await getSignedUrl('getObject', {
+      Bucket: s3Options.bucket.Bucket,
+      Key: fileKey,
+    });
+    return signedUrl;
+  } catch (err) {
+    throw err;
+  }
+}
+
+
+async function deleteFileFromS3(fileKey, s3Options) {
+  const s3 = new S3(s3Options)
+  return new Promise((resolve, reject) => {
+    s3.deleteObject(
+      {
+        Bucket: s3Options.bucket.Bucket,
+        Key: fileKey,
+      },
+      (err, data) => {
+        if (err) {
+          return reject(false)
+        }
+        return resolve(true)
+      },
+    )
+  })
+}
+
 export default {
   getAccounts,
   getHealth,
@@ -558,4 +650,7 @@ export default {
   debugPostParse,
   debugPostAnalyze,
   debugPostFuzz,
+  uploadFileToS3,
+  getSignedUrlFromS3,
+  deleteFileFromS3,
 };

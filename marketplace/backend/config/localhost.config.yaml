@@ -16,14 +16,15 @@ nodes:
   - id: 0
     label: mercata-testnet-node1
     url: https://node1.mercata-testnet2.blockapps.net
+    fileStorageHost: https://www.google.com #$FILE_STORAGE_HOST
     port: 30303
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000
       openIdDiscoveryUrl: >-
-        https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
-      clientId: localhost
-      clientSecret: ab85bdf6-9715-441f-b3e5-c8be53c3a55e
+        https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+      clientId: dev
+      clientSecret: d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
       scope: email openid
       serviceOAuthFlow: 
       redirectUri: http://localhost/api/v1/authentication/callback

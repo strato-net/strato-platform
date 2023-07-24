@@ -30,7 +30,8 @@ interface Config {
 
 interface Node {
   url:string,
-  oauth:OAuthConfig
+  oauth:OAuthConfig,
+  fileStorageHost?:string,
 }
 
 interface Member {

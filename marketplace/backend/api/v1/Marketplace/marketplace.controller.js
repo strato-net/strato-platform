@@ -21,7 +21,7 @@ class MarketplaceController {
       const productsWithImageUrl = inventories
         .map(product => ({
           ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+          imageUrl: rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
         }))
       rest.response.status200(res, productsWithImageUrl)
 
@@ -44,7 +44,7 @@ class MarketplaceController {
       const productsWithImageUrl = inventories
         .map(product => ({
           ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+          imageUrl: rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
         }))
       rest.response.status200(res, productsWithImageUrl)
 
@@ -60,7 +60,7 @@ class MarketplaceController {
       const inventories = await dapp.getTopSellingProducts({ ...query })
       const productsWithImageUrl = inventories.map(product => ({
         ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        imageUrl: rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
         )
       }))
       rest.response.status200(res, productsWithImageUrl)
@@ -77,7 +77,7 @@ class MarketplaceController {
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
       const productsWithImageUrl = inventories.map(product => ({
         ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        imageUrl: rest.getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
         )
       }))
       rest.response.status200(res, productsWithImageUrl)

@@ -1535,6 +1535,37 @@ async function listExtStorage(user, args, options:Options) {
 }
 
 // =====================================================================
+//   External Storage
+//   NEW!
+// =====================================================================
+
+async function uploadFileToS3(fileKey, fileBuffer, s3Options, options:Options) {
+  const uploadResult = await api.uploadFileToS3(
+    fileKey,
+    fileBuffer,
+    s3Options,
+    options,
+  );
+  return uploadResult;
+}
+
+async function getSignedUrlFromS3(fileKey, s3Options) {
+  const uploadResult = await api.getSignedUrlFromS3(
+    fileKey,
+    s3Options
+  );
+  return uploadResult;
+}
+
+async function deleteFileFromS3(fileKey, s3Options) {
+  const uploadResult = await api.deleteFileFromS3(
+    fileKey,
+    s3Options
+  );
+  return uploadResult;
+}
+
+// =====================================================================
 //   OAuth
 // =====================================================================
 
@@ -1801,5 +1832,8 @@ export default {
   RestError,
   response,
   //
-  waitForAddress
+  waitForAddress,
+  uploadFileToS3,
+  getSignedUrlFromS3,
+  deleteFileFromS3
 };

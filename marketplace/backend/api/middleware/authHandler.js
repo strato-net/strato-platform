@@ -5,6 +5,7 @@ import jwtDecode from 'jwt-decode'
 import config from '/load.config'
 
 const getTokenFromCookie = async (req, res) => {
+  console.log("REQ!: ", req)
   const tokenName = req.app.oauth.getCookieNameAccessToken()
   if (req.cookies[tokenName]) {
     try {
@@ -78,7 +79,9 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
+        console.log("error", err)
+        console.log('res', res)
+        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR,res)
         return next()
       }
 

@@ -23,7 +23,7 @@ class OrderController {
       const order = await dapp.getOrder(args, chainOptions)
       const orderLinesWithImageUrl = order.orderLines.map(orderLine => ({
         ...orderLine,
-        imageUrl: getSignedUrlFromS3(orderLine.imageKey, req.app.get(constants.s3ParamName))
+        imageUrl: rest.getSignedUrlFromS3(orderLine.imageKey, req.app.get(constants.s3ParamName))
       }))
       const result = { ...order, orderLines: orderLinesWithImageUrl }
       rest.response.status200(res, result)
