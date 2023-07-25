@@ -18,6 +18,7 @@ module SolidVM.Model.CodeCollection.Function (
   Modifier,
   UsingF(..),
   Using,
+  FunctionCallType(..),
   tShow,
   tShow',
   tRead,
@@ -53,6 +54,8 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
+
+import           Blockchain.Strato.Model.Account (Account)
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
@@ -149,7 +152,7 @@ makeLenses ''FuncF
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
 
-type Func = Positioned FuncF 
+type Func = Positioned FuncF
 
 data ModifierF a = Modifier
   { _modifierArgs     :: Map Text SolidVM.IndexedType
@@ -210,4 +213,7 @@ instance ToSchema Using where
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
-  
+
+data FunctionCallType = DefaultCall
+                      | RawCall Account
+                      | DelegateCall Account
