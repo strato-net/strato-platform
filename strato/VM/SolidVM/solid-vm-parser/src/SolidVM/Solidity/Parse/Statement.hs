@@ -405,8 +405,8 @@ numberUnit = do
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep literal
 
-parseDelegateCallArgs :: SolidityParser (SolidString, [SVMType.Type])
-parseDelegateCallArgs = do
+parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
+parseExternalCallArgs = do
   ~(fname, args) <-  do
       name <- fromMaybe "fallback" <$> optionMaybe identifier
       args <-  parens $ commaSep  simpleType

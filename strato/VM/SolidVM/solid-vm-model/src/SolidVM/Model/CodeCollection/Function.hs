@@ -215,5 +215,5 @@ instance Arbitrary a => Arbitrary (FuncF a) where
 
 
 data FunctionCallType = DefaultCall
-                      | RawCall Account
+                      | RawCall
                       | DelegateCall Account

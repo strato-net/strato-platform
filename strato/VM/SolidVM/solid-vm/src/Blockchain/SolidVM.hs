@@ -466,7 +466,7 @@ call' :: MonadSM m
 call' from to' fnCalltype mContract functionName isRCC argExps  = do
   let (to, ccToGet) = case fnCalltype of
         CC.DefaultCall        -> (to', to')
-        CC.RawCall _          -> (to', to')
+        CC.RawCall            -> (to', to')
         CC.DelegateCall proxy -> (from, proxy)
       fromChain = from ^. accountChainId
       toChain   = to ^. accountChainId
@@ -525,13 +525,11 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
 
   let (functionName', argsParsed) =
         case fnCalltype of
-          CC.RawCall _ -> (case runParser parseDelegateCallArgs (ParserState "" "" M.empty) "" functionName of
+          CC.DefaultCall -> (functionName, [])
+          -- Handles RawCall and DelegateCall function signature parsing
+          _ -> (case runParser parseExternalCallArgs (ParserState "" "" M.empty) "" functionName of
             Right (funcTocall, typesArr) -> (funcTocall, typesArr)
             _                            -> (functionName, []))
-          CC.DelegateCall _ -> (case runParser parseDelegateCallArgs (ParserState "" "" M.empty) "" functionName of
-            Right (funcTocall, typesArr) -> (funcTocall, typesArr)
-            _                            -> (functionName, []))
-          _ -> (functionName, [])
 
   (!f, !args) <-
         case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
@@ -544,12 +542,12 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                           Just ci -> if fromChain == toChain then readOnly ci else True
                     f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
                 return (f', args')
-          -- Handles .call() logic, equivalent to EVM CALL opcode
-          (Just theFunction, CC.RawCall _) -> do
+          -- Handles .call() and .delegatecall() logic
+          (Just theFunction, _) -> do
                 let mtheFunction' = do
-                      let boolTrueIfArgsSameLength thyFunc = (length argsParsed )  == (length $ CC._funcArgs thyFunc)
-                          filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ( [theFunction] ++  (CC._funcOverload  theFunction) )
-                          boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
+                      let boolTrueIfArgsSameLength thyFunc = (length argsParsed) == (length $ CC._funcArgs thyFunc)
+                          filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload  theFunction))
+                          boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) -> a == d) $ zip argsParsed (CC._funcArgs funck)
                           finalFuncFind                    = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
                       case finalFuncFind of
                         [a] -> Just a
@@ -561,50 +559,11 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                                 let ro = case mCallInfo of
                                           Nothing -> False
                                           Just ci -> if fromChain == toChain then readOnly ci else True
-                                    f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
                                 return (f', args')
                       _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
                                   Just fallbackFunc -> do
-                                                args' <- argsToVals contract' fallbackFunc argExps
-                                                mCallInfo <- getCurrentCallInfoIfExists
-                                                let ro = case mCallInfo of
-                                                              Nothing -> False
-                                                              Just ci -> if fromChain == toChain then readOnly ci else True
-                                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
-                                                return (f', args')
-                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
-            -- args' <- argsToVals contract' theFunction argExps
-            -- mCallInfo <- getCurrentCallInfoIfExists
-            -- let ro = case mCallInfo of
-            --           Nothing -> False
-            --           Just ci -> if fromChain == toChain then readOnly ci else True
-            --     f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
-            -- return (f', args')
-
-          -- Handles .delegatecall() logic, equivalent to EVM DELEGATECALL opcode
-          (Just theFunction, CC.DelegateCall _) -> do
-                -- find the func that matches the arguments the user gave
-                -- if not found return Nothing and then call fallback
-                let mtheFunction' = do
-                      let boolTrueIfArgsSameLength thyFunc = (length argsParsed )  == (length $ CC._funcArgs thyFunc)
-                          filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ( [theFunction] ++  (CC._funcOverload  theFunction) )
-                          boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
-                          finalFuncFind                    = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
-                      case finalFuncFind of
-                        [a] -> Just a
-                        _   -> Nothing
-                case mtheFunction' of
-                      Just theFunction' | (length argsParsed) == (length argExps) -> do
-                                args' <- argsToVals contract' theFunction' argExps
-                                mCallInfo <- getCurrentCallInfoIfExists
-                                let ro = case mCallInfo of
-                                          Nothing -> False
-                                          Just ci -> if fromChain == toChain then readOnly ci else True
-                                    f' =  (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
-                                return (f', args')
-                      _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
-                                  Just fallbackFunc -> do
-                                                args' <- argsToVals contract' fallbackFunc argExps
+                                                args'     <- argsToVals contract' fallbackFunc argExps
                                                 mCallInfo <- getCurrentCallInfoIfExists
                                                 let ro = case mCallInfo of
                                                               Nothing -> False
@@ -1954,7 +1913,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to call" args)
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
-              res <- callWithResult fromAddress toAddress (CC.RawCall toAddress) Nothing funcName False args'
+              res <- callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
               case res of
                   Just a  -> return $ Constant  a
                   Nothing -> return $ Constant SNULL
