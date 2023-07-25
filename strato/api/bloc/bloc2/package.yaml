@@ -14,6 +14,7 @@ dependencies:
   - solid-vm-parser
   - parsec
   - solid-vm-model
+  - solid-vm
 
 
 library:
@@ -22,7 +23,6 @@ library:
   dependencies:
     - aeson
     - base16-bytestring
-    - bloc-sql-monad
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
@@ -34,7 +34,6 @@ library:
     - clock
     - common-log
     - conduit
-    - core-api-monad
     - core-api2
     - cryptonite
     - directory
@@ -51,7 +50,6 @@ library:
     - monad-alter
     - monad-logger
     - mtl
-    - opaleye
     - ordered-containers
     - postgresql-simple
     - process

@@ -17,37 +17,32 @@ import           Data.Aeson.Types
 import           Data.Aeson.KeyMap            as KeyMap
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (fromMaybe, listToMaybe, maybeToList)
+import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Generic.Random               as GR
 import           GHC.Generics
-import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
-import           Data.Source.Map
 
 data XabiKind = ContractKind
               | InterfaceKind
+              | AbstractKind
               | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
 instance Arbitrary XabiKind where
-  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+  arbitrary = elements [ContractKind, AbstractKind, InterfaceKind, LibraryKind]
 
 instance ToSchema XabiKind where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Xabi Kind Schema"
-    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, or an interface"
+    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, an abstract contract or an interface"
     & mapped.schema.example ?~ toJSON ContractKind
 
 data Xabi = Xabi
@@ -323,66 +318,6 @@ instance ToSchema Using where
      & mapped.schema.example ?~ toJSON sampleUsing
      where sampleUsing :: Using
            sampleUsing = Using "for uint[]"
-
-
-data ContractDetails = ContractDetails
-  { contractdetailsBin        :: !Text
-  , contractdetailsAccount    :: !(Maybe Account)
-  , contractdetailsBinRuntime :: !Text
-  , contractdetailsCodeHash   :: !CodePtr
-  , contractdetailsName       :: !Text
-  , contractdetailsSrc        :: !SourceMap
-  , contractdetailsXabi       :: !Xabi
-  } deriving (Show,Eq,Generic,NFData)
-
-instance ToJSON ContractDetails where
-  toJSON ContractDetails{..} = object $
-    [ "bin" .= contractdetailsBin
-    , "address" .= fmap _accountAddress contractdetailsAccount
-    , "chainId" .= fmap _accountChainId contractdetailsAccount
-    , "bin-runtime" .= contractdetailsBinRuntime
-    , "codeHash" .= contractdetailsCodeHash
-    , "name" .= contractdetailsName
-    , "src" .= contractdetailsSrc
-    , "xabi" .= contractdetailsXabi
-    ]
-
-instance FromJSON ContractDetails where
-  parseJSON = withObject "ContractDetails" $ \obj ->
-    ContractDetails
-      <$> obj .: "bin"
-      <*> (do
-        mAddr <- obj .:? "address"
-        case mAddr of
-          Nothing -> pure Nothing
-          Just addr -> Just . Account addr <$> (obj .:? "chainId"))
-      <*> obj .: "bin-runtime"
-      <*> obj .: "codeHash"
-      <*> obj .: "name"
-      <*> (fromMaybe mempty <$> obj .:? "src")
-      <*> obj .: "xabi"
-
-instance ToSample ContractDetails where toSamples _ = noSamples
-
-instance Arbitrary ContractDetails where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSchema ContractDetails where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "ContractDetails"
-    & mapped.schema.description ?~ "Returned data from contract creation."
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ContractDetails
-      ex = ContractDetails
-        { contractdetailsBin = "ContractBin"
-        , contractdetailsAccount = Just $ Account (Address 0xdeadbeef) Nothing
-        , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
-        , contractdetailsName = "DetailsName"
-        , contractdetailsSrc = namedSource "DetailsName.sol" "contract DetailsName { }"
-        , contractdetailsXabi = sampleXabi
-        }
 
 --------------------------------------------------------------------------------
 

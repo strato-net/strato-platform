@@ -16,6 +16,7 @@ module Data.Source.Annotation
   , withAnnotation
   , withPosition
   , position
+  , emptySourceAnnotation
   , typeErrorToAnnotation
   , sourceAnnotationStart
   , sourceAnnotationEnd
@@ -26,6 +27,7 @@ import           Control.Lens              hiding ((.=))
 import           Control.DeepSeq
 import           Data.Aeson                as Aeson
 import           Data.Data
+import           Data.Default
 import qualified Data.Map                  as M
 import qualified Data.Text                 as T
 import           Data.Source.Position
@@ -63,6 +65,9 @@ instance FromJSON a => FromJSON (SourceAnnotation a) where
 instance Arbitrary a => Arbitrary (SourceAnnotation a) where
   arbitrary = SourceAnnotation <$> arbitrary <*> arbitrary <*> arbitrary
 
+instance Default a => Default (SourceAnnotation a) where
+  def = SourceAnnotation def def def
+
 instance ToSchema (SourceAnnotation a) where
   declareNamedSchema _ = return $ NamedSchema (Just "SourceAnnotation")
     ( mempty
@@ -88,6 +93,9 @@ instance Show a => Show (SourceAnnotation a) where
 
 type Positioned f = f (SourceAnnotation ())
 type Annotated f = f (SourceAnnotation Text)
+
+emptySourceAnnotation :: SourceAnnotation ()
+emptySourceAnnotation = SourceAnnotation (initialPosition "") (initialPosition "") ()
 
 parseErrorToAnnotation :: ParseError -> SourceAnnotation Text
 parseErrorToAnnotation pe =

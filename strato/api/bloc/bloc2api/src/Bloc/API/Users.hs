@@ -45,12 +45,10 @@ import           Control.Lens.Operators             hiding ((.=))
 import           Control.Lens.TH
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
-import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
-import qualified Data.Text.Encoding                 as Text
 import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Numeric.Natural
@@ -64,7 +62,6 @@ import           Bloc.API.TypeWrappers
 import           Bloc.API.Utils
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
-import           BlockApps.Solidity.Xabi
 
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.Json              (RawTransaction', UnsignedRawTransaction')
@@ -382,28 +379,6 @@ instance ToSchema UploadListContract where
         , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
-
-newtype PostUsersUploadListResponse = PostUsersUploadListResponse
-  { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
-
-instance ToSchema PostUsersUploadListResponse
-
-instance Arbitrary PostUsersUploadListResponse where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostUsersUploadListResponse where
-  toJSON (PostUsersUploadListResponse contractDetails) = object
-    [ "contractJSON" .= Text.decodeUtf8 (ByteString.Lazy.toStrict (encode contractDetails)) ]
-
-instance FromJSON PostUsersUploadListResponse where
-  parseJSON = withObject "PostUsersUploadListResponse" $ \obj -> do
-    str <- obj .: "contractJSON"
-    case eitherDecode (ByteString.Lazy.fromStrict (Text.encodeUtf8 str)) of
-      Left err      -> fail err
-      Right details -> return $ PostUsersUploadListResponse details
-
-instance ToSample PostUsersUploadListResponse where
-  toSamples _ = noSamples
 
 data ContractListParameters = ContractListParameters
   { fromAddr  :: Address

@@ -13,7 +13,6 @@
 
 module Main where
 
-import           Prelude hiding (lookup)
 import           Control.Lens.Operators
 import           Control.Monad.Change.Modify  (Accessible)
 import           Control.Monad.Change.Alter
@@ -52,7 +51,6 @@ import           Bloc.Server.BlocOptions    ()
 import           Bloc.Server.Utils          (toMaybe)
 import           BlockApps.Init
 import           BlockApps.Logging
-import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
@@ -61,10 +59,10 @@ import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 
-import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI hiding (httpManager)
-import           Control.Monad.Composable.SQL    hiding (SQLM)
+import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault  hiding (httpManager)
+
+import           SolidVM.Model.CodeCollection.Contract
 
 import           Text.Tools
 
@@ -87,48 +85,40 @@ import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
 import           Options
-import           SelectAccessible                ()
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
-instance ( (Keccak256 `Alters` SourceMap) m
-         , MonadLogger m
-         , HasBlocEnv m
-         , HasBlocSQL m
-         , HasSQL m
-         ) => Selectable Account ContractDetails (CoreAPIM m) where
+instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
                             . fmap listToMaybe
-                            . blocStrato
-                            . Account.getAccountsFilter
+                            . Account.getAccount'
                             $ Account.accountsFilterParams
                             & Account.qaAddress ?~ (a ^. accountAddress)
                             & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) (\d -> Just d{contractdetailsAccount = Just a}) <$> getContractDetailsByCodeHash codePtr
+    MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (CoreAPIM m) where
-  lookup p   = lift . lookup p
-  insert p k = lift . insert p k
-  delete p   = lift . delete p
+instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
+  select p = lift . select p
 
-instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (VaultM m) where
-  lookup p   = lift . lookup p
-  insert p k = lift . insert p k
-  delete p   = lift . delete p
+instance Selectable Account Contract m => Selectable Account Contract (VaultM m) where
+  select p = lift . select p
 
-instance (MonadLogger m, MonadUnliftIO m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
-  lookup _   = contractBySourceHash
-  insert _   = insertContractSourceQuery
-  delete _ _ = liftIO . throwIO . AnError $ "Cannot delete from contractsSourceTable"
+instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
+  select _ = Account.getCodeFromPostgres
 
-instance (MonadUnliftIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
+  select p = lift . select p
+
+instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
+  select p = lift . select p
+
+instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
                             . fmap listToMaybe
-                            . blocStrato
-                            . Account.getAccountsFilter
+                            . Account.getAccount'
                             $ Account.accountsFilterParams
                             & Account.qaAddress ?~ (a ^. accountAddress)
                             & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
@@ -140,10 +130,17 @@ instance (MonadUnliftIO m, MonadLogger m) => Selectable Account AddressState (Co
       codePtr
       (toMaybe 0 $ addressStateRefChainId r)
 
+instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
+  select p = lift . select p
+
+instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT BlocEnv m) where
+  select p = lift . select p
+
 type CoreAPI =
   "eth" :> "v1.2" :>
   (
     Account.API
+    :<|> Account.CodeAPI
     :<|> BatchTransactionResult.API
     :<|> BlkLast.API
     :<|> Block.API
@@ -165,8 +162,14 @@ type CoreAPI =
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-coreServer :: (MonadLogger m, HasSQL m, Accessible VaultData m ) => ServerT CoreAPI m
+coreServer :: ( MonadLogger m
+              , HasSQL m
+              , Accessible VaultData m
+              , Selectable Keccak256 SourceMap m
+              )
+           => ServerT CoreAPI m
 coreServer = Account.server
+  :<|> Account.codeServer
   :<|> BatchTransactionResult.server
   :<|> BlkLast.server
   :<|> Block.server
@@ -187,13 +190,11 @@ coreServer = Account.server
 
 fullServer :: ( MonadLogger m
               , HasSQL m
-              , HasBlocSQL m
               , HasBlocEnv m
               , HasVault m
-              , HasCoreAPI m
-              , Selectable Account ContractDetails m
+              , Selectable Account Contract m
               , Selectable Account AddressState m
-              , (Keccak256 `Alters` SourceMap) m
+              , Selectable Keccak256 SourceMap m
               )
            => ServerT FullAPI m
 fullServer = coreServer :<|> bloc
@@ -201,8 +202,8 @@ fullServer = coreServer :<|> bloc
 ----------------
 
 
-hoistCoreServer :: BlocEnv -> BlocSQLEnv -> Server FullAPI
-hoistCoreServer blocEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> Server FullAPI
+hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -213,9 +214,7 @@ hoistCoreServer blocEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (conve
       runLoggingT .
         runSQLM .
         flip runReaderT blocEnv .
-        runBlocSQLMUsingEnv blocSQLEnv .
-        runVaultM "http://localhost:8013/strato/v2.3" .
-        runCoreAPIM "http://localhost:3000/eth/v1.2" $ f
+        runVaultM "http://localhost:8013/strato/v2.3" $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -241,8 +240,6 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
 
-  blocSQLEnv <- createBlocSQLEnv "postgres" 5432 "postgres" "api"
-
   let env =
         BlocEnv{
           gasOn = flags_gasOn,
@@ -254,10 +251,10 @@ main = do
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue
           }
-  run 3000 $ app env blocSQLEnv theDoc
+  run 3000 $ app env theDoc
 
-app :: BlocEnv -> BlocSQLEnv -> Swagger -> Application
-app blocEnv blocSQLEnv theDoc =
+app :: BlocEnv -> Swagger -> Application
+app blocEnv theDoc =
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
@@ -265,7 +262,7 @@ app blocEnv blocSQLEnv theDoc =
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ addPathsTo404
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
-  $ hoistCoreServer blocEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc
+  $ hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
 
 
 

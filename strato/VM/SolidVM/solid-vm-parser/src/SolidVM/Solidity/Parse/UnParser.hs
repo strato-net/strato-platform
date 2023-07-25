@@ -51,6 +51,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case _xabiKind contract of
         ContractKind -> "contract "
         InterfaceKind -> "interface "
+        AbstractKind -> "abstract contract "
         LibraryKind -> "library ")
   <> Text.unpack name
   <> (case inherited of

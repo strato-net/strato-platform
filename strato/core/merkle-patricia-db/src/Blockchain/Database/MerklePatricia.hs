@@ -26,10 +26,10 @@
 
 module Blockchain.Database.MerklePatricia (
   genericLookupDB, genericInsertDB, genericDeleteDB,
-  Key, Val, StateDB(..), StateRoot(..), NodeData(..),
-  openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
+  Key, Val, StateDB(..), StateRoot(..), NodeDataF(..), NodeData,
+  runMP, openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
-  initializeBlank, blankStateRoot
+  initializeBlank, blankStateRoot, addAllKVs
   ) where
 
 import           Control.Monad.Change.Alter
@@ -42,7 +42,7 @@ import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Strato.Model.Keccak256           (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Util                (byteString2NibbleString)
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do
@@ -101,11 +101,10 @@ keyExists sr key = isJust <$> getKeyVal sr key
 
 -- | Returns the StateRoot of the blank database
 blankStateRoot :: StateRoot
-blankStateRoot = StateRoot $ keccak256ToByteString $ hash (rlpSerialize $ rlpEncode (0 :: Integer))
+blankStateRoot = emptyTriePtr
 
--- | Initialize the DB by adding a blank stateroot.
-initializeBlank :: (StateRoot `Alters` NodeData) m
-                => m ()
-initializeBlank =
-    let bytes = rlpSerialize $ rlpEncode EmptyNodeData
-    in insert Proxy (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData
+addAllKVs :: (RLPSerializable x, RLPSerializable y, (StateRoot `Alters` NodeData) m) => StateRoot -> [(x,y)] -> m StateRoot
+addAllKVs sr [] = return sr
+addAllKVs sr (x:rest) = do
+  sr' <- unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
+  addAllKVs sr' rest

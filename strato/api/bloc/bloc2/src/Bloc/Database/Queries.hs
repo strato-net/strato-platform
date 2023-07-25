@@ -14,222 +14,55 @@
 {-# LANGUAGE BangPatterns          #-}
 
 module Bloc.Database.Queries
-  ( contractBySourceHash
-  , insertContractSourceQuery
-  , evmContractByCodeHash
-  , evmCodeHashByName
-  , insertEvmContractNameQuery
-  , insertContractDetailsQuery
-  , sourceToContractDetails
+  ( sourceToContractDetails
   , getContractDetailsForContract
   , getContractDetailsByCodeHash
   , evmContractSolidVMError
   ) where
 
 import           Blockchain.Data.AddressStateDB  (AddressState, unsafeResolveCodePtrSelect)
-import           Control.Arrow
 import           Control.DeepSeq
-import           Control.Monad
 import qualified Control.Monad.Change.Alter      as A
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Class       (lift)
 import           Control.Monad.Trans.Except
-import qualified Crypto.Saltine.Class            as Saltine
-import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
-import           Data.Aeson                      (Result(..), fromJSON)
-import qualified Data.ByteString                 as B
-import qualified Data.ByteString.Char8           as BC
-import           Data.Either                     (fromRight)
-import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
-import           Data.Maybe
-import           Data.Profunctor
-import           Data.Profunctor.Product.Default
-import           Data.RLP
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
-import           Data.Traversable                (for)
-import qualified Database.Esqueleto.Legacy       as E
-import           Database.PostgreSQL.Simple.FromField hiding (name, format)
-import           Opaleye                         hiding (not, null, index, FromField)
-import qualified Opaleye as O
-import           Opaleye.Internal.PGTypesExternal
 import           Text.Format
 import           UnliftIO
 
-
-
-import           Bloc.API.AbiBin     (AbiBin(..))
-import           Bloc.API.Utils
-import           Bloc.Database.Tables
-import           Bloc.Database.Solc
-import           Bloc.Monad
-import           Bloc.Server.Utils
-import           Bloc.XabiHelper
-import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
-import           BlockApps.Solidity.Parse.Parser
-import           BlockApps.Solidity.Xabi
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
+import           Blockchain.SolidVM.CodeCollectionDB
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Data.Source.Annotation
 import           Data.Source.Map
+import           SolidVM.Model.CodeCollection
 
-import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.SQL
 import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-contractBySourceHash
-  :: (MonadLogger m, HasBlocSQL m)
-  => Keccak256
-  -> m (Maybe SourceMap)
-contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
-  (_,sh,src) <- selectTable contractsSourceTable -< ()
-  restrict -< sh .== toFields srcHash
-  returnA -< (src)
-
-insertContractSourceQuery
-  :: (MonadLogger m, HasBlocSQL m)
-  => Keccak256
-  -> SourceMap
-  -> m ()
-insertContractSourceQuery srcHash src' = do
-  let src = serializeSourceMap src'
-  void . blocModify $ \ conn ->
-    runInsert_ conn $ Insert {
-    iTable=contractsSourceTable,
-    iRows=[
-      ( Nothing
-      , toFields srcHash
-      , toFields src
-      )],
-    iReturning=rCount,
-    iOnConflict=Nothing
-    }
-
-evmContractByCodeHash
-  :: (MonadLogger m, HasBlocSQL m)
-  => Keccak256
-  -> m [(Text, Keccak256)]
-evmContractByCodeHash codeHash = blocQuery $ proc () -> do
-  (_,ch,name,sh) <- selectTable evmContractNameTable -< ()
-  restrict -< ch .== toFields codeHash
-  returnA -< (name,sh)
-
-evmCodeHashByName
-  :: (MonadLogger m, HasBlocSQL m)
-  => Text
-  -> m [Keccak256]
-evmCodeHashByName cName = blocQuery $ proc () -> do
-  (_,ch,name,_) <- selectTable evmContractNameTable -< ()
-  restrict -< name .== toFields cName
-  returnA -< ch
-
-insertEvmContractNameQuery
-  :: (MonadLogger m, HasBlocSQL m)
-  => Keccak256
-  -> Text
-  -> Keccak256
-  -> m ()
-insertEvmContractNameQuery codeHash cName srcHash = do
-  void . blocModify $ \ conn ->
-    runInsert_ conn $ Insert {
-    iTable=evmContractNameTable,
-    iRows=[
-      ( Nothing
-      , toFields codeHash
-      , toFields cName
-      , toFields srcHash
-      )],
-    iReturning=rCount,
-    iOnConflict=Nothing
-    }
-
-insertContractDetailsQuery
-  :: (A.Alters Keccak256 SourceMap m)
-  => SourceMap
-  -> m ()
-insertContractDetailsQuery sourceList =
-  void $ insertQuery
-  where insertQuery = do
-          let encodedSrc = serializeSourceMap sourceList
-              srcHash    = hash (Text.encodeUtf8 encodedSrc)
-
-          A.insert (A.Proxy @SourceMap) srcHash sourceList
-
-getContractDetailsFromDB
-  :: (HasSQL m)
-  => CodePtr
-  -> Text
-  -> m (Maybe ContractDetails)
-getContractDetailsFromDB codePtr ctrName = do
-  res <- fmap (map E.entityVal) . sqlQuery $ E.select $
-    E.from $ \(contractDetailsRef) -> do
-      E.where_ (contractDetailsRef E.^. ContractDetailsRefCodeHash E.==. E.val codePtr)
-      E.where_ (contractDetailsRef E.^. ContractDetailsRefName E.==. E.val ctrName)
-      return contractDetailsRef
-  case listToMaybe res of
-    Nothing -> pure $ Nothing
-    Just a -> pure $ Just $ ContractDetails
-      { contractdetailsBin = ""
-      , contractdetailsAccount = contractDetailsRefAccount a
-      , contractdetailsBinRuntime = ""
-      , contractdetailsCodeHash =  contractDetailsRefCodeHash a
-      , contractdetailsName = contractDetailsRefName a
-      , contractdetailsSrc = SourceMap []
-      , contractdetailsXabi = contractDetailsRefXabi a
-      }
-
-insertContractDetails
-  :: (HasSQL m)
-  => ContractDetails
-  -> Bool
-  -> m ()
-insertContractDetails (ContractDetails _ a _ ch n _ x) shouldInsert = case shouldInsert of
-  True -> sqlQuery $ E.insert_ $ ContractDetailsRef a ch n x
-  False -> pure $ ()
-
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
-                                , (Keccak256 `A.Alters` SourceMap) m
-                                , MonadLogger m
-                                , HasBlocSQL m
-                                , HasSQL m
+                                , (Keccak256 `A.Selectable` SourceMap) m
                                 )
-                             => CodePtr -> m (Either Text ContractDetails)
+                             => CodePtr -> m (Either Text (CodePtr, Contract))
 getContractDetailsByCodeHash codePtr = do
   runExceptT $ do
     mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
-      (shouldCompile, name, ch) <- case codeHash of
-        EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
-          [] -> throwE $ "Could not find EVM contract for code hash " <> Text.pack (format ch)
-          ((name, sh):xs) -> do
-            unless (null xs) $
-              $logWarnS "getContractDetailsByCodeHash" . Text.pack $ concat
-                [ "Found multiple EVM contracts for code hash "
-                , format ch
-                , ". Picking first one from the list."
-                ]
-            pure (Do Compile, name, sh)
-        SolidVMCode name ch -> pure (Don't Compile, Text.pack name, ch)
+      (name, ch) <- case codeHash of
+        EVMCode _ -> throwE $ "EVM contracts no longer supported"
+        SolidVMCode name ch -> pure (Text.pack name, ch)
         CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
-      cd <- lift $ getContractDetailsFromDB codeHash name
-      case cd of
-        Nothing -> do 
-          srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
-            Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
-            Just s -> pure s
-          detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap True
-          case Map.lookup name detailsMap of
-              Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
-              Just d -> pure $! d
-        Just d -> pure $! d 
+      srcMap <- lift (A.select (A.Proxy @SourceMap) ch) >>= \case
+        Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
+        Just s -> pure s
+      let nameStr = Text.unpack name
+      ~(cHash, cc) <- either (throwE . Text.pack . show) pure $ sourceToContractDetails srcMap
+      case Map.lookup nameStr $ _contracts cc of
+          Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
+          Just d -> pure (SolidVMCode nameStr cHash, d)
     let !mDetails' = force mDetails
     case mDetails' of
       Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
@@ -242,202 +75,27 @@ evmContractSolidVMError = Text.concat
   , "If you are intending to use EVM, please modify your contracts and try again."
   ]
 
-getContractDetailsForContract :: ( A.Selectable Account AddressState m
-                                 , (Keccak256 `A.Alters` SourceMap) m
-                                 , MonadLogger m
-                                 , HasBlocSQL m
-                                 , HasSQL m
-                                 )
-                              => Text -> SourceMap -> Maybe Text -> m (Maybe (Text, ContractDetails))
-getContractDetailsForContract theVM src mContract = do
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-
-  idsAndDetails <- do
-    details <- if hasAnyNonEmptySources src
-                 then sourceToContractDetails shouldCompile src True
-                 else return Map.empty
-    pure details
-
-  case mContract of
-    Nothing ->
-      case Map.toList idsAndDetails of
+getContractDetailsForContract :: MonadIO m
+                              => SourceMap -> Maybe Text -> m (Maybe (CodePtr, Contract))
+getContractDetailsForContract src mContract = do
+  eCodeCollection <- if hasAnyNonEmptySources src
+                       then pure $ sourceToContractDetails src
+                       else throwIO . UserError $ "No source code given for contract"
+  case eCodeCollection of
+    Left annotations -> throwIO . UserError . Text.pack $ "Detected errors during compilation: " ++ show annotations
+    Right (ch, CodeCollection{..}) -> case mContract of
+      Nothing -> case Map.elems _contracts of
         [] -> pure Nothing
-        [x] -> Just <$> checkCodeHash x
+        [x] -> pure $ Just (SolidVMCode (_contractName x) ch, x)
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-    Just contract -> do
-      x <- let srcStr = serializeSourceMap src
-            in blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> srcStr)  (Map.lookup contract idsAndDetails)
-      Just <$> checkCodeHash (contract, x)
-  where checkCodeHash x@(_,cd) = case contractdetailsCodeHash cd of
-          (EVMCode _) -> pure x
-          (SolidVMCode _ _) -> case theVM of
-            "EVM" -> throwIO $ UserError evmContractSolidVMError
-            _ -> pure x
-          c@(CodeAtAccount _ name) -> getContractDetailsByCodeHash c >>= \case
-            Left e -> throwIO $ UserError e
-            Right details -> pure (Text.pack name, details)
+      Just c -> pure . fmap (SolidVMCode (Text.unpack c) ch,) $ Map.lookup (Text.unpack c) _contracts
 
-sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
-                           , MonadLogger m
-                           , HasBlocSQL m
-                           , HasSQL m
-                           )
-                        => Should Compile -> SourceMap -> Bool -> m (Map Text ContractDetails)
-sourceToContractDetails shouldCompile sourceList shouldInsert =
-  let createContractDetails =
-        case shouldCompile of
-          Do Compile    -> compileContract
-          Don't Compile -> createMetadataNoCompile shouldInsert
-   in createContractDetails sourceList
-
-compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
-                   , MonadLogger m
-                   , HasBlocSQL m
-                   )
-                => SourceMap -> m (Map Text ContractDetails)
-compileContract sourceList = do
-  let source = sourceBlob sourceList
-      eVerXabis = parseXabi "-" $ Text.unpack source
-      encodedSrc = serializeSourceMap sourceList
-      srcHash = hash (Text.encodeUtf8 encodedSrc)
-  (ver, xabis) <- case eVerXabis of
-    Left err -> blocError . UserError . Text.pack $ err
-    Right (v, xs) -> return (v, Map.fromList xs)
-  eabiBins <- fromJSON <$> compileSolc ver source
-  abiBins <- case eabiBins of
-    Error err -> blocError . UserError . Text.pack $ err
-    -- Starting with 0.4.9, solc prepends a filename to abi keys.
-    -- Bloc should too, but this change is easier :^)
-    Success res -> return . Map.mapKeys (snd . Text.breakOnEnd ":") $ res
-  --TODO - clean this up, what should filename be instead of "-"
-  --       get rid of error
-  --       name nicer, mabye merge with next let
-  let contracts = Map.intersectionWith (,) xabis abiBins
-  details <- for (Map.toList contracts) $ \ (contrName, (xabi,AbiBin{..})) -> do
-    let ch = binRuntimeToCodeHash binRuntime
-        cds = ContractDetails
-          { contractdetailsBin = bin
-          , contractdetailsAccount = Nothing
-          , contractdetailsBinRuntime = binRuntime
-          , contractdetailsCodeHash =  EVMCode ch
-          , contractdetailsName = contrName
-          , contractdetailsSrc = sourceList
-          , contractdetailsXabi = xabi
-          }
-    insertEvmContractNameQuery ch contrName srcHash
-    pure (contrName, cds)
-
-  A.insert (A.Proxy @SourceMap) srcHash sourceList
-
-  pure $ Map.fromList details
+sourceToContractDetails :: SourceMap -> Either [SourceAnnotation Text] (Keccak256, CodeCollection)
+sourceToContractDetails = createMetadataNoCompile
 
 -- SolidVM only
-createMetadataNoCompile :: ( MonadLogger m
-                           , HasSQL m
-                           , (Keccak256 `A.Alters` SourceMap) m
-                           )
-                        => Bool -> SourceMap -> m (Map Text ContractDetails)
-createMetadataNoCompile shouldInsert sourceList = do
-  let source = sourceBlob sourceList
-      encodedSrc = serializeSourceMap sourceList
-      oldXabi  =  parseXabi "-" $ Text.unpack source
-      eVerXabis = (case oldXabi of Left _ -> parseSolidXabi "-" $ Text.unpack source; _ -> oldXabi;)
-      srcHash = hash (Text.encodeUtf8 encodedSrc)
-  xabis <- case eVerXabis of
-    Left err -> blocError . UserError . Text.pack $ err
-    Right (_, xs) -> return $ Map.fromList xs
-  let contracts = xabis
-  details <- flip Map.traverseWithKey contracts $ \ contrName (xabi) -> do
-        let cd = ContractDetails
-              { contractdetailsBin = source
-              , contractdetailsAccount = Nothing
-              , contractdetailsBinRuntime = contrName `Text.append` source
-              , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
-              , contractdetailsName = contrName
-              , contractdetailsSrc = sourceList
-              , contractdetailsXabi = xabi
-              }
-        insertContractDetails cd shouldInsert
-        pure $ cd
-
-  A.insert (A.Proxy @SourceMap) srcHash sourceList
-  pure details
-
-instance DefaultFromField PGBytea Address where
-  defaultFromField = fromPGSFromField
-
-instance FromField Address where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !word160 = bytesToWord160 $ B.unpack theByteString
-    return $ Address word160
-
-instance Default ToFields Address (O.Field PGBytea) where
-  def = lmap getBytes def
-    where
-      getBytes (Address x) = B.pack . word160ToBytes $ x
-
-instance DefaultFromField PGBytea SecretBox.Nonce where
-  defaultFromField = fromPGSFromField
-
-instance FromField SecretBox.Nonce where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !decoded = fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
-    return decoded
-
-instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
-  def = lmap Saltine.encode def
-instance Default ToFields JwtToken (O.Field PGText) where
-  def = lmap getJwtToken def
-
-instance Default ToFields StateMutability (O.Field PGText) where
-  def = lmap tShow def
-
-instance DefaultFromField PGText StateMutability where
-  defaultFromField = fromPGSFromField
-
-instance FromField StateMutability where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !decoded = fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
-    return decoded
-
-instance DefaultFromField PGBytea Keccak256 where
-  defaultFromField = fromPGSFromField
-
-instance FromField Keccak256 where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !decoded = unsafeCreateKeccak256FromByteString theByteString
-    return decoded
-
-instance Default ToFields Keccak256 (O.Field PGBytea) where
-  def = lmap keccak256ToByteString def
-
-instance DefaultFromField PGBytea CodePtr where
-  defaultFromField = fromPGSFromField
-
-instance FromField CodePtr where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !decoded = fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
-    return decoded
-
-instance Default ToFields CodePtr (O.Field PGBytea) where
-  def = lmap rlpSerialize def
-
-instance DefaultFromField PGBytea (Maybe ChainId) where
-  defaultFromField = fromPGSFromField
-
-instance FromField ChainId where
-  fromField f mdata = do
-    !theByteString <- fromField f mdata
-    let !decoded = ChainId $ byteStringToWord256 theByteString
-    return decoded
-
-instance Default ToFields (Maybe ChainId) (O.Field PGBytea) where
-  def = lmap fromChainId def
-        where fromChainId = \case
-                Nothing -> B.empty
-                Just cid -> word256ToByteString $ unChainId cid
+createMetadataNoCompile :: SourceMap -> Either [SourceAnnotation Text] (Keccak256, CodeCollection)
+createMetadataNoCompile sourceList =
+  let compiledSource = compileSourceWithAnnotations True (Map.fromList $ unSourceMap sourceList)
+      srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
+   in (srcHash,) <$> compiledSource

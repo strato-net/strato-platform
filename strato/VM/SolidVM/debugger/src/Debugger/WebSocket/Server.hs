@@ -93,8 +93,8 @@ broadcast message conn = do
   putStrLn message
   WS.sendTextData conn $ T.pack message
 
-wsDebugger :: Int -> DebugSettings -> IO ()
-wsDebugger port dSettings = do
-  putStrLn $ "Starting WS Debugger on port " ++ show port
+wsDebugger :: String -> Int -> DebugSettings -> IO ()
+wsDebugger host port dSettings = do
+  putStrLn $ "Starting WS Debugger with host " ++ show host ++ " on port " ++ show port
   inUse <- newTVarIO False
-  WS.runServer "172.20.20.7" port $ wsDebuggerServer inUse dSettings
+  WS.runServer host port $ wsDebuggerServer inUse dSettings
