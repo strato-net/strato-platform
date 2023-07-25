@@ -10,7 +10,7 @@ const ImageCollage = (props) => {
 
   return (
     <>
-      <div style={{ margin: '20px' }}>
+      <div style={{width:'800px', height:'600px', margin:'auto', marginTop: '20px' }}>
         <Row
           gutter={{ xs: 8, sm: 16 }}
           justify="space-around"
@@ -37,6 +37,9 @@ const ImageCollage = (props) => {
               preview={false}
               src={images[2]}
             />
+          <div className='img-count' onClick={() => { handleImagePreview() }} >
+            {images?.length} Photos
+          </div>
           </Col>
         </Row>
       </div>
