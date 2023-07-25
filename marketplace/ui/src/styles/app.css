@@ -143,3 +143,11 @@
   bottom: 5%;
   right: 5%;
 }
+
+.slick-arrow{
+display: none !important;
+}
+
+.slick-slider:hover .slick-arrow{
+ display: block !important;
+}
