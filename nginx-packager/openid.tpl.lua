@@ -34,7 +34,7 @@ local verify_opts = {
 }
 
 local authenticate_opts = {
-  redirect_uri = "/identity/callback",
+  redirect_uri = "/auth/openidc/return",
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
