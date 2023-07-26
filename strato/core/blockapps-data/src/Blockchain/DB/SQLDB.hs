@@ -8,6 +8,7 @@ module Blockchain.DB.SQLDB
   ( HasSQLDB
   , SQLDB(..)
   , sqlQuery
+  , sqlQueryNoTransaction
   , runSqlPool
   , runPostgresConn
   , createPostgresqlPool
@@ -39,6 +40,9 @@ type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Accessible SQLDB m)
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
 sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< access Proxy
+
+sqlQueryNoTransaction :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
+sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . unSQLDB =<< access Proxy
 
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB

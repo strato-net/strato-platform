@@ -43,7 +43,7 @@ type SqlDbM m = SQL.SqlPersistT m
 
 commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  sqlQuery $ do
+  sqlQueryNoTransaction $ do
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
