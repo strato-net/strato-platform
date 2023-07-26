@@ -18,6 +18,7 @@ module Handlers.Storage
   , StorageAddress(..)
   , HexStorage(..)
   , CodeKind(..)
+  , getStorage'
   ) where
 
 import           Control.Arrow               ((***))
@@ -29,6 +30,7 @@ import qualified Database.Esqueleto.Legacy      as E
 import           Database.Persist.Postgresql
 import           GHC.Generics
 import           MaybeNamed
+import           Numeric.Natural
 import           Servant
 import           Servant.Client
 
@@ -54,6 +56,8 @@ type API =
             :> QueryParam "address" Address
             :> QueryParam "chainid" (MaybeNamed ChainId)
             :> QueryParams "chainids" ChainId
+            :> QueryParam "offset" Natural
+            :> QueryParam "limit" Natural
             :> Get '[JSON] [StorageAddress]
 
 data StorageFilterParams = StorageFilterParams
@@ -66,12 +70,14 @@ data StorageFilterParams = StorageFilterParams
   , qsAddress  :: Maybe Address
   , qsChainId  :: Maybe (MaybeNamed ChainId)
   , qsChainIds :: [ChainId]
+  , qsOffset   :: Maybe Natural
+  , qsLimit    :: Maybe Natural
   } deriving (Eq, Ord, Show)
 
 storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  []
+  [] Nothing Nothing
 
 getStorageClient :: StorageFilterParams -> ClientM [StorageAddress]
 getStorageClient = uncurryStorageFilterParams getStorageClient'
@@ -79,7 +85,7 @@ getStorageClient = uncurryStorageFilterParams getStorageClient'
     getStorageClient' = client (Proxy @API)
     uncurryStorageFilterParams f StorageFilterParams{..} = f
       qsKey qsMinKey qsMaxKey qsValue qsMinValue qsMaxValue
-      qsAddress qsChainId qsChainIds
+      qsAddress qsChainId qsChainIds qsOffset qsLimit
 
 server :: HasSQL m => ServerT API m
 server = getStorage
@@ -144,7 +150,8 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
 
             E.where_ (foldl1 (E.&&.) criteria2)
 
-            E.limit $ appFetchLimit
+            E.offset . fromIntegral $ fromMaybe 0 qsOffset
+            E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
 
             E.orderBy [E.asc (storage E.^. StorageKey)]
 
@@ -159,9 +166,9 @@ data NamedChainId = UnnamedChainIds [ChainId]
 getStorage :: Selectable StorageFilterParams [StorageAddress] m
            => Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe Address ->
-              Maybe (MaybeNamed ChainId) -> [ChainId] -> m [StorageAddress]
-getStorage a b c d e f g h i =
-  getStorage' (StorageFilterParams a b c d e f g h i)
+              Maybe (MaybeNamed ChainId) -> [ChainId] -> Maybe Natural -> Maybe Natural -> m [StorageAddress]
+getStorage a b c d e f g h i j k =
+  getStorage' (StorageFilterParams a b c d e f g h i j k)
 
 getStorage' :: Selectable StorageFilterParams [StorageAddress] m 
             => StorageFilterParams -> m [StorageAddress]

@@ -35,12 +35,16 @@ import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
+import           Data.Source.Annotation
 import           Data.Source.Map
+import           Data.Source.Position
+import           SolidVM.Model.CodeCollection.Contract
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 type GetContracts = "contracts"
+                 :> QueryParam "name" Text
                  :> QueryParam "offset" Integer
                  :> QueryParam "limit" Integer
                  :> QueryParam "chainid" ChainId
@@ -121,7 +125,26 @@ type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> QueryParam "chainid" ChainId
-  :> Get '[JSON] ContractDetails
+  :> Get '[JSON] Contract
+
+instance ToSample Contract where
+  toSamples _ = singleSample $ Contract {
+    _contractName = "SimpleStorage",
+    _parents = [],
+    _constants = Map.empty,
+    _storageDefs = Map.empty,
+    _userDefined = Map.empty,
+    _enums = Map.empty,
+    _structs = Map.empty,
+    _errors = Map.empty,
+    _events = Map.empty,
+    _functions = Map.empty,
+    _constructor = Nothing,
+    _modifiers = Map.empty,
+    _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) (),
+    _usings = Map.empty,
+    _contractType = ContractType
+  }
 --------------------------------------------------------------------------------
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
@@ -198,7 +221,7 @@ type GetContractsDetails = "contracts"
   :> Capture "contractAddress" Address
   :> "details"
   :> QueryParam "chainid" ChainId
-  :> Get '[JSON] ContractDetails -- change to HTML
+  :> Get '[JSON] Contract -- change to HTML
 
 --instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
 --  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty

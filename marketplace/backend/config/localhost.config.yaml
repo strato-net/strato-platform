@@ -1,20 +1,18 @@
+
 apiDebug: true
 timeout: 600000
 VM: SolidVM
 configDirPath: ./config
 deployFilename: localhost.deploy.yaml
 orgDeployFilename: org.deploy.yaml
-serverHost: http://localhost
-serverIP: 
+serverHost:
+serverIP:
 orgName: blockapps
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
-dockerized: false
-marketplaceUiUrlPrefix: "/marketplace"
-
 nodes:
   - id: 0
-    label: mercata-testnet-node1
+    label: mercata-testnet2-node1
     url: https://node1.mercata-testnet2.blockapps.net
     fileStorageHost: https://www.google.com #$FILE_STORAGE_HOST
     port: 30303
@@ -26,9 +24,9 @@ nodes:
       clientId: dev
       clientSecret: d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
       scope: email openid
-      serviceOAuthFlow: 
+      serviceOAuthFlow:
       redirectUri: http://localhost/api/v1/authentication/callback
       logoutRedirectUri: http://localhost
-      tokenField: 
-      tokenUsernameProperty: 
-      tokenUsernamePropertyServiceFlow: 
+      tokenField:
+      tokenUsernameProperty:
+      tokenUsernamePropertyServiceFlow:

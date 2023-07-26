@@ -46,7 +46,6 @@ module Debugger.Types
 import           Control.DeepSeq
 import           Control.Monad
 import qualified Control.Monad.Change.Modify          as Mod
-import           Control.Monad.IO.Class
 import           Data.Aeson                           as Aeson
 import           Data.Foldable                        (for_)
 import           Data.Functor.Identity
@@ -177,7 +176,7 @@ newDebugSettings =
         <*> newEmptyTMVar
 
 type Debuggable m =
-  ( MonadIO m
+  ( MonadUnliftIO m
   , Mod.Modifiable (Maybe DebugSettings) m
   , Mod.Accessible [SourcePosition] m
   , Mod.Accessible VariableSet m
@@ -197,7 +196,9 @@ breakpoint :: Debuggable m => Evaluator m -> m ()
 breakpoint eval = do
   poss <- Mod.access (Mod.Proxy @[SourcePosition])
   case poss of
-    [] -> pure ()
+    [] -> do
+      debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
+      for_ debugSettings $ \d -> atomically $ writeTVar (current d) Running
     (pos:_) -> do
       isBreak <- isBreakpoint eval pos
       when isBreak $ handleBreakpoint eval pos
@@ -251,31 +252,33 @@ handleBreakpoint :: Debuggable m
                  -> m ()
 handleBreakpoint eval pos = do
   debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
-  for_ debugSettings $ loop True
+  for_ debugSettings loop
   where
-    loop sendPing d@DebugSettings{..} = do
-      evalLoop
-      stateAndOp <- atomically $ (,) <$> readTVar current <*> tryReadTChan operation
-      case stateAndOp of
-        (_, Just Run) -> void . atomically $ writeTVar current Running
-        (_, Just StepIn) -> step 2
-        (_, Just StepOver) -> step 1
-        (_, Just StepOut) -> step 0
-        (Stepping n, _) -> do
+    loop d@DebugSettings{..} = do
+      state <- atomically $ readTVar current
+      case state of
+        Stepping n -> do
           cStack <- Mod.access (Mod.Proxy @[SourcePosition])
-          unless (length cStack >= n) $ doPause >> loop False d
-        _ -> doPause >> loop False d
+          let cLen = length cStack
+          if cLen == 0
+            then void . atomically $ writeTVar current Running
+            else unless (cLen >= n) $ void (atomically $ writeTVar current Running) >> loop d -- Set to running to trigger doPause on next loop
+        _ -> do
+          eCmd <- doPause >> race evalLoop (atomically $ readTChan operation)
+          case eCmd of
+            Right Run -> void . atomically $ writeTVar current Running
+            Right StepIn -> step 2
+            Right StepOver -> step 1
+            Right StepOut -> step 0
+            _ -> loop d
       where step k = do
               n <- length <$> Mod.access (Mod.Proxy @[SourcePosition])
               void . atomically . writeTVar current . Stepping $ n + k
-            evalLoop = do
-              mReq <- atomically $ tryReadTChan requests
-              for_ mReq $ \(req, res) -> do
-                mExpr <- atomically $ tryTakeTMVar req
-                for_ mExpr $ \expr -> do
-                  resp <- withoutDebugging $ eval expr
-                  atomically $ putTMVar res resp
-                evalLoop
+            evalLoop = forever $ do
+              (req, res) <- atomically $ readTChan requests
+              expr <- atomically $ takeTMVar req
+              resp <- withoutDebugging $ eval expr
+              atomically $ putTMVar res resp
 
             doPause = do
               cStack <- Mod.access (Mod.Proxy @[SourcePosition])
@@ -285,4 +288,4 @@ handleBreakpoint eval pos = do
               VariableSet varSet <- Mod.access (Mod.Proxy @VariableSet)
               varMap <- for varSet $ traverse (withoutDebugging . eval) . M.fromSet id
               void . atomically . writeTVar current . Paused $ DebugState pos cStack varMap watchValsMap
-              when sendPing . void . atomically $ tryPutTMVar ping ()
+              void . atomically $ tryPutTMVar ping ()

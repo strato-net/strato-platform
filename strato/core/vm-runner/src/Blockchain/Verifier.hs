@@ -17,7 +17,7 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.StateDB
 -- import           Blockchain.Mining
 -- import           Blockchain.Mining.Instant
@@ -27,7 +27,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util
 import           Blockchain.Verification
 import           Blockchain.VMOptions
 
@@ -68,20 +67,13 @@ checkParentChildValidity _ OutputBlock{obBlockData=c} parentBSum = do
 -- verifier::Miner
 -- verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
 
-addAllKVs :: (RLPSerializable obj, (MP.StateRoot `A.Alters` MP.NodeData) m)
-          => MP.StateRoot -> [(Integer, obj)] -> m MP.StateRoot
-addAllKVs x [] = return x
-addAllKVs sr (x:rest) = do
-  sr' <- MP.unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVs sr' rest
-
 verifyTransactionRoot'::OutputBlock -> (Bool,MP.StateRoot)
 verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
     let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (blockDataTransactionsRoot bd == tVal, tVal)
 
 verifyTransactionRoot::HasStateDB m=>OutputBlock->m (Bool,MP.StateRoot)
 verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
-  sr <- addAllKVs MP.emptyTriePtr $ zip [0..] $ (otBaseTx <$> txs)
+  sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer)..] $ (otBaseTx <$> txs)
   return (blockDataTransactionsRoot bd == sr, sr)
 
 verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool

@@ -37,7 +37,9 @@ import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.Function (on)
 import qualified Data.List as L (take)
+import Data.Ranged.Boundaries
 import Data.String
 import Data.Word
 import Numeric
@@ -51,7 +53,14 @@ type Nibble = Word8
 -- | This is the basic 'NibbleString' data type.
 --
 -- A 'NibbleString' is just a 'ByteString' internally, but with a spot to store the extra Nibble for odd length strings.
-data NibbleString = EvenNibbleString B.ByteString | OddNibbleString Nibble B.ByteString deriving (Show, Eq, Ord)
+data NibbleString = EvenNibbleString B.ByteString | OddNibbleString Nibble B.ByteString deriving (Show, Eq)
+
+instance Ord NibbleString where
+  compare = compare `on` unpack
+
+instance DiscreteOrdered NibbleString where
+  adjacent      _ _ = False
+  adjacentBelow _   = Nothing
 
 instance Pretty NibbleString where
   pretty (EvenNibbleString s) = blue $ text $ BC.unpack (B16.encode s)

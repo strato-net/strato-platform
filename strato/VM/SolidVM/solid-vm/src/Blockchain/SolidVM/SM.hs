@@ -63,9 +63,8 @@ import           Control.Lens hiding (Context)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.Reader
 import           Control.DeepSeq (($!!), force)
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -160,14 +159,13 @@ BlockData
 data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
-  , ssEvents        :: Q.Seq Event
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   , _gasInfo        :: GasInfo
   }
 makeLenses ''SState
 
-type SM m = StateT SState m
+type SM m = ReaderT (IORef SState) m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
@@ -187,24 +185,37 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
-                 , MonadIO m --todo: remove
+                 , MonadUnliftIO m --todo: remove
                  , MonadCatch m
                  , MonadLogger m
                  )
 
-instance Monad m => HasMemAddressStateDB (SM m) where
+get :: MonadUnliftIO m => SM m SState
+get = readIORef =<< ask
+{-# INLINE get #-}
+
+gets :: MonadUnliftIO m => (SState -> a) -> SM m a
+gets f = f <$> get
+{-# INLINE gets #-}
+
+modify :: MonadUnliftIO m => (SState -> SState) -> SM m ()
+modify f = ask >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE modify #-}
+
+instance MonadUnliftIO m => HasMemAddressStateDB (SM m) where
   getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
   putAddressStateTxDBMap    m = modify $ ssMemDBs . stateTxMap .~ m
   getAddressStateBlockDBMap   = gets $ _stateBlockMap . _ssMemDBs
   putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
-instance Monad m => HasMemRawStorageDB (SM m) where
+instance MonadUnliftIO m => HasMemRawStorageDB (SM m) where
   getMemRawStorageTxDB       = gets $ _storageTxMap . _ssMemDBs
   putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
-instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -214,7 +225,8 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -223,7 +235,7 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m)
          => (Maybe Word256 `A.Alters` MP.StateRoot) (SM m) where
   lookup p chainId = do
     (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
@@ -240,7 +252,7 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) m
     Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
     lift $ A.delete p chainId
 
-instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
@@ -273,7 +285,7 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance Monad m => Mod.Accessible Env.Environment (SM m) where
+instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
 
 instance (Mod.Modifiable (Maybe DebugSettings) m)
@@ -281,34 +293,29 @@ instance (Mod.Modifiable (Maybe DebugSettings) m)
   get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
   put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
 
-instance Monad m => Mod.Modifiable Env.Sender (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
   put _ (Env.Sender s) = modify $ \ss@SState{env=e} -> ss{env = e{Env.sender = s}}
 
-instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
-instance Monad m => Mod.Modifiable MemDBs (SM m) where
-  get _    = gets $ _ssMemDBs
+instance MonadUnliftIO m => Mod.Modifiable MemDBs (SM m) where
+  get _    = gets _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
 
-instance Monad m => Mod.Modifiable GasInfo (SM m) where
-  get _ = use gasInfo
-  put _ = assign gasInfo 
+instance MonadUnliftIO m => Mod.Modifiable GasInfo (SM m) where
+  get _   = gets _gasInfo
+  put _ g = modify $ gasInfo .~ g
 
-instance Monad m => Mod.Modifiable Action (SM m) where
-  get _ = use action
-  put _ = assign action
+instance MonadUnliftIO m => Mod.Modifiable Action (SM m) where
+  get _   = gets _action
+  put _ a = modify $ action .~ a
 
-instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
-  -- adding events to the action so that slipstream gets them,
-  --   and also to the events field of the sstate, so that they get sent to
-  --    TxrIndexer for governance updates
-  get    _   = gets ssEvents    -- This will get (Q.Seq Event)
-  put    _ q = do               -- This will replace (Q.Seq Event)
-    action . Action.events .= q
-    modify $ \sstate -> sstate { ssEvents = q }
+instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Event) (SM m) where
+  get _   = gets (Action._events . _action)
+  put _ q = modify $ action . Action.events .~ q
 
 runSM :: ( MonadUnliftIO m
          , MonadLogger m
@@ -329,14 +336,14 @@ runSM maybeCode env gi chainId' f = do
         SState {
         env = env,
         callStack = [],
-        ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
         _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
         }
-
-  eValState <- try $ runStateT f startingState
-  case eValState of
+  startingStateRef <- newIORef startingState
+  eVal <- try $ runReaderT f startingStateRef
+  sstateAfter <- readIORef startingStateRef
+  case eVal of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they
@@ -349,7 +356,7 @@ runSM maybeCode env gi chainId' f = do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
         else return $ Left se
-    Right (value, sstateAfter) -> do
+    Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
 

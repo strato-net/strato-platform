@@ -23,7 +23,9 @@ class InventoryController {
       }
 
       const inventory = await dapp.getInventory(args, chainOptions)
-      const inventoryImageUrl = rest.getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
+      const inventoryImageUrl = await rest.getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
+      console.log("inventory")
+      console.log("inventoryImageUrl", inventoryImageUrl)
       const result = { ...inventory, imageUrl: inventoryImageUrl }
       rest.response.status200(res, result)
 
@@ -38,11 +40,15 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories.map(inventory => ({
-        ...inventory,
-        imageUrl: rest.getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
+      
+      const inventoriesWithImageUrl = await Promise.all(inventories.map(async (inventory) => {
+        const imageUrl = await rest.getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName));
+        return {
+          ...inventory,
+          imageUrl,
+        };
+      }));
+      
       rest.response.status200(res, inventoriesWithImageUrl)
 
       return next()
@@ -112,7 +118,7 @@ class InventoryController {
   static validateCreateInventoryArgs(args) {
     const createInventorySchema = Joi.object({
       productAddress: Joi.string().required(),
-      quantity: Joi.number().integer().greater(0).required(),
+      quantity: Joi.number().integer().min(0).required(),
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
