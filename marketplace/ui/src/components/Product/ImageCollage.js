@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Col, Row, Modal, Image } from 'antd';
+import CarouselComponent from './Carousel';
 
 const ImageCollage = (props) => {
   const [open, setOpen] = useState(false);
@@ -10,37 +11,34 @@ const ImageCollage = (props) => {
 
   return (
     <>
-      <div style={{width:'800px', height:'600px', margin:'auto', marginTop: '20px' }}>
+      <div style={{ width: '800px', height: '600px', margin: 'auto', marginTop: '20px' }}>
         <Row
           gutter={{ xs: 8, sm: 16 }}
           justify="space-around"
           align="middle"
           style={{ cursor: "pointer" }}>
           <Col span={16}>
-            <Image
-              width={'100%'}
-              onClick={() => { handleImagePreview() }}
-              preview={false}
-              src={images[0]}
-            />
+            <CarouselComponent images={images} />
           </Col>
-          <Col span={8}>
-            <Image
-              width={'100%'}
-              onClick={() => { handleImagePreview() }}
-              preview={false}
-              src={images[1]}
-            />
-            <Image
-              width={'100%'}
-              onClick={() => { handleImagePreview() }}
-              preview={false}
-              src={images[2]}
-            />
-          <div className='img-count' onClick={() => { handleImagePreview() }} >
-            {images?.length} Photos
-          </div>
-          </Col>
+          {images.length >= 3
+            && <Col span={8}>
+              <Image
+                width={'100%'}
+                onClick={() => { handleImagePreview() }}
+                preview={false}
+                src={images[1]}
+              />
+              <Image
+                width={'100%'}
+                onClick={() => { handleImagePreview() }}
+                preview={false}
+                src={images[2]}
+              />
+              <div className='img-count' onClick={() => { handleImagePreview() }} >
+                {images?.length} Photos
+              </div>
+            </Col>
+          }
         </Row>
       </div>
 
