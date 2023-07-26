@@ -1,5 +1,6 @@
 export const Images = {
   'logo': require("./resources/logo.png"),
+  'mercataLogo': require("./resources/mercata-logo.png"),
   'noProductSymbol': require('./resources/noProductSymbol.png'),
   'noEventPageSymbol': require('./resources/no_event.png'),
   'art': require("./resources/categories/art.png"),

@@ -34,7 +34,7 @@ const App = () => {
         <UsersProvider>
           <HeaderComponent user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
-        <Content>
+        <Content className="mt-20">
           <AuthenticatedRoutes user={user} users={users} />
         </Content>
       </Layout>
