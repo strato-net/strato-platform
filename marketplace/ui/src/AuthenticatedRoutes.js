@@ -34,6 +34,7 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
+import PropertyListings from "./components/PropertiesComponents/PropertyListings";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -390,6 +391,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.Properties.url}
         element={
           <UsersProvider>
+            <PropertyListings user={user} />
           </UsersProvider>
         }
       />
