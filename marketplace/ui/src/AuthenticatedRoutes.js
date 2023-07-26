@@ -53,7 +53,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         exact
         path={routes.LoginRedirect.url}
         element={
-          <LoginRedirect/>
+          <LoginRedirect />
         }
       />
       <Route
@@ -382,6 +382,14 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <EventsProvider>
               <EventSerialNumberList user={user} users={users} />
             </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.Properties.url}
+        element={
+          <UsersProvider>
           </UsersProvider>
         }
       />
