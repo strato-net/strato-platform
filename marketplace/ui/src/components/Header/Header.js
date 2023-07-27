@@ -93,7 +93,13 @@ const HeaderComponent = ({ user, loginUrl }) => {
                   <UserOutlined className="text-xl" />
                   Profile
                 </div>
-                <div className="flex p-6 items-center gap-4 cursor-pointer border-b border-secondryC hover:bg-red">
+                <div
+                  className="flex p-6 items-center gap-4 cursor-pointer border-b border-secondryC hover:bg-red"
+                  onClick={() => {
+                    navigate(routes.MyAssets.url);
+                    setShowMenu(false);
+                  }}
+                >
                   <PieChartOutlined className="text-xl" />
                   My Assets
                 </div>
