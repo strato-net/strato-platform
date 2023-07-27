@@ -1,11 +1,10 @@
-{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Strato.Strato23.API.Ping where
 
-import           Servant.API
-import           Strato.Strato23.API.Types
-
+import Servant.API
+import Strato.Strato23.API.Types
 
 --------------------------------------------------------------------------------
 -- Routes and Types

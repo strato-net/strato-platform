@@ -1,11 +1,11 @@
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Debugger.Util where
 
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           UnliftIO
-import           UnliftIO.Concurrent
+import Control.Monad
+import Control.Monad.IO.Class
+import UnliftIO
+import UnliftIO.Concurrent
 
 microsecondsPerSecond :: Int
 microsecondsPerSecond = 1000000

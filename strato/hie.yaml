@@ -1,0 +1,622 @@
+cradle:
+  stack:
+    - path: "VM/EVM/ethereum-vm/src/"
+      component: "ethereum-vm:lib"
+
+    - path: "VM/EVM/evm-solidity/src/"
+      component: "evm-solidity:lib"
+
+    - path: "VM/SolidVM/debugger/src/"
+      component: "debugger:lib"
+
+    - path: "VM/SolidVM/debugger/tests/"
+      component: "debugger:test:debugger-spec"
+
+    - path: "VM/SolidVM/solid-vm/src/"
+      component: "solid-vm:lib"
+
+    - path: "VM/SolidVM/solid-vm/exec_src/ExprsNeeded.hs"
+      component: "solid-vm:exe:exprs-needed"
+
+    - path: "VM/SolidVM/solid-vm/tests/"
+      component: "solid-vm:test:solid-vm-spec"
+
+    - path: "VM/SolidVM/solid-vm/bench/CodeBench.hs"
+      component: "solid-vm:bench:codebench"
+
+    - path: "VM/SolidVM/solid-vm/bench/Paths_solid_vm.hs"
+      component: "solid-vm:bench:codebench"
+
+    - path: "VM/SolidVM/solid-vm-fuzzer/src/"
+      component: "solid-vm-fuzzer:lib"
+
+    - path: "VM/SolidVM/solid-vm-fuzzer/tests/"
+      component: "solid-vm-fuzzer:test:solid-vm-spec"
+
+    - path: "VM/SolidVM/solid-vm-model/src/"
+      component: "solid-vm-model:lib"
+
+    - path: "VM/SolidVM/solid-vm-model/test/"
+      component: "solid-vm-model:test:storage-test"
+
+    - path: "VM/SolidVM/solid-vm-model/bench/StorageBench.hs"
+      component: "solid-vm-model:bench:storage-bench"
+
+    - path: "VM/SolidVM/solid-vm-parser/src/"
+      component: "solid-vm-parser:lib"
+
+    - path: "VM/SolidVM/solid-vm-parser/exec_src/Parse.hs"
+      component: "solid-vm-parser:exe:parse-solidvm"
+
+    - path: "VM/SolidVM/solid-vm-parser/tests/"
+      component: "solid-vm-parser:test:solid-vm-spec"
+
+    - path: "VM/SolidVM/solid-vm-static-analysis/src/"
+      component: "solid-vm-static-analysis:lib"
+
+    - path: "VM/SolidVM/source-tools/src"
+      component: "source-tools:lib"
+
+    - path: "VM/SolidVM/source-tools/test/"
+      component: "source-tools:test:source-tools-test"
+
+    - path: "VM/vrun/app/Main.hs"
+      component: "vrun:exe:vrun"
+
+    - path: "VM/vrun/app/Paths_vrun.hs"
+      component: "vrun:exe:vrun"
+
+    - path: "api/bloc/bloc2/src/"
+      component: "bloc2:lib"
+
+    - path: "api/bloc/bloc2/test/"
+      component: "bloc2:test:blockapps-bloc22-server-test"
+
+    - path: "api/bloc/bloc2api/src/"
+      component: "bloc2api:lib"
+
+    - path: "api/bloc/bloc2api/test/"
+      component: "bloc2api:test:blockapps-strato-api-test"
+
+    - path: "api/core/src"
+      component: "core-api2:lib"
+
+    - path: "api/ethereum-jsonrpc/src/Main.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/APIProxy.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/Binary.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/Commands.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/RPC.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/Server.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/ethereum-jsonrpc/src/Paths_ethereum_jsonrpc.hs"
+      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
+
+    - path: "api/strato-api/exec_src/PostRawTransaction.hs"
+      component: "strato-api:exe:post-raw-transaction"
+
+    - path: "api/strato-api/exec_src/Options.hs"
+      component: "strato-api:exe:post-raw-transaction"
+
+    - path: "api/strato-api/exec_src/Main.hs"
+      component: "strato-api:exe:strato-api"
+
+    - path: "api/strato-api/exec_src/Options.hs"
+      component: "strato-api:exe:strato-api"
+
+    - path: "core/blockapps-data/src/"
+      component: "blockapps-data:lib"
+
+    - path: "core/blockapps-data/exec_src/GlobalDB.hs"
+      component: "blockapps-data:exe:global-db"
+
+    - path: "core/blockapps-data/exec_src/Paths_blockapps_data.hs"
+      component: "blockapps-data:exe:global-db"
+
+    - path: "core/blockapps-data/test/"
+      component: "blockapps-data:test:blockapps-data-test"
+
+    - path: "core/blockapps-datadefs/src/"
+      component: "blockapps-datadefs:lib"
+
+    - path: "core/blockapps-mpdbs/src/"
+      component: "blockapps-mpdbs:lib"
+
+    - path: "core/blockapps-mpdbs/test/"
+      component: "blockapps-mpdbs:test:blockapps-mpdbs-test"
+
+    - path: "core/blockstanbul/src/"
+      component: "blockstanbul:lib"
+
+    - path: "core/blockstanbul/test/"
+      component: "blockstanbul:test:blockstanbul-test"
+
+    - path: "core/blockstanbul/bench/OneNode.hs"
+      component: "blockstanbul:bench:one-node"
+
+    - path: "core/blockstanbul/bench/Paths_blockstanbul.hs"
+      component: "blockstanbul:bench:one-node"
+
+    - path: "core/ethereum-discovery/src/"
+      component: "ethereum-discovery:lib"
+
+    - path: "core/ethereum-discovery/exec_src/Main.hs"
+      component: "ethereum-discovery:exe:ethereum-discover"
+
+    - path: "core/ethereum-discovery/exec_src/Paths_ethereum_discovery.hs"
+      component: "ethereum-discovery:exe:ethereum-discover"
+
+    - path: "core/ethereum-discovery/test/"
+      component: "ethereum-discovery:test:ethereum-discover-test"
+
+    - path: "core/ethereum-encryption/src"
+      component: "ethereum-encryption:lib"
+
+    - path: "core/fast-keccak256/src/"
+      component: "fast-keccak256:lib"
+
+    - path: "core/fast-keccak256/test/"
+      component: "fast-keccak256:test:keccak256-test"
+
+    - path: "core/fast-keccak256/bench/HashBench.hs"
+      component: "fast-keccak256:bench:hash-bench"
+
+    - path: "core/fast-keccak256/bench/Paths_fast_keccak256.hs"
+      component: "fast-keccak256:bench:hash-bench"
+
+    - path: "core/fastMP/src"
+      component: "fastMP:lib"
+
+    - path: "core/fastMP/app/Main.hs"
+      component: "fastMP:exe:fastMP-exe"
+
+    - path: "core/fastMP/app/Paths_fastMP.hs"
+      component: "fastMP:exe:fastMP-exe"
+
+    - path: "core/fastMP/app/insertLDB.hs"
+      component: "fastMP:exe:insertLDB"
+
+    - path: "core/fastMP/app/Main.hs"
+      component: "fastMP:exe:insertLDB"
+
+    - path: "core/fastMP/app/Paths_fastMP.hs"
+      component: "fastMP:exe:insertLDB"
+
+    - path: "core/fastMP/app/insertMP.hs"
+      component: "fastMP:exe:insertMP"
+
+    - path: "core/fastMP/app/Main.hs"
+      component: "fastMP:exe:insertMP"
+
+    - path: "core/fastMP/app/Paths_fastMP.hs"
+      component: "fastMP:exe:insertMP"
+
+    - path: "core/fastMP/app/makeSampleKVs.hs"
+      component: "fastMP:exe:makeSampleKVs"
+
+    - path: "core/fastMP/app/Main.hs"
+      component: "fastMP:exe:makeSampleKVs"
+
+    - path: "core/fastMP/app/Paths_fastMP.hs"
+      component: "fastMP:exe:makeSampleKVs"
+
+    - path: "core/merkle-patricia-db/src"
+      component: "merkle-patricia-db:lib"
+
+    - path: "core/merkle-patricia-db/test"
+      component: "merkle-patricia-db:test:test-merkle-patricia-db"
+
+    - path: "core/merkle-patricia-db/bench/MPBench.hs"
+      component: "merkle-patricia-db:bench:mpbench"
+
+    - path: "core/merkle-patricia-db/bench/Paths_merkle_patricia_db.hs"
+      component: "merkle-patricia-db:bench:mpbench"
+
+    - path: "core/miner-ethash/src/"
+      component: "miner-ethash:lib"
+
+    - path: "core/miner-ethash/exec_src/Main.hs"
+      component: "miner-ethash:exe:miner-ethash"
+
+    - path: "core/miner-ethash/exec_src/Paths_miner_ethash.hs"
+      component: "miner-ethash:exe:miner-ethash"
+
+    - path: "core/miner-ethash/exec_src/mkDataset.hs"
+      component: "miner-ethash:exe:mkDataset"
+
+    - path: "core/miner-ethash/exec_src/Main.hs"
+      component: "miner-ethash:exe:mkDataset"
+
+    - path: "core/miner-ethash/exec_src/Paths_miner_ethash.hs"
+      component: "miner-ethash:exe:mkDataset"
+
+    - path: "core/privacy/src/"
+      component: "blockapps-privacy:lib"
+
+    - path: "core/privacy/test/"
+      component: "blockapps-privacy:test:privacy-test"
+
+    - path: "core/seqevents/src/"
+      component: "seqevents:lib"
+
+    - path: "core/seqevents/test/"
+      component: "seqevents:test:seqevents-spec"
+
+    - path: "core/strato-conf/src"
+      component: "strato-conf:lib"
+
+    - path: "core/strato-genesis/src/"
+      component: "strato-genesis:lib"
+
+    - path: "core/strato-genesis/exec_src/Main.hs"
+      component: "strato-genesis:exe:generate-genesis"
+
+    - path: "core/strato-genesis/exec_src/GenesisSetup.hs"
+      component: "strato-genesis:exe:genesis-setup"
+
+    - path: "core/strato-genesis/test"
+      component: "strato-genesis:test:strato-genesis-test"
+
+    - path: "core/strato-init/src/"
+      component: "strato-init:lib"
+
+    - path: "core/strato-init/exec_src/FromRestore.hs"
+      component: "strato-init:exe:from-restore"
+
+    - path: "core/strato-init/exec_src/GenesisBuilder.hs"
+      component: "strato-init:exe:genesis-builder"
+
+    - path: "core/strato-init/exec_src/InitWorker.hs"
+      component: "strato-init:exe:init-worker"
+
+    - path: "core/strato-init/exec_src/Main.hs"
+      component: "strato-init:exe:strato-setup"
+
+    - path: "core/strato-init/exec_src/TabulaRasa.hs"
+      component: "strato-init:exe:tabula-rasa"
+
+    - path: "core/strato-init/test/"
+      component: "strato-init:test:strato-init-test"
+
+    - path: "core/strato-model/src"
+      component: "strato-model:lib"
+
+    - path: "core/strato-model/test/"
+      component: "strato-model:test:strato-model-tests"
+
+    - path: "core/strato-model/bench/Word256Bench.hs"
+      component: "strato-model:bench:word256"
+
+    - path: "core/strato-model/bench/Paths_strato_model.hs"
+      component: "strato-model:bench:word256"
+
+    - path: "core/strato-networks/src"
+      component: "strato-networks:lib"
+
+    - path: "core/strato-p2p/src"
+      component: "strato-p2p:lib"
+
+    - path: "core/strato-p2p/exec_src/StratoP2PMain.hs"
+      component: "strato-p2p:exe:strato-p2p"
+
+    - path: "core/strato-p2p/exec_src/Paths_strato_p2p.hs"
+      component: "strato-p2p:exe:strato-p2p"
+
+    - path: "core/strato-p2p/test"
+      component: "strato-p2p:test:strato-p2p-client-test"
+
+    - path: "core/strato-redis-blockdb/src"
+      component: "strato-redis-blockdb:lib"
+
+    - path: "core/strato-redis-blockdb/test"
+      component: "strato-redis-blockdb:test:strato-redis-blockdb-test"
+
+    - path: "core/strato-sequencer/src"
+      component: "strato-sequencer:lib"
+
+    - path: "core/strato-sequencer/exec-src/ForcedConfigChange.hs"
+      component: "strato-sequencer:exe:forced-config-change"
+
+    - path: "core/strato-sequencer/exec-src/Main.hs"
+      component: "strato-sequencer:exe:strato-sequencer"
+
+    - path: "core/strato-sequencer/exec-src/Flags.hs"
+      component: "strato-sequencer:exe:strato-sequencer"
+
+    - path: "core/strato-sequencer/test"
+      component: "strato-sequencer:test:strato-sequencer-spec"
+
+    - path: "core/strato-sequencer/bench/BlockstanbulSend.hs"
+      component: "strato-sequencer:bench:send-to-blockstanbul"
+
+    - path: "core/strato-sequencer/bench/Paths_strato_sequencer.hs"
+      component: "strato-sequencer:bench:send-to-blockstanbul"
+
+    - path: "core/strato-statediff/src/"
+      component: "strato-statediff:lib"
+
+    - path: "core/vm-runner/src/"
+      component: "vm-runner:lib"
+
+    - path: "core/vm-runner/exec_src/Main.hs"
+      component: "vm-runner:exe:vm-runner"
+
+    - path: "core/vm-runner/exec_src/Paths_vm_runner.hs"
+      component: "vm-runner:exe:vm-runner"
+
+    - path: "core/vm-runner/test/"
+      component: "vm-runner:test:ethereum-vm-test"
+
+    - path: "core/vm-runner/bench/ExtractBench.hs"
+      component: "vm-runner:bench:extractbench"
+
+    - path: "core/vm-runner/bench/Microbench.hs"
+      component: "vm-runner:bench:microbench"
+
+    - path: "core/vm-tools/src/"
+      component: "vm-tools:lib"
+
+    - path: "core/vm-tools/test/"
+      component: "vm-tools:test:contextm-test"
+
+    - path: "indexer/slipstream/src/"
+      component: "slipstream:lib"
+
+    - path: "indexer/slipstream/exec_src/Main.hs"
+      component: "slipstream:exe:slipstream"
+
+    - path: "indexer/slipstream/exec_src/Paths_slipstream.hs"
+      component: "slipstream:exe:slipstream"
+
+    - path: "indexer/slipstream/tests/"
+      component: "slipstream:test:slipstream-test"
+
+    - path: "indexer/strato-index/src/"
+      component: "strato-index:lib"
+
+    - path: "indexer/strato-index/exec_src/ApiIndexerMain.hs"
+      component: "strato-index:exe:strato-api-indexer"
+
+    - path: "indexer/strato-index/exec_src/P2PIndexerMain.hs"
+      component: "strato-index:exe:strato-p2p-indexer"
+
+    - path: "indexer/strato-index/exec_src/TxrIndexerMain.hs"
+      component: "strato-index:exe:strato-txr-indexer"
+
+    - path: "indexer/strato-index/test/"
+      component: "strato-index:test:strato-index-test"
+
+    - path: "libs/blockapps-haskoin/./"
+      component: "blockapps-haskoin:lib"
+
+    - path: "libs/bloomfilter/./"
+      component: "bloomfilter:lib"
+
+    - path: "libs/bloomfilter/tests"
+      component: "bloomfilter:test:tests"
+
+    - path: "libs/clockwork/src"
+      component: "clockwork:lib"
+
+    - path: "libs/common-log/src"
+      component: "common-log:lib"
+
+    - path: "libs/common-log/test/"
+      component: "common-log:test:common-log-test"
+
+    - path: "libs/composable-monads/kafka-monad/src"
+      component: "kafka-monad:lib"
+
+    - path: "libs/composable-monads/sql-monad/src"
+      component: "sql-monad:lib"
+
+    - path: "libs/composable-monads/vault-monad/src"
+      component: "vault-monad:lib"
+
+    - path: "libs/ethereum-rlp/library/"
+      component: "ethereum-rlp:lib"
+
+    - path: "libs/ethereum-rlp/test/"
+      component: "ethereum-rlp:test:test"
+
+    - path: "libs/ethereum-rlp/bench/RLPShootout.hs"
+      component: "ethereum-rlp:bench:rlpserial"
+
+    - path: "libs/ethereum-rlp/bench/ZipBench.hs"
+      component: "ethereum-rlp:bench:zipbench"
+
+    - path: "libs/format/src"
+      component: "format:lib"
+
+    - path: "libs/json-rpc-client/src"
+      component: "json-rpc-client:lib"
+
+    - path: "libs/json-rpc-client/demo/Server.hs"
+      component: "json-rpc-client:exe:demo-server"
+
+    - path: "libs/json-rpc-client/demo/Signatures.hs"
+      component: "json-rpc-client:exe:demo-server"
+
+    - path: "libs/json-rpc-client/demo/Client.hs"
+      component: "json-rpc-client:exe:demo-client"
+
+    - path: "libs/json-rpc-client/demo/Signatures.hs"
+      component: "json-rpc-client:exe:demo-client"
+
+    - path: "libs/json-rpc-client/tests"
+      component: "json-rpc-client:test:tests"
+
+    - path: "libs/json-rpc-server/./"
+      component: "json-rpc-server:lib:uses"
+
+    - path: "libs/json-rpc-server/src"
+      component: "json-rpc-server:lib"
+
+    - path: "libs/json-rpc-server/demo/Demo.hs"
+      component: "json-rpc-server:exe:demo"
+
+    - path: "libs/json-rpc-server/tests"
+      component: "json-rpc-server:test:tests"
+
+    - path: "libs/kafka/milena/./"
+      component: "milena:lib"
+
+    - path: "libs/kafka/milena/test"
+      component: "milena:test:test"
+
+    - path: "libs/kafka/milena-tools/src"
+      component: "milena-tools:lib"
+
+    - path: "libs/labeled-error/src"
+      component: "labeled-error:lib"
+
+    - path: "libs/logserver/exec_src/LogServer.hs"
+      component: "logserver:exe:logserver"
+
+    - path: "libs/logserver/exec_src/Paths_logserver.hs"
+      component: "logserver:exe:logserver"
+
+    - path: "libs/monad-alter/src"
+      component: "monad-alter:lib"
+
+    - path: "libs/nibblestring/src"
+      component: "nibblestring:lib"
+
+    - path: "libs/partitioner/src"
+      component: "partitioner:lib"
+
+    - path: "libs/prometheus/blockapps-init/src"
+      component: "blockapps-init:lib"
+
+    - path: "libs/prometheus/blockapps-init/exec_src/TestReload.hs"
+      component: "blockapps-init:exe:test-reload"
+
+    - path: "libs/prometheus/cross-monitoring/src/"
+      component: "cross-monitoring:lib"
+
+    - path: "libs/secp256k1-haskell/src"
+      component: "secp256k1-haskell:lib"
+
+    - path: "libs/secp256k1-haskell/test"
+      component: "secp256k1-haskell:test:spec"
+
+    - path: "libs/type-lits/src"
+      component: "type-lits:lib"
+
+    - path: "libs/x509-certs/src"
+      component: "x509-certs:lib"
+
+    - path: "libs/x509-certs/test/"
+      component: "x509-certs:test:x509-test"
+
+    - path: "simulator/strato-lite/src/"
+      component: "strato-lite:lib"
+
+    - path: "simulator/strato-lite/exec_src/Main.hs"
+      component: "strato-lite:exe:strato-lite"
+
+    - path: "simulator/strato-lite/exec_src/Paths_strato_lite.hs"
+      component: "strato-lite:exe:strato-lite"
+
+    - path: "simulator/strato-lite/tests/"
+      component: "strato-lite:test:simulator-spec"
+
+    - path: "tools/blockapps-tools/src/"
+      component: "blockapps-tools:lib"
+
+    - path: "tools/blockapps-tools/exec_src/B16Decode.hs"
+      component: "blockapps-tools:exe:b16decode"
+
+    - path: "tools/blockapps-tools/exec_src/ModifyDate.hs"
+      component: "blockapps-tools:exe:modifyDate"
+
+    - path: "tools/blockapps-tools/exec_src/Main.hs"
+      component: "blockapps-tools:exe:queryStrato"
+
+    - path: "tools/blockapps-tools/test/"
+      component: "blockapps-tools:test:blockapps-tools-test"
+
+    - path: "tools/debugger-tools/exec_src/ghc-debug.hs"
+      component: "debugger-tools:exe:ghc-debug"
+
+    - path: "tools/x509-tools/exec_src/X509CertRegistry.hs"
+      component: "x509-tools:exe:x509-certificate-registry"
+
+    - path: "tools/x509-tools/exec_src/X509CertGenerator.hs"
+      component: "x509-tools:exe:x509-generator"
+
+    - path: "tools/x509-tools/exec_src/X509CertInfo.hs"
+      component: "x509-tools:exe:x509-info"
+
+    - path: "tools/x509-tools/exec_src/X509Keygen.hs"
+      component: "x509-tools:exe:x509-keygen"
+
+    - path: "tools/x509-tools/exec_src/X509SaltineDecrypt.hs"
+      component: "x509-tools:exe:x509-saltine-decrypt"
+
+    - path: "vault/api/src"
+      component: "blockapps-vault-wrapper-api:lib"
+
+    - path: "vault/client/src"
+      component: "blockapps-vault-wrapper-client:lib"
+
+    - path: "vault/server/src"
+      component: "blockapps-vault-wrapper-server:lib"
+
+    - path: "vault/server/app/Main.hs"
+      component: "blockapps-vault-wrapper-server:exe:blockapps-vault-wrapper-server"
+
+    - path: "vault/server/app/Options.hs"
+      component: "blockapps-vault-wrapper-server:exe:blockapps-vault-wrapper-server"
+
+    - path: "vault/server/app/MigrateKeys.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-keys"
+
+    - path: "vault/server/app/Options.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-keys"
+
+    - path: "vault/server/app/MigrateMercata.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-mercata"
+
+    - path: "vault/server/app/Options.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-mercata"
+
+    - path: "vault/server/app/MigrateNodeKey.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-nodekey"
+
+    - path: "vault/server/app/Options.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-nodekey"
+
+    - path: "vault/server/app/MigrateSalt.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-salt"
+
+    - path: "vault/server/app/Options.hs"
+      component: "blockapps-vault-wrapper-server:exe:migrate-salt"
+
+    - path: "vault/server/test/"
+      component: "blockapps-vault-wrapper-server:test:vault-wrapper-spec"
+
+    - path: "vault-proxy/api/src"
+      component: "blockapps-vault-proxy-api:lib"
+
+    - path: "vault-proxy/server/src"
+      component: "blockapps-vault-proxy-server:lib"
+
+    - path: "vault-proxy/server/app/Main.hs"
+      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
+
+    - path: "vault-proxy/server/app/Options.hs"
+      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
+
+    - path: "vault-proxy/server/test/"
+      component: "blockapps-vault-proxy-server:test:vault-proxy-spec"

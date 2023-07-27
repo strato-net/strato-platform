@@ -1,21 +1,23 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Blockchain.Sequencer.BinaryInstances() where
 
-import           Data.Binary
+module Blockchain.Sequencer.BinaryInstances () where
 
-import qualified Blockchain.Data.ChainInfo   as CI
-import           Blockchain.Data.TXOrigin    ()
-import           GHC.Generics                ()
+import qualified Blockchain.Data.ChainInfo as CI
+import Blockchain.Data.TXOrigin ()
+import Blockchain.Strato.Model.Address ()
+import Blockchain.Strato.Model.ExtendedWord ()
+import Blockchain.Strato.Model.Keccak256 ()
+import Data.Binary
+import Data.ByteString ()
+import GHC.Generics ()
 
-import           Blockchain.Strato.Model.Address   ()
-import           Blockchain.Strato.Model.Keccak256 ()
-import           Blockchain.Strato.Model.ExtendedWord ()
-import           Data.ByteString             ()
+instance Binary CI.ChainSignature
 
-instance Binary CI.ChainSignature where
-instance Binary CI.UnsignedChainInfo where
-instance Binary CI.ChainInfo where
-instance Binary CI.CodeInfo where
+instance Binary CI.UnsignedChainInfo
+
+instance Binary CI.ChainInfo
+
+instance Binary CI.CodeInfo
 
 instance Binary CI.AccountInfo where
   put (CI.NonContract a n) = putWord8 0 >> put a >> put n

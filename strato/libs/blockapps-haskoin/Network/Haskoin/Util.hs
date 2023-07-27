@@ -1,31 +1,31 @@
-
-{-|
-  This module defines various utility functions used across the
-  Network.Haskoin modules.
--}
+-- |
+--  This module defines various utility functions used across the
+--  Network.Haskoin modules.
 module Network.Haskoin.Util
-(
-  -- * ByteString helpers
-  bsToInteger
-, integerToBS
-, bsToHex
-, hexToBS
+  ( -- * ByteString helpers
+    bsToInteger,
+    integerToBS,
+    bsToHex,
+    hexToBS,
+    encode',
+    decodeToMaybe,
+  )
+where
 
-, encode'
-, decodeToMaybe
-) where
-
-import Data.Word (Word8)
-import Data.Bits ((.|.), shiftL, shiftR)
-import Data.List (unfoldr)
-import Data.Binary (Binary, encode, decodeOrFail)
+import Data.Binary (Binary, decodeOrFail, encode)
 import Data.Binary.Get (ByteOffset)
-
-import qualified Data.ByteString.Lazy as BL (ByteString, toChunks, fromChunks)
+import Data.Bits (shiftL, shiftR, (.|.))
+import qualified Data.ByteString as BS
+  ( ByteString,
+    concat,
+    pack,
+    unpack,
+  )
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C (pack, unpack)
-import qualified Data.ByteString as BS
-    (ByteString, concat, pack, unpack)
+import qualified Data.ByteString.Lazy as BL (ByteString, fromChunks, toChunks)
+import Data.List (unfoldr)
+import Data.Word (Word8)
 
 -- ByteString helpers
 
@@ -55,8 +55,8 @@ bsToInteger = (foldr f 0) . reverse . BS.unpack
 integerToBS :: Integer -> BS.ByteString
 integerToBS 0 = BS.pack [0]
 integerToBS i
-    | i > 0     = BS.pack $ reverse $ unfoldr f i
-    | otherwise = error "integerToBS not defined for negative values"
+  | i > 0 = BS.pack $ reverse $ unfoldr f i
+  | otherwise = error "integerToBS not defined for negative values"
   where
     f 0 = Nothing
     f x = Just $ (fromInteger x :: Word8, x `shiftR` 8)
@@ -81,24 +81,28 @@ encode' = toStrictBS . encode
 
 -- | Strict version of @Data.Binary.decodeOrFail@
 decodeOrFail' ::
-    Binary a =>
-    BS.ByteString ->
-    Either (BS.ByteString, ByteOffset, String) (BS.ByteString, ByteOffset, a)
+  Binary a =>
+  BS.ByteString ->
+  Either (BS.ByteString, ByteOffset, String) (BS.ByteString, ByteOffset, a)
 decodeOrFail' bs = case decodeOrFail $ toLazyBS bs of
-    Left  (lbs,o,err) -> Left  (toStrictBS lbs,o,err)
-    Right (lbs,o,res) -> Right (toStrictBS lbs,o,res)
+  Left (lbs, o, err) -> Left (toStrictBS lbs, o, err)
+  Right (lbs, o, res) -> Right (toStrictBS lbs, o, res)
 
 -- | Try to decode a Data.Binary value. If decoding succeeds, apply the function
 -- to the result. Otherwise, return the default value.
-fromDecode :: Binary a
-           => BS.ByteString -- ^ The bytestring to decode
-           -> b             -- ^ Default value to return when decoding fails
-           -> (a -> b)      -- ^ Function to apply when decoding succeeds
-           -> b             -- ^ Final result
+fromDecode ::
+  Binary a =>
+  -- | The bytestring to decode
+  BS.ByteString ->
+  -- | Default value to return when decoding fails
+  b ->
+  -- | Function to apply when decoding succeeds
+  (a -> b) ->
+  -- | Final result
+  b
 fromDecode bs def f = either (const def) (f . lst) $ decodeOrFail' bs
   where
-    lst (_,_,c) = c
-
+    lst (_, _, c) = c
 
 -- | Decode a Data.Binary value into the Maybe monad. A Just value is returned
 -- with the result upon success. Otherwise, Nothing is returned.

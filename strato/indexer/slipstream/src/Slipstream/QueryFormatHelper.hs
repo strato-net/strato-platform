@@ -1,9 +1,10 @@
 -- library for all sql query formatting functions
 {-# LANGUAGE OverloadedStrings #-}
+
 module Slipstream.QueryFormatHelper where
 
 import qualified Data.Text as T
-import           Slipstream.Data.Globals (TableName(..))
+import Slipstream.Data.Globals (TableName (..))
 
 tshow :: Show a => a -> T.Text
 tshow = T.pack . show
@@ -56,27 +57,27 @@ tableNameToText (IndexTableName o a c) =
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
-tableNameToText (MappingTableName o a c m ) =
+   in prefix <> c
+tableNameToText (MappingTableName o a c m) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndMapping = c <> "." <> m
-  in "mapping@" <> prefix <> contractAndMapping
+   in "mapping@" <> prefix <> contractAndMapping
 tableNameToText (HistoryTableName o a c) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
-  in "history@" <> prefix <> c
+   in "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
-  in prefix <> contractAndEvent
+   in prefix <> contractAndEvent
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
@@ -86,4 +87,3 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
-

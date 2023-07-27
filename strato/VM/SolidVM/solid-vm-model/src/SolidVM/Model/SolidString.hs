@@ -1,9 +1,7 @@
-
 module SolidVM.Model.SolidString where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-
 
 type SolidString = String
 
@@ -18,7 +16,6 @@ labelToText = T.pack
 
 textToLabel :: Text -> SolidString
 textToLabel = T.unpack
-
 
 {-
 type SolidString = Text

@@ -1,71 +1,74 @@
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE DeriveFoldable     #-}
-{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module SolidVM.Model.CodeCollection.Function (
-  FuncF(..),
-  Func,
-  StateMutability(..),
-  Visibility(..),
-  ModifierF(..),
-  Modifier,
-  UsingF(..),
-  Using,
-  tShow,
-  tShow',
-  tRead,
-  funcArgs,
-  funcVals,
-  funcStateMutability,
-  funcContents,
-  funcVisibility,
-  funcConstructorCalls,
-  funcModifiers,
-  funcContext,
-  funcIsFree,
-  funcOverload,
-  modifierArgs,
-  modifierSelector,
-  modifierContents,
-  modifierContext,
-  usingContract,
-  usingType,
-  usingContext
-  ) where
+module SolidVM.Model.CodeCollection.Function
+  ( FuncF (..),
+    Func,
+    StateMutability (..),
+    Visibility (..),
+    ModifierF (..),
+    Modifier,
+    UsingF (..),
+    Using,
+    tShow,
+    tShow',
+    tRead,
+    funcArgs,
+    funcVals,
+    funcStateMutability,
+    funcContents,
+    funcVisibility,
+    funcConstructorCalls,
+    funcModifiers,
+    funcContext,
+    funcIsFree,
+    funcOverload,
+    modifierArgs,
+    modifierSelector,
+    modifierContents,
+    modifierContext,
+    usingContract,
+    usingType,
+    usingContext,
+  )
+where
 
-import           Control.Lens                 (mapped, (&), (?~), makeLenses)
-import           Control.DeepSeq
-import           Data.Aeson
-import           Data.Aeson.Casing
-import           Data.Aeson.Casing.Internal   (dropFPrefix)
-import           Data.Map.Strict              (Map)
-import           Data.Source
-import           Data.Swagger
-import           Data.Text                    (Text)
-import qualified Generic.Random               as GR
-import           GHC.Generics
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances    ()
-import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
-import           SolidVM.Model.SolidString
+import Control.DeepSeq
+import Control.Lens (makeLenses, mapped, (&), (?~))
+import Data.Aeson
+import Data.Aeson.Casing
+import Data.Aeson.Casing.Internal (dropFPrefix)
+import Data.Map.Strict (Map)
+import Data.Source
+import Data.Swagger
+import Data.Text (Text)
+import GHC.Generics
+import qualified Generic.Random as GR
+import SolidVM.Model.CodeCollection.Statement
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import SolidVM.Model.SolidString
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 --------------------------------------------------------------------------------
 soliditySchemaOptions :: SchemaOptions
-soliditySchemaOptions = SchemaOptions
-  { fieldLabelModifier = camelCase . dropFPrefix
-  , constructorTagModifier = id
-  , datatypeNameModifier = id
-  , allNullaryToStringTag = True
-  , unwrapUnaryRecords = True
-  }
+soliditySchemaOptions =
+  SchemaOptions
+    { fieldLabelModifier = camelCase . dropFPrefix,
+      constructorTagModifier = id,
+      datatypeNameModifier = id,
+      allNullaryToStringTag = True,
+      unwrapUnaryRecords = True
+    }
+
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
@@ -88,24 +91,26 @@ instance ToJSON StateMutability where
 
 instance FromJSON StateMutability where
   parseJSON = withText "StateMutability" $ \t ->
-      case tRead t of
-          Just sm -> pure sm
-          Nothing -> fail $ "invalid StateMutability: " ++ show t
-
+    case tRead t of
+      Just sm -> pure sm
+      Nothing -> fail $ "invalid StateMutability: " ++ show t
 
 instance Arbitrary StateMutability where
   arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema StateMutability where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "State Mutability"
-    & mapped.schema.description ?~ "Reserved keywords for function state mutability"
-    & mapped.schema.example ?~ toJSON View
 
-data Visibility = Private
-                | Public
-                | Internal
-                | External
-  deriving (Eq,Show,Generic, NFData)
+instance ToSchema StateMutability where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema soliditySchemaOptions proxy
+      & mapped . name ?~ "State Mutability"
+      & mapped . schema . description ?~ "Reserved keywords for function state mutability"
+      & mapped . schema . example ?~ toJSON View
+
+data Visibility
+  = Private
+  | Public
+  | Internal
+  | External
+  deriving (Eq, Show, Generic, NFData)
 
 tShow' :: Visibility -> Text
 tShow' Private = "private"
@@ -115,48 +120,54 @@ tShow' External = "external"
 
 instance ToJSON Visibility where
   toJSON = String . tShow'
+
 instance FromJSON Visibility
+
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
+
 instance ToSchema Visibility where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "Visibility of a Function"
-    & mapped.schema.description ?~ "SolidVM Function Visibility"
-    & mapped.schema.example ?~ toJSON ex
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema soliditySchemaOptions proxy
+      & mapped . name ?~ "Visibility of a Function"
+      & mapped . schema . description ?~ "SolidVM Function Visibility"
+      & mapped . schema . example ?~ toJSON ex
     where
       ex :: Visibility
       ex = Public
 
-
 -- Changes to this structure should also have changes in the Unparser :)
 data FuncF a = Func
-  { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , _funcStateMutability :: Maybe StateMutability
-  -- These Values are only used for parsing, not for the actual function
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , _funcContents :: Maybe [StatementF a]
-  , _funcVisibility :: Maybe Visibility
-  , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
-  , _funcContext :: a
-  , _funcIsFree :: Bool
-  , _funcOverload :: [FuncF a]
-  } deriving (Eq,Show,Generic, Functor, NFData, Foldable, Traversable)
+  { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)],
+    _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)],
+    _funcStateMutability :: Maybe StateMutability,
+    -- These Values are only used for parsing, not for the actual function
+    -- This data will not be stored in the db and will have no
+    -- relevance when constructing from the db.
+    _funcContents :: Maybe [StatementF a],
+    _funcVisibility :: Maybe Visibility,
+    _funcConstructorCalls :: Map SolidString [(ExpressionF a)],
+    _funcModifiers :: [(SolidString, [(ExpressionF a)])],
+    _funcContext :: a,
+    _funcIsFree :: Bool,
+    _funcOverload :: [FuncF a]
+  }
+  deriving (Eq, Show, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''FuncF
 
 instance ToJSON a => ToJSON (FuncF a)
+
 instance FromJSON a => FromJSON (FuncF a)
 
-type Func = Positioned FuncF 
+type Func = Positioned FuncF
 
 data ModifierF a = Modifier
-  { _modifierArgs     :: Map Text SolidVM.IndexedType
-  , _modifierSelector :: Text
-  , _modifierContents :: Maybe [StatementF a]
-  , _modifierContext  :: a
-  } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
+  { _modifierArgs :: Map Text SolidVM.IndexedType,
+    _modifierSelector :: Text,
+    _modifierContents :: Maybe [StatementF a],
+    _modifierContext :: a
+  }
+  deriving (Eq, Show, Generic, NFData, Functor, Foldable, Traversable)
 
 makeLenses ''ModifierF
 
@@ -168,46 +179,48 @@ instance ToJSON a => ToJSON (ModifierF a) where
 instance FromJSON a => FromJSON (ModifierF a) where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-
 instance Arbitrary a => Arbitrary (ModifierF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 data UsingF a = Using
-  { _usingContract :: SolidString
-  , _usingType     :: SolidString -- TODO: Use Type here
-  , _usingContext  :: a
-  } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
+  { _usingContract :: SolidString,
+    _usingType :: SolidString, -- TODO: Use Type here
+    _usingContext :: a
+  }
+  deriving (Eq, Show, Generic, Functor, NFData, Traversable, Foldable)
 
 makeLenses ''UsingF
 
 type Using = Positioned UsingF
 
 instance ToJSON a => ToJSON (UsingF a) where
-  toJSON (Using dec typ ctx) = object
-    [ "using" .= dec
-    , "for" .= typ
-    , "context" .= ctx
-    ]
+  toJSON (Using dec typ ctx) =
+    object
+      [ "using" .= dec,
+        "for" .= typ,
+        "context" .= ctx
+      ]
 
 instance FromJSON a => FromJSON (UsingF a) where
-  parseJSON (Object o) = Using
-                     <$> (o .: "using")
-                     <*> (o .: "for")
-                     <*> (o .: "context")
+  parseJSON (Object o) =
+    Using
+      <$> (o .: "using")
+      <*> (o .: "for")
+      <*> (o .: "context")
   parseJSON o = fail $ "SolidVM.Using: Expected Object, got " ++ show o
 
 instance Arbitrary a => Arbitrary (UsingF a) where
   arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance ToSchema Using where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-     & mapped.name ?~ "Using schema"
-     & mapped.schema.description ?~ "Xabi of a `using` declaration"
-     & mapped.schema.example ?~ toJSON sampleUsing
-     where sampleUsing :: UsingF ()
-           sampleUsing = Using "SafeMath" "uint256" ()
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema soliditySchemaOptions proxy
+      & mapped . name ?~ "Using schema"
+      & mapped . schema . description ?~ "Xabi of a `using` declaration"
+      & mapped . schema . example ?~ toJSON sampleUsing
+    where
+      sampleUsing :: UsingF ()
+      sampleUsing = Using "SafeMath" "uint256" ()
 
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform
-
-  

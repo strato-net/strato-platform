@@ -1,64 +1,59 @@
-{-# LANGUAGE Arrows              #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE Arrows #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
-
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Bloc.Server.Chain where
 
-import           Control.Arrow                     ((***))
-import           Control.Lens                      ((?~), at)
-import           Control.Monad                     (join, when, unless)
-import qualified Control.Monad.Change.Alter        as A
-import           Control.Monad.Composable.Vault
-import           Crypto.Random.Entropy
-import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
-import           Data.Source.Map
-import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
+import Bloc.API.Chain
+import Bloc.Database.Queries
+import Bloc.Monad
+import Bloc.Server.TransactionResult (constructArgValuesAndSource)
+import Bloc.Server.Utils (getSigVals, maybeChainBatchResult, waitFor)
+import BlockApps.Logging
+import BlockApps.Solidity.XabiContract
+import BlockApps.SolidityVarReader
+import Blockchain.DB.SQLDB
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.ChainInfo
+import Blockchain.Data.DataDefs
+import Blockchain.Data.TransactionResultStatus
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.TypeLits
+import Control.Arrow ((***))
+import Control.Lens (at, (?~))
+import Control.Monad (join, unless, when)
+import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Vault
+import Crypto.Random.Entropy
+import qualified Data.Map.Strict as Map
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
+import Data.Source.Map
+import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Database.Esqueleto.Legacy as E
-
-import           Bloc.API.Chain
-import           Bloc.Monad
-import           BlockApps.Logging
-import           BlockApps.SolidityVarReader
-import           BlockApps.Solidity.XabiContract
-import           Bloc.Database.Queries
-import           Bloc.Server.TransactionResult  (constructArgValuesAndSource)
-import           Bloc.Server.Utils              (waitFor, getSigVals, maybeChainBatchResult)
-
-import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.TransactionResultStatus
-import           Blockchain.DB.SQLDB
-import           Blockchain.TypeLits
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.Keccak256
-import           Control.Monad.Change.Alter
-import           Control.Monad.Composable.SQL
-import           Handlers.Chain
-import           SolidVM.Model.CodeCollection.Contract hiding (errors)
-import           SolidVM.Model.CodeCollection.Function
-import           SQLM
-import           Strato.Strato23.Client
-import           Strato.Strato23.API.Types
-import           Text.Format
-
-import           UnliftIO
-
+import Handlers.Chain
 import qualified Handlers.Chain as CORE
+import SQLM
+import SolidVM.Model.CodeCollection.Contract hiding (errors)
+import SolidVM.Model.CodeCollection.Function
+import Strato.Strato23.API.Types
+import Strato.Strato23.Client
+import Text.Format
+import UnliftIO
 
 governanceAddress :: Address
 governanceAddress = Address 0x100
@@ -80,13 +75,17 @@ governanceAddress = Address 0x100
 --           TypeArrayDynamic (SimpleType TypeAccount) -> m'
 --           _ -> m
 
-createChainInfo :: ( A.Selectable Account AddressState m
-                   , (Keccak256 `A.Selectable` SourceMap) m
-                   , MonadLogger m
-                   , HasVault m
-                   , HasSQL m
-                   )
-                => Text -> Keccak256 -> ChainInput -> m ChainInfo
+createChainInfo ::
+  ( A.Selectable Account AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    MonadLogger m,
+    HasVault m,
+    HasSQL m
+  ) =>
+  Text ->
+  Keccak256 ->
+  ChainInput ->
+  m ChainInfo
 createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChains mmd _) = do
   when (null (unChainMembers members)) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
@@ -99,36 +98,38 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
         Just codePtr -> either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
         Nothing -> getContractDetailsForContract mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
-      Nothing -> return ([],[], md)
-      Just (resolvedCodePtr, contract) -> do
-          let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
-              govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
+    Nothing -> return ([], [], md)
+    Just (resolvedCodePtr, contract) -> do
+      let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
+          govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
-          let contractHash = fromMaybe resolvedCodePtr mCodePtr
+      let contractHash = fromMaybe resolvedCodePtr mCodePtr
 
-          let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash []
-              jsrc = serializeSourceMap src
-              codeInfo' = [CodeInfo "" jsrc $ Just . Text.pack $ _contractName contract]
-          md' <- do
-            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
-            (_, argsAsSource) <- constructArgValuesAndSource (Just chaininputArgs) xabiArgs
-            pure $ (at "args" ?~ argsAsSource) md
-          return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
+      let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash []
+          jsrc = serializeSourceMap src
+          codeInfo' = [CodeInfo "" jsrc $ Just . Text.pack $ _contractName contract]
+      md' <- do
+        let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+            xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
+        (_, argsAsSource) <- constructArgValuesAndSource (Just chaininputArgs) xabiArgs
+        pure $ (at "args" ?~ argsAsSource) md
+      return ([contractAcctInfo], codeInfo', md') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
-  let maybeNonContract a b | a == governanceAddress = Nothing
-                           | otherwise = Just $ NonContract a b
+  let maybeNonContract a b
+        | a == governanceAddress = Nothing
+        | otherwise = Just $ NonContract a b
       nonContractAcctInfo = catMaybes $ nmap maybeNonContract balances
       acctInfo = cAcctInfo ++ nonContractAcctInfo
       unsigned =
-        (UnsignedChainInfo lbl
-                           acctInfo
-                           codeInfo
-                           members
-                           pChains
-                           creationBlockHash
-                           nonce
-                           metaData
+        ( UnsignedChainInfo
+            lbl
+            acctInfo
+            codeInfo
+            members
+            pChains
+            creationBlockHash
+            nonce
+            metaData
         )
       msgHash = keccak256ToByteString $ rlpHash unsigned
   sig <- blocVaultWrapper $ postSignature (Just userName) (MsgHash msgHash)
@@ -136,8 +137,10 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
       chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
 
-withLastBlockHash :: (HasSQL m) =>
-                     (Keccak256 -> m b) -> m b
+withLastBlockHash ::
+  (HasSQL m) =>
+  (Keccak256 -> m b) ->
+  m b
 withLastBlockHash f = do
   maybeBlkHash <- getLastBlockHash
   case maybeBlkHash of
@@ -146,30 +149,33 @@ withLastBlockHash f = do
 
 getLastBlockHash :: (HasSQL m) => m (Maybe Keccak256)
 getLastBlockHash = do
-    blks <- fmap (map (E.entityVal)) . sqlQuery $ E.select $
-        E.from $ \a -> do
-          E.limit 1
-          E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
-          return a
+  blks <- fmap (map (E.entityVal)) . sqlQuery $
+    E.select $
+      E.from $ \a -> do
+        E.limit 1
+        E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
+        return a
 
-    return $ fmap blockDataRefHash $ listToMaybe blks
+  return $ fmap blockDataRefHash $ listToMaybe blks
 
-
-postChainInfo :: ( A.Selectable Account AddressState m
-                 , (Keccak256 `A.Selectable` SourceMap) m
-                 , MonadLogger m
-                 , HasBlocEnv m
-                 , HasSQL m
-                 , HasVault m
-                 )
-              => Maybe Text -> ChainInput -> m ChainId
+postChainInfo ::
+  ( A.Selectable Account AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    MonadLogger m,
+    HasBlocEnv m,
+    HasSQL m,
+    HasVault m
+  ) =>
+  Maybe Text ->
+  ChainInput ->
+  m ChainId
 postChainInfo mJwtToken chainInput = case mJwtToken of
   Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just jwtToken -> withLastBlockHash $ \bHash -> do
     evmCompatibleOn <- fmap evmCompatible getBlocEnv
     if evmCompatibleOn
-        then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
-    else do
+      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+      else do
         chainInfo' <- createChainInfo jwtToken bHash chainInput
         chainId <- CORE.postChain chainInfo'
         let isAsync = fromMaybe False $ chaininputAsync chainInput
@@ -183,13 +189,16 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
                 "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
         pure chainId
 
-postChainInfos :: ( A.Selectable Account AddressState m
-                  , (Keccak256 `A.Selectable` SourceMap) m
-                  , MonadLogger m
-                  , HasSQL m
-                  , HasVault m
-                  )
-               => Maybe Text -> [ChainInput] -> m [ChainId]
+postChainInfos ::
+  ( A.Selectable Account AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    MonadLogger m,
+    HasSQL m,
+    HasVault m
+  ) =>
+  Maybe Text ->
+  [ChainInput] ->
+  m [ChainId]
 postChainInfos mJwtToken chainInputs = case mJwtToken of
   Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just userName -> withLastBlockHash $ \bHash -> do
@@ -208,49 +217,61 @@ postChainInfos mJwtToken chainInputs = case mJwtToken of
             \(cId, (txr, _)) -> "Chain creation for " <> format (unChainId cId) <> " failed: " <> show (transactionResultStatus txr)
     pure chainIds
 
-
-waitForChainInfo :: (MonadLogger m,
-                     HasSQL m) =>
-                    ChainId -> m (Maybe (TransactionResult, Maybe ChainInfo))
+waitForChainInfo ::
+  ( MonadLogger m,
+    HasSQL m
+  ) =>
+  ChainId ->
+  m (Maybe (TransactionResult, Maybe ChainInfo))
 waitForChainInfo chainId = do
   result <- waitForChainInfos [chainId]
   case result of
     Nothing -> do
       $logInfoS "waitForChainInfo" "Timed out!"
       return Nothing
-    Just (x:_) -> return $ Just x
+    Just (x : _) -> return $ Just x
     Just [] -> return Nothing
 
-waitForChainInfos :: (MonadLogger m,
-                      HasSQL m) =>
-                     [ChainId] -> m (Maybe [(TransactionResult, Maybe ChainInfo)])
+waitForChainInfos ::
+  ( MonadLogger m,
+    HasSQL m
+  ) =>
+  [ChainId] ->
+  m (Maybe [(TransactionResult, Maybe ChainInfo)])
 waitForChainInfos chainIds = waitFor go
-  where go = do
-          infos <- catMaybes <$> maybeChainBatchResult chainIds
-          $logInfoLS "waitForChainInfo/req" chainIds
-          $logDebugLS "waitForChainInfo/resp" infos
-          return (length infos == length chainIds, infos)
+  where
+    go = do
+      infos <- catMaybes <$> maybeChainBatchResult chainIds
+      $logInfoLS "waitForChainInfo/req" chainIds
+      $logDebugLS "waitForChainInfo/resp" infos
+      return (length infos == length chainIds, infos)
 
-getSingleChainInfo :: (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
-                ChainId -> m ChainIdChainOutput
-
+getSingleChainInfo ::
+  (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
+  ChainId ->
+  m ChainIdChainOutput
 getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing Nothing
 
-
-getChainInfo :: Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>
-                [ChainId] -> Maybe Text -> Maybe Integer -> Maybe Integer -> m [ChainIdChainOutput]
-getChainInfo chainIds mChainLabel lim off = --do
-  (getChain  chainIds mChainLabel lim off) >>= (\chainIdChainInfos -> return $ map convertChainInfo chainIdChainInfos)
-    where
-      convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
-      convertChainInfo chp = do
-        let chtup = unNamedTuple @"id" @"info" chp
-        let chinfo =  chainInfo $ snd chtup
-        let getAddrBalance acct = case acct of
-                                    NonContract a b -> (a, b)
-                                    ContractNoStorage a b _ -> (a, b)
-                                    ContractWithStorage a b _ _ -> (a, b)
-                                    SolidVMContractWithStorage a b _ _ -> (a, b)
-        let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
-            mems = members chinfo
-        NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput
+getChainInfo ::
+  Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>
+  [ChainId] ->
+  Maybe Text ->
+  Maybe Integer ->
+  Maybe Integer ->
+  m [ChainIdChainOutput]
+getChainInfo chainIds mChainLabel lim off =
+  --do
+  (getChain chainIds mChainLabel lim off) >>= (\chainIdChainInfos -> return $ map convertChainInfo chainIdChainInfos)
+  where
+    convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
+    convertChainInfo chp = do
+      let chtup = unNamedTuple @"id" @"info" chp
+      let chinfo = chainInfo $ snd chtup
+      let getAddrBalance acct = case acct of
+            NonContract a b -> (a, b)
+            ContractNoStorage a b _ -> (a, b)
+            ContractWithStorage a b _ _ -> (a, b)
+            SolidVMContractWithStorage a b _ _ -> (a, b)
+      let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
+          mems = members chinfo
+      NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput

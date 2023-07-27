@@ -1,3 +1,4 @@
+{- ORMOLU_DISABLE -}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -142,7 +143,7 @@ decodeHex str = if BS.null r then Just bs else Nothing where
 -}
 
 decodeHex :: ConvertibleStrings a ByteString => a -> Maybe ByteString
-decodeHex str = 
+decodeHex str =
     case B16.decode $ cs str of
       Left _ -> Nothing
       Right v -> Just v

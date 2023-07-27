@@ -1,73 +1,72 @@
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ImplicitParams             #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 -- {-# OPTIONS -fno-warn-unused-top-binds #-}
 
-module Bloc.Monad (
-  Should(..),
-  Compile(..),
-  CacheNonce(..),
-  HasBlocEnv,
-  blocMaybe,
-  getBlocEnv,
-  blocVaultWrapper,
-  BlocEnv(..)
-  ) where
+module Bloc.Monad
+  ( Should (..),
+    Compile (..),
+    CacheNonce (..),
+    HasBlocEnv,
+    blocMaybe,
+    getBlocEnv,
+    blocVaultWrapper,
+    BlocEnv (..),
+  )
+where
 
-
-import           Control.Monad.Reader
-import           Data.Cache
-import           Data.Text                          (Text)
-import           GHC.Stack
-import           Servant
-import           Servant.Client
-
-import           UnliftIO                           hiding (Handler(..))
-
-import           Bloc.API.Transaction
-import           BlockApps.Logging
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.Nonce
-
-import           Control.Monad.Change.Modify        hiding (modify)
-import           Control.Monad.Composable.Vault     hiding (httpManager)
-
-import           SQLM
+import Bloc.API.Transaction
+import BlockApps.Logging
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.ChainId
+import Blockchain.Strato.Model.Nonce
+import Control.Monad.Change.Modify hiding (modify)
+import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Reader
+import Data.Cache
+import Data.Text (Text)
+import GHC.Stack
+import SQLM
+import Servant.Client
+import UnliftIO hiding (Handler (..))
 
 data Should a = Don't a | Do a
+
 data Compile = Compile
+
 data CacheNonce = CacheNonce
 
 type HasBlocEnv m = Accessible BlocEnv m
 
 data BlocEnv = BlocEnv
-  { stateFetchLimit    :: Integer
-  , gasOn              :: Bool
-  , evmCompatible      :: Bool
-  , txSizeLimit        :: Int
-  , accountNonceLimit  :: Integer
-  , gasLimit           :: Integer
-  , globalNonceCounter :: Cache Account Nonce
-  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
+  { stateFetchLimit :: Integer,
+    gasOn :: Bool,
+    evmCompatible :: Bool,
+    txSizeLimit :: Int,
+    accountNonceLimit :: Integer,
+    gasLimit :: Integer,
+    globalNonceCounter :: Cache Account Nonce,
+    txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 --------------------------------------------------------------------------------
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
-                    ClientM x -> m x
+blocVaultWrapper ::
+  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+  ClientM x ->
+  m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
   VaultData url mgr <- access Proxy

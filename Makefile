@@ -92,7 +92,7 @@ build_common_profiled: build_buildbase
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-strato: build_common
+strato: build_common prettify
 	@echo Now building core-strato...
 	cp -fr strato/licenses ${STRATODIR}
 	cp strato/doit.sh ${STRATODIR}
@@ -133,3 +133,8 @@ test:
 
 docker-clean:
 	rm -rf ${FAKEROOT}
+
+prettify:
+	cd strato && \
+	chmod +x pretty.sh && \
+	./pretty.sh
