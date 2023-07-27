@@ -13,13 +13,16 @@ const MyAssetCard = (product, index) => {
 
     switch (status) {
         case "For Sale":
-            statusBackgroundColor = "#3452FF";
+            statusBackgroundColor = "#92A2FB";
             break;
         case "Retired":
-            statusBackgroundColor = "#F11010";
+            statusBackgroundColor = "#F98C8C";
             break;
         case "Unpublished":
             statusBackgroundColor = "#F0C452";
+            break;
+        case "Sold":
+            statusBackgroundColor = "#92FBFB";
             break;
         default:
             statusBackgroundColor = "#36C487";
@@ -95,7 +98,16 @@ const MyAssetCard = (product, index) => {
                         </Button>
                     </div>
                 }
-
+                {status === "Sold" &&
+                    <div className="absolute bottom-3 w-full">
+                        <Button
+                            type="primary"
+                            className="h-10 w-11/12 ml-3"
+                        >
+                            Edit
+                        </Button>
+                    </div>
+                }
             </div>
         </div>
     )
