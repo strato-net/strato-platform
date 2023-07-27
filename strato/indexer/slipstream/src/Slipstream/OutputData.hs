@@ -39,9 +39,8 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Data.Aeson                      (encode, toJSON)
+import           Data.Aeson                      (encode, object, (.=))
 import           Data.Bifunctor                  (first)
-import qualified Data.HashMap.Strict as HM
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
@@ -54,6 +53,7 @@ import           Data.List (nubBy, groupBy)
 import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
+import qualified Data.ByteString.Lazy.Char8 as BSL
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
@@ -238,7 +238,7 @@ baseAssetColumns = [ "record_id"
               , "transaction_hash"
               , "transaction_sender"
               , "contractname"
-              , "jsonb"
+              , "data"
               ]
 
 baseTableColumns :: TableColumns
@@ -711,6 +711,8 @@ insertIndexTableQuery cs = concat $
                          ]
               vals = flip map contracts $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+
+              -- vals = wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd list
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
@@ -789,6 +791,15 @@ insertContractInAssetTableQuery (o,a,n) =
   let contractTableName = indexTableName o a n
    in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
 
+
+-- Function to convert a tuple to a JSON object
+tupleToJson :: (Text, Text) -> Text
+tupleToJson (k, v) = T.pack $ BSL.unpack $ encode $ object ["key" .= k, "value" .= v]
+
+-- Convert a list of tuples to a list of JSON strings
+convertToJSON :: [(Text, Text)] -> [Text]
+convertToJSON tuples = map tupleToJson tuples
+
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
 insertAssetTableQuery cs = concat $
@@ -796,6 +807,10 @@ insertAssetTableQuery cs = concat $
    in flip map (map snd $ partitionWith (length . snd) cs') $ \case
         [] -> []
         contracts@((_,list):_) ->
+          -- let tableName = indexTableName
+          --         (E.organization x)
+          --         (E.application x)
+          --         (E.contractName x)
           let keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAssetTableColumns
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
@@ -805,20 +820,22 @@ insertAssetTableQuery cs = concat $
                          , tshow . E.blockNumber
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
+                         , E.organization --contractname
                          ]
-              vals = flip map contracts $ \(row, _) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals --Others
-              assetVals = flip map contracts $ \(row, rowList) ->
-                map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-              jsonbAsVals = wrapAndEscape $ [T.pack $ show $ toJSON $ HM.fromList (zip (map fst list) (map show assetVals))] --JSONB Column
-              inserts = csv $ vals ++ [jsonbAsVals]
+
+              vals = flip map contracts $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ (convertToJSON rowList)
+              -- assetVals = flip map contracts $ \(row, rowList) ->
+              --   map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+              -- jsonbAsVals = wrapAndEscape $ [T.pack $ show $ toJSON $ HM.fromList (zip (map fst list) (map show assetVals))] --JSONB Column
+              inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO Asset "
                 , keySt
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (record_id) DO UPDATE SET
+  ON CONFLICT (contractname) DO UPDATE SET
     record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
