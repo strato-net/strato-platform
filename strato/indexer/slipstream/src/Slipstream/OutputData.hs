@@ -656,7 +656,7 @@ createAssetTableQuery =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
-        , ",\n  PRIMARY KEY (address));"
+        , ",\n  PRIMARY KEY (contractname));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -787,7 +787,7 @@ insertMappingTableQuery ms = concat $
 insertContractInAssetTableQuery :: OutputM m => (Text, Text, Text) -> ConduitM () Text m ()
 insertContractInAssetTableQuery (o,a,n) =
   let contractTableName = indexTableName o a n
-   in yield $ T.concat [ "INSERT INTO ASSET (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
+   in yield $ T.concat [ "INSERT INTO \"Asset\" VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
