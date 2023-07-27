@@ -5,11 +5,10 @@ import jwtDecode from 'jwt-decode'
 import config from '/load.config'
 
 const getTokenFromCookie = async (req, res) => {
-  let temp = await req.app.oauth
-  const tokenName = temp.getCookieNameAccessToken()
+  const tokenName = req.app.oauth.getCookieNameAccessToken()
   if (req.cookies[tokenName]) {
     try {
-      await temp.validateAndGetNewToken(req, res)
+      await req.app.oauth.validateAndGetNewToken(req, res)
       return req.cookies[tokenName] // the cookie may have the updated value here after validateAndGetNewToken()
     } catch (err) {
       console.log(
@@ -32,11 +31,11 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
-// const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
-const getLoginUrl = async (req) => {
-  let temp = await req.app.oauth
-  return config.dockerized ? '/marketplace/login/' : temp.getSigninURL()
-};
+const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+// const getLoginUrl = async (req) => {
+//   let temp = await req.app.oauth
+//   return config.dockerized ? '/marketplace/login/' : temp.getSigninURL()
+// };
 
 
 class AuthHandler {
@@ -95,11 +94,10 @@ class AuthHandler {
     }
   }
 
-  static async initOauth() {
+  static initOauth() {
     let oauth
     try {
-      oauth = await oauthUtil.init(config.nodes[0].oauth)
-      console.log('help!: ', oauth.getSigninURL())
+      oauth = oauthUtil.init(config.nodes[0].oauth)
     } catch (err) {
       console.log('Error initializing oauth handlers')
       process.exit(1)
