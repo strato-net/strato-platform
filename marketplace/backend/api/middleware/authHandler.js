@@ -32,11 +32,6 @@ const getTokenFromHeader = async (req) => {
 }
 
 const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
-// const getLoginUrl = async (req) => {
-//   let temp = await req.app.oauth
-//   return config.dockerized ? '/marketplace/login/' : temp.getSigninURL()
-// };
-
 
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
@@ -83,14 +78,11 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        console.error('Error authorizing request', err)
         return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, err)
-        // return next()
       }
       return rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: await getLoginUrl(req),
       })
-      // return next()
     }
   }
 
