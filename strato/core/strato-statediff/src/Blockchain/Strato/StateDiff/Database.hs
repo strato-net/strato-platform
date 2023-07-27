@@ -43,7 +43,7 @@ type SqlDbM m = SQL.SqlPersistT m
 
 commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  sqlQuery $ do
+  sqlQueryNoTransaction $ do
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
@@ -87,7 +87,8 @@ createAccount blockNumber accountDiffs =
 
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
       SQL.insertMany_ (concat newStorage)
-      traverse_ (`SQL.upsert` []) $ uncurry codeRef <$> accountDiffs
+      traverse_ (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs) `catch` (\(e :: SomeException) -> do
+        $logWarnS "commitSqlDiffs/createAccount" . T.pack $ "Error inserting code: " ++ show e)
     code' account diff = getField (theError account "code") $ code diff
     codeRef account diff = CodeRef {
       codeRefCodeHash = hash $ code' account diff,
