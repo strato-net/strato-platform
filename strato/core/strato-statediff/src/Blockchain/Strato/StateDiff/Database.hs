@@ -48,7 +48,7 @@ type SqlDbM m = SQL.SqlPersistT m
 
 commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  sqlQuery $ do
+  sqlQueryNoTransaction $ do
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
@@ -80,7 +80,9 @@ createAccount blockNumber accountDiffs =
   catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
     tryCreates = do
-      codeIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs)
+      codeIDs <- fmap catMaybes $ (map (Just . SQL.entityKey) <$> traverse (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs)) `catch` (\(e :: SomeException) -> do
+        $logWarnS "commitSqlDiffs/createAccount" . T.pack $ "Error inserting code: " ++ show e
+        pure Nothing)
       let newAccounts = map (uncurry $ uncurry addrRef) $ zip accountDiffs codeIDs
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
       addrIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) newAccounts
