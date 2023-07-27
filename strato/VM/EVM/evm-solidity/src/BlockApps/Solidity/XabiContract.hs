@@ -1,8 +1,9 @@
 
 
 --this module is used to convert an EVM XABI to a partial Contract type (defined in SolidVM).  Since the XABI is missing a lot of the stuff in Contract, this conversion will always be incomplete, but the resulting type can be used anywhere that doesn't need the missing stuff.  This will allow us to unify some code that works with both solidvm and EVM
-module Slipstream.XabiContract (
-  xabiToPartialContract  
+module BlockApps.Solidity.XabiContract (
+  xabiToPartialContract,
+  indexedTypeToEvmIndexedType
   ) where
 
 
@@ -56,6 +57,14 @@ evmIndexedTypeToIndexedType x = IndexedType {
   indexedTypeType = evmTypeToType $ OLDXABI.indexedTypeType x
   }
 
+indexedTypeToEvmIndexedType :: IndexedType -> Maybe OLDXABI.IndexedType
+indexedTypeToEvmIndexedType x =
+  let mType = typeToEvmType $ indexedTypeType x
+   in fmap (\t -> OLDXABI.IndexedType {
+        OLDXABI.indexedTypeIndex = indexedTypeIndex x,
+        OLDXABI.indexedTypeType = t
+        }) mType
+
 evmTypeToType :: OLDXABI.Type -> SVMType.Type
 evmTypeToType (OLDXABI.Int x y) = SVMType.Int x y
 evmTypeToType (OLDXABI.String x) = SVMType.String x
@@ -69,6 +78,21 @@ evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x (textToLabel y) $ fmap (map 
 evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y
 evmTypeToType (OLDXABI.Contract x) = SVMType.Contract $ textToLabel x
 evmTypeToType (OLDXABI.Mapping x y z) = SVMType.Mapping x (evmTypeToType y) (evmTypeToType z)
+
+typeToEvmType :: SVMType.Type -> Maybe OLDXABI.Type
+typeToEvmType (SVMType.Int x y) = Just $ OLDXABI.Int x y
+typeToEvmType (SVMType.String x) = Just $ OLDXABI.String x
+typeToEvmType (SVMType.Bytes x y) = Just $ OLDXABI.Bytes x y
+typeToEvmType SVMType.Bool = Just $ OLDXABI.Bool
+typeToEvmType (SVMType.Address _) = Just $ OLDXABI.Address
+typeToEvmType (SVMType.Account _) = Just $ OLDXABI.Account
+typeToEvmType (SVMType.UnknownLabel x _) = Just $ OLDXABI.UnknownLabel x
+typeToEvmType (SVMType.Struct x y) = Just $ OLDXABI.Struct x (labelToText y)
+typeToEvmType (SVMType.Enum x y z) = Just $ OLDXABI.Enum x (labelToText y) (map labelToText <$> z)
+typeToEvmType (SVMType.Array x y) = flip OLDXABI.Array y <$> typeToEvmType x
+typeToEvmType (SVMType.Contract x) = Just $ OLDXABI.Contract (labelToText x)
+typeToEvmType (SVMType.Mapping x y z) = OLDXABI.Mapping x <$> typeToEvmType y <*> typeToEvmType z
+typeToEvmType _ = Nothing
 
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())
 varTypeToVariableDecl x =
@@ -97,4 +121,5 @@ dummyAnnotation =
       },
     _sourceAnnotationAnnotation = ()
   }
+
 

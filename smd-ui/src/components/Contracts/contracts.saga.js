@@ -13,8 +13,8 @@ import { handleErrors } from '../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts(chainid, limit, offset) {
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}`
+export function getContracts(chainid, limit, offset, name) {
+  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${name ? `&name=${name}` : ''}`
 
   return fetch(
     url,
@@ -36,7 +36,7 @@ export function getContracts(chainid, limit, offset) {
 
 export function* fetchContracts(action) {
   try {
-    let response = yield call(getContracts, action.chainId, action.limit, action.offset);
+    let response = yield call(getContracts, action.chainId, action.limit, action.offset, action.name);
     yield put(fetchContractsSuccess(response));
   }
   catch (err) {

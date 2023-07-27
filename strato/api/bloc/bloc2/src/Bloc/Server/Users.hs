@@ -11,7 +11,6 @@ module Bloc.Server.Users (
 import           Control.Lens
 import           Control.Monad
 import qualified Control.Monad.Change.Alter        as A
-import           Control.Monad.Except
 import           Data.Source.Map                   (SourceMap)
 import           UnliftIO
 
@@ -27,18 +26,14 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Bloc.Server.BlocOptions
-import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Handlers.AccountInfo
 import           Handlers.Faucet
 import           SQLM
 
 
-postUsersFill :: ( HasCoreAPI m
-                 , A.Selectable Account AddressState m
-                 , (Keccak256 `A.Alters` SourceMap) m
-                 , HasBlocSQL m
+postUsersFill :: ( A.Selectable Account AddressState m
+                 , (Keccak256 `A.Selectable` SourceMap) m
                  , MonadLogger m
                  , HasSQL m
                  , HasBlocEnv m
@@ -47,9 +42,9 @@ postUsersFill :: ( HasCoreAPI m
 postUsersFill _ addr resolve = do
   shouldPost <- fmap gasOn getBlocEnv
   if shouldPost
-    then blocTransaction $ do
+    then do
       when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-      hashes <- blocStrato $ postFaucetClient addr
+      hashes <- postFaucet addr
       result <- getBlocTransactionResult' hashes resolve
       when (resolve && Success == blocTransactionStatus result) $ do
         waitForBalance addr
@@ -63,12 +58,12 @@ postUsersFill _ addr resolve = do
       then pure $ BlocTransactionResult Success zeroHash Nothing Nothing
       else throwIO $ UserError "the '/fill' route doesn't work when the 'gasOn' flag has been set to false."
 
-waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
+waitForBalance :: (MonadLogger m, HasSQL m) => Address -> m ()
 waitForBalance addr = waitForWithTimeout "no user account found" go
-  where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m (Bool, ())
+  where go :: (MonadLogger m, HasSQL m) => m (Bool, ())
         go = do
           let params = accountsFilterParams & qaAddress ?~ addr & qaMinBalance ?~ 1
-          accts <- blocStrato $ getAccountsFilter params
+          accts <- getAccount' params
           $logInfoLS "waitForBalance/req" params
           $logInfoLS "waitForBalance/resp" accts
           return (not $ null accts, ())

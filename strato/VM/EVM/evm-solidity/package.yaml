@@ -17,12 +17,14 @@ dependencies:
   - bimap
   - bytestring
   - containers
+  - monad-alter
   - ordered-containers
   - parsec
   - QuickCheck
   - solid-vm-model
   - strato-model
   - text
+  - transformers
   - unordered-containers
   - vector
 

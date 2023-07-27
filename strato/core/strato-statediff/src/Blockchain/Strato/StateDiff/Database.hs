@@ -30,7 +30,7 @@ import           Control.Lens ((^.))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
-import           Data.Foldable                               (for_)
+import           Data.Foldable                               (for_, traverse_)
 import qualified Data.Map                                    as Map
 import           Data.Maybe
 import qualified Data.Text                                   as T
@@ -87,6 +87,13 @@ createAccount blockNumber accountDiffs =
 
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
       SQL.insertMany_ (concat newStorage)
+      traverse_ (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs) `catch` (\(e :: SomeException) -> do
+        $logWarnS "commitSqlDiffs/createAccount" . T.pack $ "Error inserting code: " ++ show e)
+    code' account diff = getField (theError account "code") $ code diff
+    codeRef account diff = CodeRef {
+      codeRefCodeHash = hash $ code' account diff,
+      codeRefCode     = code' account diff
+    }
     addrRef account diff = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
       addressStateRefNonce = getField (theError account "nonce") $ nonce diff,

@@ -21,11 +21,13 @@ import Control.Exception
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Binary (encode, decode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as Char8
 import Data.Coerce
 import qualified Data.Map as M
@@ -39,7 +41,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import qualified Numeric (readHex, showHex)
-import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, xdescribe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -97,13 +99,13 @@ import Blockchain.DB.ChainDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.BlockSummary
 import Data.Foldable (for_)
-import Blockchain.Database.MerklePatricia.InternalMem (mpMap)
 import Blockchain.Bagger (processNewBestBlock)
 import Blockchain.Sequencer.Event
 import qualified Control.Monad.State                   as State
 import Data.Map.Strict (Map)
 import qualified Blockchain.Data.TXOrigin as TXO
 import Data.Either                     (fromRight)
+import Debug.Trace
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -196,6 +198,10 @@ anyModifierError _ = False
 anyReservedWordError :: Selector HandledException
 anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
 anyReservedWordError _ = False
+
+anyDuplicateContractError :: Selector HandledException
+anyDuplicateContractError (HE Blockchain.SolidVM.Exception.DuplicateContract{}) = True
+anyDuplicateContractError _ = False
 
 anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
@@ -738,6 +744,19 @@ bAccount a =
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
+
+-- hash(0xFF, sender, salt, code_hash, args)[12::]
+deriveAddressWithSalt :: String -> BC.ByteString -> String -> Address
+deriveAddressWithSalt salt src args = do
+  let theAddress = fromJust $ stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"
+      theHash = hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
+                                               , rlpEncode theAddress
+                                               , rlpEncode salt
+                                               , rlpEncode $ keccak256ToByteString $ hash src
+                                               , rlpEncode args
+                                               ]
+  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
+  (decode $ BL.drop 12 $ encode theHash)
 
 spec :: Spec
 spec = do
@@ -5701,8 +5720,8 @@ contract qq {
 }|]
     getFields ["t2a", "t2x"] `shouldReturn` [BInteger 2022, BInteger 2022]
 
-  it "can create salted contract" . runTest $ do
-    runBS [r|
+  it "can deterministically create multiple salted contracts with no args" . runTest $ do
+    let src = [r|
 
 contract X {
   string public xNum;
@@ -5720,16 +5739,98 @@ contract qq {
   constructor() public {
     salt' = "salt";
     x = new X{salt: salt'}();
-    y = new Y{salt: salt'}();
-    z = new X{salt: "something"}();
+    y = new Y{salt: "something"}();
 
   }
 }|]
-    getFields ["x", "y", "z"] `shouldReturn` 
-      [ bContract "X" 0x6532c90691674287ccc10aeb251e0a0f7439073e
-      , bContract "Y" 0xfa29c1031db9942202c710ed85879c3d3e9f7110
-      , bContract "X" 0x898eabafbe40a722b6393ff16c9166e75e519b8f
+    runBS src
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[]"
+      , bContract "Y" $ deriveAddressWithSalt "something" (BC.pack src) "[]"
       ]
+
+  it "can deterministically create multiple salted contract with args" . runTest $ do
+    let src = [r|
+
+contract X {
+  string public xNum;
+  constructor(string _xNum) public {
+    xNum = _xNum;
+  }
+}
+
+contract Y {
+  uint public yNum;
+  constructor(uint _yNum) public {
+    yNum = _yNum;
+  }
+}
+
+contract qq {
+  X public x;
+  Y public y;
+  X public z;
+  bytes32 salt';
+  constructor() public {
+    salt' = "salt";
+    x = new X{salt: salt'}("xNum");
+    y = new Y{salt: salt'}(100);
+
+  }
+}|]
+    runBS src
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SString \"xNum\"]"
+      , bContract "Y" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SInteger 100]"
+      ]
+    [BContract "X" x] <- getFields ["x"]
+    [BContract "Y" y] <- getFields ["y"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "xNum") `shouldReturn` BString "xNum"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing y) (singleton "yNum") `shouldReturn` BInteger 100
+  
+
+  it "can deterministically create salted contract with multiple args" . runTest $ do
+    let src = [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  constructor() public {
+    x = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+  }
+}|] 
+    runBS src
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt "Dustin Norwood" (BC.pack src) "[Constant: SString \"Dustin Norwood\",Constant: SString \"Thebestcertyoucangetfor$99.99\"]"]
+    [BContract "User" x] <- getFields["x"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+
+  it "should fail when trying to create salted contract to the same address" $ runTest (do
+    runBS [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  User public y;
+  constructor() public {
+    x = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+    y = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+  }
+}|]) `shouldThrow` anyDuplicateContractError
       
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|

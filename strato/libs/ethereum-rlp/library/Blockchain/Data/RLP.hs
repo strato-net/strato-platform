@@ -11,6 +11,9 @@ module Blockchain.Data.RLP (
   RLPObject(..),
   formatRLPObject,
   RLPSerializable(..),
+  RLPSerializable1(..),
+  rlpDecode1,
+  rlpEncode1,
   rlpSplit,
   rlpSplitMaybe,
   rlpSplitEither,
@@ -27,6 +30,9 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
+import           Data.Fix
+import           Data.Functor.Compose
+import           Data.Functor.Identity
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
@@ -51,6 +57,15 @@ class RLPSerializable a where
   rlpDecode::RLPObject->a
   rlpEncode::a->RLPObject
 
+class RLPSerializable1 f where
+  liftRlpDecode :: (RLPObject -> a) -> RLPObject -> f a
+  liftRlpEncode :: (a -> RLPObject) -> f a -> RLPObject
+
+rlpDecode1 :: (RLPSerializable1 f, RLPSerializable a) => RLPObject -> f a
+rlpDecode1 = liftRlpDecode rlpDecode
+
+rlpEncode1 :: (RLPSerializable1 f, RLPSerializable a) => f a -> RLPObject
+rlpEncode1 = liftRlpEncode rlpEncode
 
 instance Pretty RLPObject where
   pretty (RLPArray objects) =
@@ -193,21 +208,53 @@ instance RLPSerializable T.Text where
   rlpEncode = rlpEncode . encodeUtf8
   rlpDecode = decodeUtf8 . rlpDecode
 
+instance RLPSerializable a => RLPSerializable (Identity a) where
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance RLPSerializable1 Identity where
+  liftRlpEncode f = f . runIdentity
+  liftRlpDecode f = Identity . f
+
+instance (RLPSerializable1 f, RLPSerializable1 g, RLPSerializable a) => RLPSerializable (Compose f g a) where
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable1 f, RLPSerializable1 g) => RLPSerializable1 (Compose f g) where
+  liftRlpEncode f = liftRlpEncode (liftRlpEncode f) . getCompose
+  liftRlpDecode f = Compose . liftRlpDecode (liftRlpDecode f)
+
+instance RLPSerializable1 f => RLPSerializable (Fix f) where
+  rlpEncode = rlpEncode1 . unFix
+  rlpDecode = Fix . rlpDecode1
+
 instance RLPSerializable a => RLPSerializable [a] where
-  rlpEncode as = RLPArray $ map rlpEncode as
-  rlpDecode (RLPArray as) = map rlpDecode as
-  rlpDecode x = error $ "rlpDecode [a]: Expected RLPArray, got " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance RLPSerializable1 [] where
+  liftRlpEncode f as = RLPArray $ f <$> as
+  liftRlpDecode f (RLPArray os) = f <$> os
+  liftRlpDecode _ os = error $ "rlpDecode []: Expected RLPArray, got " ++ show os
 
 -- serialization for tuples, triples, etc. of serializable types
 instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
-  rlpEncode (a,b) = RLPArray [rlpEncode a, rlpEncode b]
-  rlpDecode (RLPArray [a,b]) = (rlpDecode a, rlpDecode b)
-  rlpDecode x = error $ "rlpDecode for tuples not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance RLPSerializable a => RLPSerializable1 ((,) a) where
+  liftRlpEncode f (a,b) = RLPArray [rlpEncode a, f b]
+  liftRlpDecode f (RLPArray [a, b]) = (rlpDecode a, f b)
+  liftRlpDecode _ x = error $ "rlpDecode for tuples not defined for " ++ show x
 
 instance (RLPSerializable a, RLPSerializable b, RLPSerializable c) => RLPSerializable (a,b,c) where
-  rlpEncode (a,b,c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpDecode (RLPArray [a,b,c]) = (rlpDecode a, rlpDecode b, rlpDecode c)
-  rlpDecode x = error $ "rlpDecode for triples not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable a, RLPSerializable b) => RLPSerializable1 ((,,) a b) where
+  liftRlpEncode f (a,b,c) = RLPArray [rlpEncode a, rlpEncode b, f c]
+  liftRlpDecode f (RLPArray [a,b,c]) = (rlpDecode a, rlpDecode b, f c)
+  liftRlpDecode _ x = error $ "rlpDecode for triples not defined for " ++ show x
 
 instance
   ( RLPSerializable a
@@ -215,9 +262,13 @@ instance
   , RLPSerializable c
   , RLPSerializable d
   ) => RLPSerializable (a,b,c,d) where
-  rlpEncode (a,b,c,d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d]
-  rlpDecode (RLPArray [a,b,c,d]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d)
-  rlpDecode x = error $ "rlpDecode for 4-tuples not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable a, RLPSerializable b, RLPSerializable c) => RLPSerializable1 ((,,,) a b c) where
+  liftRlpEncode f (a,b,c,d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, f d]
+  liftRlpDecode f (RLPArray [a,b,c,d]) = (rlpDecode a, rlpDecode b, rlpDecode c, f d)
+  liftRlpDecode _ x = error $ "rlpDecode for 4-tuples not defined for " ++ show x
 
 instance
   ( RLPSerializable a
@@ -226,9 +277,13 @@ instance
   , RLPSerializable d
   , RLPSerializable e
   ) => RLPSerializable (a,b,c,d,e) where
-  rlpEncode (a,b,c,d,e) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d, rlpEncode e]
-  rlpDecode (RLPArray [a,b,c,d,e]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d, rlpDecode e)
-  rlpDecode x = error $ "rlpDecode for 5-tuples not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable a, RLPSerializable b, RLPSerializable c, RLPSerializable d) => RLPSerializable1 ((,,,,) a b c d) where
+  liftRlpEncode f (a,b,c,d,e) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d, f e]
+  liftRlpDecode f (RLPArray [a,b,c,d,e]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d, f e)
+  liftRlpDecode _ x = error $ "rlpDecode for 5-tuples not defined for " ++ show x
 
 instance
   ( RLPSerializable a
@@ -238,27 +293,39 @@ instance
   , RLPSerializable e
   , RLPSerializable f
   ) => RLPSerializable (a,b,c,d,e,f) where
-  rlpEncode (a,b,c,d,e,f) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d, rlpEncode e, rlpEncode f]
-  rlpDecode (RLPArray [a,b,c,d,e,f]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d, rlpDecode e, rlpDecode f)
-  rlpDecode x = error $ "rlpDecode for 6-tuples not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable a, RLPSerializable b, RLPSerializable c, RLPSerializable d, RLPSerializable e) => RLPSerializable1 ((,,,,,) a b c d e) where
+  liftRlpEncode g (a,b,c,d,e,f) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d, rlpEncode e, g f]
+  liftRlpDecode g (RLPArray [a,b,c,d,e,f]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d, rlpDecode e, g f)
+  liftRlpDecode _ x = error $ "rlpDecode for 6-tuples not defined for " ++ show x
 
 
 -- generic instance for Maybe
 instance (RLPSerializable a) => RLPSerializable (Maybe a) where
-  rlpEncode Nothing = RLPString ""
-  rlpEncode (Just a) = RLPArray [rlpEncode a]
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
 
-  rlpDecode (RLPString "") = Nothing
-  rlpDecode (RLPArray [x]) = Just (rlpDecode x)
-  rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
+instance RLPSerializable1 Maybe where
+  liftRlpEncode _ Nothing  = RLPString ""
+  liftRlpEncode f (Just a) = RLPArray [f a]
+
+  liftRlpDecode _ (RLPString "") = Nothing
+  liftRlpDecode f (RLPArray [x]) = Just (f x)
+  liftRlpDecode _ _ = error "error in rlpDecode for Maybe: bad RLPObject"
 
 
 -- generic instance for Data.Map
 instance (RLPSerializable k, RLPSerializable v, Ord k)
   => RLPSerializable (M.Map k v) where
-  rlpEncode mp = RLPArray $ map rlpEncode (M.toList mp)
-  rlpDecode (RLPArray rp) = M.fromList (map rlpDecode rp)
-  rlpDecode x = error $ "rlpDecode for Map not defined for " ++ show x
+  rlpEncode = rlpEncode1
+  rlpDecode = rlpDecode1
+
+instance (RLPSerializable k, Ord k) => RLPSerializable1 (M.Map k) where
+  liftRlpEncode f mp = RLPArray $ map (liftRlpEncode f) (M.toList mp)
+  liftRlpDecode f (RLPArray rp) = M.fromList (map (liftRlpDecode f) rp)
+  liftRlpDecode _ x = error $ "rlpDecode for Map not defined for " ++ show x
 
 instance RLPSerializable Bool where
   rlpEncode True = RLPScalar 1

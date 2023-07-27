@@ -38,7 +38,11 @@ class ContractMethodCall extends Component {
 
   submit = (values) => {
     try {
-      const parsedArgs = this.props.contractInfo.xabi.funcs[this.props.symbolName] ? Object.entries(this.props.contractInfo.xabi.funcs[this.props.symbolName].args)
+      let unparsedArgs = [];
+      if (this.props.contractInfo.contract && this.props.contractInfo.contract._functions && this.props.contractInfo.contract._functions[this.props.symbolName]) {
+        unparsedArgs = this.props.contractInfo.contract._functions[this.props.symbolName]._funcArgs;
+      }
+      const parsedArgs = unparsedArgs
         .reduce((args, [arg, info]) => {
           try {
             args[arg] = JSON.parse(values[arg]);
@@ -48,7 +52,7 @@ class ContractMethodCall extends Component {
             args[arg] = values[arg];
             return args;
           }
-        }, {}) : {}
+        }, {})
         const payload = {
           contractName: this.props.contractName,
           contractAddress: this.props.contractAddress,
@@ -191,20 +195,22 @@ class ContractMethodCall extends Component {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
     const isModeOauth = isOauthEnabled();
-    const funcInfo = this.props.contractInfo.xabi && Object.getOwnPropertyNames(this.props.contractInfo.xabi).length > 0 ? this.props.contractInfo.xabi.funcs[this.props.symbolName] : {}
-    if (funcInfo.args && Object.getOwnPropertyNames(funcInfo.args).length > 0) {
-      const args = Object.getOwnPropertyNames(funcInfo.args);
+    let funcInfo = {};
+    if (this.props.contractInfo.contract && this.props.contractInfo.contract._functions) {
+      funcInfo = this.props.contractInfo.contract._functions[this.props.symbolName];
+    }
+    if (funcInfo._funcArgs && funcInfo._funcArgs.length > 0) {
       const self = this;
-      args.forEach(function (arg, i) {
+      funcInfo._funcArgs.forEach(function (arg, i) {
         params.push(
           <tr key={self.props.symbolName + '-args-' + i}>
-            <td style={{ paddingTop: '10px' }}>{arg}</td>
+            <td style={{ paddingTop: '10px' }}>{arg[0]}</td>
             <td>
               <Field
-                name={arg}
+                name={arg[0]}
                 component="input"
                 type="text"
-                placeholder={funcInfo.args[arg].type || funcInfo.args[arg].tag}
+                placeholder={arg[1].type.tag || ''}
                 className="pt-input"
                 required
               />
@@ -308,13 +314,13 @@ class ContractMethodCall extends Component {
                   >
                     <pre >
                       {/* Render the function signature */}
-                      function {this.props.symbolName}{`(${funcInfo && funcInfo.args && Object.getOwnPropertyNames(funcInfo.args).length > 0 && Object.entries(funcInfo.args).map(([key, val]) => {
-                        return `${val.tag.toLowerCase()} ${key}`
-                      }).join(',')})`} {funcInfo && funcInfo.vals && Object.getOwnPropertyNames(funcInfo.vals).length > 0 && `returns (${Object.entries(funcInfo.vals).map(([key, val]) => {
-                        return val.tag.toLowerCase()
+                      function {this.props.symbolName}{`(${funcInfo && funcInfo._funcArgs && funcInfo._funcArgs.length > 0 && funcInfo._funcArgs.map(([key, val]) => {
+                        return `${val.type.tag.toLowerCase()} ${key}`
+                      }).join(',')})`} {funcInfo && funcInfo._funcVals && funcInfo._funcVals.length > 0 && `returns (${funcInfo._funcVals.map(([key, val]) => {
+                          return val.type.tag.toLowerCase();
                       }).join(',')})`} &#123;
                       {/* Render the function body */}
-                        {`\n\t`}{funcInfo.contents || 'Error loading function body'}
+                        {`\n\t`}{/*funcInfo._funcContents || 'Error loading function body'*/}
                       {`\n`}&#125;
                     </pre>
                   </Collapse>

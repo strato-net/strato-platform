@@ -18,6 +18,7 @@ library:
   - bytestring
   - containers
   - cryptonite
+  - data-default
   - deepseq
   - ethereum-rlp
   - format

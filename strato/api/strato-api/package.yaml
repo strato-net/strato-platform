@@ -2,13 +2,13 @@ name:                strato-api
 
 dependencies:
 - base
-- bloc-sql-monad
 - bloc2
 - hflags
 - monad-alter
 - mtl
 - postgresql-simple
 - transformers
+- solid-vm-model
 - source-tools
 
 executables:
@@ -17,7 +17,6 @@ executables:
     source-dirs:         exec_src
     other-modules:
     - Options
-    - SelectAccessible
     dependencies:
     - aeson
     - bloc2api
@@ -29,7 +28,6 @@ executables:
     - cache
     - clock
     - common-log
-    - core-api-monad
     - core-api2
     - evm-solidity
     - format
@@ -54,15 +52,6 @@ executables:
     # Don't touch this next setting, leave -threaded, otherwise it WILL NOT WORK
     # https://blockappsdev.slack.com/archives/G5E7K3ETX/p1645104924934129
     ghc-options: -threaded
-
-  strato-api-init:
-    main:                StratoAPIInit.hs
-    source-dirs:         exec_src
-    other-modules:
-    - SelectAccessible
-    dependencies:
-    - common-log
-
 
   post-raw-transaction:
     main:                PostRawTransaction.hs

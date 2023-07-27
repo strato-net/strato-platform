@@ -12,6 +12,7 @@ library:
     - binary
     - bytestring
     - containers
+    - data-default
     - deepseq
     - ethereum-rlp
     - hashable

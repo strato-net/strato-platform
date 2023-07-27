@@ -19,7 +19,6 @@ library:
   - aeson
   - base16-bytestring
   - binary
-  - bloc2
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
@@ -85,6 +84,7 @@ tests:
       - seqevents
       - mtl
       - crypto-api
+      - binary
       - blockapps-data
       - core-api2
       - strato-genesis
