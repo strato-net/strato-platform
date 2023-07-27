@@ -139,6 +139,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
+  , assetInsert     :: Maybe ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -293,6 +294,11 @@ getCodeCollection cp ccString = do
     EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
+getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = Map.lookup parent cc
+  in mapMaybe getContractForParent parents'
+
 processTheMessages :: (MonadLogger m, HasSQL m) =>
                       BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env conn g messages = do
@@ -313,6 +319,38 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
+
+  contractsUsingAssets' <- forM creates $ \(ccString, cp, o, a, _, _) -> do
+    cc' <- getCC cp ccString
+    case cc' of
+      Right cc -> do
+              contractsUsingAssets <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+                let n = labelToText nameString
+                    a' = if a /= ""
+                           then a
+                           else case cp of
+                            SolidVMCode n' _ | nameString /= n' -> T.pack n'
+                            _ -> a
+                    parents' = c ^. parents
+                    parentContracts = getContractsForParents parents' (cc^.contracts)
+                    nameParts = (o, a', n)    
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+                $logInfoS "processTheMessagesDAVID parents': " $ T.pack $ show parents'
+                $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
+                $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
+                $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
+                when(length parentAbstractContracts >= 1) $
+                  outputData conn $ insertContractInAssetTableQuery nameParts -- we did this because we dont have contract name
+
+                return [T.pack $ _contractName c]
+              pure $ Right contractsUsingAssets
+
+      Left cc -> do
+        $logInfoS "processTheMessages" $ T.pack cc
+        pure $ Left cc -- Either String String
+
+  let contractsUsingAssets = concat $ rights contractsUsingAssets'
+
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
     case cc' of
@@ -398,7 +436,10 @@ processTheMessages env conn g messages = do
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          pure . Right $ BatchedInserts indexContract hs pMappings
+          if (SE.contractName indexContract) `elem` contractsUsingAssets
+            then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
+          else
+            pure . Right $ BatchedInserts indexContract Nothing hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -413,6 +454,7 @@ processTheMessages env conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    unless (null ins) $ outputData conn . insertAssetTable $ map assetInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
