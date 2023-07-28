@@ -18,6 +18,7 @@ module Slipstream.Globals
     getContractState,
     forceGlobalEval,
     newGlobals,
+    getAssetTableRow,
     module Slipstream.Data.Globals
   ) where
 
@@ -81,6 +82,12 @@ getMappingTables globalsIORef org app contract = do
                           isMappingTableName _ _ = False
   let mapNames = map mtMappingName (M.keys mappingTables)
   return mapNames
+
+getAssetTableRow :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [TableName]
+getAssetTableRow globalsIORef org app contract = do
+  createdAssetTableRow <- scrapeFor globalsIORef (AssetTableRowName org app contract)
+  let assetNames = (M.keys createdAssetTableRow)
+  return assetNames
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do

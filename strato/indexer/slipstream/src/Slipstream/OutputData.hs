@@ -282,11 +282,11 @@ historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameter
 indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
+assetTableRowName :: Text -> Text -> Text -> TableName
+assetTableRowName o a n = uncurry3 AssetTableRowName $ constructTableNameParameters o a n
+
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
-
-assetTableName :: Text -> TableName
-assetTableName n = AssetTableName n
 
 createExpandIndexTable
   :: OutputM m
@@ -369,7 +369,7 @@ createAssetTable :: OutputM m
                  => IORef Globals
                  -> ConduitM () Text m ()
 createAssetTable globalsIORef = do
-  let tableName = assetTableName "Asset"
+  let tableName = indexTableName "" "" "Asset"
   tableExists <- isTableCreated globalsIORef tableName
   when (not tableExists) $ do
     yield $ createAssetTableQuery
@@ -652,7 +652,7 @@ createMappingTableQuery (o, a, n, m) =
 
 createAssetTableQuery :: Text
 createAssetTableQuery =
-  let tableName = assetTableName "Asset"
+  let tableName = indexTableName "" "" "Asset"
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
@@ -787,10 +787,17 @@ insertMappingTableQuery ms = concat $
                 , ";"
                 ]
 
-insertContractInAssetTableQuery :: OutputM m => (Text, Text, Text) -> ConduitM () Text m ()
-insertContractInAssetTableQuery (o,a,n) =
-  let contractTableName = indexTableName o a n
-   in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
+insertContractInAssetTableQuery :: OutputM m => IORef Globals -> (Text, Text, Text) -> ConduitM () Text m ()
+insertContractInAssetTableQuery globalsIORef (o,a,n) = do
+  let tableName = assetTableRowName o a n
+  tableExists <- isTableCreated globalsIORef tableName
+  $logInfoLS "insertContractInAssetTableQuery/assetTableRowExists" (tableName, tableExists)
+
+  when (not tableExists) $ do
+    incNumAssetRowTables
+    yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText tableName, "');" ]
+    let list = ["data"]
+    setTableCreated globalsIORef tableName list
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"

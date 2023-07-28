@@ -320,40 +320,41 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
 
-  contractsUsingAssets' <- forM creates $ \(ccString, cp, o, a, _, _) -> do
-    cc' <- getCC cp ccString
-    case cc' of
-      Right cc -> do
-              contractsUsingAssets <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-                let n = labelToText nameString
-                    a' = if a /= ""
-                           then a
-                           else case cp of
-                            SolidVMCode n' _ | nameString /= n' -> T.pack n'
-                            _ -> a
-                    parents' = c ^. parents
-                    parentContracts = getContractsForParents parents' (cc^.contracts)
-                    nameParts = (o, a', n)    
-                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
-                $logInfoS "processTheMessagesDAVID parents': " $ T.pack $ show parents'
-                -- $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
-                -- $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
-                -- $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
-                $logInfoS "processTheMessagesDAVID CONTRACT: " $ T.pack $ _contractName c
-                if (length parentAbstractContracts >= 1) 
-                  then do
-                    outputData conn $ insertContractInAssetTableQuery nameParts -- we did this because we dont have contract name
-                    return [T.pack $ _contractName c]
-                  else 
-                    return []
-              $logInfoS "processTheMessagesDAVID LOOP1 contractsUsingAssets" . T.pack $ show contractsUsingAssets
-              pure $ Right contractsUsingAssets
+  -- contractsUsingAssets' <- forM creates $ \(ccString, cp, o, a, _, _) -> do
+  --   cc' <- getCC cp ccString
+  --   case cc' of
+  --     Right cc -> do
+  --             contractsUsingAssets <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+  --               let n = labelToText nameString
+  --                   a' = if a /= ""
+  --                          then a
+  --                          else case cp of
+  --                           SolidVMCode n' _ | nameString /= n' -> T.pack n'
+  --                           _ -> a
+  --                   parents' = c ^. parents
+  --                   parentContracts = getContractsForParents parents' (cc^.contracts)
+  --                   nameParts = (o, a', n)    
+  --                   parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+  --               $logInfoS "processTheMessagesDAVID parents': " $ T.pack $ show parents'
+  --               -- $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
+  --               -- $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
+  --               -- $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
+  --               $logInfoS "processTheMessagesDAVID CONTRACT: " $ T.pack $ _contractName c
+  --               if (length parentAbstractContracts >= 1) 
+  --                 then do
+  --                   outputData conn $ insertContractInAssetTableQuery g nameParts -- we did this because we dont have contract name
+  --                   return [T.pack $ _contractName c]
+  --                 else 
+  --                   return []
+  --             $logInfoS "processTheMessagesDAVID LOOP1 contractsUsingAssets" . T.pack $ show contractsUsingAssets
+  --             pure $ Right contractsUsingAssets
 
-      Left cc -> do
-        $logInfoS "processTheMessages" $ T.pack cc
-        pure $ Left cc -- Either String String
+  --     Left cc -> do
+  --       $logInfoS "processTheMessages" $ T.pack cc
+  --       pure $ Left cc -- Either String String
 
-  let contractsUsingAssets = concat $ rights contractsUsingAssets'
+  -- let contractsUsingAssets = concat $ rights contractsUsingAssets'
+  -- $logInfoS "processTheMessagesDAVID LOOP2 contractsUsingAssets" . T.pack $ show contractsUsingAssets
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
@@ -379,6 +380,10 @@ processTheMessages env conn g messages = do
                     listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
                     listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
                     mapNames = map fst listOfMappingsWithRecords
+                    parents' = c ^. parents
+                    parentContracts = getContractsForParents parents' (cc^.contracts)
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
@@ -395,6 +400,11 @@ processTheMessages env conn g messages = do
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn $ createExpandEventTables g c nameParts
+
+                $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts) ++" contract: " ++ show (_contractName c)
+                when (length parentAbstractContracts >= 1) $ do
+                  outputData conn $ insertContractInAssetTableQuery g nameParts 
+
 
                 -- ifoutputData conn $ insertIntoAssetTable g c nameParts 
 
@@ -436,13 +446,14 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          assets <- getAssetTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
           $logInfoS "processTheMessagesDAVID indexContract" . T.pack $ show $ SE.contractName indexContract
-          $logInfoS "processTheMessagesDAVID contractsUsingAssets" . T.pack $ show contractsUsingAssets
-          if (SE.contractName indexContract) `elem` contractsUsingAssets
+          $logInfoS "processTheMessagesDAVID contractsUsingAssets" . T.pack $ show assets
+          if (AssetTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` assets
             then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
           else
             pure . Right $ BatchedInserts indexContract Nothing hs pMappings
