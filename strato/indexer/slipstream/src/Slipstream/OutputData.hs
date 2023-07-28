@@ -39,7 +39,8 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Data.Aeson                      (encode)
+import qualified Data.Aeson                      as Aeson         
+import qualified Data.Aeson.Key as AesonKey          
 import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -792,14 +793,15 @@ insertContractInAssetTableQuery (o,a,n) =
   let contractTableName = indexTableName o a n
    in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
 
+-- Step 3: Create a newtype wrapper for the Map
+newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Text)
 
--- -- Function to convert a tuple to a JSON object
--- tupleToJson :: (Text, Text) -> Text
--- tupleToJson (k, v) = T.pack $ BSL.unpack $ encode $ object ["key" .= k, "value" .= v]
+-- Step 4: Implement the ToJSON instance for the newtype wrapper
+instance Aeson.ToJSON MapWrapper where
+  toJSON (MapWrapper m) = Aeson.object (map (\(k, v) -> k Aeson..= v) (Map.toList m))
 
--- -- Convert a list of tuples to a list of JSON strings
--- convertToJSON :: [(Text, Text)] -> [Text]
--- convertToJSON tuples = map tupleToJson tuples
+aesonHelper :: Map.Map Text Text -> Map.Map Aeson.Key Text
+aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, y)) (Map.toList m)
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
@@ -808,7 +810,7 @@ insertAssetTableQuery cs = concat $
    in flip map (map snd $ partitionWith (length . snd) cs') $ \case
         [] -> []
         contracts@((x,_):_) ->
-          let tableName = indexTableName
+          let tableName = tableNameToText $ indexTableName
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
@@ -825,13 +827,13 @@ insertAssetTableQuery cs = concat $
                          ]
 
               vals = flip map contracts $ \(row, rowList) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [T.pack (show tableName)] ++ [T.pack $ show (encode rowList)]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableName)] ++ [T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
               inserts = csv vals
            in (:[]) $ T.concat
-                [ "INSERT INTO Asset "
+                [ "INSERT INTO \"Asset\" "
                 , keySt
                 , "\n  VALUES "
-                , inserts
+                , inserts 
                 , [r|
   ON CONFLICT (contractname) DO UPDATE SET
     record_id = excluded.record_id,
@@ -841,8 +843,9 @@ insertAssetTableQuery cs = concat $
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender
+    transaction_sender = excluded.transaction_sender,
     data = excluded.data|]
+                , ";"
                 ]
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
@@ -1039,8 +1042,8 @@ solidityValueToText (SolidityValueAsString x) = escapeQuotes x
 solidityValueToText (SolidityBool x)          = tshow x
 solidityValueToText (SolidityNum x )          = tshow x
 solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
-solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 
 valueToSQLTextFilterContract :: Value -> Maybe Text
