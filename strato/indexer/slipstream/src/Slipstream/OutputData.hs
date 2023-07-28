@@ -39,7 +39,7 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Data.Aeson                      (encode, object, (.=))
+import           Data.Aeson                      (encode)
 import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -48,12 +48,13 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
+-- import qualified Data.Text.Encoding as TE
 import           Data.Time
 import           Data.List (nubBy, groupBy)
 import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
-import qualified Data.ByteString.Lazy.Char8 as BSL
+-- import qualified Data.ByteString.Lazy.Char8 as BSL
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
@@ -623,7 +624,7 @@ insertAssetTable contracts = do
     case validContracts of
         [] -> return () -- no valid contracts, do nothing
         (E.ProcessedContract { organization = org, application = app, contractName = cName } : _) -> do
-            let tableName = historyTableName org app cName
+            let tableName = indexTableName org app cName
             $logInfoS "insertAssetTable" $ T.pack $ "Inserting row in asset table for: " ++ show tableName
             yieldMany $ insertAssetTableQuery validContracts
 
@@ -792,26 +793,26 @@ insertContractInAssetTableQuery (o,a,n) =
    in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
 
 
--- Function to convert a tuple to a JSON object
-tupleToJson :: (Text, Text) -> Text
-tupleToJson (k, v) = T.pack $ BSL.unpack $ encode $ object ["key" .= k, "value" .= v]
+-- -- Function to convert a tuple to a JSON object
+-- tupleToJson :: (Text, Text) -> Text
+-- tupleToJson (k, v) = T.pack $ BSL.unpack $ encode $ object ["key" .= k, "value" .= v]
 
--- Convert a list of tuples to a list of JSON strings
-convertToJSON :: [(Text, Text)] -> [Text]
-convertToJSON tuples = map tupleToJson tuples
+-- -- Convert a list of tuples to a list of JSON strings
+-- convertToJSON :: [(Text, Text)] -> [Text]
+-- convertToJSON tuples = map tupleToJson tuples
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
 insertAssetTableQuery cs = concat $
-  let cs' = (\c@E.ProcessedContract{contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
+  let cs' = (\c@E.ProcessedContract{contractData = contractData} -> (c, Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
    in flip map (map snd $ partitionWith (length . snd) cs') $ \case
         [] -> []
-        contracts@((_,list):_) ->
-          -- let tableName = indexTableName
-          --         (E.organization x)
-          --         (E.application x)
-          --         (E.contractName x)
-          let keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAssetTableColumns
+        contracts@((x,_):_) ->
+          let tableName = indexTableName
+                  (E.organization x)
+                  (E.application x)
+                  (E.contractName x)  
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAssetTableColumns
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -820,14 +821,11 @@ insertAssetTableQuery cs = concat $
                          , tshow . E.blockNumber
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
-                         , E.organization --contractname
+                         , E.organization
                          ]
 
               vals = flip map contracts $ \(row, rowList) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ (convertToJSON rowList)
-              -- assetVals = flip map contracts $ \(row, rowList) ->
-              --   map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-              -- jsonbAsVals = wrapAndEscape $ [T.pack $ show $ toJSON $ HM.fromList (zip (map fst list) (map show assetVals))] --JSONB Column
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [T.pack (show tableName)] ++ [T.pack $ show (encode rowList)]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO Asset "
@@ -843,10 +841,8 @@ insertAssetTableQuery cs = concat $
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender|]
-                , if null list then "" else ",\n    "
-                , tableUpsert $ map fst list
-                , ";"
+    transaction_sender = excluded.transaction_sender
+    data = excluded.data|]
                 ]
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
