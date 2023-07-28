@@ -232,7 +232,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         runSQLM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:" <> flags_vaultProxyPort <> "/strato/v2.3" ) . 
-        runIdentitytM flags_identityServerUrl getNodeUrl $ f
+        runIdentitytM getIdServerUrl getNodeUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -282,12 +282,6 @@ app blocEnv theDoc =
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
   $ hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
 
-getNodeUrl :: String
-getNodeUrl = if flags_nodeHost == "http://localhost:8080"
-  then  "http://localhost:8080"
-  else (if flags_ssl then "https://"<> flags_nodeHost else "http://"<> flags_nodeHost)
-
-
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =
   baseApp req $ \response -> do
@@ -311,3 +305,19 @@ instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a)
 instance ToSchema Value where
   declareNamedSchema _ = return $
     NamedSchema (Just "JSON Value") mempty
+
+-----------
+
+--Simple helper functions
+
+getNodeUrl :: String
+getNodeUrl = if flags_nodeHost == "http://localhost:8080"
+  then  "http://localhost:8080"
+  else (if flags_ssl then "https://"<> flags_nodeHost else "http://"<> flags_nodeHost)
+
+getIdServerUrl ::  String
+getIdServerUrl = if flags_identityServerUrl == "" 
+      then (case flags_network  of  
+            "mercata-hydrogen" -> flags_hydrogenIdServer
+            _ -> error "Unsupported identity server")
+      else flags_identityServerUrl

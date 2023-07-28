@@ -235,6 +235,9 @@ function newnode {
   if [-n "${STRATO_PORT_VAULT_PROXY}"]; then
       vPoxyPort="--vaultProxyPort=${STRATO_PORT_VAULT_PROXY}"
   fi
+  if [-n "${idServerUrl}"]; then
+      idServer="--identityServerUrl=${idServerUrl}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
@@ -248,7 +251,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}"  "${nodeHost}" "${ssl}" "${vPoxyPort}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}"  "${nodeHost}" "${ssl}" "${vPoxyPort}" "${idServer}" "${networkFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
