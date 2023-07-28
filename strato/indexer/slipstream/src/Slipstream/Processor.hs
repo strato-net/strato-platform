@@ -339,6 +339,7 @@ processTheMessages env conn g messages = do
                 $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
                 $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
                 $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
+                $logInfoS "processTheMessagesDAVID length CONTRACT: " $ T.pack $ _contractName c
                 when(length parentAbstractContracts >= 1) $
                   outputData conn $ insertContractInAssetTableQuery nameParts -- we did this because we dont have contract name
 
@@ -436,6 +437,8 @@ processTheMessages env conn g messages = do
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
+          $logInfoS "processTheMessagesDAVID indexContract" . T.pack $ show $ SE.contractName indexContract
+          $logInfoS "processTheMessagesDAVID contractsUsingAssets" . T.pack $ show contractsUsingAssets
           if (SE.contractName indexContract) `elem` contractsUsingAssets
             then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
           else
