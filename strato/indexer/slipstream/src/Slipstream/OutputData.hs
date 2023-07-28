@@ -794,14 +794,14 @@ insertContractInAssetTableQuery (o,a,n) =
    in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
 
 -- Step 3: Create a newtype wrapper for the Map
-newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Text)
+newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Aeson.Value)
 
 -- Step 4: Implement the ToJSON instance for the newtype wrapper
 instance Aeson.ToJSON MapWrapper where
   toJSON (MapWrapper m) = Aeson.object (map (\(k, v) -> k Aeson..= v) (Map.toList m))
 
-aesonHelper :: Map.Map Text Text -> Map.Map Aeson.Key Text
-aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, y)) (Map.toList m)
+aesonHelper :: Map.Map Text Text -> Map.Map Aeson.Key Aeson.Value
+aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, Aeson.toJSON y)) (Map.toList m)
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
@@ -827,7 +827,7 @@ insertAssetTableQuery cs = concat $
                          ]
 
               vals = flip map contracts $ \(row, rowList) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableName)] ++ [T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO \"Asset\" "
