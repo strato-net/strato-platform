@@ -336,14 +336,17 @@ processTheMessages env conn g messages = do
                     nameParts = (o, a', n)    
                     parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
                 $logInfoS "processTheMessagesDAVID parents': " $ T.pack $ show parents'
-                $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
-                $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
-                $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
-                $logInfoS "processTheMessagesDAVID length CONTRACT: " $ T.pack $ _contractName c
-                when(length parentAbstractContracts >= 1) $
-                  outputData conn $ insertContractInAssetTableQuery nameParts -- we did this because we dont have contract name
-
-                return [T.pack $ _contractName c]
+                -- $logInfoS "processTheMessagesDAVID parentContracts: " $ T.pack $ show parentContracts
+                -- $logInfoS "processTheMessagesDAVID parentAbstractContracts: " $ T.pack $ show parentAbstractContracts
+                -- $logInfoS "processTheMessagesDAVID length parentAbstractContracts: " $ T.pack $ show (length parentAbstractContracts)
+                $logInfoS "processTheMessagesDAVID CONTRACT: " $ T.pack $ _contractName c
+                if (length parentAbstractContracts >= 1) 
+                  then do
+                    outputData conn $ insertContractInAssetTableQuery nameParts -- we did this because we dont have contract name
+                    return [T.pack $ _contractName c]
+                  else 
+                    return []
+              $logInfoS "processTheMessagesDAVID LOOP1 contractsUsingAssets" . T.pack $ show contractsUsingAssets
               pure $ Right contractsUsingAssets
 
       Left cc -> do
