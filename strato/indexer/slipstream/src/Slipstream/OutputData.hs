@@ -713,7 +713,6 @@ insertIndexTableQuery cs = concat $
               vals = flip map contracts $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
 
-              -- vals = wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd list
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
