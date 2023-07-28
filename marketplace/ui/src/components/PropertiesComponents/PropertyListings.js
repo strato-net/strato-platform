@@ -17,7 +17,7 @@ function PropertyListings() {
               (property, key) =>
                 property?.ListPrice && (
                   <Col key={key}>
-                    <Link to={`/${property.id}`}>
+                    <Link to={`/properties/${property.id}`}>
                       <PropertyCard property={property} />
                     </Link>
                   </Col>
