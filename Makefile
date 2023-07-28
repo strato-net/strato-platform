@@ -115,8 +115,6 @@ vault-nginx:
 identity-provider: build_common
 	@echo Now building Identity Server...
 	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
-	if [ -f strato/identity-provider/rootCert.pem ]; then echo "Copying identity-provider/rootCert.pem files"; cp strato/identity-provider/rootCert.pem ${IDENTITYDIR}; else echo "Warning: no rootCert.pem to start identity server"; fi
-	if [ -f strato/identity-provider/rootPriv.pem ]; then echo "Copying identity-provider/rootPriv.pem files"; cp strato/identity-provider/rootPriv.pem ${IDENTITYDIR}; else echo "Warning: no rootePriv.pem to start identity server"; fi
 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
 

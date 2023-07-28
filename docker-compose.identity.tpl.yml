@@ -27,6 +27,9 @@ services:
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
+    volumes: 
+      - ./rootCert.pem:/identity-provider/rootCert.pem
+      - ./rootPriv.pem:/identity-provider/rootPriv.pem
     logging:
       driver: "json-file"
       options:
