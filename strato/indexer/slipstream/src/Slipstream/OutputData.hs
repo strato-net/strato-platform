@@ -39,8 +39,7 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import qualified Data.Aeson                      as Aeson         
-import qualified Data.Aeson.Key as AesonKey          
+import qualified Data.Aeson                      as Aeson                  
 import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -792,23 +791,6 @@ insertContractInAssetTableQuery :: OutputM m => (Text, Text, Text) -> ConduitM (
 insertContractInAssetTableQuery (o,a,n) =
   let contractTableName = indexTableName o a n
    in yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
-
--- Step 3: Create a newtype wrapper for the Map
-newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Aeson.Value)
-
--- Step 4: Implement the ToJSON instance for the newtype wrapper
-instance Aeson.ToJSON MapWrapper where
-  toJSON (MapWrapper m) = Aeson.object (map (\(k, v) -> k Aeson..= v) (Map.toList m))
-
-aesonHelper :: Map.Map Text Text -> Map.Map Aeson.Key Aeson.Value
-aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, Aeson.toJSON $ removeSingleQuotes y)) (Map.toList m)
-
-removeSingleQuotes :: T.Text -> T.Text
-removeSingleQuotes inputText =
-    let str = T.unpack inputText
-        -- Remove the single quotes from the string
-        cleanedStr = filter (/= '\'') str
-    in T.pack cleanedStr
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
