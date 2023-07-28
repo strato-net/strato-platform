@@ -30,7 +30,8 @@ HTTP_PORT=8080 \
 
 Like all our getting-started scripts, this should be run within the same directory where the identity server's docker-compose, docker-compose.identity.yml, is located.
 
-3. In `strato-platform/strato/api/strato-api/exec_src/Options.hs` change `defineFlag "indetityServerUrl" ("http://multinode301.ci.blockapps.net:8080" :: String) "The URL of the identity server"` to the appriopiate url.
-4. For `strato-platform/strato/api/core/src/Handlers/IdentityServerCallback.hs`
-        i.  Be aware that `server =  return =<< (redirect "http://localhost:8080")` by default redirects to `locahost:8080`. This should redirect to marketplace app, but if the node is running on another port or has different configuration options this will need to change as well. 
+[!IMPORTANT]
+The below is important!
+
+3. An important step is setting th URL to you ID-server for your strato node. As of this writing, you can pass the arguement in you strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, the network flag is used to map to a hardcoded ID server url. 
 4.  In the `strato-platform/strato/identity-provider` directory, needs a `rootPriv.pem` and `rootCert.pem` . As of now in the Makefile there is a `if statement` that will move the `.pem` files if present to the identity server docker container, but if not present strato will build, but there will be a runtime error when trying to run the identity server.
