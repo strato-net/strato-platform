@@ -32,6 +32,7 @@ executables:
     - evm-solidity
     - format
     - http-types
+    - identity-monad
     - insert-ordered-containers
     - lens
     - servant-multipart

@@ -224,6 +224,13 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
+  if [ -n "${NODE_HOST}" ]; then
+      nodeHost="--nodeHost=${NODE_HOST}"
+  fi
+  if [ -n "${ssl}" ]; then
+      sslFlag="--ssl=${ssl}"
+  fi
+
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
@@ -236,7 +243,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}"  "${nodeHost}" "${ssl}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."

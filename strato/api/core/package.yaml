@@ -55,5 +55,6 @@ library:
   - blockapps-vault-wrapper-client
   - blockapps-identity-provider-client
   - vault-monad
+  - identity-monad
   - blockapps-vault-wrapper-server
   - strato-redis-blockdb

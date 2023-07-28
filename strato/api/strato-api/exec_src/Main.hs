@@ -60,6 +60,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 
 import           Control.Monad.Composable.SQL
+import           Control.Monad.Composable.Identity
 import           Control.Monad.Composable.Vault  hiding (httpManager)
 
 import           SolidVM.Model.CodeCollection.Contract
@@ -230,8 +231,8 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
       runLoggingT .
         runSQLM .
         flip runReaderT blocEnv .
-        runVaultM "http://localhost:8013/strato/v2.3" . 
-        runIdentitytM flags_indetityServerUrl $ f
+        runVaultM flags_vaultProxyUrl . 
+        runIdentitytM flags_identityServerUrl getNodeUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -281,6 +282,10 @@ app blocEnv theDoc =
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
   $ hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
 
+getNodeUrl :: String
+getNodeUrl = if flags_nodeHost == "http://localhost:8080"
+  then  "http://localhost:8080"
+  else (if flags_ssl then "https://"<> flags_nodeHost else "http://"<> flags_nodeHost)
 
 
 addPathsTo404 :: Middleware

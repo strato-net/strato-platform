@@ -166,6 +166,7 @@ services:
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
+    - NODE_HOST=${NODE_HOST}
     - network=${network:-mercata-hydrogen}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
@@ -194,6 +195,7 @@ services:
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - splitinit=true
+    - ssl=${ssl:-false}
     - stratoHost=strato:3000
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}

@@ -24,7 +24,7 @@ import           Servant.Client
 import           Control.Monad.IO.Class
 
 import           Control.Monad.Change.Modify        (access)
-import           Control.Monad.Composable.Vault
+import           Control.Monad.Composable.Identity
 import           SQLM
 
 import           BlockApps.Logging
@@ -37,25 +37,24 @@ type API =  "identity"
           :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
           :>  PostRedirect 301 String
 
-redirect :: (ToHttpApiData loc, MonadIO m, MonadLogger m, HasIdentity m)
-    => loc --  what to put in the 'Location' header
-    -> Text
-    ->  m (Headers '[Header "Location" loc] Address)
-redirect a accessToken = do
+redirect :: (ToHttpApiData String, MonadIO m, MonadLogger m, HasIdentity m)
+    => Text ->  m (Headers '[Header "Location" String] Address)
+redirect accessToken = do
+  IdentityData _ _ nodeUrl <- access Proxy
   address <- getUserAddress accessToken
-  return $ (addHeader a address)
+  return $ addHeader nodeUrl address
 
 server :: (MonadIO m, MonadLogger m, HasIdentity m) => ServerT API m
-server =  return =<< (redirect "http://localhost:8080") -- TODO fix this port number to be an option
+server =  return =<< redirect 
 
 identitytWrapper :: (MonadIO m, MonadLogger m, HasIdentity m, HasCallStack) =>
                     ClientM x -> m x
 identitytWrapper client' = do
   logInfoCS callStack "Calling Identity Server"
-  IdentityData url mgr <- access Proxy
+  IdentityData url mgr _ <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (mkClientEnv mgr url)-- Todo make a better error statement
   either (blocError . IdentitytWrapperError) return resultEither
 
 getUserAddress ::  (MonadIO m, MonadLogger m, HasIdentity m) => Text -> m Address
-getUserAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) 
+getUserAddress accessToken = identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken)
