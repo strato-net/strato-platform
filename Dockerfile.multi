@@ -58,6 +58,6 @@ FROM built as identity-provider
 COPY ./identity-provider /identity-provider
 EXPOSE 8001
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
-  CMD curl --silent --output /dev/null --fail localhost:8014/_ping || exit 1
+  CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
 WORKDIR /var/lib/identity
 ENTRYPOINT ["/identity-provider/doit.sh"]
