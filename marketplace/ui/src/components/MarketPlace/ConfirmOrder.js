@@ -30,7 +30,6 @@ import DataTableComponent from "../DataTableComponent";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import "./index.css";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -267,15 +266,6 @@ const ConfirmOrder = () => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
-      ),
-      dataIndex: "unitOfMeasure",
-      align: "center",
-      render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
       width:"12%"
     },
     {

@@ -448,7 +448,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   // ------------------------------ PRODUCT MANAGER --------------------------------
   contract.createProduct = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs }
+    const newArgs = { ...args.productArgs }
     return managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
   };
   contract.updateProduct = async function (args, options = defaultOptions) {
@@ -549,8 +549,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       productId: restArgs.productAddress,
       status: restArgs.status,
       inventoryId: createdInventoryAddress,
-
-      uniqueProductCode: productDetail.uniqueProductCode
     };
     const [itemStatus, itemAddress, repeatedSerialNumbers] = await managers.itemManager.addItem(itemParams);
 
@@ -1118,7 +1116,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         );
         if (product) {
           orderLine.productName = product.name;
-          orderLine.manufacturer = product.manufacturer;
           orderLine.imageKey = product.imageKey;
           orderLine.amount = orderLine.pricePerUnit * orderLine.quantity + orderLine.shippingCharges + orderLine.tax;
         }

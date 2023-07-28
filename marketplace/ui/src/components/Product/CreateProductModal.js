@@ -8,7 +8,6 @@ import getSchema from "./ProductSchema";
 //sub-categories
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
-import { unitOfMeasures } from "../../helpers/constants";
 
 const { Option } = Select;
 
@@ -34,19 +33,8 @@ const CreateProductModal = ({
       name: null,
       address: "",
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
-    manufacturer: "",
-    unitofmeasurement: {
-      name: null,
-      value: "",
-    },
-    leastSellableUnit: "",
     description: "",
     active: true,
-    userUniqueProductCode:""
   };
 
   const formik = useFormik({
@@ -68,14 +56,9 @@ const CreateProductModal = ({
         productArgs: {
           name: encodeURIComponent(values.name),
           description: encodeURIComponent(values.description),
-          manufacturer: encodeURIComponent(values.manufacturer),
-          unitOfMeasurement: values.unitofmeasurement.value,
-          leastSellableUnit: parseInt(values.leastSellableUnit),
           imageKey: imageData.imageKey,
           isActive: values.active,
           category: values.category.name,
-          subCategory: values.subCategory.name,
-          userUniqueProductCode:values.userUniqueProductCode,
         },
       };
 
@@ -222,7 +205,6 @@ const CreateProductModal = ({
                   value={formik.values.category.name}
                   onChange={(value) => {
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -235,108 +217,6 @@ const CreateProductModal = ({
                   getIn(formik.errors, "category.name") && (
                     <span className="text-error text-xs">
                       {getIn(formik.errors, "category.name")}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4">
-              <Form.Item
-                label="Sub Category"
-                name="subCategory"
-                className="w-72"
-              >
-                <Select
-                  id="subCategory"
-                  showSearch
-                  placeholder="Select Sub Category"
-                  allowClear
-                  name="subCategory.name"
-                  value={formik.values.subCategory.name}
-                  onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
-                  }}
-                >
-                  {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
-                  )}
-                </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
-                    </span>
-                  )}
-              </Form.Item>
-              <Form.Item
-                label="Manufacturer"
-                name="manufacturer"
-                className="w-72"
-              >
-                <Input
-                  label="manufacturer"
-                  placeholder="Enter Manufacturer"
-                  name="manufacturer"
-                  value={formik.values.manufacturer}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.manufacturer && formik.errors.manufacturer && (
-                  <span className="text-error text-xs">
-                    {formik.errors.manufacturer}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Unit of Measurement "
-                name="unitofmeasurement "
-                className="w-72"
-              >
-                <Select
-                  id="unitofmeasurement"
-                  placeholder="Select Unit of Measurement "
-                  allowClear
-                  name="unitofmeasurement.name"
-                  value={formik.values.unitofmeasurement.name}
-                  onChange={(value) => {
-                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
-                    formik.setFieldValue("unitofmeasurement.name", selectedUOM.name);
-                    formik.setFieldValue("unitofmeasurement.value", value);
-                  }}
-                >
-                  {unitOfMeasures.map((e, index) => (
-                    <Option value={e.value} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
-                    </span>
-                  )}
-              </Form.Item>
-              <Form.Item
-                label="Least Sellable Unit"
-                name="leastSellableUnit"
-                className="w-72"
-              >
-                <Input
-                  label="leastSellableUnit"
-                  name="leastSellableUnit"
-                  value={formik.values.leastSellableUnit}
-                  onChange={formik.handleChange}
-                  placeholder="Enter Least Sellable Unit"
-                />
-                {formik.touched.leastSellableUnit &&
-                  formik.errors.leastSellableUnit && (
-                    <span className="text-error text-xs">
-                      {formik.errors.leastSellableUnit}
                     </span>
                   )}
               </Form.Item>
@@ -372,24 +252,6 @@ const CreateProductModal = ({
                 </span>
               )}
             </Form.Item>
-              <Form.Item
-                label="Unique Product Code"
-                name="userUniqueProductCode"
-                className="w-72"
-              >
-                <Input
-                  label="userUniqueProductCode"
-                  placeholder="Enter Unique Product Code"
-                  name="userUniqueProductCode"
-                  value={formik.values.userUniqueProductCode}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.userUniqueProductCode && formik.errors.userUniqueProductCode && (
-                  <span className="text-error text-xs">
-                    {formik.errors.userUniqueProductCode}
-                  </span>
-                )}
-              </Form.Item>
             </div>
            
           </div>

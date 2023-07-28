@@ -20,7 +20,7 @@ import { useState, useEffect, useMemo } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
-import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { CHARGES } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
@@ -81,7 +81,6 @@ const Checkout = ({ user }) => {
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,
-          unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.pricePerUnit,
           quantity: item.product.address,
           tax: calculateTax(item),
@@ -177,17 +176,6 @@ const Checkout = ({ user }) => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
-      ),
-      dataIndex: "unitOfMeasure",
-      align: "center",
-      render: (text) => (
-        <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
-      ),
       width: "12%"
     },
     {

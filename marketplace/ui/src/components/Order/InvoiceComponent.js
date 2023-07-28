@@ -210,7 +210,6 @@ const InvoiceComponent = ({ invoice }) => {
           {/* <Text style={styles.title}>Items</Text> */}
           <View style={styles.tableHeader}>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Product Name</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Manufacturer</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Unit Price($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Quantity</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Shipping Charges($)</Text>
@@ -220,8 +219,6 @@ const InvoiceComponent = ({ invoice }) => {
           {invoice.orderLines.map(item => (
             <View style={styles.tableRow} key={item.id}>
               <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(item.productName)}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(item.manufacturer)}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${item.pricePerUnit}</Text>
               {/* <View style={styles.separator} /> */}

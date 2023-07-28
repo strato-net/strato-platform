@@ -23,14 +23,9 @@ export const productArgs = (uid, category, subCategory) => {
         productArgs: {
             name: `name_${uid}`,
             description: `description_${uid}`,
-            manufacturer: `manufacturer_${uid}`,
-            unitOfMeasurement: 1,
-            userUniqueProductCode: `uniqueProductCode_${uid}`,
-            leastSellableUnit: uid,
             imageKey: `1673855860544_seeds.jpg`,
             isActive: true,
             category: category,
-            subCategory: subCategory
         }
     }
 
@@ -69,7 +64,6 @@ export const marketplaceArgs = (category, subCategory, productName, brandName) =
         category: [category],
         subCategory: [subCategory],
         name: [productName],
-        manufacturer: [brandName]
     }
 
     return args

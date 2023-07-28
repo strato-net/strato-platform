@@ -155,14 +155,9 @@ class ProductController {
       productArgs: Joi.object({
         name: Joi.string().required(),
         description: Joi.string().required(),
-        manufacturer: Joi.string().required(),
-        unitOfMeasurement: Joi.number().integer().min(1).max(10).required(),
-        userUniqueProductCode: Joi.string().allow("").required(),
-        leastSellableUnit: Joi.number().required(),
         imageKey: Joi.string().required(),
         isActive: Joi.boolean().required(),
         category: Joi.string().required(),
-        subCategory: Joi.string().required()
       })
     });
 
@@ -182,7 +177,6 @@ class ProductController {
         description: Joi.string(),
         imageKey: Joi.string(),
         isActive: Joi.boolean(),
-        userUniqueProductCode: Joi.string().allow(""),
         oldImageKey: Joi.string().optional()
       }).required()
     });

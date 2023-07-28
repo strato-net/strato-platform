@@ -22,7 +22,6 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
@@ -477,36 +476,7 @@ const ProductDetails = ({ user, users }) => {
   const DescriptionComponent = () => {
     return (
       <Space direction="vertical">
-        <Space>
-          <DescTitle text="Product Id" />
-          <DescTitle text="                      :" />
-          <Text className="text-[13px]">{details.uniqueProductCode}</Text>
-        </Space>
 
-        <Space>
-          <DescTitle text="Unique Product Code" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">{details.userUniqueProductCode ? details.userUniqueProductCode : " "}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Manufacturer" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{decodeURIComponent(details.manufacturer)}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Unit of Measurement" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">
-            {UNIT_OF_MEASUREMENTS[details.unitOfMeasurement]}
-          </Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Least Sellable Unit" />
-          <DescTitle text="       :" />
-          <Text className="text-[13px]">{details.leastSellableUnit}</Text>
-        </Space>
       </Space>
     );
   };

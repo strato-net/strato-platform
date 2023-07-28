@@ -159,8 +159,6 @@ async function updateProduct(admin, contract, _args, baseOptions) {
         return agg | (base << 1);
       case "isActive":
         return agg | (base << 2);
-      case "userUniqueProductCode":
-        return agg | (base << 3);
       default:
         return agg;
     }

@@ -10,7 +10,7 @@ import {
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
-import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants";
+import { INVENTORY_STATUS } from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import routes from "../../helpers/routes";
 
@@ -115,15 +115,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               </Popover>
             </div>
           </div>
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Manufacturer</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {decodeURIComponent(inventory.manufacturer)}
-            </p>
-          </div>
           <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Price Per Unit</p>
             <p text-secondryB text-sm>
@@ -131,16 +122,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
             <p className="text-secondryB text-sm ml-3">
               $ {inventory.pricePerUnit}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Least Sellable Unit</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {inventory.leastSellableUnit} (
-              {UNIT_OF_MEASUREMENTS[inventory.unitOfMeasurement]})
             </p>
           </div>
           <div className="flex mt-1 items-center">

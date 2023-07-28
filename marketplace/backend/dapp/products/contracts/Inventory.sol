@@ -11,18 +11,18 @@ contract Inventory is InventoryStatus{
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-
-    address public productId;
-    string public category;
-    string public subCategory;
-    int public quantity;
-    int public pricePerUnit;
-    string public batchId;
-    int public availableQuantity;
-    InventoryStatus public status;
+                                                                // Remove:
+    address public productId;                                   //  subCategory
+    string public category;                                     //  batchId
+    string public subCategory;                              
+    int public quantity;                                          
+    int public pricePerUnit;                                    // Add:
+    string public batchId;                                      //  vintage: unit
+    int public availableQuantity;                               //  purchasedQuantity: uint
+    InventoryStatus public status;                              //  retiredQuantity: uint
     uint public createdDate;
-
-
+                                                              
+                                                                
     constructor(
             string _category
         ,   string _subCategory

@@ -9,19 +9,6 @@ export const HTTP_METHODS = {
   PUT: "PUT",
 };
 
-export const UNIT_OF_MEASUREMENTS = {
-  1: "LB",
-  2: "Ounce",
-  3: "Ton",
-  4: "Bag",
-  5: "Box",
-  6: "Piece",
-  7: "Bale",
-  8: "Gallon",
-  9: "Pound",
-  10: "Yard"
-};
-
 export const US_DATE_FORMAT = "MM/DD/YYYY";
 
 export const MAX_QUANTITY = 1000000;
@@ -33,19 +20,6 @@ export const INVENTORY_STATUS = {
   1: "Published",
   2: "Unpublished",
 };
-
-export const unitOfMeasures = [
-  { name: "LB", value: 1 },
-  { name: "Ounce", value: 2 },
-  { name: "Ton", value: 3 },
-  { name: "Bag", value: 4 },
-  { name: "Box", value: 5 },
-  { name: "Piece", value: 6 },
-  { name: "Bale", value: 7 },
-  { name: "Gallon", value: 8 },
-  { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 }
-];
 
 export const CHARGES = {
   "SHIPPING": 0,

@@ -53,14 +53,9 @@ function marshalIn(_args) {
     const defaultArgs = {
         name: '',
         description: '',
-        manufacturer: '',
-        unitOfMeasurement: '',
-        uniqueProductCode: '',
-        leastSellableUnit: 0,
         imageKey: '',
         isActive: false,
         category: '',
-        subCategory: '',
         createdDate: 0
     };
 
