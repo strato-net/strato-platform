@@ -86,13 +86,7 @@ getMappingTables globalsIORef org app contract = do
 getAssetTableRow :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [TableName]
 getAssetTableRow globalsIORef org app contract = do
   createdAssetTableRow <- scrapeFor globalsIORef (AssetTableRowName org app contract)
-  let assetTables = M.filterWithKey isAssetTableName createdAssetTableRow
-                        where
-                          isAssetTableName :: TableName -> TableColumns -> Bool
-                          isAssetTableName (AssetTableRowName o a n) _ =
-                            o == org && a == app && n == contract
-                          isAssetTableName _ _ = False
-  let assetNames = (M.keys assetTables)
+  let assetNames = (M.keys createdAssetTableRow)
   return assetNames
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
