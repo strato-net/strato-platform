@@ -17,7 +17,7 @@ module Options
 
 import HFlags
 
-defineFlag "port" (8081 :: Int) "Port to run ientity server on"
+defineFlag "port" (8014 :: Int) "Port to run identity server on"
 defineFlag "vaultProxyUrl" ("http://localhost:8013/strato/v2.3" :: String) "URL to Vault"
 defineFlag "nodeUrl" ("http://localhost" :: String) "URL of the Strato Node to register the cert on"
 defineFlag "issuerCertPath" ("/identity-provider/rootCert.pem" :: String) "The .pem filepath to the issuer's X509 cert"

@@ -8,10 +8,8 @@ services:
   identity-provider:
     environment:
     - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
-    - identityProviderPort=${identityProviderPort:-8081}
+    - identityProviderPort=${identityProviderPort:-8014}
     - vaultProxyUrl=${vaulProxyUrl}
-    - issuerCertPath=${issuerCertPath}
-    - issuerPrivKeyPath=${issuerPrivKeyPath}
     - nodeUrl=${nodeUrl}
     - OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}
     - OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}

@@ -9,7 +9,7 @@ sslCertFileType=${sslCertFileType:-pem}
 # OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 # OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST:-identity-provider}
-IDENTITY_PORT=${IDENTITY_PORT:-8081}
+IDENTITY_PORT=${IDENTITY_PORT:-8014}
 IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY:-8013}
 
 # If container is running for the first time - generate config:
