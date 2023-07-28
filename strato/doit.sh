@@ -9,6 +9,8 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-"8013"}
+
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
@@ -230,6 +232,9 @@ function newnode {
   if [ -n "${ssl}" ]; then
       sslFlag="--ssl=${ssl}"
   fi
+  if [-n "${STRATO_PORT_VAULT_PROXY}"]; then
+      vPoxyPort="--vaultProxyPort=${STRATO_PORT_VAULT_PROXY}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
@@ -243,7 +248,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}"  "${nodeHost}" "${ssl}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}"  "${nodeHost}" "${ssl}" "${vPoxyPort}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."

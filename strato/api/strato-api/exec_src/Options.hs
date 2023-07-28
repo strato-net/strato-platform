@@ -24,5 +24,6 @@ defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transact
 defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
 defineFlag "identityServerUrl" ("http://multinode301.ci.blockapps.net:8080" :: String) "The URL of the identity server"
 defineFlag "vaultProxyUrl" ("http://localhost:8013/strato/v2.3" :: String) "URL to Vault"
+defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
 defineFlag "nodeHost" ("http://localhost:8080" :: String) "The marketplace url"
 defineFlag "ssl" (False :: Bool) "Whether or not to add https or http to the nodeHost"
