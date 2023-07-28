@@ -801,7 +801,14 @@ instance Aeson.ToJSON MapWrapper where
   toJSON (MapWrapper m) = Aeson.object (map (\(k, v) -> k Aeson..= v) (Map.toList m))
 
 aesonHelper :: Map.Map Text Text -> Map.Map Aeson.Key Aeson.Value
-aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, Aeson.toJSON y)) (Map.toList m)
+aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, Aeson.toJSON $ removeSingleQuotes y)) (Map.toList m)
+
+removeSingleQuotes :: T.Text -> T.Text
+removeSingleQuotes inputText =
+    let str = T.unpack inputText
+        -- Remove the single quotes from the string
+        cleanedStr = filter (/= '\'') str
+    in T.pack cleanedStr
 
 insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
 insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
@@ -823,7 +830,6 @@ insertAssetTableQuery cs = concat $
                          , tshow . E.blockNumber
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
-                         , E.organization
                          ]
 
               vals = flip map contracts $ \(row, rowList) ->
