@@ -31,15 +31,12 @@ function runIdentityServer {
   --OAUTH_PROVIDER_URL="${OAUTH_PROVIDER_URL}"
   --OAUTH_TOKEN_ENDPOINT="${OAUTH_TOKEN_ENDPOINT}"
   --OAUTH_USER_ENDPOINT="${OAUTH_USER_ENDPOINT}"
-  --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}"
   --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}"
   --OAUTH_MASTER_CLIENT_ID="${OAUTH_MASTER_CLIENT_ID}"
+  --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}"
   --OAUTH_MASTER_CLIENT_SECRET="${OAUTH_MASTER_CLIENT_SECRET}"
   "
   
-  if [ -n "${identityProviderPort}" ]; then
-      pFlag="--port=${identityProviderPort}"
-  fi
   if [ -n "${vaultProxyUrl}" ]; then
       vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
   fi
@@ -95,8 +92,8 @@ function runIdentityServer {
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
-    "${pFlag}" "${vpFlag}" "${icFlag}" "${ipFlag}" \
+    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --port="${identityProviderPort}" \
+    "${vpFlag}" "${icFlag}" "${ipFlag}" \
     "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" \
     "${nuFlag}" &>> logs/identity-provider-server
   
