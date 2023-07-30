@@ -8,7 +8,7 @@ sslCertFileType=${sslCertFileType:-pem}
 # OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 # OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 # OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-IDENTITY_PROVIDER_HOST=${IDENTITY_PROVIDER_HOST:-identity-provider}
+IDENTITY_PROVIDER_HOSTNAME=${IDENTITY_PROVIDER_HOSTNAME:-identity-provider}
 IDENTITY_PORT=${IDENTITY_PORT:-8014}
 IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY:-8013}
 
@@ -45,7 +45,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   # Replacing HOST NAME PLACEHOLDERS
-  sed -i "s/__IDENTITY_PROVIDER_HOST__/$IDENTITY_PROVIDER_HOST/g" /tmp/nginx.conf
+  sed -i "s/__IDENTITY_PROVIDER_HOSTNAME__/$IDENTITY_PROVIDER_HOSTNAME/g" /tmp/nginx.conf
   sed -i "s/__IDENTITY_PORT__/$IDENTITY_PORT/g" /tmp/nginx.conf
   sed -i "s/__IDENTITY_PORT_VAULT_PROXY__/$IDENTITY_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
