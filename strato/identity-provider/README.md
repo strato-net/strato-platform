@@ -25,7 +25,7 @@ HTTP_PORT=8080 \
   VAULT_URL=https://vault.blockapps.net:8093 \
   realmName=mercata-testnet \
   nodeUrl=https://node2.mercata-testnet2.blockapps.net \
-  ./idServerStart.sh
+  ./identity
 ```
 
 Like all our getting-started scripts, this should be run within the same directory where the identity server's docker-compose, docker-compose.identity.yml, is located.
