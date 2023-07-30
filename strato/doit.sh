@@ -229,9 +229,6 @@ function newnode {
   if [ -n "${NODE_HOST}" ]; then
       nodeHost="--nodeHost=${NODE_HOST}"
   fi
-  if [ -n "${ssl}" ]; then
-      sslFlag="--ssl=${ssl}"
-  fi
   if [-n "${STRATO_PORT_VAULT_PROXY}"]; then
       vPoxyPort="--vaultProxyPort=${STRATO_PORT_VAULT_PROXY}"
   fi
