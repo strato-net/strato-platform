@@ -58,7 +58,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         address _productAddress,
         int _quantity,
         int _pricePerUnit,
-        string _batchId,
+        string _vintage,
         InventoryStatus _status,
         uint _createdDate,
         string[] _serialNumbers
@@ -69,7 +69,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                 product.addInventory(
                     _quantity,
                     _pricePerUnit,
-                    _batchId,
+                    _vintage,
                     _status,
                     _createdDate,
                     tx.origin
@@ -96,7 +96,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                 product.addInventory(
                     _quantity,
                     _pricePerUnit,
-                    _batchId,
+                    _vintage,
                     _status,
                     _createdDate,
                     tx.origin

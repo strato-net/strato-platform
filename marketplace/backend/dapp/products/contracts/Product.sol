@@ -97,7 +97,7 @@ contract Product_3 is InventoryStatus {
     function addInventory(
         int _quantity,
         int _pricePerUnit,
-        string _batchId,
+        string _vintage,
         InventoryStatus _status,
         uint _createdDate,
         address _owner
@@ -111,10 +111,9 @@ contract Product_3 is InventoryStatus {
         }
         Inventory inventory = new Inventory(
             category,
-            subCategory,
             _quantity,
             _pricePerUnit,
-            _batchId,
+            _vintage,
             _status,
             _createdDate,
             _owner

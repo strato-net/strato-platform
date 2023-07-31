@@ -13,12 +13,6 @@ import CategoryProductCard from "./CategoryProductCard";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useEffect, useState } from "react";
-//sub-categories
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
 //Marketplace
 import { actions } from "../../contexts/marketplace/actions";
 import {
@@ -81,23 +75,13 @@ const CategoryProductList = ({ user }) => {
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
-  //=========================Sub-categories===============================//
-
-  const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys } = useSubCategoryState();
 
   useEffect(() => {
     let categorys = null;
     if (selectedCategories.length) {
       categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [subCategoryDispatch, selectedCategories]);
-
-  const onChangeSubCategory = (e) => {
-    let valuesChecked = checkValues(e, selectedSubCategories)
-    setSelectedSubCategories(valuesChecked);
-  };
+  }, [selectedCategories]);
 
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)

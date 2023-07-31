@@ -12,7 +12,7 @@ import {
   Upload,
   notification
 } from "antd";
-import { Link } from "react-router-dom" ;
+import { Link } from "react-router-dom";
 import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { actions } from "../../contexts/inventory/actions";
@@ -20,9 +20,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import {
-  useSubCategoryState,
-} from "../../contexts/subCategory";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
@@ -45,8 +42,6 @@ const CreateInventoryModal = ({
   const [api, contextHolder] = notification.useNotification();
   const [uploadErr, setUploadErr] = useState("");
 
-  //Sub-categories
-  const { issubCategorysLoading } = useSubCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
 
@@ -55,17 +50,13 @@ const CreateInventoryModal = ({
       name: null,
       address: null,
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
     productName: {
       name: null,
       address: "",
     },
     quantity: null,
     pricePerUnit: "",
-    batchId: "",
+    vintage: null,
     serialNumber: {
       serialNumStr: "",
       serialNumArr: [],
@@ -78,7 +69,7 @@ const CreateInventoryModal = ({
     validationSchema: schema,
     onSubmit: function (values) {
       if (
-        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) || 
+        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
         // Serial numbers are optional, we can submit the form if there are none. 
         (values.serialNumber.serialNumArr.length === 0)
       ) {
@@ -93,25 +84,20 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
-    if(formik.values.subCategory && formik.values.category.name){
+    if (formik.values.category.name) {
       productActions.fetchCategoryBasedProduct(
         productDispatch,
-        formik.values.category.name,
-        formik.values.subCategory.name ?? null
+        formik.values.category.name
       );
     }
-  }, [
-    productDispatch,
-    formik.values.subCategory,
-    formik.values.subCategory.name
-  ]);
+  }, [productDispatch, formik.values.category.name]);
 
   const handleCreateFormSubmit = async (values) => {
     const body = {
       productAddress: values.productName.address,
       quantity: parseInt(values.quantity),
       pricePerUnit: values.pricePerUnit,
-      batchId: values.batchId,
+      vintage: values.vintage,
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       serialNumber: values.serialNumber.serialNumArr,
     };
@@ -167,17 +153,17 @@ const CreateInventoryModal = ({
         let rawMaterialSerials = [];
         let isAlreadyPresent = serialNumArr.find(elem => elem.itemSerialNumber === row["ItemSerialNumber"]);
         if (row["ItemSerialNumber"]) {
-          if(row["RawMaterialProductName"]){
-            if(!row['RawMaterialProductId']) {
+          if (row["RawMaterialProductName"]) {
+            if (!row['RawMaterialProductId']) {
               setUploadErr("Missing value - 'RawMaterialProductId'");
               return;
             }
-          
+
             for (let j = 1; j <= MAX_RAW_MATERIAL; j++) {
               if (row[`RawMaterialSerialNumber${j}`]) {
                 rawMaterialSerials.push(row[`RawMaterialSerialNumber${j}`])
-              }else{
-                if(j === 1){
+              } else {
+                if (j === 1) {
                   setUploadErr("Missing value - 'RawMaterialSerialNumber1'");
                   return;
                 }
@@ -186,13 +172,13 @@ const CreateInventoryModal = ({
           }
 
           let itemRecord;
-        
+
           if (isAlreadyPresent) {
-          
+
 
             itemRecord = {
               itemSerialNumber: row["ItemSerialNumber"],
-              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === ""? [] : [{
+              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === "" ? [] : [{
                 rawMaterialProductName: encodeURIComponent(row['RawMaterialProductName']),
                 rawMaterialProductId: row["RawMaterialProductId"],
                 rawMaterialSerialNumbers: [...rawMaterialSerials]
@@ -214,7 +200,7 @@ const CreateInventoryModal = ({
           }
         }
       }
-     
+
       serialNumbers = serialNumbers.substring(0, serialNumbers.length - 1);
       formik.setFieldValue("serialNumber.serialNumStr", serialNumbers);
       formik.setFieldValue("serialNumber.serialNumArr", serialNumArr);
@@ -257,189 +243,150 @@ const CreateInventoryModal = ({
           Add Inventory
         </h1>
         <hr className="text-secondryD mt-3" />
-        {issubCategorysLoading ? (
-          <div className="h-44 flex justify-center items-center">
-            <Spin spinning={issubCategorysLoading} size="large" />
-          </div>
-        ) : (
-          <Form
-            layout="vertical"
-            className="mt-5"
-            onSubmit={formik.handleSubmit}
-          >
-            <div className="w-full mb-3">
-              <div className="flex justify-between ">
-                <Form.Item label="Category" name="category" className="w-72">
-                  <Select
-                    placeholder="Select Category"
-                    showSearch
-                    allowClear
-                    id="category"
-                    name="category.name"
-                    disabled={false}
-                    value={formik.values.category.name}
-                    onChange={(value) => {
-                      formik.setFieldValue("category.name", value);
-                      formik.setFieldTouched("category.name", false, false);
-                      
-                      if(formik.values.subCategory.name){
-                        formik.setFieldValue("subCategory.name", null);
-                      }
-                      if(formik.values.productName.name){
-                        formik.setFieldValue("productName.name", null);
-                      }
-                    }}
-                  >
-                    {categorys.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "category.name") &&
-                    getIn(formik.errors, "category.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "category.name")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item
-                  label="Sub Category"
-                  name="subCategory"
-                  className="w-72"
-                >
-                  <Select
-                    placeholder="Select Sub Category"
-                    allowClear
-                    showSearch
-                    name="subCategory.name"
-                    id="subCategory"
-                    disabled={false}
-                    loading={issubCategorysLoading}
-                    value={formik.values.subCategory.name}
-                    onChange={(value) => {
-                      formik.setFieldValue("subCategory.name", value);
-                      formik.setFieldTouched("subCategory.name", false, false);
-                    }}
-                  >
-                    {categorys.map((category) =>
-                      category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                        <Option value={e.name} key={index}>
-                          {e.name}
-                        </Option>
-                      )) : null
-                    )}
-                  </Select>
-                  {getIn(formik.touched, "subCategory.name") &&
-                    getIn(formik.errors, "subCategory.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "subCategory.name")}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
-              <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Product Name"
-                  name="productName"
-                  className="w-72"
-                >
-                  <Select
-                    placeholder="Select Product"
-                    allowClear
-                    showSearch
-                    id="product"
-                    value={formik.values.productName.name}
-                    name="productName.name"
-                    loading={isCategoryBasedProductsLoading}
-                    disabled={
-                      !formik.values.category.name ||
-                      !formik.values.subCategory.name || isCategoryBasedProductsLoading
-                    }
-                    onChange={(value) => {
-                      let selectedProduct = { address: "" };
-                      if (value) {
-                        selectedProduct = categoryBasedProducts.find(
-                          (e) => e.name === value
-                        );
-                      }
-                      formik.setFieldValue("productName.name", value);
-                      formik.setFieldValue(
-                        "productName.address",
-                        selectedProduct.address
-                      );
-                      formik.setFieldTouched("productName.name", false, false);
-                    }}
-                  >
-                    {categoryBasedProducts.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {decodeURIComponent(e.name)}
-                      </Option>
-                    ))}
-                  </Select>
+        <Form
+          layout="vertical"
+          className="mt-5"
+          onSubmit={formik.handleSubmit}
+        >
+          <div className="w-full mb-3">
+            <div className="flex justify-between ">
+              <Form.Item label="Category" name="category" className="w-72">
+                <Select
+                  placeholder="Select Category"
+                  showSearch
+                  allowClear
+                  id="category"
+                  name="category.name"
+                  disabled={false}
+                  value={formik.values.category.name}
+                  onChange={(value) => {
+                    formik.setFieldValue("category.name", value);
+                    formik.setFieldTouched("category.name", false, false);
 
-                  {getIn(formik.touched, "productName.name") &&
-                    getIn(formik.errors, "productName.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "productName.name")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Quantity" name="quantity" className="w-72">
-                  <Input
-                    label="quantity"
-                    placeholder="Enter Quantity"
-                    name="quantity"
-                    disabled={false}
-                    value={formik.values.quantity}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.quantity && formik.errors.quantity && (
-                    <span className="text-error text-xs">
-                      {formik.errors.quantity}
-                    </span>
-                  )}
-                </Form.Item>
-              </div>
-              <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Price Per Unit"
-                  name="pricePerUnit "
-                  className="w-72"
+                    if (formik.values.productName.name) {
+                      formik.setFieldValue("productName.name", null);
+                    }
+                  }}
                 >
-                  <Input
-                    label="pricePerUnit"
-                    placeholder="Enter Price"
-                    name="pricePerUnit"
-                    value={formik.values.pricePerUnit}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.pricePerUnit &&
-                    formik.errors.pricePerUnit && (
-                      <span className="text-error text-xs">
-                        {formik.errors.pricePerUnit}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Batch ID" name="batchId" className="w-72">
-                  <Input
-                    label="batchId"
-                    placeholder="Enter Batch ID"
-                    name="batchId"
-                    disabled={false}
-                    value={formik.values.batchId}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.batchId && formik.errors.batchId && (
+                  {categorys.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "category.name") &&
+                  getIn(formik.errors, "category.name") && (
                     <span className="text-error text-xs">
-                      {formik.errors.batchId}
+                      {getIn(formik.errors, "category.name")}
                     </span>
                   )}
-                </Form.Item>
-              </div>
-              <div className="mt-4 flex justify-between items-center">
-                <div>Serial Numbers</div>
-                <div className="flex items-center">
+              </Form.Item>
+              <Form.Item label="Quantity" name="quantity" className="w-72">
+                <Input
+                  label="quantity"
+                  placeholder="Enter Quantity"
+                  name="quantity"
+                  disabled={false}
+                  value={formik.values.quantity}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.quantity && formik.errors.quantity && (
+                  <span className="text-error text-xs">
+                    {formik.errors.quantity}
+                  </span>
+                )}
+              </Form.Item>
+            </div>
+            <div className="flex justify-between mt-4 ">
+              <Form.Item
+                label="Product Name"
+                name="productName"
+                className="w-72"
+              >
+                <Select
+                  placeholder="Select Product"
+                  allowClear
+                  showSearch
+                  id="product"
+                  value={formik.values.productName.name}
+                  name="productName.name"
+                  loading={isCategoryBasedProductsLoading}
+                  disabled={
+                    !formik.values.category.name || isCategoryBasedProductsLoading
+                  }
+                  onChange={(value) => {
+                    let selectedProduct = { address: "" };
+                    if (value) {
+                      selectedProduct = categoryBasedProducts.find(
+                        (e) => e.name === value
+                      );
+                    }
+                    formik.setFieldValue("productName.name", value);
+                    formik.setFieldValue(
+                      "productName.address",
+                      selectedProduct.address
+                    );
+                    formik.setFieldTouched("productName.name", false, false);
+                  }}
+                >
+                  {categoryBasedProducts.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {decodeURIComponent(e.name)}
+                    </Option>
+                  ))}
+                </Select>
+
+                {getIn(formik.touched, "productName.name") &&
+                  getIn(formik.errors, "productName.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "productName.name")}
+                    </span>
+                  )}
+              </Form.Item>
+              <Form.Item
+                label="Vintage"
+                name="vintage"
+                className="w-72"
+              >
+                <Input
+                  label="vintage"
+                  placeholder="Enter Vintage"
+                  name="vintage"
+                  value={formik.values.vintage}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.vintage &&
+                  formik.errors.vintage && (
+                    <span className="text-error text-xs">
+                      {formik.errors.vintage}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+            <div className="flex justify-between mt-4 ">
+              <Form.Item
+                label="Price Per Unit"
+                name="pricePerUnit "
+                className="w-72"
+              >
+                <Input
+                  label="pricePerUnit"
+                  placeholder="Enter Price"
+                  name="pricePerUnit"
+                  value={formik.values.pricePerUnit}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.pricePerUnit &&
+                  formik.errors.pricePerUnit && (
+                    <span className="text-error text-xs">
+                      {formik.errors.pricePerUnit}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+            <div className="mt-4 flex justify-between items-center">
+              <div>Serial Numbers</div>
+              <div className="flex items-center">
                 <Link to="/sample.csv" target="_blank" download>
                   <div className="flex items-center" >
                     <DownloadOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
@@ -447,64 +394,63 @@ const CreateInventoryModal = ({
                       Download Sample CSV
                     </div>
                   </div>
-                  </Link>
-                  <Upload
-                    onChange={uploadCSV}
-                    accept=".csv"
-                    customRequest={() => { }}
-                    showUploadList={false}
-                  >
-                    <div className="ml-8 flex items-center">
-                      <PaperClipOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
-                      <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
-                        Upload CSV
-                      </div>
-                    </div>
-                  </Upload>
-                </div>
-              </div>
-              <Form.Item>
-                <TextArea
-                  label="serialNumbers"
-                  className="mt-2"
-                  disabled={true}
-                  rows={4}
-                  value={formik.values.serialNumber.serialNumStr}
-                  placeholder="Upload serial numbers using upload CSV option"
-                />
-                {getIn(formik.touched, "serialNumber.serialNumStr") &&
-                  getIn(formik.errors, "serialNumber.serialNumStr") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "serialNumber.serialNumStr")}
-                    </span>
-                  )}
-                {getIn(formik.touched, "serialNumber.serialNumArr") &&
-                  getIn(formik.errors, "serialNumber.serialNumArr") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "serialNumber.serialNumArr")}
-                    </span>
-                  )}
-              </Form.Item>
-
-              <Form.Item label="Status" name="status" className="mt-4">
-                <Radio.Group
-                  value={formik.values.status}
-                  onChange={formik.handleChange}
-                  name="status"
+                </Link>
+                <Upload
+                  onChange={uploadCSV}
+                  accept=".csv"
+                  customRequest={() => { }}
+                  showUploadList={false}
                 >
-                  <Radio value={true}>Publish</Radio>
-                  <Radio value={false}>Unpublish</Radio>
-                </Radio.Group>
-
-                {formik.touched.status && formik.errors.status && (
+                  <div className="ml-8 flex items-center">
+                    <PaperClipOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
+                    <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
+                      Upload CSV
+                    </div>
+                  </div>
+                </Upload>
+              </div>
+            </div>
+            <Form.Item>
+              <TextArea
+                label="serialNumbers"
+                className="mt-2"
+                disabled={true}
+                rows={4}
+                value={formik.values.serialNumber.serialNumStr}
+                placeholder="Upload serial numbers using upload CSV option"
+              />
+              {getIn(formik.touched, "serialNumber.serialNumStr") &&
+                getIn(formik.errors, "serialNumber.serialNumStr") && (
                   <span className="text-error text-xs">
-                    {formik.errors.status}
+                    {getIn(formik.errors, "serialNumber.serialNumStr")}
                   </span>
                 )}
-              </Form.Item>
-            </div>
-          </Form>
-        )}
+              {getIn(formik.touched, "serialNumber.serialNumArr") &&
+                getIn(formik.errors, "serialNumber.serialNumArr") && (
+                  <span className="text-error text-xs">
+                    {getIn(formik.errors, "serialNumber.serialNumArr")}
+                  </span>
+                )}
+            </Form.Item>
+
+            <Form.Item label="Status" name="status" className="mt-4">
+              <Radio.Group
+                value={formik.values.status}
+                onChange={formik.handleChange}
+                name="status"
+              >
+                <Radio value={true}>Publish</Radio>
+                <Radio value={false}>Unpublish</Radio>
+              </Radio.Group>
+
+              {formik.touched.status && formik.errors.status && (
+                <span className="text-error text-xs">
+                  {formik.errors.status}
+                </span>
+              )}
+            </Form.Item>
+          </div>
+        </Form>
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

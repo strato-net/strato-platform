@@ -4,9 +4,6 @@ import { Form, Modal, Input, Select, Radio, Button, Upload, Spin } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { PictureOutlined } from "@ant-design/icons";
 import getSchema from "./ProductSchema";
-
-//sub-categories
-import { useSubCategoryState } from "../../contexts/subCategory";
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 
@@ -24,9 +21,6 @@ const UpdateProductModal = ({
   const [selectedImage, setSelectedImage] = useState(null);
   const [isImgChanged, setIsImgChanged] = useState(false);
   const dispatch = useProductDispatch();
-
-  //Sub-categories
-  const { issubCategorysLoading } = useSubCategoryState();
 
   const {
     isproductUpdating,

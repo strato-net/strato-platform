@@ -31,7 +31,7 @@ const UpdateInventoryModal = ({
   const { categorys, iscategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
-  
+
 
   const { isinventoryUpdating } =
     useInventoryState();
@@ -41,17 +41,13 @@ const UpdateInventoryModal = ({
       name: null,
       address: null,
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
     productName: {
       name: null,
       address: "",
     },
     quantity: null,
     pricePerUnit: "",
-    batchId: "",
+    vintage: null,
     serialNumber: null,
     status: true,
   };
@@ -71,22 +67,9 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
-      let subCategory; 
-      categorys.map(
-        (category) => category.subCategories.map(
-          (subCategoryRecord) => {
-            if (subCategoryRecord.name === inventoryToUpdate.inventory.subCategory) {
-              subCategory = subCategoryRecord;
-            } 
-          }
-        )
-      );
       let nextState = {
         category: {
           name: inventoryToUpdate.category.name,
-        },
-        subCategory: {
-          name: subCategory.name ?? "",
         },
         productName: {
           name: inventoryToUpdate.inventory.name,
@@ -94,11 +77,11 @@ const UpdateInventoryModal = ({
         },
         quantity: inventoryToUpdate.inventory.quantity,
         pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
-        batchId: inventoryToUpdate.inventory.batchId,
+        vintage: inventoryToUpdate.inventory.vintage,
         serialNumber: null,
         status: inventoryToUpdate.inventory.status === 1 ? true : false,
       };
-    
+
       setFormState(nextState);
     }
   }, [inventoryToUpdate]);
@@ -113,7 +96,7 @@ const UpdateInventoryModal = ({
       },
     };
 
-  
+
 
     let isDone = await actions.updateInventory(dispatch, body);
 
@@ -166,7 +149,6 @@ const UpdateInventoryModal = ({
                   value={formik.values.category.name}
                   onChange={(value) => {
                     formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -182,37 +164,20 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item
-                label="Sub Category"
-                name="subCategory"
-                className="w-72"
-              >
-                <Select
-                  placeholder="Select Sub Category"
-                  allowClear
-                  showSearch
-                  id="subCategory"
-                  name="subCategory.name"
+              <Form.Item label="Quantity" name="quantity" className="w-72">
+                <Input
+                  label="quantity"
+                  placeholder="Enter Quantity"
+                  name="quantity"
                   disabled={true}
-                  value={formik.values.subCategory.name}
-                  onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
-                  }}
-                >
-                  {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
-                  )}
-                </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
-                    </span>
-                  )}
+                  value={formik.values.quantity}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.quantity && formik.errors.quantity && (
+                  <span className="text-error text-xs">
+                    {formik.errors.quantity}
+                  </span>
+                )}
               </Form.Item>
             </div>
             <div className="flex justify-between mt-4 ">
@@ -259,18 +224,21 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item label="Quantity" name="quantity" className="w-72">
+              <Form.Item
+                label="Vintage"
+                name="vintage"
+                className="w-72"
+              >
                 <Input
-                  label="quantity"
-                  placeholder="Enter Quantity"
-                  name="quantity"
-                  disabled={true}
-                  value={formik.values.quantity}
+                  label="vintage"
+                  placeholder="Enter Vintage"
+                  name="vintage"
+                  value={formik.values.vintage}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.quantity && formik.errors.quantity && (
+                {formik.touched.vintage && formik.errors.vintage && (
                   <span className="text-error text-xs">
-                    {formik.errors.quantity}
+                    {formik.errors.vintage}
                   </span>
                 )}
               </Form.Item>
@@ -291,21 +259,6 @@ const UpdateInventoryModal = ({
                 {formik.touched.pricePerUnit && formik.errors.pricePerUnit && (
                   <span className="text-error text-xs">
                     {formik.errors.pricePerUnit}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Batch ID" name="batchId" className="w-72">
-                <Input
-                  label="batchId"
-                  placeholder="Enter Batch ID"
-                  name="batchId"
-                  disabled={true}
-                  value={formik.values.batchId}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.batchId && formik.errors.batchId && (
-                  <span className="text-error text-xs">
-                    {formik.errors.batchId}
                   </span>
                 )}
               </Form.Item>

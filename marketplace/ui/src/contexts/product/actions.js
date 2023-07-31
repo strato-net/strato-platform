@@ -314,12 +314,12 @@ const actions = {
     }
   },
 
-  fetchCategoryBasedProduct: async (dispatch, category, subCategory) => {
+  fetchCategoryBasedProduct: async (dispatch, category) => {
     dispatch({ type: actionDescriptors.fetchCategoryBasedProduct });
 
     try {
       const response = await fetch(
-        `${apiUrl}/product?isDeleted=false&category=${category}&subCategory=${subCategory}`,
+        `${apiUrl}/product?isDeleted=false&category=${category}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -394,17 +394,14 @@ const actions = {
     }
   },
   
-  fetchProductsForFilter: async (dispatch, categorys, subCategorys) => {
+  fetchProductsForFilter: async (dispatch, categorys) => {
     dispatch({ type: actionDescriptors.fetchProductsForFilter });
 
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
-    const subCategoryQuery = subCategorys
-      ? `&subCategory[]=${subCategorys}`
-      : "";
     try {
       const response = await fetch(
-        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}${subCategoryQuery}`,
+        `${apiUrl}/product/filter/names?isDeleted=false&${categoryQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

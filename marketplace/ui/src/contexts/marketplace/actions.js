@@ -136,7 +136,6 @@ const actions = {
   fetchMarketplace: async (
     dispatch,
     categorys,
-    subCategorys,
     products,
     minQty,
     maxQty,
@@ -147,17 +146,13 @@ const actions = {
 
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
-    const subCategoryQuery = subCategorys
-      ? `&subCategory[]=${subCategorys}`
-      : "";
-
     const productQuery = products ? `&productId[]=${products}` : "";
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}`,
+        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${productQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -193,7 +188,6 @@ const actions = {
   fetchMarketplaceLoggedIn: async (
     dispatch,
     categorys,
-    subCategorys,
     products,
     minQty,
     maxQty,
@@ -204,17 +198,13 @@ const actions = {
 
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
-    const subCategoryQuery = subCategorys
-      ? `&subCategory[]=${subCategorys}`
-      : "";
-
     const productIdQuery = products ? `&productId[]=${products}` : "";
     const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}`,
+        `${apiUrl}/marketplace/all?${qtyQuery}${priceQuery}${categoryQuery}${productIdQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

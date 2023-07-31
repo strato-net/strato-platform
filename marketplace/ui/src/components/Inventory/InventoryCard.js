@@ -125,13 +125,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
           </div>
           <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Batch ID</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">{inventory.batchId}</p>
-          </div>
-          <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Remaining Quantity</p>
             <p text-secondryB text-sm>
               :

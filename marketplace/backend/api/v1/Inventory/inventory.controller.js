@@ -114,7 +114,7 @@ class InventoryController {
       productAddress: Joi.string().required(),
       quantity: Joi.number().integer().min(0).required(),
       pricePerUnit: Joi.number().integer().greater(0).required(),
-      batchId: Joi.string().required(),
+      vintage: Joi.number().integer().min(0).required(),
       status: Joi.number().integer().min(1).max(2).required(),
       serialNumber: Joi.array().when(Joi.array().length(0), {
         then: Joi.array().length(0).required(),

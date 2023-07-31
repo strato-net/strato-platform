@@ -33,7 +33,7 @@ const factory = {
             // Number of serial numbers should match the quantity if they are provided.
             quantity: 2,
             pricePerUnit: uid,
-            batchId: `batchId_${uid}`,
+            vintage: `${uid}`,
             serialNumbers: [`A1${uid}`, `A2${uid}`],
             status: 2,
             createdDate: 1673251301
@@ -45,7 +45,7 @@ const factory = {
         const args = {
             quantity: 3,
             pricePerUnit: uid,
-            batchId: `batchId_${uid}`,
+            vintage: `${uid}`,
             serialNumbers: [],
             status: 2,
             createdDate: 1673251301

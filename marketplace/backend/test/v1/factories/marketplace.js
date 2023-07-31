@@ -8,17 +8,7 @@ export const categoryArgs = (uid) => {
     return args
 }
 
-export const subCategoryArgs = (categoryAddress, uid) => {
-    const args = {
-        categoryAddress,
-        name: `name_${uid}`,
-        description: `description_${uid}`,
-    }
-
-    return args
-}
-
-export const productArgs = (uid, category, subCategory) => {
+export const productArgs = (uid, category) => {
     const args = {
         productArgs: {
             name: `name_${uid}`,
@@ -38,7 +28,7 @@ export const inventoryArgs = (address, uid) => {
         quantity,
         productAddress: address,
         pricePerUnit: uid,
-        batchId: `batchId_${uid}`,
+        vintage: `${uid}`,
         status: 1,
         serialNumber: [
             {
@@ -59,10 +49,9 @@ export const inventoryArgs = (address, uid) => {
     return args
 }
 
-export const marketplaceArgs = (category, subCategory, productName, brandName) => {
+export const marketplaceArgs = (category, productName, brandName) => {
     const args = {
         category: [category],
-        subCategory: [subCategory],
         name: [productName],
     }
 

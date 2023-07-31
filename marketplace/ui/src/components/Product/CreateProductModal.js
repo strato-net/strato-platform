@@ -5,7 +5,6 @@ import TextArea from "antd/es/input/TextArea";
 import { PictureOutlined } from "@ant-design/icons";
 import getSchema from "./ProductSchema";
 
-//sub-categories
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 

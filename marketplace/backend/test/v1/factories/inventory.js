@@ -4,7 +4,7 @@ export const inventoryArgs = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: 20,
-    batchId: `batchId_${uid}`,
+    vintage: `${uid}`,
     status: 1,
     serialNumber: [ 
       {
@@ -78,7 +78,7 @@ export const inventoryArgsWithNoSN = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: 20,
-    batchId: `batchId_${uid}`,
+    vintage: `${uid}`,
     status: 1,
     serialNumber: []
   }
@@ -91,7 +91,7 @@ export const newInventoryArgs = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: uid,
-    batchId: `batchId_${uid}`,
+    vintage: `${uid}`,
     status: 1,
     serialNumber: [
       {

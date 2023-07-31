@@ -19,16 +19,6 @@ export const Category = {
   transferOwnership: '/transferOwnership',
 }
 
-export const SubCategory = {
-  prefix: '/subcategory',
-  get: '/:address/',
-  getAll: '/',
-  create: '/',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-}
-
 export const Product = {
   prefix: '/product',
   get: '/:address',

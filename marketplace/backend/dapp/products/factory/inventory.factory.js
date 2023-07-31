@@ -4,10 +4,9 @@ const factory = {
     getInventoryArgs(uid, userAddress) {
         const args = {
             category: 'Carbon',
-            subCategory: 'Carbon Credit',
             quantity: 3,
             pricePerUnit: uid,
-            batchId: `batchId_${uid}`,
+            vintage: `${uid}`,
             status: 2,
             createdDate: new Date().getTime(),
             owner: userAddress
