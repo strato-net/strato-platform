@@ -97,7 +97,7 @@ const CreateInventoryModal = ({
       productAddress: values.productName.address,
       quantity: parseInt(values.quantity),
       pricePerUnit: values.pricePerUnit,
-      vintage: values.vintage,
+      vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       serialNumber: values.serialNumber.serialNumArr,
     };

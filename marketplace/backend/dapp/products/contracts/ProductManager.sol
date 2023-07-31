@@ -58,7 +58,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         address _productAddress,
         int _quantity,
         int _pricePerUnit,
-        string _vintage,
+        uint _vintage,
         InventoryStatus _status,
         uint _createdDate,
         string[] _serialNumbers

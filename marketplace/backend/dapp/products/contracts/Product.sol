@@ -97,7 +97,7 @@ contract Product_3 is InventoryStatus {
     function addInventory(
         int _quantity,
         int _pricePerUnit,
-        string _vintage,
+        uint _vintage,
         InventoryStatus _status,
         uint _createdDate,
         address _owner

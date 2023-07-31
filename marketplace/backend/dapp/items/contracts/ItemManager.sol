@@ -23,7 +23,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     function addItem(
         address _productId,
         address _inventoryId,
-        uint _uniqueProductCode,
+        // uint _uniqueProductCode,
         ItemObject[] _itemObject,
         ItemStatus _status,
         string _comment,
@@ -35,13 +35,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
         if (_itemObject[0].serialNumber == "") {
 
             for (uint256 i = 0; i < _itemObject.length; i++) {
-                Item_3 itemAddr= new Item_3(_productId, _uniqueProductCode, _inventoryId, "", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
+                Item_3 itemAddr= new Item_3(_productId, _inventoryId, "", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
                 _createdDate);
 
                 address itemContractAddress= address(itemAddr);
                 itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
 
-                uniqueSerialNumberByUPC[_itemObject[0].serialNumber] = _uniqueProductCode;
+                // uniqueSerialNumberByUPC[_itemObject[0].serialNumber] = _uniqueProductCode;
                 itemProductIdMapping[itemContractAddress] = _productId;
                 itemInventoryIdMapping[itemContractAddress] = _inventoryId;
                 itemAddresses += string(address(itemAddr)) + ",";
@@ -53,12 +53,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
             string currentSerialNumber = _itemObject[i].serialNumber;
             uint exisitngUPC = uniqueSerialNumberByUPC[currentSerialNumber];
 
-            if (exisitngUPC == _uniqueProductCode) {
-                repeatedSerialNumbers += currentSerialNumber + ",";
-            } else {
+            // if (exisitngUPC == _uniqueProductCode) {
+            //     repeatedSerialNumbers += currentSerialNumber + ",";
+            // } else {
                 Item_3 itemAddr = new Item_3(
                     _productId,
-                    _uniqueProductCode,
+                    // _uniqueProductCode,
                     _inventoryId,
                     currentSerialNumber,
                     _status,
@@ -78,13 +78,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     itemContractAddress
                 );
 
-                uniqueSerialNumberByUPC[
-                    currentSerialNumber
-                ] = _uniqueProductCode;
+                // uniqueSerialNumberByUPC[
+                //     currentSerialNumber
+                // ] = _uniqueProductCode;
                 itemProductIdMapping[itemContractAddress] = _productId;
                 itemInventoryIdMapping[itemContractAddress] = _inventoryId;
                 itemAddresses += string(address(itemAddr)) + ",";
-            }
+            // }
         }
         return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
     }
@@ -159,7 +159,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address[] _itemsAddress,
         address _newOwner,
         address _dappAddress
-    ) public returns (uint, address, address) {
+    ) public returns (uint) {
         string itemAddresses = "";
         // if(_itemsAddress.length <= 0){
         //     return (RestStatus.BAD_REQUEST,address(0),address(0));
@@ -168,13 +168,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
         Dapp dapp = Dapp(address(_dappAddress));
         ProductManager productManager = dapp.productManager();
 
-        (address productId, address inventoryId) = getProductAndInventory(
-            productManager,
-            _itemsAddress,
-            _newOwner
-        );
+        // (address productId, address inventoryId) = getProductAndInventory(
+        //     productManager,
+        //     _itemsAddress,
+        //     _newOwner
+        // );
 
-        return (RestStatus.OK, productId, inventoryId);
+        return (RestStatus.OK);
     }
 
 }

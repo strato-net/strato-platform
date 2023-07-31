@@ -9,7 +9,7 @@ contract Item_3 is ItemStatus {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-
+                                                                // Add: CreditBatchSerialization   // Remove: itemNumber, serialNumber, comment
     address public productId;
     address public inventoryId;
     string public serialNumber;
@@ -36,7 +36,7 @@ contract Item_3 is ItemStatus {
 
     constructor(
         address _productId,
-        uint _uniqueProductCode,
+        // uint _uniqueProductCode,
         address _inventoryId,
         string _serialNumber,
         ItemStatus _status,
@@ -62,14 +62,14 @@ contract Item_3 is ItemStatus {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        if (_rawMaterialSerialNumber.length > 0) {
-            addRawMaterials(
-                _uniqueProductCode,
-                _rawMaterialProductName,
-                _rawMaterialSerialNumber,
-                _rawMaterialProductId
-            );
-        }
+        // if (_rawMaterialSerialNumber.length > 0) {
+        //     addRawMaterials(
+        //         _uniqueProductCode,
+        //         _rawMaterialProductName,
+        //         _rawMaterialSerialNumber,
+        //         _rawMaterialProductId
+        //     );
+        // }
     }
 
     function update(
@@ -163,40 +163,40 @@ contract Item_3 is ItemStatus {
     }
 
     // Add the raw material for the item
-    function addRawMaterial(
-        uint _uniqueProductCode,
-        string _rawMaterialProductName,
-        string _rawMaterialSerialNumber,
-        string _rawMaterialProductId
-    ) public returns (uint256) {
-        RawMaterial_3 rawMaterial = new RawMaterial_3(
-            serialNumber,
-            _rawMaterialSerialNumber,
-            _rawMaterialProductName,
-            _uniqueProductCode,
-            _rawMaterialProductId,
-            createdDate
-        );
-        return RestStatus.OK;
-    }
+    // function addRawMaterial(
+    //     uint _uniqueProductCode,
+    //     string _rawMaterialProductName,
+    //     string _rawMaterialSerialNumber,
+    //     string _rawMaterialProductId
+    // ) public returns (uint256) {
+    //     RawMaterial_3 rawMaterial = new RawMaterial_3(
+    //         serialNumber,
+    //         _rawMaterialSerialNumber,
+    //         _rawMaterialProductName,
+    //         _uniqueProductCode,
+    //         _rawMaterialProductId,
+    //         createdDate
+    //     );
+    //     return RestStatus.OK;
+    // }
 
     // Add the raw materials for the item
-    function addRawMaterials(
-        uint _uniqueProductCode,
-        string[] _rawMaterialProductName,
-        string[] _rawMaterialSerialNumber,
-        string[] _rawMaterialProductId
-    ) public returns (uint256) {
-        for (uint256 i = 0; i < _rawMaterialProductName.length; i++) {
-            addRawMaterial(
-                _uniqueProductCode,
-                _rawMaterialProductName[i],
-                _rawMaterialSerialNumber[i],
-                _rawMaterialProductId[i]
-            );
-        }
-        return RestStatus.OK;
-    }
+    // function addRawMaterials(
+    //     uint _uniqueProductCode,
+    //     string[] _rawMaterialProductName,
+    //     string[] _rawMaterialSerialNumber,
+    //     string[] _rawMaterialProductId
+    // ) public returns (uint256) {
+    //     for (uint256 i = 0; i < _rawMaterialProductName.length; i++) {
+    //         addRawMaterial(
+    //             _uniqueProductCode,
+    //             _rawMaterialProductName[i],
+    //             _rawMaterialSerialNumber[i],
+    //             _rawMaterialProductId[i]
+    //         );
+    //     }
+    //     return RestStatus.OK;
+    // }
 
     // ------------------- ASSET SHARD MEMBERSHIP FUNCTIONS ---------------
 
