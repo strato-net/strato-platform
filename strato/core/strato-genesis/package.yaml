@@ -50,6 +50,7 @@ library:
 executables:
   generate-genesis:
     source-dirs: exec_src/
+    ghc-options: -dynamic
     main: Main.hs
     other-modules: []
     dependencies:
@@ -87,4 +88,4 @@ tests:
       - text
       - time
       - vector
-    ghc-options: -Wall -dynamic
+    ghc-options: -Wall
