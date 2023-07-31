@@ -461,6 +461,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     const { creditBatchSerialization, ...restArgs } = args;
+    const quantity = args.quantity;
 
     // const serialNo = [];
     // const repeatedSerialNumber = [];
@@ -534,7 +535,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if (args.quantity === 0) {
+    if (quantity === 0) {
       return [
         createInventoryStatus,
         createdInventoryAddress,
@@ -542,6 +543,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
 
     const itemParams = {
+      quantity,
       creditBatchSerialization,
       createdDate,
       productId: restArgs.productAddress,

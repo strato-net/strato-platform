@@ -24,6 +24,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _productId,
         address _inventoryId,
         string _creditBatchSerialization,
+        int _quantity,
         // ItemObject[] _itemObject,
         ItemStatus _status,
         uint _createdDate
@@ -38,6 +39,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             _productId,
             _inventoryId,
             _creditBatchSerialization,
+            _quantity,
             _status,
             _createdDate
         );

@@ -13,6 +13,7 @@ contract Item_3 is ItemStatus {
     address public productId;
     address public inventoryId;
     string public creditBatchSerialization;
+    int public quantity;
     ItemStatus public status;
     uint public createdDate;
 
@@ -36,6 +37,7 @@ contract Item_3 is ItemStatus {
         address _productId,
         address _inventoryId,
         string _creditBatchSerialization,
+        int _quantity,
         ItemStatus _status,
         uint _createdDate
     ) public {
@@ -44,6 +46,7 @@ contract Item_3 is ItemStatus {
         productId = _productId;
         inventoryId = _inventoryId;
         creditBatchSerialization = _creditBatchSerialization;
+        quantity = _quantity;
         status = _status;
         createdDate = _createdDate;
 

@@ -134,6 +134,7 @@ class ItemController {
         inventoryId: Joi.string().required(),
         creditBatchSerialization: Joi.string().required(),
         status: Joi.number().integer().min(1).max(4).required(),
+        quantity: Joi.number().integer().min(0).required()
       })
     });
 

@@ -8,6 +8,7 @@ const factory = {
                 productId: '0000000000000000000000000000000000000000',
                 inventoryId: '0000000000000000000000000000000000000000',
                 creditBatchSerialization: uid + 1,
+                quantity: 10,
                 status: 2,
                 createdDate: new Date().getTime()
             }
@@ -20,6 +21,7 @@ const factory = {
                 productId:  '0000000000000000000000000000000000000000',
                 inventoryId:  '0000000000000000000000000000000000000000',
                 creditBatchSerialization: '',
+                quantity: 10,
                 status: 2,
                 createdDate: new Date().getTime()
             }

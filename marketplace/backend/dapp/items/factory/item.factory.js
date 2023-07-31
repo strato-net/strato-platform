@@ -8,6 +8,7 @@ const factory = {
                 productId: '0000000000000000000000000000000000000000',
                 inventoryId: '0000000000000000000000000000000000000000',
                 creditBatchSerialization: `serialNumber_${uid}`,
+                quantity: 10,
                 status: 2,
                 createdDate: new Date().getTime(),
             }

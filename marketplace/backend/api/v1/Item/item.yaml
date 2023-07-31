@@ -131,6 +131,8 @@ definitions:
             type: string
           creditBatchSerialization:
             type: string
+          quantity:
+            type: number
           status:
             type: string
           createdAt:
@@ -151,6 +153,8 @@ definitions:
             type: string
           creditBatchSerialization:
             type: string
+          quantity:
+            type: number
           status:
             type: string
           createdAt:

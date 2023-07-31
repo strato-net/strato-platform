@@ -58,6 +58,7 @@ function marshalIn(_args) {
         productId: '',
         inventoryId: '',
         creditBatchSerialization: '',
+        quantity: 0,
         status: 1,
         createdDate: 0,
     };
