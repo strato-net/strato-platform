@@ -23,6 +23,7 @@ end
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
+local id_provider = ''
 local unique_name = ''
 local user_access_token = ''
 local verify_res = ''
@@ -68,40 +69,31 @@ if ngx.req.get_headers()["Authorization"] then
   local header = ngx.req.get_headers()["Authorization"]
   local divider = header:find(' ')
   user_access_token = header:sub(divider + 1)
+
+  if verify_res['iss'] ~= nil then
+    id_provider = verify_res['iss']
+  end
+
+  if verify_res['sub'] ~= nil then
+    unique_name = verify_res['sub']
+  end
+
 else
-  -- Else - use the openidc authenticate flow
-
-  local authenticate_res, authenticate_err
-  -- if requested_uri is the UI page (like SMD) or the API call
-  if ngx.var.is_ui == "true" then
-    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow;
-    -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
-    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
-  else
-    -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
-    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
-    if (authenticate_res == authenticate_err and authenticate_res == nil and ngx.var.allow_optional_anon_access ~= "true") then
-      ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    end
-  end
-
-  -- in case if authentication failed (case unhandled - server error)
-  if (authenticate_err) then
-    ngx.status = 500
-    ngx.say(authenticate_err)
-    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
-
-  if authenticate_res ~= nil and authenticate_res.access_token then
-    user_access_token = authenticate_res.access_token
-  end
+  ngx.status = 401
+  ngx.say("No Authorization header is provided with the request.")
+  ngx.exit(ngx.HTTP_UNAUTHORIZED)
 end
 
 if user_access_token ~= '' then
-  ngx.req.set_header("X-USER-UNIQUE-NAME", verify_res['sub'])
-  ngx.req.set_header("X-IDENTITY-PROVIDER-ID", verify_res['iss'])
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
+
+if id_provider ~= '' then
+  ngx.req.set_header("X-IDENTITY-PROVIDER-ID", id_provider)
+end
+
+if unique_name ~= '' then
+  ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")
