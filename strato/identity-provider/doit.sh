@@ -26,8 +26,6 @@ function runIdentityServer {
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
   --vaultProxyUrl="${vaultProxyUrl}"
-  --issuerCertPath="${issuerCertPath}"
-  --issuerPrivKeyPath="${issuerPrivKeyPath}"
   --nodeUrl="${nodeUrl}"
   --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}"
   --OAUTH_MASTER_CLIENT_ID="${OAUTH_MASTER_CLIENT_ID}"
@@ -37,9 +35,6 @@ function runIdentityServer {
   
   if [ -n "${vaultProxyUrl}" ]; then
       vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
-  fi
-  if [ -n "${issuerCertPath}" ]; then
-      icFlag="--issuerCertPath=${issuerCertPath}"
   fi
   if [ -n "${issuerPrivKeyPath}" ]; then
       ipFlag="--issuerPrivKeyPath=${issuerPrivKeyPath}"
@@ -91,7 +86,7 @@ function runIdentityServer {
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} \
     --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --port="${identityProviderPort}" \
-    "${vpFlag}" "${icFlag}" "${ipFlag}" \
+    "${vpFlag}" "${ipFlag}" \
     "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" \
     "${nuFlag}" &>> logs/identity-provider-server
   
