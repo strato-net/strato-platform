@@ -8,8 +8,8 @@ services:
   identity-provider:
     environment:
     - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
-    - identityProviderPort=${identityProviderPort:-8014}
-    - vaultProxyUrl=${vaulProxyUrl}
+    - identityProviderPort=${identityProviderPort}
+    - vaultProxyUrl=${vaultProxyUrl}
     - nodeUrl=${nodeUrl}
     - OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}
     - OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}
@@ -26,8 +26,8 @@ services:
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
     volumes: 
-      - ./rootCert.pem:/identity-provider/rootCert.pem
-      - ./rootPriv.pem:/identity-provider/rootPriv.pem
+      - ./rootCert.pem:/identity-provider/rootCert.pem:ro
+      - ./rootPriv.pem:/identity-provider/rootPriv.pem:ro
     logging:
       driver: "json-file"
       options:

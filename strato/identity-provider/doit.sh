@@ -5,6 +5,7 @@ set -ex
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
+identityProviderPort=${identityProviderPort:-8014}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
@@ -24,7 +25,7 @@ function runIdentityServer {
   identity-provider:
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
-  --vaultProxyUrl="${vaulProxyUrl}"
+  --vaultProxyUrl="${vaultProxyUrl}"
   --issuerCertPath="${issuerCertPath}"
   --issuerPrivKeyPath="${issuerPrivKeyPath}"
   --nodeUrl="${nodeUrl}"
