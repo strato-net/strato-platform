@@ -26,6 +26,8 @@ module SolidVM.Model.CodeCollection.Function (
   funcStateMutability,
   funcContents,
   funcVisibility,
+  funcVirtual,
+  funcOverrides,
   funcConstructorCalls,
   funcModifiers,
   funcContext,
@@ -137,6 +139,8 @@ data FuncF a = Func
   -- relevance when constructing from the db.
   , _funcContents :: Maybe [StatementF a]
   , _funcVisibility :: Maybe Visibility
+  , _funcVirtual :: Bool
+  , _funcOverrides :: Maybe [SolidString] -- override can be for multiple contracts, e.g. override(Base1, Base2)
   , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , _funcContext :: a

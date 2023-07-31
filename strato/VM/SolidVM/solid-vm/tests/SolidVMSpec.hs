@@ -2180,13 +2180,13 @@ contract qq is Validator {
   it "can resolve super" . runTest $ do
     let ctract = [r|
 contract BaseContainer {
-  function contains(uint x) internal returns (bool) {
+  function contains(uint x) internal virtual returns (bool) {
     return x == 4;
   }
 }
 
 contract qq is BaseContainer {
-  function contains(uint x) external returns (bool) {
+  function contains(uint x) external override returns (bool) {
     return super.contains(x);
   }
 }|]
@@ -2199,17 +2199,17 @@ contract qq is BaseContainer {
   it "selects the correct super with multiple parents" . runTest $ do
     runCall' "value" "()" [r|
 contract A {
-    function value() public returns (uint) {
+    function value() public virtual returns (uint) {
         return 0xa;
     }
 }
 contract B {
-    function value() public returns (uint) {
+    function value() public virtual returns (uint) {
         return 0xb;
     }
 }
 contract qq is A, B {
-    function value() public returns (uint) {
+    function value() public override(B) returns (uint) {
         return super.value();
     }
 }|] `shouldReturn` Just ("("++show (MA.parseHex "b")++")")
@@ -2217,13 +2217,13 @@ contract qq is A, B {
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall' "value" "()" [r|
 contract A {
-  function value() public returns (uint) {
+  function value() public virtual returns (uint) {
     return 0xa;
   }
 }
 contract B {}
 contract qq is A, B {
-  function value() public returns (uint) {
+  function value() public override returns (uint) {
     return super.value();
   }
 }|] `shouldReturn` Just ("("++show (MA.parseHex "a")++")")
@@ -7233,6 +7233,27 @@ contract qq is SafeMath {
 }
 |] 
     getFields ["x"] `shouldReturn` [BInteger 4]
+
+  it "can use virtual and override" . runTest $ do
+    runBS [r|
+
+contract Parent {
+  uint x = 7;
+  function myVirtualFunc() virtual {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  function myVirtualFunc() override {
+    x = 9;
+  }
+  constructor() {
+    myVirtualFunc();
+  }
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 9]
 
 
 

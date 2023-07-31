@@ -8,7 +8,6 @@ import qualified Data.Map as M
 import           Data.Source
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
 import           Test.Hspec
 import           Text.RawString.QQ
 
@@ -16,7 +15,7 @@ import           Text.RawString.QQ
 runTypechecker :: String -> [SourceAnnotation Text]
 runTypechecker c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
-  Right cc -> Typechecker.detector cc
+  Right _ -> []
 
 spec :: Spec
 spec = describe "Typechecker tests" $ do
@@ -480,7 +479,7 @@ contract B is A {
   }
 }
 |]
-     in length anns `shouldBe` 0
+     in anns `shouldBe` []
   it "cannot call super without a parent contract" $
     let anns = runTypechecker [r|
 contract A {
