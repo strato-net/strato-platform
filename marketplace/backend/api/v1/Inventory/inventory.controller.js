@@ -116,17 +116,7 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       vintage: Joi.number().integer().min(0).required(),
       status: Joi.number().integer().min(1).max(2).required(),
-      serialNumber: Joi.array().when(Joi.array().length(0), {
-        then: Joi.array().length(0).required(),
-        otherwise: Joi.array().length(Joi.ref('quantity')).items(Joi.object({
-          itemSerialNumber: Joi.string().required(),
-          rawMaterials: Joi.array().items(Joi.object({
-            rawMaterialProductName: Joi.string().required(),
-            rawMaterialProductId: Joi.string().required(),
-            rawMaterialSerialNumbers: Joi.array().items(Joi.string().required()).min(1).required()
-          })).required()
-        })).required()
-      }).required(),
+      creditBatchSerialization: Joi.string().required()
     });
 
     

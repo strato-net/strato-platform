@@ -9,13 +9,11 @@ contract Item_3 is ItemStatus {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-                                                                // Add: CreditBatchSerialization   // Remove: itemNumber, serialNumber, comment
+                                                        
     address public productId;
     address public inventoryId;
-    string public serialNumber;
+    string public creditBatchSerialization;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
-    uint public itemNumber;
     uint public createdDate;
 
     /// @dev Events to add and remove members to this shard.
@@ -36,25 +34,17 @@ contract Item_3 is ItemStatus {
 
     constructor(
         address _productId,
-        // uint _uniqueProductCode,
         address _inventoryId,
-        string _serialNumber,
+        string _creditBatchSerialization,
         ItemStatus _status,
-        string _comment,
-        string[] _rawMaterialProductName,
-        string[] _rawMaterialSerialNumber,
-        string[] _rawMaterialProductId,
-        uint _itemNumber,
         uint _createdDate
     ) public {
         owner = tx.origin;
 
         productId = _productId;
         inventoryId = _inventoryId;
-        serialNumber = _serialNumber;
+        creditBatchSerialization = _creditBatchSerialization;
         status = _status;
-        comment = _comment;
-        itemNumber = _itemNumber;
         createdDate = _createdDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -74,7 +64,6 @@ contract Item_3 is ItemStatus {
 
     function update(
         ItemStatus _status,
-        string _comment,
         uint _scheme
     ) returns (uint) {
         if(ownerOrganization != getUserOrganization(tx.origin)){
@@ -87,9 +76,6 @@ contract Item_3 is ItemStatus {
 
         if ((_scheme & (1 << 0)) == (1 << 0)) {
             status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
         }
 
         return RestStatus.OK;

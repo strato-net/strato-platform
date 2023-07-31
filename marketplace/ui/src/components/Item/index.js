@@ -60,16 +60,16 @@ const Item = () => {
   }
 
   let columns = [
-    {
-      title: "Serial Number".toUpperCase(),
-      dataIndex: "serialNumber",
-      align: "center",
-    },
-    {
-      title: "Item Number".toUpperCase(),
-      dataIndex: "itemNumber",
-      align: "center",
-    },
+    // {
+    //   title: "Serial Number".toUpperCase(),
+    //   dataIndex: "serialNumber",
+    //   align: "center",
+    // },
+    // {
+    //   title: "Item Number".toUpperCase(),
+    //   dataIndex: "itemNumber",
+    //   align: "center",
+    // },
   ];
 
   useEffect(() => {

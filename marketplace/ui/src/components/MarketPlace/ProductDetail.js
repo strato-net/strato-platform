@@ -284,54 +284,54 @@ const ProductDetails = ({ user, users }) => {
   ];
 
   const ownershipColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      // Fixes UI issue of children having the same key
-      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            if (isEventSelected) setIsEventSelected(false);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   // Fixes UI issue of children having the same key
+    //   key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
+    //   align: "center",
+    //   onCell: (record) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsSerialNumberSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemOwnershipHistory(
+    //           itemDispatch,
+    //           record.address
+    //         );
+    //       },
+    //     };
+    //   },
+    //   render: (serialNumber) => (
+    //     <Button type="link" className="text-primary text-[17px]">
+    //       {serialNumber}
+    //     </Button>
+    //   ),
+    // },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+    //   dataIndex: "itemNumber",
+    //   key: "itemNumber",
+    //   align: "center",
+    //   onCell: (record, rowIndex) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsSerialNumberSelected(true);
+    //         if (isEventSelected) setIsEventSelected(false);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemOwnershipHistory(
+    //           itemDispatch,
+    //           record.address
+    //         );
+    //       },
+    //     };
+    //   },
+    //   render: (serialNumber) => (
+    //     <Button type="link" className="text-primary text-[17px]">
+    //       {serialNumber}
+    //     </Button>
+    //   ),
+    // },
   ];
 
   const eventDetailColumn = [
@@ -407,65 +407,65 @@ const ProductDetails = ({ user, users }) => {
   ];
 
   const transformationColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-        >
-          {text}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            if (isEventSelected) setIsEventSelected(false);
-            if (isSerialNumberSelected) setIsSerialNumberSelected(false);
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-          onClick={() => {
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   key: "serialNumber",
+    //   align: "center",
+    //   onCell: (record) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsTransformationSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemRawMaterials(
+    //           itemDispatch,
+    //           details.uniqueProductCode,
+    //           record.serialNumber
+    //         );
+    //       }
+    //     };
+    //   },
+    //   render: (text) => (
+    //     <Button
+    //       type="link"
+    //       className="text-primary text-[17px]"
+    //     >
+    //       {text}
+    //     </Button>
+    //   ),
+    // },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+    //   dataIndex: "itemNumber",
+    //   key: "itemNumber",
+    //   align: "center",
+    //   onCell: (record, rowIndex) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         if (isEventSelected) setIsEventSelected(false);
+    //         if (isSerialNumberSelected) setIsSerialNumberSelected(false);
+    //         setIsTransformationSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemRawMaterials(
+    //           itemDispatch,
+    //           details.uniqueProductCode,
+    //           record.serialNumber
+    //         );
+    //       }
+    //     };
+    //   },
+    //   render: (text) => (
+    //     <Button
+    //       type="link"
+    //       className="text-primary text-[17px]"
+    //       onClick={() => {
 
-          }}
-        >
-          {text}
-        </Button>
-      ),
-    },
+    //       }}
+    //     >
+    //       {text}
+    //     </Button>
+    //   ),
+    // },
   ];
 
 

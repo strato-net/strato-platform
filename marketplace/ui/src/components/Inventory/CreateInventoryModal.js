@@ -57,10 +57,7 @@ const CreateInventoryModal = ({
     quantity: null,
     pricePerUnit: "",
     vintage: null,
-    serialNumber: {
-      serialNumStr: "",
-      serialNumArr: [],
-    },
+    creditBatchSerialization: "Test123",
     status: true,
   };
 
@@ -68,17 +65,17 @@ const CreateInventoryModal = ({
     initialValues: initialValues,
     validationSchema: schema,
     onSubmit: function (values) {
-      if (
-        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
-        // Serial numbers are optional, we can submit the form if there are none. 
-        (values.serialNumber.serialNumArr.length === 0)
-      ) {
-        handleCreateFormSubmit(values);
-      } else {
-        setUploadErr(
-          "Quantity of items and number of serial numbers should be same"
-        );
-      }
+      // if (
+      //   (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
+      //   // Serial numbers are optional, we can submit the form if there are none. 
+      //   (values.serialNumber.serialNumArr.length === 0)
+      // ) {
+      handleCreateFormSubmit(values);
+      // } else {
+      //   setUploadErr(
+      //     "Quantity of items and number of serial numbers should be same"
+      //   );
+      // }
     },
     enableReinitialize: true,
   });
@@ -99,7 +96,7 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      serialNumber: values.serialNumber.serialNumArr,
+      creditBatchSerialization: "Test123",
     };
 
     let isDone = await actions.createInventory(dispatch, body);
@@ -384,7 +381,7 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             </div>
-            <div className="mt-4 flex justify-between items-center">
+            {/* <div className="mt-4 flex justify-between items-center">
               <div>Serial Numbers</div>
               <div className="flex items-center">
                 <Link to="/sample.csv" target="_blank" download>
@@ -409,8 +406,8 @@ const CreateInventoryModal = ({
                   </div>
                 </Upload>
               </div>
-            </div>
-            <Form.Item>
+            </div> */}
+            {/* <Form.Item>
               <TextArea
                 label="serialNumbers"
                 className="mt-2"
@@ -431,8 +428,7 @@ const CreateInventoryModal = ({
                     {getIn(formik.errors, "serialNumber.serialNumArr")}
                   </span>
                 )}
-            </Form.Item>
-
+            </Form.Item> */}
             <Form.Item label="Status" name="status" className="mt-4">
               <Radio.Group
                 value={formik.values.status}

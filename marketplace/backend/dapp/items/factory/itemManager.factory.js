@@ -6,19 +6,9 @@ const factory = {
         const args = {
             itemArgs: {
                 productId: '0000000000000000000000000000000000000000',
-                uniqueProductCode: parseInt(util.iuid()),
                 inventoryId: '0000000000000000000000000000000000000000',
-                itemObject: [...new Array(5)].map((d, i) => {
-                    return {
-                        serialNumber: uid + i,
-                        itemNumber: parseInt(util.iuid() + i),
-                        rawMaterialProductName: [`rawMaterialProductName_${uid + i}`],
-                        rawMaterialSerialNumber: [`rawMaterialSerialNumber_${uid + i}`],
-                        rawMaterialProductId: [`rawMaterialProductId_${uid + i}`]
-                    }
-                }),
+                creditBatchSerialization: uid + 1,
                 status: 2,
-                comment: `comment_${uid}`,
                 createdDate: new Date().getTime()
             }
         };
@@ -28,19 +18,9 @@ const factory = {
         const args = {
             itemArgs: {
                 productId:  '0000000000000000000000000000000000000000',
-                uniqueProductCode: parseInt(util.iuid()),
                 inventoryId:  '0000000000000000000000000000000000000000',
-                itemObject: [...new Array(5)].map((d, i) => {
-                    return {
-                        serialNumber: '',
-                        itemNumber: parseInt(util.iuid() + i),
-                        rawMaterialProductName: [],
-                        rawMaterialSerialNumber: [],
-                        rawMaterialProductId: []
-                    }
-                }),
+                creditBatchSerialization: '',
                 status: 2,
-                comment: `comment_${uid}`,
                 createdDate: new Date().getTime()
             }
         };
@@ -50,7 +30,6 @@ const factory = {
         const args = {
             itemsAddress: address,
             status: 1,
-            comment: `new_comment_${uid}`
         }
 
         return args

@@ -6,16 +6,10 @@ const factory = {
         const args = {
             itemArgs: {
                 productId: '0000000000000000000000000000000000000000',
-                uniqueProductCode: parseInt(util.iuid()),
                 inventoryId: '0000000000000000000000000000000000000000',
-                serialNumber: `serialNumber_${uid}`,
-                itemNumber: parseInt(util.iuid()),
+                creditBatchSerialization: `serialNumber_${uid}`,
                 status: 2,
-                comment: `comment_${uid}`,
                 createdDate: new Date().getTime(),
-                rawMaterialProductName: [`rawMaterialProductName_${uid}`],
-                rawMaterialSerialNumber: [`rawMaterialSerialNumber_${uid}`],
-                rawMaterialProductId: [`rawMaterialProductId_${uid}`]
             }
         };
         return args;
@@ -25,7 +19,6 @@ const factory = {
             itemAddress: address,
             updates: {
                 status: 1,
-                comment: `comment_${uid}`
             }
         }
 

@@ -132,9 +132,8 @@ class ItemController {
       itemArgs: Joi.object({
         productId: Joi.string().required(),
         inventoryId: Joi.string().required(),
-        serialNumber: Joi.string().required(),
+        creditBatchSerialization: Joi.string().required(),
         status: Joi.number().integer().min(1).max(4).required(),
-        comment: Joi.string().required()
       })
     });
 
@@ -166,7 +165,6 @@ class ItemController {
       itemAddress: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().integer().min(1).max(4),
-        comment: Joi.string()
       }).required()
     });
 

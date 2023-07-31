@@ -129,11 +129,9 @@ definitions:
             type: string
           inventoryId:
             type: string
-          serialNumber:
+          creditBatchSerialization:
             type: string
           status:
-            type: string
-          comment:
             type: string
           createdAt:
             type: string
@@ -151,11 +149,9 @@ definitions:
             type: string
           inventoryId:
             type: string
-          serialNumber:
+          creditBatchSerialization:
             type: string
           status:
-            type: string
-          comment:
             type: string
           createdAt:
             type: string
