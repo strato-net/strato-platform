@@ -25,6 +25,4 @@ defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transact
 defineFlag "hydrogenIdServer" ("http://172.17.0.1:8014" :: String) "The URL of the identity server"
 defineFlag "identityServerUrl" ("" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
 defineFlag "network" ("mercata-hydrogen" :: String) "The network we are using"
-defineFlag "nodeHost" ("http://localhost:8080" :: String) "The marketplace url"
-defineFlag "ssl" (False :: Bool) "Whether or not to add https or http to the nodeHost"
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"

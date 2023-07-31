@@ -232,7 +232,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         runSQLM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:" <> flags_vaultProxyPort <> "/strato/v2.3" ) . 
-        runIdentitytM getIdServerUrl getNodeUrl $ f
+        runIdentitytM getIdServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -309,12 +309,6 @@ instance ToSchema Value where
 -----------
 
 --Simple helper functions
-
-getNodeUrl :: String
-getNodeUrl = if flags_nodeHost == "http://localhost:8080"
-  then  "http://localhost:8080"
-  else (if flags_ssl then "https://"<> flags_nodeHost else "http://"<> flags_nodeHost)
-
 getIdServerUrl ::  String
 getIdServerUrl = if flags_identityServerUrl == "" 
       then (case flags_network  of  

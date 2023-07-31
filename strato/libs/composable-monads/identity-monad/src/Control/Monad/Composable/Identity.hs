@@ -18,8 +18,7 @@ import           Servant.Client
 data IdentityData =
   IdentityData {
     urlIdentityServer :: BaseUrl,
-    httpManager' :: Manager,
-    urlNode      :: String
+    httpManager' :: Manager 
   }
 
 
@@ -27,12 +26,10 @@ type IdentityM = ReaderT IdentityData
 
 type HasIdentity m = Accessible IdentityData m
 
-runIdentitytM :: MonadIO m => String -> String -> IdentityM m a -> m a
-runIdentitytM urlIdentity urlNode' f = do
+runIdentitytM :: MonadIO m => String -> IdentityM m a -> m a
+runIdentitytM urlIdentity f = do
   identityUrl <- liftIO $ parseBaseUrl urlIdentity
   mgr <- liftIO $ case baseUrlScheme identityUrl of
         Http -> newManager defaultManagerSettings
         Https -> newManager tlsManagerSettings 
-  
-
-  runReaderT f $ IdentityData identityUrl mgr urlNode'
+  runReaderT f $ IdentityData identityUrl mgr

@@ -37,12 +37,11 @@ type API =  "identity"
           :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
           :>  PostRedirect 301 String
 
-redirect :: (ToHttpApiData String, MonadIO m, MonadLogger m, HasIdentity m)
+redirect :: ( MonadIO m, MonadLogger m, HasIdentity m)
     => Text ->  m (Headers '[Header "Location" String] Address)
 redirect accessToken = do
-  IdentityData _ _ nodeUrl <- access Proxy
   address <- getUserAddress accessToken
-  return $ addHeader nodeUrl address
+  return $ addHeader "/" address
 
 server :: (MonadIO m, MonadLogger m, HasIdentity m) => ServerT API m
 server =  return =<< redirect 
@@ -51,7 +50,7 @@ identitytWrapper :: (MonadIO m, MonadLogger m, HasIdentity m, HasCallStack) =>
                     ClientM x -> m x
 identitytWrapper client' = do
   logInfoCS callStack "Calling Identity Server"
-  IdentityData url mgr _ <- access Proxy
+  IdentityData url mgr <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (mkClientEnv mgr url)-- Todo make a better error statement
   either (blocError . IdentitytWrapperError) return resultEither
