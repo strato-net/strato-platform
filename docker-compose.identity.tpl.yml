@@ -11,9 +11,6 @@ services:
     - identityProviderPort=${identityProviderPort}
     - vaultProxyUrl=${vaultProxyUrl}
     - nodeUrl=${nodeUrl}
-    - OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}
-    - OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}
-    - OAUTH_USER_ENDPOINT=${OAUTH_USER_ENDPOINT}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
@@ -37,6 +34,8 @@ services:
     depends_on:
     - identity-provider
     environment:
+    # TODO: investigate why these are needed (referenced in docker-run.sh to update lua template
+    # ...but what is nginx using these vaules for??)
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
