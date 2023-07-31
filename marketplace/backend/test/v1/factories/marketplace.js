@@ -28,7 +28,7 @@ export const inventoryArgs = (address, uid) => {
         quantity,
         productAddress: address,
         pricePerUnit: uid,
-        vintage: 0,
+        vintage: 2000,
         status: 1,
         serialNumber: [
             {

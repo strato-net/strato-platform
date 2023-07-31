@@ -6,7 +6,7 @@ const factory = {
             category: 'Carbon',
             quantity: 3,
             pricePerUnit: uid,
-            vintage: 0,
+            vintage: 2000,
             status: 2,
             createdDate: new Date().getTime(),
             owner: userAddress

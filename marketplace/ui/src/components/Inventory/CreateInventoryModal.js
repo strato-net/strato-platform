@@ -341,27 +341,6 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
               <Form.Item
-                label="Vintage"
-                name="vintage"
-                className="w-72"
-              >
-                <Input
-                  label="vintage"
-                  placeholder="Enter Vintage"
-                  name="vintage"
-                  value={formik.values.vintage}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.vintage &&
-                  formik.errors.vintage && (
-                    <span className="text-error text-xs">
-                      {formik.errors.vintage}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
-              <Form.Item
                 label="Price Per Unit"
                 name="pricePerUnit "
                 className="w-72"
@@ -381,6 +360,29 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             </div>
+            { formik.values.category.name === "Carbon"  && 
+              <div className="flex justify-between mt-4 ">
+                <Form.Item
+                  label="Vintage"
+                  name="vintage"
+                  className="w-72"
+                >
+                  <Input
+                    label="vintage"
+                    placeholder="Enter Vintage"
+                    name="vintage"
+                    value={formik.values.vintage}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.vintage &&
+                    formik.errors.vintage && (
+                      <span className="text-error text-xs">
+                        {formik.errors.vintage}
+                      </span>
+                    )}
+                </Form.Item>
+              </div>
+            }
             {/* <div className="mt-4 flex justify-between items-center">
               <div>Serial Numbers</div>
               <div className="flex items-center">

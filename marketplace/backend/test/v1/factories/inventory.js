@@ -4,7 +4,7 @@ export const inventoryArgs = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: 20,
-    vintage: 0,
+    vintage: 2000,
     status: 1,
     serialNumber: [ 
       {
@@ -78,7 +78,7 @@ export const inventoryArgsWithNoSN = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: 20,
-    vintage: 0,
+    vintage: 2000,
     status: 1,
     serialNumber: []
   }
@@ -91,7 +91,7 @@ export const newInventoryArgs = (address, uid) => {
     quantity,
     productAddress: address,
     pricePerUnit: uid,
-    vintage: 0,
+    vintage: 2000,
     status: 1,
     serialNumber: [
       {
