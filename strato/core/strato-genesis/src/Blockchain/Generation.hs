@@ -841,39 +841,40 @@ contract UserRegistry {
         owner = msg.sender;
     }
 
-    function createUser(string _commonName, address _userAddress, address _certificateAddress) public { 
+    function createUser(string _commonName, address _userAddress, address _certificateAddress) public returns (address) { 
         require((msg.sender == owner), "You don't have permission to use this function!");
-
-        new User{salt: _commonName}(_commonName, _userAddress, _certificateAddress);
+        User newUser = new User{salt: _commonName}(_commonName, _certificateAddress);
+        return address(newUser);
     }
 }
 
 contract User {
     address public owner; // UserRegistry Contract
 
-    mapping (address => address) userCertificates;
+    address[] userCertificates;
     string public commonName;
 
-    constructor(string _commonName, address _userAddress, address _certificateAddress) {
+    constructor(string _commonName, address _certificateAddress) {
         owner = msg.sender;
         commonName = _commonName;
-        userCertificates[_userAddress] = _certificateAddress;
+        userCertificates.push(_certificateAddress);
     }
 
     function addCertificate(address _userAddress, address _certificateAddress) public {
+        // Only UserRegistry can add new certificates.
         require((msg.sender == owner), "You don't have permission to use this function!");
         
-        userCertificates[_userAddress] = _certificateAddress;
+        userCertificates.push(_certificateAddress);
     }
 
-    function callContract(address contractToCall, string functionName, ...args) public {
-        address certificateAddress = userCertificates[msg.sender];
+    function callContract(address contractToCall, string functionName, string args) public {
+        address certificateAddress = userCertificates[0];
         Certificate certificate = CertificateRegistry(address(0x509)).getCertByAddress(certificateAddress);
-        string certCommonName = certificate.commonName();
+        address certUserAddress = address(certificate.userAddress());
         
-        require((commonName == certCommonName), "You don't have permission to use this function!");
+        require((msg.sender == certUserAddress), "You don't have permission to use this function!");
 
-        contractToCall.call(functionName, ...args);
+        // contractToCall.call(functionName, args);
     }
 } 
 |]
