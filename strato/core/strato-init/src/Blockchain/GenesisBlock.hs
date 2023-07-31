@@ -49,6 +49,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Generation                       ( insertCertRegistryContract
                                                              , insertMercataGovernanceContract
+                                                             , insertUserRegistryContract
                                                              , readCertsFromGenesisInfo
                                                              , readValidatorsFromGenesisInfo
                                                              )
@@ -109,7 +110,8 @@ buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] 
 buildGenesisInfo extraFaucets extraCerts validators admins gi =
   let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertMercataGovernanceContract validators admins
+   in insertUserRegistryContract
+      . insertMercataGovernanceContract validators admins
       . insertCertRegistryContract extraCerts
       $ gi{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
