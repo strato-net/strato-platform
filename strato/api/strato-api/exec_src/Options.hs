@@ -22,7 +22,7 @@ defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhanceme
 defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions an account can make"
 defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
-defineFlag "hydrogenIdServer" ("http://localhost:8014" :: String) "The URL of the identity server"
+defineFlag "hydrogenIdServer" ("http://172.17.0.1:8014" :: String) "The URL of the identity server"
 defineFlag "identityServerUrl" ("" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
 defineFlag "network" ("mercata-hydrogen" :: String) "The network we are using"
 defineFlag "nodeHost" ("http://localhost:8080" :: String) "The marketplace url"
