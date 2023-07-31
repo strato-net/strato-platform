@@ -6,7 +6,8 @@
 
 module SolidVM.CodeCollectionTools (
   xabiToContract,
-  applyInheritance,
+  applyInheritanceNoFunctions,
+  applyInheritanceFunctions,
   resolveLabels
   ) where
 
@@ -72,16 +73,22 @@ validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
                   )
 -}
 
-applyInheritance :: CodeCollection -> SolidEither CodeCollection
-applyInheritance cc = do
+applyInheritanceNoFunctions :: CodeCollection -> SolidEither CodeCollection
+applyInheritanceNoFunctions cc = do
   ccs <- traverse (addInheritedObjects cc) $ cc^.contracts
+  pure $ cc{
+    _contracts = ccs
+  }
+
+applyInheritanceFunctions :: CodeCollection -> SolidEither CodeCollection
+applyInheritanceFunctions cc = do
+  ccs <- traverse (addInheritedFunctions cc) $ cc^.contracts
   pure $ cc{
     _contracts = ccs
   }
 
 addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
-  fu <- toUnionMaker _functions cc c
   sd <- toUnionMaker _storageDefs cc c
   ud <- toUnionMaker _userDefined cc c
   en <- toUnionMaker _enums cc c
@@ -90,7 +97,6 @@ addInheritedObjects cc c = do
   co <- toUnionMaker _constants cc c
   mo <- toUnionMaker _modifiers cc c
   pure $ c{
-  _functions=fu,
   _storageDefs=sd,
   _userDefined =ud,
   _enums=en,
@@ -98,6 +104,13 @@ addInheritedObjects cc c = do
   _events = ev,
   _constants=co,
   _modifiers=mo
+  }
+
+addInheritedFunctions :: CodeCollection -> Contract -> SolidEither Contract
+addInheritedFunctions cc c = do
+  fu <- toUnionMaker _functions cc c
+  pure $ c{
+  _functions=fu
   }
 
 toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)

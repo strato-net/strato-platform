@@ -508,7 +508,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
           Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
         where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False []
+          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing False Nothing M.empty [] dummyAnnotation False []
           dummyAnnotation :: SourceAnnotation ()
           dummyAnnotation =
             SourceAnnotation

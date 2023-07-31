@@ -205,6 +205,13 @@ unparseFuncDeep deepName Func{..} =
         Just Internal -> "internal "
         Just External -> "external "
         _ -> ""
+    <> if _funcVirtual
+         then "virtual "
+         else ""
+    <> case _funcOverrides of
+         Nothing -> ""
+         Just [] -> "override "
+         Just xs -> "override(" <> Text.intercalate ", " (map labelToText xs) <> ") "
     <> case _funcModifiers of
         [] -> ""
         xs ->

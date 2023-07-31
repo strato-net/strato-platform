@@ -163,9 +163,9 @@ compileSourceNoInheritance initCodeMap = do
 --- Don't typecheck in Slipstream!!!
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
-  let applyInheritanceE = first SVMEx . applyInheritance
+  let applyInheritanceE = first SVMEx . applyInheritanceNoFunctions
   case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
-    Right cc | typeCheck -> O.detector <$> typeCheckDetector cc
+    Right cc | typeCheck -> first SVMEx . applyInheritanceFunctions =<< (O.detector <$> typeCheckDetector cc)
              | otherwise                 -> Right cc
     Left x -> Left x
     where
