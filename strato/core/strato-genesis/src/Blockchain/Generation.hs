@@ -14,6 +14,7 @@ module Blockchain.Generation (
   insertContractsJSONHashMaps,
   insertContracts,
   insertCertRegistryContract,
+  insertUserRegistryContract,
   insertMercataGovernanceContract,
   readCertsFromGenesisInfo,
   readValidatorsFromGenesisInfo,
@@ -829,3 +830,76 @@ contract MercataGovernance {
         }
     }
 }|]
+
+userRegistryContract :: Text
+userRegistryContract = [r|
+contract UserRegistry {
+    // The UserRegistry is responsible for creating User contracts for each user.
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createUser(string _commonName, address _userAddress, address _certificateAddress) public { 
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        new User{salt: _commonName}(_commonName, _userAddress, _certificateAddress);
+    }
+}
+
+contract User {
+    address public owner; // UserRegistry Contract
+
+    mapping (address => address) userCertificates;
+    string public commonName;
+
+    constructor(string _commonName, address _userAddress, address _certificateAddress) {
+        owner = msg.sender;
+        commonName = _commonName;
+        userCertificates[_userAddress] = _certificateAddress;
+    }
+
+    function addCertificate(address _userAddress, address _certificateAddress) public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+        
+        userCertificates[_userAddress] = _certificateAddress;
+    }
+
+    function callContract(address contractToCall, string functionName, ...args) public {
+        address certificateAddress = userCertificates[msg.sender];
+        Certificate certificate = CertificateRegistry(address(0x509)).getCertByAddress(certificateAddress);
+        string certCommonName = certificate.commonName();
+        
+        require((commonName == certCommonName), "You don't have permission to use this function!");
+
+        contractToCall.call(functionName, ...args);
+    }
+} 
+|]
+
+-- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
+insertUserRegistryContract :: GenesisInfo -> GenesisInfo
+insertUserRegistryContract gi =
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
+    where 
+        initialAccounts = genesisInfoAccountInfo gi
+        initialCode     = genesisInfoCodeInfo gi
+
+        rlpWrap         = rlpSerialize . rlpEncode
+        contractSrc     = certificateRegistryContract <> "\n\n" <> userRegistryContract
+        encodedRegistry = encodeUtf8 contractSrc
+
+        rootAddress'    = fromPublicKey rootPubKey
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
+        rootSub         = fromJust $ getCertSubject rootCert
+        rootAcct = SolidVMContractWithStorage 0x420 420
+            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
+            ]
+
+        registryAcct = SolidVMContractWithStorage 0x720 720
+            (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
+            [(".owner", rootAddress)]
