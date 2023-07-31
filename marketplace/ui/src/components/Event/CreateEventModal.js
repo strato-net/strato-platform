@@ -19,7 +19,6 @@ import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//subcategories
 
 //product
 import { actions as productActions } from "../../contexts/product/actions";

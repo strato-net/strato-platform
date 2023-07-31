@@ -33,7 +33,6 @@ const { Text } = Typography;
 const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
@@ -96,7 +95,6 @@ const CategoryProductList = ({ user }) => {
         actions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           debouncedMinQty,
           debouncedMaxQty,
@@ -107,7 +105,6 @@ const CategoryProductList = ({ user }) => {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           debouncedMinQty,
           debouncedMaxQty,
@@ -118,7 +115,6 @@ const CategoryProductList = ({ user }) => {
   }, [
     marketplaceDispatch,
     selectedCategories,
-    selectedSubCategories,
     selectedProducts,
     debouncedMinQty,
     debouncedMaxQty,
@@ -132,7 +128,6 @@ const CategoryProductList = ({ user }) => {
   //=========================Other functions===============================//
 
   const clearSelection = () => {
-    setSelectedSubCategories([]);
     setSelectedProducts([]);
   };
 
