@@ -13,12 +13,6 @@ import CategoryProductCard from "./CategoryProductCard";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useEffect, useState } from "react";
-//sub-categories
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
 //Marketplace
 import { actions } from "../../contexts/marketplace/actions";
 import {
@@ -38,11 +32,8 @@ const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
-  const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
-  const [selectedBrands, setSelectedBrands] = useState([]);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
   const [maxQty, setMaxQty] = useState(MAX_QUANTITY);
@@ -83,33 +74,19 @@ const CategoryProductList = ({ user }) => {
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
-  //=========================Sub-categories===============================//
-
-  const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys } = useSubCategoryState();
 
   useEffect(() => {
     let categorys = null;
     if (selectedCategories.length) {
       categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [subCategoryDispatch, selectedCategories]);
-
-  const onChangeSubCategory = (e) => {
-    let valuesChecked = checkValues(e, selectedSubCategories)
-    setSelectedSubCategories(valuesChecked);
-  };
+  }, [selectedCategories]);
 
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
   };
 
-  const onChangeBrand = (e) => {
-    let valuesChecked = checkValues(e, selectedBrands)
-    setSelectedBrands(valuesChecked);
-  };
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
@@ -118,9 +95,7 @@ const CategoryProductList = ({ user }) => {
         actions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
           debouncedMinQty,
           debouncedMaxQty,
           debouncedMinPrice,
@@ -130,9 +105,7 @@ const CategoryProductList = ({ user }) => {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
           debouncedMinQty,
           debouncedMaxQty,
           debouncedMinPrice,
@@ -142,9 +115,7 @@ const CategoryProductList = ({ user }) => {
   }, [
     marketplaceDispatch,
     selectedCategories,
-    selectedSubCategories,
     selectedProducts,
-    selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
     debouncedMinPrice,
@@ -154,24 +125,10 @@ const CategoryProductList = ({ user }) => {
     isAuthenticated,
   ]);
 
-  //============================Manufacturers/Brands=============================//
-  useEffect(() => {
-    if (marketplaceList.length > 0) {
-      var uniqueBrands =
-        marketplaceList.map((p) => p.manufacturer)
-          .filter(
-            (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
-          );
-      setBrands(uniqueBrands);
-    }
-  }, [marketplaceList]);
-
   //=========================Other functions===============================//
 
   const clearSelection = () => {
-    setSelectedSubCategories([]);
     setSelectedProducts([]);
-    setSelectedBrands([]);
   };
 
   //=============================================================================//
@@ -288,36 +245,6 @@ const CategoryProductList = ({ user }) => {
             </Collapse>
             <Divider className="m-0" />
 
-            {/* Panel - SubCategory */}
-            {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      // onChange={onChangeSubCategory}
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {subCategorys.map((subcategory, index) => (
-                          <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                            {subcategory.name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
-
             {/* Panel - Product */}
             {marketplaceList.length > 0 && (
               <>
@@ -347,36 +274,6 @@ const CategoryProductList = ({ user }) => {
                 <Divider className="m-0" />
               </>
             )}
-
-            {/* Panel - Manufacturer/Brand */}
-            {brands.length > 0 && marketplaceList.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Brand</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedBrands}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {brands.map((brand, index) => (
-                          <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
-                            {decodeURIComponent(brand)}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
-            <div className="pb-24"></div>
           </div>
         </div>
 

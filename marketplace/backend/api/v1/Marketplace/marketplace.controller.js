@@ -12,10 +12,6 @@ class MarketplaceController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-      if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
-      }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
       const productsWithImageUrl = inventories
@@ -35,10 +31,6 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       
-      if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
-      }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
       const productsWithImageUrl = inventories

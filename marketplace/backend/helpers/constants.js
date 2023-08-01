@@ -43,16 +43,6 @@ export const STRIPE_ENV = {
 }
 Object.freeze(STRIPE_ENV)
 
-export const unitOfMeasurement = {}
-unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
-unitOfMeasurement[unitOfMeasurement['OZ'] = 2] = 'OZ';
-unitOfMeasurement[unitOfMeasurement['TON'] = 3] = 'TON';
-unitOfMeasurement[unitOfMeasurement['BAG'] = 4] = 'BAG';
-unitOfMeasurement[unitOfMeasurement['BOX'] = 5] = 'BOX';
-unitOfMeasurement[unitOfMeasurement['PIECE'] = 6] = 'PIECE';
-Object.freeze(unitOfMeasurement)
-
-
 export const inventoryStatus = {}
 inventoryStatus[inventoryStatus['PUBLISHED'] = 1] = 'PUBLISHED';
 inventoryStatus[inventoryStatus['UNPUBLISHED'] = 2] = 'UNPUBLISHED';

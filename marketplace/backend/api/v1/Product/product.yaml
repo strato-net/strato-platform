@@ -129,14 +129,6 @@ definitions:
             type: string
           description:
             type: string
-          manufacturer:
-            type: string
-          unitOfMeasurement:
-            type: string
-          uniqueProductCode:
-            type: string
-          leastSellableUnit:
-            type: number
           imageUrl:
             type: string
           fileHash:
@@ -144,8 +136,6 @@ definitions:
           isActive:
             type: boolean
           category:
-            type: string
-          subCategory:
             type: string
           createdAt:
             type: string
@@ -163,14 +153,6 @@ definitions:
             type: string
           description:
             type: string
-          manufacturer:
-            type: string
-          unitOfMeasurement:
-            type: string
-          uniqueProductCode:
-            type: string
-          leastSellableUnit:
-            type: number
           imageUrl:
             type: string
           fileHash:
@@ -178,8 +160,6 @@ definitions:
           isActive:
             type: boolean
           category:
-            type: string
-          subCategory:
             type: string
           createdAt:
             type: string

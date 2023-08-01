@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Modal, Tabs,Button } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
@@ -141,36 +140,6 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
 const Description = ({ data }) => {
   return (
     <div>
-      <div className="flex items-center">
-        <p className="text-primaryC text-sm w-44">Universal Product Code</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{data.uniqueProductCode}</p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Manufacturer</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{decodeURIComponent(data.manufacturer)}</p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Unit of Measurement</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {UNIT_OF_MEASUREMENTS[data.unitOfMeasurement]}
-        </p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Least Sellable Unit</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{data.leastSellableUnit}</p>
-      </div>
     </div>
   );
 };

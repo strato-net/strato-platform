@@ -137,7 +137,6 @@ const BoughtOrderDetails = ({ user, users }) => {
           key: prod.address,
           productImage: prod.imageUrl,
           productName: prod.productName,
-          manufacturer: prod.manufacturer,
           unitPrice: prod.pricePerUnit,
           quantity: prod.quantity,
           shippingCharges: prod.shippingCharges,
@@ -238,13 +237,6 @@ const BoughtOrderDetails = ({ user, users }) => {
           </p>
         </div>
       ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
-      dataIndex: "manufacturer",
-      key: "manufacturer",
-      align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,

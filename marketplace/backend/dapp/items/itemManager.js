@@ -57,16 +57,10 @@ function marshalIn(_args) {
         productId: '',
         inventoryId: '',
         status: 1,
-        comment: '',
         createdDate: 0,
         uniqueProductCode: '',
-        itemObject: {
-            itemNumber: 0,
-            serialNumber: '',
-            rawMaterialProductName: [''],
-            rawMaterialProductId: [''],
-            rawMaterialSerialNumber: ['']
-        }
+        creditBatchSerialization: '',
+        quantity: 0
     };
 
     const args = {
@@ -184,8 +178,6 @@ async function updateItem(admin, contract, _args, baseOptions) {
         switch (key) {
             case 'status':
                 return agg | (base << 0)
-            case 'comment':
-                return agg | (base << 1)
             default:
                 return agg
         }

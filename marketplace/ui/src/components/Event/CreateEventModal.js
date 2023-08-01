@@ -19,7 +19,6 @@ import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//subcategories
 
 //product
 import { actions as productActions } from "../../contexts/product/actions";
@@ -40,9 +39,6 @@ const EventSchema = () => {
   return yup.object().shape({
     category: yup.object().shape({
       name: yup.string().required("Category is required").nullable(),
-    }),
-    subCategory: yup.object().shape({
-      name: yup.string().required("Sub-Category is required").nullable(),
     }),
     product: yup.object().shape({
       name: yup.string().required("Product Name is required").nullable(),
@@ -106,10 +102,6 @@ const CreateEventModal = ({
         name: null,
         address: null,
       },
-      subCategory: {
-        name: null,
-        address: "",
-      },
       product: {
         name: null,
         address: "",
@@ -148,10 +140,10 @@ const CreateEventModal = ({
       summary: encodeURIComponent(values.summary),
       serialNumbers: values.serialNumber.serialNumArr
     };
-   
+
     let isDone = await actions.createEvent(dispatch, body);
     if (isDone) {
-      eventActions.fetchEvent(dispatch, 10, 0, debouncedEventSearchTerm,organization);
+      eventActions.fetchEvent(dispatch, 10, 0, debouncedEventSearchTerm, organization);
       toggleCreateEventModal(false);
     }
   };
@@ -161,16 +153,13 @@ const CreateEventModal = ({
   }, [categoryDispatch]);
 
   useEffect(() => {
-    if(formik.values.subCategory){
-      productActions.fetchCategoryBasedProduct(
-        productDispatch,
-        formik.values.category.name,
-        formik.values.subCategory.name ?? null
-      );
-    }
+    productActions.fetchCategoryBasedProduct(
+      productDispatch,
+      formik.values.category.name,
+    );
   }, [
     productDispatch,
-    formik.values.subCategory,
+    formik.values.category.name,
   ]);
 
   useEffect(() => {
@@ -202,7 +191,7 @@ const CreateEventModal = ({
         serialNumArr = [];
       for (let i = 0; i < contents.data.length; i++) {
         const row = contents.data[i];
-        if(row["ItemSerialNumber"]){
+        if (row["ItemSerialNumber"]) {
           serialNumArr.push(row["ItemSerialNumber"]);
           serialNumbers += row["ItemSerialNumber"] + ",";
         }
@@ -246,7 +235,7 @@ const CreateEventModal = ({
               disabled={isCreateEventSubmitting}
             >
               {isCreateEventSubmitting ? <Spin /> : "Add Event"}
-              
+
             </Button>
           </Row>,
         ]}
@@ -271,7 +260,6 @@ const CreateEventModal = ({
                     value={formik.values.category.name}
                     onChange={(value) => {
                       formik.setFieldValue("category.name", value);
-                      formik.setFieldValue("subCategory.name", null);
                       formik.setFieldValue("productName.name", null);
                     }}
                   >
@@ -285,40 +273,6 @@ const CreateEventModal = ({
                     getIn(formik.errors, "category.name") && (
                       <span className="text-error text-xs">
                         {getIn(formik.errors, "category.name")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item
-                  label="Sub Category"
-                  name="subCategory"
-                  className="w-72"
-                >
-                  <Select
-                    id="subCategory"
-                    placeholder="Select Sub Category"
-                    allowClear
-                    showSearch
-                    name="subCategory.name"
-                    disabled={false}
-                    loading={iscategorysLoading}
-                    value={formik.values.subCategory.name}
-                    onChange={(value) => {
-                      formik.setFieldValue("subCategory.name", value);
-                      formik.setFieldTouched("subCategory.name", false, false);
-                    }}
-                  >
-                    {categorys.map((category) =>
-                      category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                        <Option value={e.name} key={index}>
-                          {e.name}
-                        </Option>
-                      )) : null
-                    )}
-                  </Select>
-                  {getIn(formik.touched, "subCategory.name") &&
-                    getIn(formik.errors, "subCategory.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "subCategory.name")}
                       </span>
                     )}
                 </Form.Item>
@@ -338,8 +292,7 @@ const CreateEventModal = ({
                     value={formik.values.product.name}
                     loading={isCategoryBasedProductsLoading}
                     disabled={
-                      !formik.values.category ||
-                      !formik.values.subCategory || isCategoryBasedProductsLoading
+                      !formik.values.category || isCategoryBasedProductsLoading
                     }
                     onChange={(value) => {
                       let selectedProduct = { address: "" };

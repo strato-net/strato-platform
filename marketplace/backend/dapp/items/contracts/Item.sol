@@ -9,13 +9,12 @@ contract Item_3 is ItemStatus {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-
+                                                        
     address public productId;
     address public inventoryId;
-    string public serialNumber;
+    string public creditBatchSerialization;
+    int public quantity;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
-    uint public itemNumber;
     uint public createdDate;
 
     /// @dev Events to add and remove members to this shard.
@@ -36,25 +35,19 @@ contract Item_3 is ItemStatus {
 
     constructor(
         address _productId,
-        uint _uniqueProductCode,
         address _inventoryId,
-        string _serialNumber,
+        string _creditBatchSerialization,
+        int _quantity,
         ItemStatus _status,
-        string _comment,
-        string[] _rawMaterialProductName,
-        string[] _rawMaterialSerialNumber,
-        string[] _rawMaterialProductId,
-        uint _itemNumber,
         uint _createdDate
     ) public {
         owner = tx.origin;
 
         productId = _productId;
         inventoryId = _inventoryId;
-        serialNumber = _serialNumber;
+        creditBatchSerialization = _creditBatchSerialization;
+        quantity = _quantity;
         status = _status;
-        comment = _comment;
-        itemNumber = _itemNumber;
         createdDate = _createdDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -62,19 +55,18 @@ contract Item_3 is ItemStatus {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        if (_rawMaterialSerialNumber.length > 0) {
-            addRawMaterials(
-                _uniqueProductCode,
-                _rawMaterialProductName,
-                _rawMaterialSerialNumber,
-                _rawMaterialProductId
-            );
-        }
+        // if (_rawMaterialSerialNumber.length > 0) {
+        //     addRawMaterials(
+        //         _uniqueProductCode,
+        //         _rawMaterialProductName,
+        //         _rawMaterialSerialNumber,
+        //         _rawMaterialProductId
+        //     );
+        // }
     }
 
     function update(
         ItemStatus _status,
-        string _comment,
         uint _scheme
     ) returns (uint) {
         if(ownerOrganization != getUserOrganization(tx.origin)){
@@ -87,9 +79,6 @@ contract Item_3 is ItemStatus {
 
         if ((_scheme & (1 << 0)) == (1 << 0)) {
             status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
         }
 
         return RestStatus.OK;
@@ -163,40 +152,40 @@ contract Item_3 is ItemStatus {
     }
 
     // Add the raw material for the item
-    function addRawMaterial(
-        uint _uniqueProductCode,
-        string _rawMaterialProductName,
-        string _rawMaterialSerialNumber,
-        string _rawMaterialProductId
-    ) public returns (uint256) {
-        RawMaterial_3 rawMaterial = new RawMaterial_3(
-            serialNumber,
-            _rawMaterialSerialNumber,
-            _rawMaterialProductName,
-            _uniqueProductCode,
-            _rawMaterialProductId,
-            createdDate
-        );
-        return RestStatus.OK;
-    }
+    // function addRawMaterial(
+    //     uint _uniqueProductCode,
+    //     string _rawMaterialProductName,
+    //     string _rawMaterialSerialNumber,
+    //     string _rawMaterialProductId
+    // ) public returns (uint256) {
+    //     RawMaterial_3 rawMaterial = new RawMaterial_3(
+    //         serialNumber,
+    //         _rawMaterialSerialNumber,
+    //         _rawMaterialProductName,
+    //         _uniqueProductCode,
+    //         _rawMaterialProductId,
+    //         createdDate
+    //     );
+    //     return RestStatus.OK;
+    // }
 
     // Add the raw materials for the item
-    function addRawMaterials(
-        uint _uniqueProductCode,
-        string[] _rawMaterialProductName,
-        string[] _rawMaterialSerialNumber,
-        string[] _rawMaterialProductId
-    ) public returns (uint256) {
-        for (uint256 i = 0; i < _rawMaterialProductName.length; i++) {
-            addRawMaterial(
-                _uniqueProductCode,
-                _rawMaterialProductName[i],
-                _rawMaterialSerialNumber[i],
-                _rawMaterialProductId[i]
-            );
-        }
-        return RestStatus.OK;
-    }
+    // function addRawMaterials(
+    //     uint _uniqueProductCode,
+    //     string[] _rawMaterialProductName,
+    //     string[] _rawMaterialSerialNumber,
+    //     string[] _rawMaterialProductId
+    // ) public returns (uint256) {
+    //     for (uint256 i = 0; i < _rawMaterialProductName.length; i++) {
+    //         addRawMaterial(
+    //             _uniqueProductCode,
+    //             _rawMaterialProductName[i],
+    //             _rawMaterialSerialNumber[i],
+    //             _rawMaterialProductId[i]
+    //         );
+    //     }
+    //     return RestStatus.OK;
+    // }
 
     // ------------------- ASSET SHARD MEMBERSHIP FUNCTIONS ---------------
 

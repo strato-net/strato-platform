@@ -30,7 +30,6 @@ const options = {
   apis: [
     "./api/v1/users/users.yaml",
     './api/v1/Category/category.yaml',
-    './api/v1/SubCategory/subCategory.yaml',
     './api/v1/Product/product.yaml',
     './api/v1/Inventory/inventory.yaml',
     './api/v1/Item/item.yaml',

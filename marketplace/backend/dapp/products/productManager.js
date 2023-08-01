@@ -159,8 +159,6 @@ async function updateProduct(admin, contract, _args, baseOptions) {
         return agg | (base << 1);
       case "isActive":
         return agg | (base << 2);
-      case "userUniqueProductCode":
-        return agg | (base << 3);
       default:
         return agg;
     }
@@ -354,7 +352,7 @@ async function getInventories(admin, contract, args = {}, options) {
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
-        const { category, subCategory, ...newInventory } = inventory;
+        const { category, ...newInventory } = inventory;
         return {
           ...products.find((product) => product.address == inventory.productId),
           ...newInventory,

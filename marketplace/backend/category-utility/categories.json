@@ -2,36 +2,15 @@
     "categories": [
         {
             "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Carbon",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Carbon Credit"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Real Estate",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "House"
-                },
-                {
-                    "name": "Apartment"
-                },
-                {
-                    "name": "Townhouse"
-                }
-            ]
+            "imageKey": ""
         }
     ]
 }

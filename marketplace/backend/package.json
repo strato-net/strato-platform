@@ -19,7 +19,6 @@
     "test:payment": "yarn mocha-babel dapp/payments/test -b",
     "test:rawMaterial": "yarn mocha-babel dapp/items/rawMaterials/test -b",
     "test:api:category": "yarn mocha-babel test/v1/category.test.js -b",
-    "test:api:subCategory": "yarn mocha-babel test/v1/subCategory.test.js -b",
     "test:api:product": "yarn mocha-babel test/v1/product.test.js -b",
     "test:api:inventory": "yarn mocha-babel test/v1/inventory.test.js -b",
     "test:api:item": "yarn mocha-babel test/v1/item.test.js -b",

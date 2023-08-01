@@ -15,7 +15,6 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -158,14 +157,6 @@ const TopSellingProductCard = () => {
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
                         ${topSellingProduct.pricePerUnit}
-                      </Text>
-                      <Text className="mt-1 text-sm !text-primaryB">
-                        {topSellingProduct.leastSellableUnit}{" "}
-                        {
-                          UNIT_OF_MEASUREMENTS[
-                          topSellingProduct.unitOfMeasurement
-                          ]
-                        }
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button

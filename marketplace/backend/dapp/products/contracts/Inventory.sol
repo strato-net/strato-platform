@@ -1,7 +1,7 @@
  
 
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "/dapp/dapp/contracts/Dapp.sol"
+import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
@@ -11,24 +11,24 @@ contract Inventory is InventoryStatus{
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-
-    address public productId;
-    string public category;
-    string public subCategory;
-    int public quantity;
-    int public pricePerUnit;
-    string public batchId;
-    int public availableQuantity;
-    InventoryStatus public status;
+                                                           
+    address public productId;                                  
+    string public category;                                  
+    uint public purchasedQuantity;                              
+    int public quantity;                                          
+    int public pricePerUnit;                                   
+    uint public vintage;                                        
+    int public availableQuantity;                               
+    InventoryStatus public status;                              
     uint public createdDate;
-
-
+    uint public retiredQuantity;
+                                                              
+                                                                
     constructor(
             string _category
-        ,   string _subCategory
         ,   int _quantity
         ,   int _pricePerUnit
-        ,   string _batchId
+        ,   uint _vintage
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
@@ -37,13 +37,14 @@ contract Inventory is InventoryStatus{
 
         productId = msg.sender;
         category = _category;
-        subCategory = _subCategory;
+        purchasedQuantity = 0;
         quantity = _quantity;
         pricePerUnit = _pricePerUnit;
-        batchId = _batchId;
+        vintage = _vintage;
         availableQuantity = _quantity;
         status = _status;
         createdDate = _createdDate;
+        retiredQuantity = 0;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

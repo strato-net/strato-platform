@@ -22,7 +22,6 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
@@ -285,54 +284,54 @@ const ProductDetails = ({ user, users }) => {
   ];
 
   const ownershipColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      // Fixes UI issue of children having the same key
-      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            if (isEventSelected) setIsEventSelected(false);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   // Fixes UI issue of children having the same key
+    //   key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
+    //   align: "center",
+    //   onCell: (record) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsSerialNumberSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemOwnershipHistory(
+    //           itemDispatch,
+    //           record.address
+    //         );
+    //       },
+    //     };
+    //   },
+    //   render: (serialNumber) => (
+    //     <Button type="link" className="text-primary text-[17px]">
+    //       {serialNumber}
+    //     </Button>
+    //   ),
+    // },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+    //   dataIndex: "itemNumber",
+    //   key: "itemNumber",
+    //   align: "center",
+    //   onCell: (record, rowIndex) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsSerialNumberSelected(true);
+    //         if (isEventSelected) setIsEventSelected(false);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemOwnershipHistory(
+    //           itemDispatch,
+    //           record.address
+    //         );
+    //       },
+    //     };
+    //   },
+    //   render: (serialNumber) => (
+    //     <Button type="link" className="text-primary text-[17px]">
+    //       {serialNumber}
+    //     </Button>
+    //   ),
+    // },
   ];
 
   const eventDetailColumn = [
@@ -408,65 +407,65 @@ const ProductDetails = ({ user, users }) => {
   ];
 
   const transformationColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-        >
-          {text}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            if (isEventSelected) setIsEventSelected(false);
-            if (isSerialNumberSelected) setIsSerialNumberSelected(false);
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-          onClick={() => {
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   key: "serialNumber",
+    //   align: "center",
+    //   onCell: (record) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         setIsTransformationSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemRawMaterials(
+    //           itemDispatch,
+    //           details.uniqueProductCode,
+    //           record.serialNumber
+    //         );
+    //       }
+    //     };
+    //   },
+    //   render: (text) => (
+    //     <Button
+    //       type="link"
+    //       className="text-primary text-[17px]"
+    //     >
+    //       {text}
+    //     </Button>
+    //   ),
+    // },
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+    //   dataIndex: "itemNumber",
+    //   key: "itemNumber",
+    //   align: "center",
+    //   onCell: (record, rowIndex) => {
+    //     return {
+    //       onClick: (ev) => {
+    //         if (isEventSelected) setIsEventSelected(false);
+    //         if (isSerialNumberSelected) setIsSerialNumberSelected(false);
+    //         setIsTransformationSelected(true);
+    //         setSerialNumber(record.serialNumber);
+    //         itemsActions.fetchItemRawMaterials(
+    //           itemDispatch,
+    //           details.uniqueProductCode,
+    //           record.serialNumber
+    //         );
+    //       }
+    //     };
+    //   },
+    //   render: (text) => (
+    //     <Button
+    //       type="link"
+    //       className="text-primary text-[17px]"
+    //       onClick={() => {
 
-          }}
-        >
-          {text}
-        </Button>
-      ),
-    },
+    //       }}
+    //     >
+    //       {text}
+    //     </Button>
+    //   ),
+    // },
   ];
 
 
@@ -477,36 +476,7 @@ const ProductDetails = ({ user, users }) => {
   const DescriptionComponent = () => {
     return (
       <Space direction="vertical">
-        <Space>
-          <DescTitle text="Product Id" />
-          <DescTitle text="                      :" />
-          <Text className="text-[13px]">{details.uniqueProductCode}</Text>
-        </Space>
 
-        <Space>
-          <DescTitle text="Unique Product Code" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">{details.userUniqueProductCode ? details.userUniqueProductCode : " "}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Manufacturer" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{decodeURIComponent(details.manufacturer)}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Unit of Measurement" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">
-            {UNIT_OF_MEASUREMENTS[details.unitOfMeasurement]}
-          </Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Least Sellable Unit" />
-          <DescTitle text="       :" />
-          <Text className="text-[13px]">{details.leastSellableUnit}</Text>
-        </Space>
       </Space>
     );
   };

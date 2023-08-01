@@ -7,15 +7,9 @@ const factory = {
             productArgs: {
                 name: `name_${uid}`,
                 description: `description_${uid}`,
-                manufacturer: `manufacturer_${uid}`,
-                unitOfMeasurement: 1,
-                userUniqueProductCode: `userUniqueProductCode_${uid}`,
-                uniqueProductCode: parseInt(util.iuid()),
-                leastSellableUnit: uid,
                 imageKey: `imageKey_${uid}`,
                 isActive: true,
                 category: 'Carbon',
-                subCategory: 'Carbon Credit',
                 createdDate: new Date().getTime(),
                 owner: userAddress
             }
@@ -29,7 +23,6 @@ const factory = {
                 description: `description_${uid}`,
                 imageKey: `imageKey_${uid}`,
                 isActive: false,
-                userUniqueProductCode: `userUniqueProductCode_${uid}`,
             }
         }
 

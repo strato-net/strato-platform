@@ -4,7 +4,6 @@ import * as packageJson from "../../package.json"
 import { deployParamName } from "../../helpers/constants"
 
 import category from './Category'
-import subCategory from './SubCategory'
 import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
@@ -23,7 +22,6 @@ import {
   Authentication,
   Users,
   Category,
-  SubCategory,
   Product,
   Inventory,
   Item,
@@ -43,7 +41,6 @@ const router = express.Router()
 router.use(Authentication.prefix, authentication)
 router.use(Users.prefix, users)
 router.use(Category.prefix, category)
-router.use(SubCategory.prefix, subCategory)
 router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)

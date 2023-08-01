@@ -95,7 +95,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         } 
 
-        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
+        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), "", _createdDate);   // temporary fix
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(item)) + ",";
         itemsAddresses.push(address(item));

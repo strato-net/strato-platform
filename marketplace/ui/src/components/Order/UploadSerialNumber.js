@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   notification,
   Input,
-  Space,
   Modal,
   Typography,
   Divider,
@@ -138,11 +137,6 @@ const UploadSerialNumberModal = ({
             <Image width={75} height={60} src={product.imageUrl} />
             <Col className="ml-6 mb-10">
               <Title level={5}>{decodeURIComponent(product.productName)}</Title>
-              <Space className="text-[13px]">
-                <Text className="text-primaryC">Manufacturer</Text>
-                <Text>:</Text>
-                <Text className="text-primaryB">{decodeURIComponent(product.manufacturer)}</Text>
-              </Space>
             </Col>
           </Row>
           <div className="mt-4 flex justify-between items-center">

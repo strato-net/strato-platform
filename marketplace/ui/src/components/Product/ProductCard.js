@@ -4,7 +4,6 @@ import { Card, Popover, Spin } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import DeleteProductModal from "./DeleteProductModal";
 import UpdateProductModal from "./UpdateProductModal";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 
 const ProductCard = ({
   product,
@@ -106,46 +105,6 @@ const ProductCard = ({
                     <br />
                   </React.Fragment>
                 ))}              </p>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Sub Category</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {state.subCategory}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Manufacturer</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {decodeURIComponent(state.manufacturer)}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Unit of Measurement
-                </p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {UNIT_OF_MEASUREMENTS[state.unitOfMeasurement]}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Least Sellable Unit
-                </p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {state.leastSellableUnit}
-                </p>
-              </div>
               <div
                 className={classNames(
                   state.isActive

@@ -6,7 +6,6 @@
     "orderLines": [
       {
         "productName": "Cotton",
-        "manufacturer": "bayer",
         "pricePerUnit": 100,
         "quantity": 1,
         "shippingCharges": 10,
@@ -15,7 +14,6 @@
       },
       {
         "productName": "Cotton",
-        "manufacturer": "bayer",
         "pricePerUnit": 100,
         "quantity": 1,
         "shippingCharges": 10,
@@ -24,7 +22,6 @@
       },
       {
         "productName": "Cotton",
-        "manufacturer": "bayer",
         "pricePerUnit": 100,
         "quantity": 1,
         "shippingCharges": 10,

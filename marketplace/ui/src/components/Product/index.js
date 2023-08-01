@@ -18,10 +18,6 @@ import useDebounce from "../UseDebounce";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//sub-categories
-import {
-  useSubCategoryState,
-} from "../../contexts/subCategory";
 import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -44,11 +40,7 @@ const Product = () => {
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-
-  //Sub-categories
-
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -115,7 +107,7 @@ const Product = () => {
   return (
     <>
       {contextHolder}
-      {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
+      {isProductsLoading || iscategorysLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isProductsLoading} size="large" />
         </div>
@@ -187,7 +179,6 @@ const Product = () => {
                         <ProductCard
                           product={product}
                           categorys={categorys}
-                          subCategorys={subCategorys}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
                         />

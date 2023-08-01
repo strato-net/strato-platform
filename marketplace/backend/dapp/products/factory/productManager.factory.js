@@ -7,15 +7,9 @@ const factory = {
             productArgs: {
                 name: `name_${uid}`,
                 description: `description_${uid}`,
-                manufacturer: `manufacturer_${uid}`,
-                unitOfMeasurement: 1,
-                userUniqueProductCode: `userUniqueProductCode_${uid}`,
-                uniqueProductCode: parseInt(util.iuid()),
-                leastSellableUnit: uid,
                 imageKey: `imageKey_${uid}`,
                 isActive: true,
                 category: `0000000000000000000000000000000000000000`,
-                subCategory: `0000000000000000000000000000000000000000`,
                 createdDate: 1673251301,
             }
         }
@@ -28,7 +22,6 @@ const factory = {
                 description: `description_${uid}`,
                 imageKey: `imageKey_${uid}`,
                 isActive: false,
-                userUniqueProductCode: `userUniqueProductCode_${uid}`
             }
         }
 
@@ -40,7 +33,7 @@ const factory = {
             // Number of serial numbers should match the quantity if they are provided.
             quantity: 2,
             pricePerUnit: uid,
-            batchId: `batchId_${uid}`,
+            vintage: 2000,
             serialNumbers: [`A1${uid}`, `A2${uid}`],
             status: 2,
             createdDate: 1673251301
@@ -52,7 +45,7 @@ const factory = {
         const args = {
             quantity: 3,
             pricePerUnit: uid,
-            batchId: `batchId_${uid}`,
+            vintage: 2000,
             serialNumbers: [],
             status: 2,
             createdDate: 1673251301

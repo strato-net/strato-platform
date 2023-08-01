@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Card,
-  Row,
   Col,
   Breadcrumb,
   Typography,
@@ -170,12 +169,6 @@ const BoughtOrderItemDetail = ({ user, users }) => {
       </div>
       <Card className="mx-14 mb-14">
         <Text className="font-semibold text-primaryB">{decodeURIComponent(details.name)}</Text>
-        <Row className="my-6 justify-between">
-          <OrderDataComponent
-            title="MANUFACTURER"
-            value={decodeURIComponent(details.manufacturer)}
-          />
-        </Row>
         <DataTableComponent
           columns={column}
           data={data}

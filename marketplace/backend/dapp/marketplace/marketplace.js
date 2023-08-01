@@ -23,7 +23,7 @@ function marshalIn(_args) {
     const defaultArgs = {
         quantity: 0,
         pricePerUnit: 0,
-        batchId: '',
+        vintage: 2000,
         availableQuantity: 0,
         status: '',
         createdDate: 0
