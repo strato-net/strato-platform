@@ -23,7 +23,6 @@ HTTP_PORT=8080 \
   OAUTH_MASTER_CLIENT_ID=<master_client> \
   OAUTH_MASTER_CLIENT_SECRET=<master_client_secret> \
   VAULT_URL=https://vault.blockapps.net:8093 \
-  realmName=mercata-testnet \
   nodeUrl=https://node2.mercata-testnet2.blockapps.net \
   ./identity
 ```
@@ -34,4 +33,4 @@ Like all our getting-started scripts, this should be run within the same directo
 The below is important!
 
 3. An important step is setting th URL to you ID-server for your strato node. As of this writing, you can pass the arguement in you strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, the network flag is used to map to a hardcoded ID server url. 
-4.  In the `strato-platform/strato/identity-provider` directory, needs a `rootPriv.pem` and `rootCert.pem` . As of now in the Makefile there is a `if statement` that will move the `.pem` files if present to the identity server docker container, but if not present strato will build, but there will be a runtime error when trying to run the identity server.
+4.  The `strato-getting-started` directory, needs a `rootPriv.pem` and `rootCert.pem`. These files are not included in the docker image. Instead, they are mounted onto the identity server's docker container when it is first created. 

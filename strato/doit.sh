@@ -226,7 +226,7 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [-n "${idServerUrl}"]; then
+  if [ -n "${idServerUrl}" ]; then
       idServer="--identityServerUrl=${idServerUrl}"
   fi
 
