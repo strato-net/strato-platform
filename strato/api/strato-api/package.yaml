@@ -35,6 +35,8 @@ executables:
     - identity-monad
     - insert-ordered-containers
     - lens
+    - regex-compat
+    - servant-client-core
     - servant-multipart
     - servant-server
     - servant-swagger

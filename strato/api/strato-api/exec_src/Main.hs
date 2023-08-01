@@ -25,9 +25,9 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList)
+import           Data.Maybe                      (listToMaybe, maybeToList, isJust)
 import           Data.Source.Map
-import           Data.Swagger                    hiding (delete)
+import           Data.Swagger                    hiding (delete, Http)
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -36,6 +36,7 @@ import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+import           Servant.Client.Core             hiding (requestMethod)
 import           Servant.Multipart
 import           Servant.Swagger
 import           Servant.Swagger.UI
@@ -66,6 +67,7 @@ import           Control.Monad.Composable.Vault  hiding (httpManager)
 import           SolidVM.Model.CodeCollection.Contract
 
 import           Text.Tools
+import           Text.Regex
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -240,6 +242,18 @@ fullAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
+
+  if not $ null getIdServerUrl
+    then do 
+      -- check if id server connection is valid; only run if using https (unless using localhost)
+      identityUrl <- parseBaseUrl getIdServerUrl
+      let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+      let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
+      if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
+        then 
+          error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+        else putStrLn "Identity server url is valid to connect to"
+    else putStrLn "No identity server url provided"
 
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
