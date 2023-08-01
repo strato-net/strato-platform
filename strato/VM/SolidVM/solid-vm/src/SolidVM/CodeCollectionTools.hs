@@ -108,16 +108,19 @@ addInheritedObjects cc c = do
 
 addInheritedFunctions :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedFunctions cc c = do
-  fu <- toUnionMaker _functions cc c
+  fu <- toUnionMaker' _functions (M.filter ((/= Just Private) . _funcVisibility) . _functions) cc c
   pure $ c{
   _functions=fu
   }
 
 toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
-toUnionMaker f cc c = do
+toUnionMaker f = toUnionMaker' f f
+
+toUnionMaker' :: (Ord a) => (Contract -> M.Map a b) -> (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
+toUnionMaker' fSelf fAncestors cc c = do
   parents' <- getParents cc c
-  parentMaps <- traverse (toUnionMaker f cc) parents'
-  pure . M.unions $ f c : parentMaps
+  parentMaps <- traverse (toUnionMaker' fAncestors fAncestors cc) parents' -- this allows us to perform fSelf only once
+  pure . M.unions $ fSelf c : parentMaps
 
 
 
