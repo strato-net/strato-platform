@@ -3,7 +3,7 @@ import PropertyHeaderBtns from '../PropertyHeaderBtns';
 
 const { Header } = Layout;
 
-const PropertyLayout = ({ children, tab }) => {
+const PropertyLayout = ({ children, user, tab }) => {
 
   return (
     <Layout>
@@ -14,7 +14,7 @@ const PropertyLayout = ({ children, tab }) => {
           alignItems: "center",
           backgroundColor: "#001B71"
         }}>
-        <PropertyHeaderBtns tab={tab} />
+        <PropertyHeaderBtns user={user} tab={tab} />
       </Header>
       {children}
     </Layout>

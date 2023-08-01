@@ -10,13 +10,13 @@ function PropertyCard(props) {
       hoverable
       style={{ width: 300, margin: 10 }}
       cover={
-        <Carousel arrows>
+        <Carousel>
           {property?.images.map((img, key) => (
             <div key={key}>
               <img
                 style={{ width: "100%", height: 200 }}
                 alt={img.url}
-                src={`${img.url}`}
+                src={img}
               />
             </div>
           ))}

@@ -1,4 +1,4 @@
-export const States = [
+export const StateData = [
   { value: 'AL', label: 'AL' },
   { value: 'AK', label: 'AK' },
   { value: 'AZ', label: 'AZ' },

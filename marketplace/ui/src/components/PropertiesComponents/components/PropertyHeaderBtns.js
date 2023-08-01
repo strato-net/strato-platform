@@ -2,11 +2,17 @@ import React, { useState } from 'react'
 import { Button } from 'antd';
 import PropertyCreateModal from './PropertyCreateModal';
 import PropertyCreateConfirmModal from './PropertyCreateConfirmModal';
+import { useAuthenticateState } from "../../../contexts/authentication";
 
 function PropertyHeaderBtns({ tab }) {
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
+
+  console.log(tab)
 
   return (
     <>
@@ -14,6 +20,9 @@ function PropertyHeaderBtns({ tab }) {
       {tab === 'home' &&
         <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
           onClick={() => {
+            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+              window.location.href = loginUrl
+            }
             toggleCreateModal(true)
           }}
         >List Property</Button>
@@ -23,10 +32,6 @@ function PropertyHeaderBtns({ tab }) {
         toggleCreateModal={toggleCreateModal} 
         modalView={modalView}
         setModalView={setModalView}
-        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-        toggleCreateConfirmModal={toggleCreateConfirmModal}
-        />
-        <PropertyCreateConfirmModal
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         />

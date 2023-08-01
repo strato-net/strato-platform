@@ -36,6 +36,7 @@ import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 import PropertyListings from "./components/PropertiesComponents/components/PropertyListings";
 import PropertyLayout from "./components/PropertiesComponents/components/PropertyLayout";
+import PropertyDetails from "./components/PropertiesComponents/components/PropertyDetails";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -392,8 +393,19 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.Properties.url}
         element={
           <UsersProvider>
-            <PropertyLayout tab={'home'}>
+            <PropertyLayout tab='home'>
               <PropertyListings user={user} />
+            </PropertyLayout>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={`${routes.Properties.url}/:id`}
+        element={
+          <UsersProvider>
+            <PropertyLayout tab='details'>
+              <PropertyDetails user={user} />
             </PropertyLayout>
           </UsersProvider>
         }
