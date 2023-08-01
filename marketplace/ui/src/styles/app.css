@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -65,10 +66,6 @@
   background-color: #101481;
 }
 
-.ant-btn-default:not(:disabled):hover{
-  color: #fff;
-}
-
 .ant-form-item {
   margin-bottom: 0px;
 }
@@ -106,4 +103,42 @@
 
 :where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
+}
+
+.ant-carousel .slick-prev,
+.ant-carousel .slick-next,
+.ant-carousel .slick-prev:hover,
+.ant-carousel .slick-next:hover {
+  font-size: inherit;
+  color: currentColor;
+}
+
+.slick-prev {
+  left: 2% !important;
+  z-index: 1;
+  font-size: 35px !important;
+  color: white !important;
+}
+
+.slick-next {
+  right: 4% !important;
+  z-index: 1;
+  font-size: 35px !important;
+  color: white !important;
+}
+
+.img-count{
+  width: 120px;
+  position: absolute;
+  bottom: 5%;
+  right: 5%; 
+  background-color: white;
+}
+
+.slick-arrow{
+display: none !important;
+}
+
+.slick-slider:hover .slick-arrow{
+ display: block !important;
 }
