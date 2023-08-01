@@ -2345,7 +2345,7 @@ contract qq {
   constructor(){ 
     test = it_getsTrueAndThisDotV();
   }
-  function it_getsTrueAndThisDotV() external returns (bool) { // fails
+  function it_getsTrueAndThisDotV() private returns (bool) { // fails
     string_test y = new string_test();
     (bool b, string v) = y.getTrueAndThisDotV();
     return b && v == "test string" && (false == (v != "test string"));
@@ -3632,7 +3632,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint){
       aPay.transfer(13);
       bal = aPay.balance;
@@ -3658,7 +3658,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3684,7 +3684,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3710,7 +3710,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3734,7 +3734,7 @@ contract qq{
   constructor() public {
     a = account(this);
   }
-  function mySend() internal pure
+  function mySend() external pure
     returns (uint, bool){
       success = a.send(13);
       bal = a.balance;
@@ -3757,7 +3757,7 @@ contract qq{
   constructor() public {
     a = account(this);
   }
-  function myTransfer() internal pure
+  function myTransfer() external pure
     returns (uint, bool){
       success = a.transfer(13);
       bal = a.balance;
@@ -3795,7 +3795,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint, uint, uint){
       bPay.transfer(13);
       bala = aPay.balance;
@@ -3842,7 +3842,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal
+  function mySend() external
     returns (bool, uint, uint, uint){
       success = bPay.send(13);
       bala = aPay.balance;
@@ -3885,7 +3885,7 @@ contract qq{
     c = account(t);
     cPay = account(c);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint, uint, uint){
       bPay.transfer(1300);
       bala = aPay.balance;
@@ -3928,7 +3928,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, uint, uint){
       success = bPay.send(1300);
       bala = aPay.balance;
@@ -5620,7 +5620,7 @@ contract qq {
     ownerPay = payable(owner);
   }
 
-  function selfDestructThis() internal {
+  function selfDestructThis() external {
     selfdestruct(ownerPay);
   } 
 }|]
@@ -5875,16 +5875,14 @@ contract qq {
   uint myNum = 5;
   uint otherNum = 7;
   uint errorCount = 0;
-  constructor() public returns (uint,bool) {
+  constructor() {
     Divisor d =  new Divisor();
     try d.doTheDivide() returns (uint v) {
-          return (v, true);
         } catch Error(string memory amsg) { 
             // This is executed in case
             // revert was called inside getData
             // and a reason string was provided.
             errorCount++;
-            return (0, false);
         } catch Panic(uint errCode) {
             // This is executed in case of a panic,
             // i.e. a serious error like division by zero
@@ -5893,11 +5891,9 @@ contract qq {
             errorCount++;
             myNum = 3;
             otherNum = errCode;
-            return (0, false);
         } catch (bytes bigTest) {
             // This is executed in case revert() was used.
             errorCount++;
-            return (0, false);
         }
   }
 }|]
@@ -7255,5 +7251,25 @@ contract qq is Parent {
 |] 
     getFields ["x"] `shouldReturn` [BInteger 9]
 
+  it "can use virtual and override" . runTest $ do
+    runBS [r|
+
+contract Parent {
+  uint x = 7;
+  function myVirtualFunc() virtual {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  function myVirtualFunc() override {
+    x = 9;
+  }
+  constructor() {
+    myVirtualFunc();
+  }
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 9]
 
 

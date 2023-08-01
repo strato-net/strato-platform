@@ -774,6 +774,9 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
           Just theFunction | isDelegateCall == False -> do
                 args' <- argsToVals contract' theFunction argExps
                 mCallInfo <- getCurrentCallInfoIfExists
+                let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
+                when ((from /= to) && isForbidden) $
+                  unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
                 let ro = case mCallInfo of
                           Nothing -> False
                           Just ci -> if fromChain == toChain then readOnly ci else True
@@ -787,6 +790,9 @@ callWrapper' from to' mLogicAddress mContract functionName isRCC argExps  = do
                           boolTrueIfSignatureTheSame funck =  all (\(a, (_, (CC.IndexedType _ d))) ->  a == d )  $ zip argsParsed (CC._funcArgs funck)
                           finalFuncFind = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
                       case finalFuncFind of [a] -> Just  a; _ -> Nothing;
+                let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
+                when ((from /= to) && isForbidden) $
+                  unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
                 case mtheFunction' of
                       Just theFunction' | (length argsParsed) == (length argExps) -> do
                                 args' <- argsToVals contract' theFunction' argExps

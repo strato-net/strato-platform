@@ -1373,3 +1373,231 @@ contract A {
   }
 }
 |] in anns `shouldBe` []
+
+    it "can call own private function" $
+      let anns = runTypechecker [r|
+
+contract qq {
+  uint x = 7;
+  function myPrivateFunc() private {
+    x = 8;
+  }
+  constructor() {
+    try {
+      myPrivateFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in  anns `shouldBe` []
+
+    it "can't call own external function" $
+      let anns = runTypechecker [r|
+
+contract qq {
+  uint x = 7;
+  function myExternalFunc() external {
+    x = 8;
+  }
+  constructor() {
+    try {
+      myExternalFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 1
+
+    it "can call own internal function" $
+      let anns = runTypechecker [r|
+
+contract qq {
+  uint x = 7;
+  function myInternalFunc() internal {
+    x = 8;
+  }
+  constructor() {
+    try {
+      myInternalFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 0
+
+    it "can call own public function" $
+      let anns = runTypechecker [r|
+
+contract qq {
+  uint x = 7;
+  function myPublicFunc() public {
+    x = 8;
+  }
+  constructor() {
+    try {
+      myPublicFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 0
+
+    it "can't call an inherited private function" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myPrivateFunc() private {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  constructor() {
+    try {
+      myPrivateFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 1
+
+    it "can't call an inherited external function" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myExternalFunc() external {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  constructor() {
+    try {
+      myExternalFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 1
+
+    it "can call an inherited internal function" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myInternalFunc() internal {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  constructor() {
+    try {
+      myInternalFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 0
+
+    it "can call an inherited public function" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myPublicFunc() public {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  constructor() {
+    try {
+      myPublicFunc();
+    } catch {
+      x = 9;
+    }
+  }
+}
+|] in length anns `shouldBe` 0
+
+    it "can't call a private function in another contract" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myPrivateFunc() private {
+    x = 8;
+  }
+}
+
+contract qq{
+  constructor() {
+      Parent p = new Parent();
+      p.myPrivateFunc();
+  }
+}
+|] in length anns `shouldBe` 1
+
+    it "can call an external function from another contract" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myExternalFunc() external {
+    x = 8;
+  }
+}
+
+contract qq {
+  constructor() {
+      Parent p = new Parent();
+      p.myExternalFunc();
+  }
+}
+|] in length anns `shouldBe` 0
+
+    it "can't call an internal function from another contract" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myInternalFunc() internal {
+    x = 8;
+  }
+}
+
+contract qq {
+  constructor() {
+      Parent p = new Parent();
+      p.myInternalFunc();
+  }
+}
+|] in length anns `shouldBe` 1
+
+    it "can call a public function from another contract" $
+      let anns = runTypechecker [r|
+
+contract Parent {
+  uint x = 7;
+  function myPublicFunc() public {
+    x = 8;
+  }
+}
+
+contract qq {
+  constructor() {
+      Parent p = new Parent();
+      p.myPublicFunc();
+  }
+}
+|] in length anns `shouldBe` 0
