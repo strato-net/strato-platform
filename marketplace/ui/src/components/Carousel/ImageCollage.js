@@ -1,7 +1,7 @@
-import React,{useState} from 'react';
+import React, { useState } from 'react';
 import { Col, Row, Modal, Image, Button } from 'antd';
 import CarouselComponent from './Carousel';
-import {FileImageOutlined} from "@ant-design/icons";
+import { FileImageOutlined } from "@ant-design/icons";
 
 const ImageCollage = (props) => {
   const [open, setOpen] = useState(false);
@@ -12,7 +12,7 @@ const ImageCollage = (props) => {
 
   return (
     <>
-      <div style={{ width: '800px',  margin: 'auto', marginTop: '20px' }}>
+      <div style={{ margin: 'auto', marginTop: '20px' }}>
         <Row
           gutter={{ xs: 8, sm: 16 }}
           justify="space-around"
@@ -34,7 +34,7 @@ const ImageCollage = (props) => {
                 src={images[2]}
               />
               <Button type='default' className='img-count' onClick={() => { handleImagePreview() }} >
-              <FileImageOutlined />{images?.length} Photos
+                <FileImageOutlined />{images?.length} Photos
               </Button>
             </Col>
           }
