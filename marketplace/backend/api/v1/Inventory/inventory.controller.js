@@ -114,7 +114,7 @@ class InventoryController {
       productAddress: Joi.string().required(),
       quantity: Joi.number().integer().min(0).required(),
       pricePerUnit: Joi.number().integer().greater(0).required(),
-      vintage: Joi.number().integer().min(1900).required(),
+      vintage: Joi.number().integer().min(2020).max(2040).allow(0),
       status: Joi.number().integer().min(1).max(2).required(),
       creditBatchSerialization: Joi.string().required()
     });

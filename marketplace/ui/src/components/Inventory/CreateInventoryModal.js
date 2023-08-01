@@ -56,7 +56,7 @@ const CreateInventoryModal = ({
     },
     quantity: null,
     pricePerUnit: "",
-    vintage: null,
+    vintage: 0,
     creditBatchSerialization: "Test123",
     status: true,
   };

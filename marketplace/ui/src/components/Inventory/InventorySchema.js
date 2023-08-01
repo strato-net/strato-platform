@@ -10,7 +10,7 @@ const getSchema = () => {
     }),
     quantity: yup.number().required("Quantity is required").nullable(),
     pricePerUnit: yup.number().required("Price per unit is required"),
-    vintage: yup.number().required("Vintage is required").nullable(),
+    vintage: yup.number().nullable(),
     status: yup.boolean().required("Status is required"),
     serialNumber: yup.object().shape({
       serialNumStr: yup

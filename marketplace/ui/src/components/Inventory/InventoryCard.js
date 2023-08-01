@@ -139,7 +139,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               :
             </p>
             <p className="text-error text-sm ml-3">
-              {inventory.vintage}
+              {inventory.vintage === 0 ? "N/A" : inventory.vintage}
             </p>
           </div>
           <div className="flex mt-1 items-center">
