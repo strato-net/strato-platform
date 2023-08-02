@@ -898,7 +898,8 @@ insertUserRegistryContract gi =
         rootAcct = SolidVMContractWithStorage 0x420 420
             (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
                 (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "1337") MainChain))
             ]
 
         registryAcct = SolidVMContractWithStorage 0x720 720
