@@ -8,7 +8,6 @@
         "productName": "Cotton",
         "pricePerUnit": 100,
         "quantity": 1,
-        "shippingCharges": 10,
         "tax": 10,
         "amount": 120
       },
@@ -16,7 +15,6 @@
         "productName": "Cotton",
         "pricePerUnit": 100,
         "quantity": 1,
-        "shippingCharges": 10,
         "tax": 10,
         "amount": 120
       },
@@ -24,7 +22,6 @@
         "productName": "Cotton",
         "pricePerUnit": 100,
         "quantity": 1,
-        "shippingCharges": 10,
         "tax": 10,
         "amount": 120
       }      

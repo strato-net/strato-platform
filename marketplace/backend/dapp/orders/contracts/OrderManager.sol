@@ -76,9 +76,9 @@ contract OrderManager is RestStatus, OrderStatus {
         address _orderAddress,
         address _productId,
         address _inventoryId,
+        string _creditBatchSerialization,
         uint _quantity,
         uint _pricePerUnit,
-        uint _shippingCharges,
         uint _tax,
         uint _createdDate
     ) public returns (uint256, address) {
@@ -88,9 +88,9 @@ contract OrderManager is RestStatus, OrderStatus {
                 _orderAddress,
                 _productId,
                 _inventoryId,
+                _creditBatchSerialization,
                 _quantity,
                 _pricePerUnit,
-                _shippingCharges,
                 _tax,
                 _createdDate
             );

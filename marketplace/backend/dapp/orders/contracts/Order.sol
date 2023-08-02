@@ -81,11 +81,7 @@ contract Order is OrderStatus {
         // check for open status to closed status
         if (_status == OrderStatus.CANCELED) {
             return
-                getInventoriesAndAvailableQuantity(
-                    _status,
-                    orderLines,
-                    true
-                );
+                getInventoriesAndAvailableQuantity(_status, orderLines, true);
         }
 
         if (_scheme == 0) {
@@ -118,27 +114,16 @@ contract Order is OrderStatus {
         if (_status == OrderStatus.CLOSED) {
             for (uint i = 0; i < orderLines.length; i++) {
                 OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
-                // if(!orderLine.isSerialUploaded()){
-                //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
-                // }
             }
             fullfilmentDate = _fullfilmentDate;
             return
-                getInventoriesAndAvailableQuantity(
-                    _status,
-                    orderLines,
-                    false
-                );
+                getInventoriesAndAvailableQuantity(_status, orderLines, false);
         }
 
         // check for open status to closed status
         if (_status == OrderStatus.CANCELED) {
             return
-                getInventoriesAndAvailableQuantity(
-                    _status,
-                    orderLines,
-                    false
-                );
+                getInventoriesAndAvailableQuantity(_status, orderLines, false);
         }
 
         if (_scheme == 0) {
@@ -160,9 +145,9 @@ contract Order is OrderStatus {
         address _orderAddress,
         address _productId,
         address _inventoryId,
+        string creditBatchSerialization,
         uint _quantity,
         uint _pricePerUnit,
-        uint _shippingCharges,
         uint _tax,
         uint _createdDate
     ) public returns (uint256, address) {
@@ -176,9 +161,9 @@ contract Order is OrderStatus {
             _orderAddress,
             _productId,
             _inventoryId,
+            creditBatchSerialization,
             _quantity,
             _pricePerUnit,
-            _shippingCharges,
             _tax,
             _createdDate
         );

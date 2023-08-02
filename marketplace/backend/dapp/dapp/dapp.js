@@ -898,16 +898,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
 
-          const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
           await managers.orderManager.addOrderLine({
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
+            creditBatchSerialization: orderItem.creditBatchSerialization,
             quantity: inventoryObject.quantity,
             pricePerUnit: inventoryObject.pricePerUnit,
-            shippingCharges,
             tax,
             createdDate
           });

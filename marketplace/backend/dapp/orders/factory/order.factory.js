@@ -39,11 +39,11 @@ const factory = {
         const args = {
             createdDate: new Date().getTime(),
             inventoryId: constants.zeroAddress,
+            creditBatchSerialization: "Test123",
             orderAddress: constants.zeroAddress,
             pricePerUnit: uid,
             productId: constants.zeroAddress,
             quantity: uid,
-            shippingCharges: uid,
             tax: uid,
         };
         return args;

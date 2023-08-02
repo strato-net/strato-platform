@@ -15,12 +15,11 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
     address public orderAddress;
     address public productId;
     address public inventoryId;
+    string public creditBatchSerialization;
     uint public quantity;
     uint public pricePerUnit;
     uint public tax;
-    uint public shippingCharges;
     uint public createdDate;
-    bool public isSerialUploaded;
 
     address[] public itemsAddresses;
 
@@ -28,9 +27,9 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
         address _orderAddress,
         address _productId,
         address _inventoryId,
+        string _creditBatchSerialization,
         uint _quantity,
         uint _pricePerUnit,
-        uint _shippingCharges,
         uint _tax,
         uint _createdDate
     ) public {
@@ -39,12 +38,11 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
         orderAddress = _orderAddress;
         productId = _productId;
         inventoryId = _inventoryId;
+        creditBatchSerialization = _creditBatchSerialization;
         quantity = _quantity;
         pricePerUnit = _pricePerUnit;
-        shippingCharges = _shippingCharges;
         tax = _tax;
         createdDate = _createdDate;
-        isSerialUploaded = false;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

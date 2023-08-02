@@ -98,7 +98,6 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod.productName,
           unitPrice: prod.pricePerUnit,
           quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
           amount: prod.amount,
           serialNumber: prod,
           tax: prod.tax,
@@ -188,24 +187,6 @@ const SoldOrderDetails = ({ user, users }) => {
     console.log("date", date)
     setSelectedDate(date);
   };
-
-  // This is checking if we need to upload serial numbers. 
-  // Used to disable the sae button if the serial numbers aren't uploaded.
-  const allSerialNumbersUploaded = () => {
-    let serialsUploaded = true;
-    if (orderDetails === null) {
-      return serialsUploaded;
-    }
-    for (const orderLine of orderDetails.orderLines) {
-      if (orderLine.containsSerialNumber === true) {
-        if (orderLine.isSerialUploaded === false) {
-          serialsUploaded = false;
-        }
-      }
-    }
-    return serialsUploaded;
-  };
-
 
   const handleUpdateComment = async () => {
 
@@ -321,63 +302,61 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "productName",
       render: (text) => <p className="text-primary text-[17px]">{decodeURIComponent(text)}</p>,
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      // width: "192px",
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   key: "serialNumber",
+    //   align: "center",
+    //   // width: "192px",
 
-      // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
-      // If the serial number is necessary provide the upload button / view button
-      // If it is not necessary provide N/A. 
+    //   // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
+    //   // If the serial number is necessary provide the upload button / view button
+    //   // If it is not necessary provide N/A. 
 
-      render: (text) => {
-        if (text.containsSerialNumber === true) {
-          if (text.isSerialUploaded === true) {
-            return (
-              <div className="flex items-center justify-center">
-                <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
-                <p
-                  onClick={() => {
-                    navigate(
-                      `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
-                      { state: { orderId: orderDetails.orderId, address: Id } }
-                    );
-                  }}
-                  className="hover:text-primaryHover cursor-pointer"
-                >
-                  View
-                </p>
-              </div>
-            );
-          } else {
-            return (
-              <Button
-                id="upload-button"
-                className="text-primary text-[17px]"
-                type="link"
-                disabled={orderDetails.status === 4}
-                onClick={() => {
-                  setselectedProd(text);
-                  setisUploadSerialNumberModalOpen(true);
-                }}
-              >
-                Upload
-              </Button>
-            );
-          }
-        } else {
-          return (
-            <div className="flex items-center justify-center">
-              <p className="text-primary text-[17px]">N/A</p>
-            </div>
-          )
-        }
-      }
-
-
-    },
+    //   render: (text) => {
+    //     if (text.containsSerialNumber === true) {
+    //       if (text.isSerialUploaded === true) {
+    //         return (
+    //           <div className="flex items-center justify-center">
+    //             <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
+    //             <p
+    //               onClick={() => {
+    //                 navigate(
+    //                   `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
+    //                   { state: { orderId: orderDetails.orderId, address: Id } }
+    //                 );
+    //               }}
+    //               className="hover:text-primaryHover cursor-pointer"
+    //             >
+    //               View
+    //             </p>
+    //           </div>
+    //         );
+    //       } else {
+    //         return (
+    //           <Button
+    //             id="upload-button"
+    //             className="text-primary text-[17px]"
+    //             type="link"
+    //             disabled={orderDetails.status === 4}
+    //             onClick={() => {
+    //               setselectedProd(text);
+    //               setisUploadSerialNumberModalOpen(true);
+    //             }}
+    //           >
+    //             Upload
+    //           </Button>
+    //         );
+    //       }
+    //     } else {
+    //       return (
+    //         <div className="flex items-center justify-center">
+    //           <p className="text-primary text-[17px]">N/A</p>
+    //         </div>
+    //       )
+    //     }
+    //   }
+    // },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
       dataIndex: "unitPrice",
@@ -389,15 +368,6 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
       dataIndex: "quantity",
       key: "quantity",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
@@ -484,7 +454,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
+                disabled={status === getStatus(3)}
                 onClick={handleUpdateComment}
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
               >
