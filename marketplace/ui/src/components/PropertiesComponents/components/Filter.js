@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import filterData from "../../helpers/filterOptions.json"
+import filterData from "../helpers/filterOptions.json"
 import {
   Row,
   Col,

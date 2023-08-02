@@ -1,6 +1,6 @@
 import React from 'react'
 import { Spin, Typography, Tabs, Col, Row } from "antd";
-import ImageCollage from '../Carousel/ImageCollage';
+import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
 import PriceHistoryTab from "./ListingTabs/PriceHistoryTab";
@@ -104,7 +104,6 @@ function PropertyDetails() {
                 <Typography.Paragraph>
                   <b>
                     $4,800/month
-
                   </b>
                 </Typography.Paragraph>
                 <Typography.Paragraph>

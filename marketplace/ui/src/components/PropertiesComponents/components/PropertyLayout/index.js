@@ -1,14 +1,9 @@
-import React, { useState } from "react"
-import {
-  Collapse,
-  Button,
-  Layout,
-} from "antd";
-import Filter from "../Filter";
+import { Layout } from 'antd';
+import PropertyHeaderBtns from '../PropertyHeaderBtns';
 
 const { Header } = Layout;
 
-const PropertyLayout = ({ children }) => {
+const PropertyLayout = ({ children, user, tab }) => {
 
   return (
     <Layout>
@@ -19,9 +14,7 @@ const PropertyLayout = ({ children }) => {
           alignItems: "center",
           backgroundColor: "#001B71"
         }}>
-        <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}>
-          List Property
-        </Button>
+        <PropertyHeaderBtns user={user} tab={tab} />
       </Header>
       {children}
     </Layout>

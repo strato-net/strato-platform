@@ -10,13 +10,13 @@ function PropertyCard(props) {
       hoverable
       style={{ width: 300, margin: 10 }}
       cover={
-        <Carousel arrows>
-          {property?.fields?.Photos?.map((img: any, key: any) => (
+        <Carousel>
+          {property?.images.map((img, key) => (
             <div key={key}>
               <img
                 style={{ width: "100%", height: 200 }}
                 alt={img.url}
-                src={`${img.url}`}
+                src={img}
               />
             </div>
           ))}
@@ -24,12 +24,11 @@ function PropertyCard(props) {
       }
     >
       <Meta
-        title={`${property?.PostalCity}, ${property?.StateOrProvince}`}
-        description={`${property?.fields?.Beds} br | ${
-          property?.fields?.Baths
-        } ba | ${
-          property?.fields?.SqFt
-        } sqft | $${property.ListPrice?.toLocaleString()}`}
+        title={`${property?.postalCity}, ${property?.stateOrProvince} ${property?.postalCode}`}
+        description={`${property?.bedroomsTotal} br | 
+        ${property?.bathroomsTotalInteger} ba | 
+        ${property?.lotSizeArea} sqft | 
+        $${property.listPrice?.toLocaleString()}`}
       />
     </Card>
   );
