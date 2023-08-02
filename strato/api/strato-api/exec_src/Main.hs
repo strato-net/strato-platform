@@ -89,6 +89,7 @@ import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
 import           Options
+import           Blockchain.Strato.Model.Options()
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
@@ -243,17 +244,14 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
 
-  if not $ null getIdServerUrl
-    then do 
-      -- check if id server connection is valid; only run if using https (unless using localhost)
-      identityUrl <- parseBaseUrl getIdServerUrl
-      let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-      let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
-      if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-        then 
-          error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
-        else putStrLn "Identity server url is valid to connect to"
-    else putStrLn "No identity server url provided"
+  -- check if id server connection is valid; only run if using https (unless using localhost)
+  identityUrl <- parseBaseUrl getIdServerUrl
+  let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+  let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
+  if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
+    then 
+      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+    else putStrLn "Identity server url is valid to connect to"
 
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
@@ -321,11 +319,3 @@ instance ToSchema Value where
     NamedSchema (Just "JSON Value") mempty
 
 -----------
-
---Simple helper functions
-getIdServerUrl ::  String
-getIdServerUrl = if flags_identityServerUrl == "" 
-      then (case flags_network  of  
-            "mercata-hydrogen" -> flags_hydrogenIdServer
-            _ -> error "Unsupported identity server")
-      else flags_identityServerUrl
