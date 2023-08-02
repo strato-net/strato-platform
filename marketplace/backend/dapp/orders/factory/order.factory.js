@@ -13,8 +13,6 @@ const factory = {
             orderShippingCharges: uid,
             status: 1,
             amountPaid: uid,
-            buyerComments: `buyerComments_${uid}`,
-            sellerComments: `sellerComments_${uid}`,
             createdDate: new Date().getTime(),
             paymentSessionId: `paymentSessionId_${uid}`,
             shippingAddress: constants.zeroAddress
@@ -25,7 +23,6 @@ const factory = {
     getUpdateBuyerOrderArgs(uid) {
         const args = {
             status: 2,
-            buyerComments: `buyerComments_${uid}`,
         }
         return args;
     },
@@ -34,7 +31,6 @@ const factory = {
         const args = {
             status: 2,
             fullfilmentDate: new Date().getTime(),
-            sellerComments: `sellerComments_${uid}`,
         }
         return args;
     },

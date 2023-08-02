@@ -69,7 +69,6 @@ function marshalInUpdateSeller(_args){
   const defaultArgs = {
     status:1,
     fullfilmentDate:0,
-    sellerComments:''
   }
   const args = {
     ...defaultArgs,
@@ -170,8 +169,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
     switch (key) {
       case "status":
         return agg | (base << 0);
-      case "buyerComments":
-        return agg | (base << 1);
       default:
         return agg;
     }
@@ -221,8 +218,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
         return agg | (base << 0);
       case "fullfilmentDate":
         return agg | (base << 1);
-      case "sellerComments":
-        return agg | (base << 2);
       default:
         return agg;
     }

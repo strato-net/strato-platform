@@ -13,8 +13,6 @@ contract OrderManager is RestStatus, OrderStatus {
         uint _orderShippingCharges,
         OrderStatus _status,
         uint _amountPaid,
-        string _buyerComments,
-        string _sellerComments,
         uint _createdDate,
         string _paymentSessionId,
         address _shippingAddress
@@ -28,8 +26,6 @@ contract OrderManager is RestStatus, OrderStatus {
             _orderShippingCharges,
             _status,
             _amountPaid,
-            _buyerComments,
-            _sellerComments,
             _createdDate,
             _paymentSessionId,
             _shippingAddress
@@ -40,18 +36,16 @@ contract OrderManager is RestStatus, OrderStatus {
     function updateBuyerDetails(
         address _orderAddress,
         OrderStatus _status,
-        string _buyerComments,
         uint _scheme
     ) public returns (uint, string, string) {
         Order order = Order(_orderAddress);
-        return order.updateBuyerDetails(_status, _buyerComments, _scheme);
+        return order.updateBuyerDetails(_status, _scheme);
     }
 
     function updateSellerDetails(
         address _orderAddress,
         OrderStatus _status,
         uint _fullfilmentDate,
-        string _sellerComments,
         uint _scheme
     ) public returns (uint, string, string) {
         Order order = Order(_orderAddress);
@@ -59,7 +53,6 @@ contract OrderManager is RestStatus, OrderStatus {
             order.updateSellerDetails(
                 _status,
                 _fullfilmentDate,
-                _sellerComments,
                 _scheme
             );
     }
@@ -67,7 +60,6 @@ contract OrderManager is RestStatus, OrderStatus {
     function getInventoriesAndAvailableQuantity(
         address _orderAddress,
         OrderStatus _status,
-        string _comments,
         address[] _orderLines,
         bool _isBuyer
     ) public returns (uint, string, string) {
@@ -75,7 +67,6 @@ contract OrderManager is RestStatus, OrderStatus {
         return
             order.getInventoriesAndAvailableQuantity(
                 _status,
-                _comments,
                 _orderLines,
                 _isBuyer
             );

@@ -42,7 +42,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [paid, setPaid] = useState(false);
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
-  const [comment, setcomment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
   const [isUploadSerialNumberModalOpen, setisUploadSerialNumberModalOpen] =
@@ -82,14 +81,13 @@ const SoldOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
-      setcomment(orderDetails.sellerComments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
       if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
         setSelectedDate(null);
       } else {
         setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
       }
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -191,8 +189,8 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-// This is checking if we need to upload serial numbers. 
-// Used to disable the sae button if the serial numbers aren't uploaded.
+  // This is checking if we need to upload serial numbers. 
+  // Used to disable the sae button if the serial numbers aren't uploaded.
   const allSerialNumbersUploaded = () => {
     let serialsUploaded = true;
     if (orderDetails === null) {
@@ -241,7 +239,6 @@ const SoldOrderDetails = ({ user, users }) => {
         address: Id,
 
         updates: {
-          sellerComments: comment,
           status: parseInt(getStatusByValue(status)),
 
         },
@@ -249,9 +246,8 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-      
+
         updates: {
-          sellerComments: comment,
           status: 3,
           fullfilmentDate: dayjs(selectedDate).unix(),
         },
@@ -268,29 +264,24 @@ const SoldOrderDetails = ({ user, users }) => {
     handleCancel();
     let body = {};
     if (selectedStatus === getStatus(4)) {
-      if (comment === "") {
-        openToast("bottom", true, "Comment is mandatory to cancel order");
-        return;
-      }
       body = {
         address: Id,
-      
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
-          sellerComments: comment,
           // fullfilmentDate: dayjs(selectedDate).unix(),
         },
       };
     } else {
       body = {
         address: Id,
-        
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
         },
       };
     }
-   
+
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
@@ -336,7 +327,7 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "serialNumber",
       align: "center",
       // width: "192px",
-      
+
       // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
       // If the serial number is necessary provide the upload button / view button
       // If it is not necessary provide N/A. 
@@ -608,25 +599,6 @@ const SoldOrderDetails = ({ user, users }) => {
                   }}
                   onChange={onDateChange}
                   disabled={false}
-                />
-              </div>
-            </Row>
-
-            <Row className="flex-nowrap items-center justify-between mb-6">
-              <div className="w-full">
-                <Text className="block text-primaryC text-[13px] mb-2">
-                  COMMENTS
-                </Text>
-                <TextArea
-                  rows={2}
-                  placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
-                  disabled={
-                    orderDetails.status === 3 || orderDetails.status === 4
-                  }
-                  onChange={(event) => {
-                    setcomment(encodeURIComponent(event.target.value));
-                  }}
                 />
               </div>
             </Row>

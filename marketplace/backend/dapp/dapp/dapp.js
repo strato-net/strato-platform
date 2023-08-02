@@ -889,8 +889,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderShippingCharges: shippingCharge,
           status: ORDER_STATUS.AWAITING_FULFILLMENT,
           amountPaid,
-          buyerComments: '',
-          sellerComments: '',
           createdDate, paymentSessionId, shippingAddress
         }
 

@@ -21,8 +21,6 @@ contract Order is OrderStatus {
     uint public paymentDate;
     uint public amountPaid;
     uint public fullfilmentDate;
-    string public buyerComments;
-    string public sellerComments;
     uint public createdDate;
     string public paymentSessionId;
     address public shippingAddress;
@@ -46,8 +44,6 @@ contract Order is OrderStatus {
         uint _orderShippingCharges,
         OrderStatus _status,
         uint _amountPaid,
-        string _buyerComments,
-        string _sellerComments,
         uint _createdDate,
         string _paymentSessionId,
         address _shippingAddress
@@ -62,8 +58,6 @@ contract Order is OrderStatus {
         orderShippingCharges = _orderShippingCharges;
         status = OrderStatus.AWAITING_FULFILLMENT;
         amountPaid = _amountPaid;
-        buyerComments = _buyerComments;
-        sellerComments = _sellerComments;
         createdDate = _createdDate;
         paymentSessionId = _paymentSessionId;
         shippingAddress = _shippingAddress;
@@ -76,7 +70,6 @@ contract Order is OrderStatus {
 
     function updateBuyerDetails(
         OrderStatus _status,
-        string _buyerComments,
         uint _scheme
     ) public returns (uint, string, string) {
         mapping(string => string) ownerCert = getUserCert(tx.origin);
@@ -90,7 +83,6 @@ contract Order is OrderStatus {
             return
                 getInventoriesAndAvailableQuantity(
                     _status,
-                    _buyerComments,
                     orderLines,
                     true
                 );
@@ -104,17 +96,12 @@ contract Order is OrderStatus {
             changeStatus(_status);
         }
 
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            buyerComments = _buyerComments;
-        }
-
         return (RestStatus.OK, string(address(0)), string(address(0)));
     }
 
     function updateSellerDetails(
         OrderStatus _status,
         uint _fullfilmentDate,
-        string _sellerComments,
         uint _scheme
     ) public returns (uint, string, string) {
         mapping(string => string) ownerCert = getUserCert(tx.origin);
@@ -139,7 +126,6 @@ contract Order is OrderStatus {
             return
                 getInventoriesAndAvailableQuantity(
                     _status,
-                    _sellerComments,
                     orderLines,
                     false
                 );
@@ -150,7 +136,6 @@ contract Order is OrderStatus {
             return
                 getInventoriesAndAvailableQuantity(
                     _status,
-                    _sellerComments,
                     orderLines,
                     false
                 );
@@ -165,9 +150,6 @@ contract Order is OrderStatus {
         }
         if ((_scheme & (1 << 1)) == (1 << 1)) {
             fullfilmentDate = _fullfilmentDate;
-        }
-        if ((_scheme & (1 << 2)) == (1 << 2)) {
-            sellerComments = _sellerComments;
         }
 
         return (RestStatus.OK, "", "");
@@ -224,16 +206,10 @@ contract Order is OrderStatus {
 
     function getInventoriesAndAvailableQuantity(
         OrderStatus _status,
-        string _comments,
         address[] _orderLines,
         bool _isBuyer
     ) public returns (uint, string, string) {
         changeStatus(_status);
-        if (_isBuyer) {
-            buyerComments = _comments;
-        } else {
-            sellerComments = _comments;
-        }
         string inventories = "";
         string orderLineQuantities = "";
         for (uint i = 0; i < orderLines.length; i++) {
