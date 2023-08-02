@@ -53,6 +53,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         { label: <div id="Inventory">Inventory</div>, key: '2' },
         { label: <div id="Products">Products</div>, key: '3' },
         { label: <div id="Events">Events</div>, key: '4' },
+        { label: <div id="Property">Property</div>, key: '5' },
       ]
     },
     {
@@ -69,6 +70,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
+    routes.Properties.url
   ];
 
   const logout = () => {
@@ -93,6 +95,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
+    } else if (pathName.includes("/properties") || pathName === "/properties") {
+      setSelectedTab("5");
     }
     else{
       setSelectedTab("0");

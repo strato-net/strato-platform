@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Spin, Typography, Tabs, Col, Row } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
@@ -6,8 +6,18 @@ import FeaturesTab from "./ListingTabs/FeaturesTab";
 import PriceHistoryTab from "./ListingTabs/PriceHistoryTab";
 import ReviewTab from "./ListingTabs/ReviewTab";
 import ListingContactCard from './ListingTabs/ListingContactCard';
+import { useParams } from 'react-router-dom';
+import { actions } from '../../../contexts/propertyContext/actions';
+import { usePropertiesDispatch } from '../../../contexts/propertyContext';
 
 function PropertyDetails() {
+  const dispatch = usePropertiesDispatch()
+  let { id } = useParams();
+
+  useEffect(() => {
+    // actions.fetchPropertyDetails(dispatch, id)
+  }, [])
+
   // Dummy data for Collage & Carousel
   const imglist = [
     'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1607154818od-w1024_h768_x2.webp',
@@ -51,7 +61,7 @@ function PropertyDetails() {
 
   return (
     <>
-      <Col span={16} style={{ margin: 'auto' }}>
+      <Col span={16} style={{ margin: 'auto', marginBottom: '100px' }}>
         <ImageCollage images={imglist} />
         <Row justify={"center"} align="top"
           style={{ marginTop: 50 }} >

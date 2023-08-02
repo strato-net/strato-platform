@@ -8,6 +8,9 @@ const actionDescriptors = {
   fetchProperties: "fetch_properties",
   fetchPropertiesSuccessful: "fetch_properties_successful",
   fetchPropertiesFailed: "fetch_properties_failed",
+  fetchPropertyDetails: "fetch_property_details",
+  fetchPropertyDetailsSuccessful: "fetch_property_details_successful",
+  fetchPropertyDetailsFailed: "fetch_property_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
 };
@@ -22,7 +25,7 @@ const actions = {
   },
 
   createProperty: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.createProduct });
+    dispatch({ type: actionDescriptors.createProperty });
     try {
       const response = await fetch(`${apiUrl}/properties`, {
         method: HTTP_METHODS.POST,
@@ -72,7 +75,7 @@ const actions = {
       ? `&queryValue=${queryValue}&queryFields=name`
       : "";
 
-    dispatch({ type: actionDescriptors.fetchProduct });
+    dispatch({ type: actionDescriptors.fetchProperties });
 
     try {
       const response = await fetch(
@@ -83,7 +86,7 @@ const actions = {
       );
 
       const body = await response.json();
-     
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
@@ -93,7 +96,7 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchProductFailed,
-          error: "Error while fetching product list",
+          error: "Error while fetching property list",
         });
       }
       dispatch({
@@ -103,8 +106,48 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchProductFailed,
-        error: "Error while fetching product list",
+        error: "Error while fetching property list",
       });
     }
   },
+
+  fetchPropertyDetails: async (dispatch, id) => {
+    dispatch({ type: actionDescriptors.fetchPropertyDetails })
+    try {
+      const response = await fetch(`${apiUrl}/properties/${id}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPropertyDetailsSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchPropertyDetailsFailed,
+          error: "Error while fetching property list",
+        });
+        return;
+      }
+      dispatch({
+        type: actionDescriptors.fetchPropertyDetailsFailed,
+        error: body.error,
+      });
+      return;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchPropertyDetailsFailed,
+        error: "Error while fetching property detail",
+      });
+      
+    }
+  },
 }
+
+export { actions, actionDescriptors }

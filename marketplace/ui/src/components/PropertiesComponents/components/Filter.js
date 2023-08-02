@@ -40,7 +40,7 @@ const Filter = () => {
   const [inputParkingType, setInputParkingType] = useState();
 
   // const { properties, isPropertiesLoading } = usePropertiesState();
-  const [isDrawerOpen, setDrawerOpen] = useState(false); 
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   const onChangeZipcodeValidation = (newValue) => {
     setInputZipcodeValue(newValue);
@@ -135,6 +135,7 @@ const Filter = () => {
               step={50000}
               min={0}
               max={2000000}
+              type='number'
               onChange={onChangeMinPrice}
               value={
                 typeof inputMinPriceValue === "number" ? inputMinPriceValue : 0
@@ -143,6 +144,7 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={2000000}
+              type='number'
               style={{ width: "100%" }}
               placeholder="input min price"
               value={inputMinPriceValue}
@@ -159,6 +161,7 @@ const Filter = () => {
               step={50000}
               min={0}
               max={2000000}
+              type='number'
               onChange={onChangeMaxPrice}
               value={
                 typeof inputMaxPriceValue === "number" ? inputMaxPriceValue : 0
@@ -167,6 +170,7 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={2000000}
+              type='number'
               style={{ width: "100%" }}
               placeholder="input max price"
               value={inputMaxPriceValue}
@@ -184,9 +188,10 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={99999}
+              type='number'
               value={inputZipcodeValue}
               style={{ width: "100%" }}
-              placeholder="Input a Zipcode"
+              placeholder="Enter Zipcode"
               onChange={onChangeZipcodeValidation}
             />
             <Typography.Title
@@ -229,6 +234,7 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={7}
+              type='number'
               style={{ width: "100%" }}
               placeholder="input min bedrooms"
               value={inputMinBedrooms}
@@ -253,6 +259,7 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={7}
+              type='number'
               style={{ width: "100%" }}
               placeholder="input min bathrooms"
               value={inputMinBathrooms}
@@ -299,6 +306,7 @@ const Filter = () => {
             </Typography.Title>
             <InputNumber
               min={0}
+              type='number'
               style={{ width: "100%" }}
               placeholder="input min sq ft."
               value={inputMinSqFt}
@@ -349,7 +357,9 @@ const Filter = () => {
           >
             {/* Properties for you */}
             <Space style={{ marginLeft: "15px" }}>
-              <Button icon={<FilterFilled />} onClick={openDrawer}>Filter</Button>
+              <Button icon={<FilterFilled />} onClick={openDrawer}>
+                Filter
+              </Button>
             </Space>
           </Typography.Title>
         </Col>
