@@ -16,7 +16,8 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
   const [name, setname] = useState('')
   const [description, setdescription] = useState('')
   const [lotNumber, setLotNumber] = useState('')
-  const [street, setStreet] = useState('')
+  const [addressLine1, setAddressLine1] = useState('')
+  const [addressLine2, setAddressLine2] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
   const [zipCode, setZipCode] = useState('')
@@ -34,7 +35,7 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
   const [previewTitle, setPreviewTitle] = useState('');
   const [fileList, setFileList] = useState([]);
 
-  const isDisabledCreateView = (!name || !description || !lotNumber || !street || !city || !state || !description || !zipCode || !askingPrice);
+  const isDisabledCreateView = (!name || !description || !lotNumber || !addressLine1 || !addressLine2 || !city || !state || !description || !zipCode || !askingPrice);
   const isDisabledFactsView = (!homeType || !bedrooms || !bathrooms || !squareFeet || !yearBuilt || !lotSize);
 
   const handleModalToggle = () => {
@@ -177,16 +178,25 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
               />
             </Form.Item>
             <Form.Item
-              label="Street*"
+              label="Address Line 1*"
               name="street"
               rules={[{ message: 'Please input an asking price.' }]}
             >
               <Input
                 label="Street"
-                defaultValue={street}
-                maxLength={100}
-                showCount
-                onChange={(e) => setStreet(e.target.value)}
+                defaultValue={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Address Line 2*"
+              name="street"
+              rules={[{ message: 'Please input an asking price.' }]}
+            >
+              <Input
+                label="Street"
+                defaultValue={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
               />
             </Form.Item>
             <Form.Item
@@ -197,8 +207,6 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
               <Input
                 label="City"
                 defaultValue={city}
-                maxLength={100}
-                showCount
                 onChange={(e) => setCity(e.target.value)}
               />
             </Form.Item>
