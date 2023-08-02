@@ -21,7 +21,7 @@ const ImageCollage = (props) => {
           <Col span={16}>
             <CarouselComponent images={images} />
           </Col>
-          {images.length >= 3
+          {images?.length >= 3
             && <Col span={8}>
               <Image
                 width={'100%'}
