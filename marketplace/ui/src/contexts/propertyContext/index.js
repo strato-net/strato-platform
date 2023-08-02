@@ -13,6 +13,8 @@ const PropertyProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
+    propertyDetails: null,
+    isPropertyDetailsLoading: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

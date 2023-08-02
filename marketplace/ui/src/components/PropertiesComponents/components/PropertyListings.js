@@ -1,11 +1,20 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Row, Col, Typography, Space } from 'antd'
 import PropertyCard from './PropertyCard'
 import { sampleProperties } from '../helpers/sampleProperties'
 import Filter from './Filter'
+import { actions } from '../../../contexts/propertyContext/actions'
+import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 
 function PropertyListings() {
+  const dispatch = usePropertiesDispatch()
+
+  useEffect(() => {
+    // TODO: will be used when API is ready
+    // actions.fetchProperties(dispatch)
+  }, [])
+
   return (
     <>
     <Row justify="center">

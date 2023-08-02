@@ -34,12 +34,36 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchProperties:
       return {
         ...state,
-        isProductsLoading: true,
+        isPropertiesLoading: true,
+      };
+    case actionDescriptors.fetchPropertiesSuccessful:
+      return {
+        ...state,
+        isPropertiesLoading: false,
+        properties: action.payload
+      };
+    case actionDescriptors.fetchPropertiesFailed:
+      return {
+        ...state,
+        isPropertiesLoading: false,
+        properties: action.error
       };
     case actionDescriptors.fetchPropertyDetails:
       return {
         ...state,
-        isProductsLoading: true,
+        isPropertyDetailsLoading: true,
+      };
+    case actionDescriptors.fetchPropertyDetailsSuccessful:
+      return {
+        ...state,
+        isPropertyDetailsLoading: true,
+        propertyDetails: action.payload
+      };
+    case actionDescriptors.fetchPropertyDetailsFailed:
+      return {
+        ...state,
+        isPropertyDetailsLoading: false,
+        propertyDetails: action.payload
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
