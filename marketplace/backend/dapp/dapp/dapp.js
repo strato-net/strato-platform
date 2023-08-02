@@ -458,80 +458,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.deleteProduct(args);
   };
   contract.createInventory = async function (args, options = defaultOptions) {
-    // const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     const { creditBatchSerialization, ...restArgs } = args;
     const quantity = args.quantity;
-
-    // const serialNo = [];
-    // const repeatedSerialNumber = [];
     const serialNumbers = []
 
-
-    // if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-    //   for (let i = 0; i < serialNumber.length; i += 200) {
-    //     serialNo.push(serialNumber[i].itemSerialNumber)
-    //     const serialNumberArr = serialNo.slice(i, i + 200);
-    //     const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
-
-    //     items.forEach(obj => {
-    //       const item = serialNumberArr.find(num => num === obj.serialNumber);
-    //       if (item) {
-    //         repeatedSerialNumber.push(item);
-    //       }
-    //     });
-    //   }
-    // }
-    // if (repeatedSerialNumber.length != 0) {
-    //   throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
-    // }
-
-    // const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
-
-    // let transformedArray = [];
-
-    // if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-    //   serialNumber.forEach(function (item) {
-    //     let rawMaterialProductNameArray = [];
-    //     let rawMaterialSerialNumberArray = [];
-    //     let rawMaterialProductIdArray = [];
-
-    //     if (item.rawMaterials.length != 0) {
-    //       item.rawMaterials.forEach(function (rawMaterial) {
-    //         let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-    //         let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-    //         let rawMaterialProductId = rawMaterial.rawMaterialProductId;
-
-    //         for (const element of rawMaterialSerialNumbers) {
-    //           rawMaterialProductNameArray.push(rawMaterialProductName);
-    //           rawMaterialSerialNumberArray.push(element);
-    //           rawMaterialProductIdArray.push(rawMaterialProductId);
-    //         }
-    //       });
-    //     }
-
-    //     transformedArray.push({
-    //       "itemNumber": parseInt(util.iuid()),
-    //       "serialNumber": item.itemSerialNumber,
-    //       "rawMaterialProductName": rawMaterialProductNameArray,
-    //       "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-    //       "rawMaterialProductId": rawMaterialProductIdArray
-    //     });
-    //     serialNumbers.push(item.itemSerialNumber)
-    //   });
-    // }
-    // For some reason an else statement is not working here
-    // if (serialNumber.length === 0 || serialNumber.length === undefined) {
-    //   const quantity = args.quantity;
-    //   for (let i = 0; i < quantity; i++) {
-    //     transformedArray.push({
-    //       "creditBatchSerialization": "",
-    //       "rawMaterialProductName": [],
-    //       "rawMaterialSerialNumber": [],
-    //       "rawMaterialProductId": []
-    //     });
-    //   }
-    // }
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
@@ -550,13 +481,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       status: restArgs.status,
       inventoryId: createdInventoryAddress,
     };
-    const [itemStatus, itemAddress, repeatedSerialNumbers] = await managers.itemManager.addItem(itemParams);
+    const [itemStatus, itemAddress] = await managers.itemManager.addItem(itemParams);
 
     return [
       itemStatus,
       createdInventoryAddress,
       itemAddress.slice(0, -1),
-      repeatedSerialNumbers.slice(0, -1),
     ];
 
   };
