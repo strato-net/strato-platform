@@ -745,19 +745,6 @@ bAccount a =
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
 
--- hash(0xFF, sender, salt, code_hash, args)[12::]
-deriveAddressWithSalt :: String -> BC.ByteString -> String -> Address
-deriveAddressWithSalt salt src args = do
-  let theAddress = fromJust $ stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"
-      theHash = hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
-                                               , rlpEncode theAddress
-                                               , rlpEncode salt
-                                               , rlpEncode $ keccak256ToByteString $ hash src
-                                               , rlpEncode args
-                                               ]
-  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
-  (decode $ BL.drop 12 $ encode theHash)
-
 spec :: Spec
 spec = do
   xdescribe "Ballot" $ do
@@ -5745,8 +5732,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[]"
-      , bContract "Y" $ deriveAddressWithSalt "something" (BC.pack src) "[]"
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "[]"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (BC.pack src) "[]"
       ]
 
   it "can deterministically create multiple salted contract with args" . runTest $ do
@@ -5780,8 +5767,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SString \"xNum\"]"
-      , bContract "Y" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SInteger 100]"
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "[Constant: SString \"xNum\"]"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "[Constant: SInteger 100]"
       ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -5807,7 +5794,7 @@ contract qq {
   }
 }|] 
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt "Dustin Norwood" (BC.pack src) "[Constant: SString \"Dustin Norwood\",Constant: SString \"Thebestcertyoucangetfor$99.99\"]"]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (BC.pack src) "[Constant: SString \"Dustin Norwood\",Constant: SString \"Thebestcertyoucangetfor$99.99\"]"]
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
