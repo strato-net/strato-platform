@@ -8,7 +8,7 @@ import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 
 function PropertyListings() {
-  const dispatch = usePropertiesDispatch()
+  // const dispatch = usePropertiesDispatch()
 
   useEffect(() => {
     // TODO: will be used when API is ready
