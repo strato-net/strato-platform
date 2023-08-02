@@ -38,6 +38,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
 import Slipstream.Options
 import Slipstream.OutputData
+import Slipstream.Processor
 
 import SelectAccessible ()
 
@@ -93,4 +94,7 @@ main = do
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
 
+    --Create Asset table
+    generateAssetTable conn gref
+    
     getAndProcessMessages env conn gref

@@ -18,9 +18,13 @@ module Slipstream.OutputData (
   insertIndexTable,
   insertForeignKeys,
   insertMappingTable,
+  insertAssetTable,
+  insertAssetTableQuery,
+  insertContractInAssetTableQuery,
   createIndexTable,
   createMappingTable,
   createHistoryTable,
+  createAssetTable,
   insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
@@ -35,7 +39,7 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Data.Aeson                      (encode)
+import qualified Data.Aeson                      as Aeson                  
 import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -44,11 +48,13 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
+-- import qualified Data.Text.Encoding as TE
 import           Data.Time
 import           Data.List (nubBy, groupBy)
 import           Data.Function (on)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Data.ByteString.Base16          as Base16
+-- import qualified Data.ByteString.Lazy.Char8 as BSL
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
@@ -223,11 +229,27 @@ baseMappingColumns = [ "record_id"
               , "mapname"
               ]
 
+baseAssetColumns :: TableColumns
+baseAssetColumns = [ "record_id"
+              , "address"
+              , "chainId"
+              , "block_hash"
+              , "block_timestamp"
+              , "block_number"
+              , "transaction_hash"
+              , "transaction_sender"
+              , "contractname"
+              , "data"
+              ]
+
 baseTableColumns :: TableColumns
 baseTableColumns = baseColumns
 
 baseMappingTableColumns :: TableColumns
 baseMappingTableColumns = baseMappingColumns
+
+baseAssetTableColumns :: TableColumns
+baseAssetTableColumns = baseAssetColumns
 
 
 -- discard app if org is null
@@ -260,9 +282,11 @@ historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameter
 indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
+assetTableRowName :: Text -> Text -> Text -> TableName
+assetTableRowName o a n = uncurry3 AssetTableRowName $ constructTableNameParameters o a n
+
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingTableNameParameters o a n m
-
 
 createExpandIndexTable
   :: OutputM m
@@ -340,6 +364,18 @@ createIndexTable globalsIORef contract (o, a, n) = do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
+
+createAssetTable :: OutputM m
+                 => IORef Globals
+                 -> ConduitM () Text m ()
+createAssetTable globalsIORef = do
+  let tableName = indexTableName "" "" "Asset"
+  tableExists <- isTableCreated globalsIORef tableName
+  when (not tableExists) $ do
+    yield $ createAssetTableQuery
+    let list = ["data"]
+    setTableCreated globalsIORef tableName list
+
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable :: OutputM m
@@ -579,6 +615,20 @@ insertHistoryTable contracts@(E.ProcessedContract { organization = org, applicat
   $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
+insertAssetTable :: OutputM m
+                 => [Maybe E.ProcessedContract]
+                 -> ConduitM () Text m ()
+insertAssetTable [] = return () -- no data, do nothing
+insertAssetTable contracts = do
+    let validContracts = catMaybes contracts
+    case validContracts of
+        [] -> return () -- no valid contracts, do nothing
+        (E.ProcessedContract { organization = org, application = app, contractName = cName } : _) -> do
+            let tableName = indexTableName org app cName
+            $logInfoS "insertAssetTable" $ T.pack $ "Inserting row in asset table for: " ++ show tableName
+            yieldMany $ insertAssetTableQuery validContracts
+
+
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
   let tableName = indexTableName o a n
@@ -598,6 +648,16 @@ createMappingTableQuery (o, a, n, m) =
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "mapname text","key text", "value text"]
         , ",\n  PRIMARY KEY (address, key));"
+        ]
+
+createAssetTableQuery :: Text
+createAssetTableQuery =
+  let tableName = indexTableName "" "" "Asset"
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
+        , ",\n  PRIMARY KEY (contractname));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -652,6 +712,7 @@ insertIndexTableQuery cs = concat $
                          ]
               vals = flip map contracts $ \(row, rowList) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
@@ -722,6 +783,62 @@ insertMappingTableQuery ms = concat $
     contractname = excluded.contractname,
     mapname = excluded.mapname,
     value = excluded.value|]
+                , ";"
+                ]
+
+insertContractInAssetTableQuery :: OutputM m => IORef Globals -> (Text, Text, Text) -> ConduitM () Text m ()
+insertContractInAssetTableQuery globalsIORef (o,a,n) = do
+  let tableName = assetTableRowName o a n
+  tableExists <- isTableCreated globalsIORef tableName
+  $logInfoLS "insertContractInAssetTableQuery/assetTableRowExists" (tableName, tableExists)
+
+  when (not tableExists) $ do
+    incNumAssetRowTables
+    yield $ T.concat [ "INSERT INTO \"Asset\" (contractname) VALUES ('", tableNameToDoubleQuoteText tableName, "');" ]
+    let list = ["data"]
+    setTableCreated globalsIORef tableName list
+
+insertAssetTableQuery :: [E.ProcessedContract] -> [Text]
+insertAssetTableQuery [] = error "insertAssetTableQuery: unhandled empty list"
+insertAssetTableQuery cs = concat $
+  let cs' = (\c@E.ProcessedContract{contractData = contractData} -> (c, Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
+   in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+        [] -> []
+        contracts@((x,_):_) ->
+          let tableName = tableNameToText $ indexTableName
+                  (E.organization x)
+                  (E.application x)
+                  (E.contractName x)  
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAssetTableColumns
+              baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
+                         , tshow . E.address
+                         , E.chain
+                         , T.pack . keccak256ToHex . E.blockHash
+                         , tshow . E.blockTimestamp
+                         , tshow . E.blockNumber
+                         , T.pack . keccak256ToHex . E.transactionHash
+                         , tshow . E.transactionSender
+                         ]
+
+              vals = flip map contracts $ \(row, rowList) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
+              inserts = csv vals
+           in (:[]) $ T.concat
+                [ "INSERT INTO \"Asset\" "
+                , keySt
+                , "\n  VALUES "
+                , inserts 
+                , [r|
+  ON CONFLICT (contractname) DO UPDATE SET
+    record_id = excluded.record_id,
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    data = excluded.data|]
                 , ";"
                 ]
 
@@ -919,8 +1036,8 @@ solidityValueToText (SolidityValueAsString x) = escapeQuotes x
 solidityValueToText (SolidityBool x)          = tshow x
 solidityValueToText (SolidityNum x )          = tshow x
 solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
-solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 
 valueToSQLTextFilterContract :: Value -> Maybe Text
