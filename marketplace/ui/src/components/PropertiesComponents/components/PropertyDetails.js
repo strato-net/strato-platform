@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Spin, Typography, Tabs, Col, Row } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
@@ -6,24 +6,28 @@ import FeaturesTab from "./ListingTabs/FeaturesTab";
 import PriceHistoryTab from "./ListingTabs/PriceHistoryTab";
 import ReviewTab from "./ListingTabs/ReviewTab";
 import ListingContactCard from './ListingTabs/ListingContactCard';
+import { useParams } from 'react-router-dom';
+import { actions } from '../../../contexts/propertyContext/actions';
+import { usePropertiesDispatch } from '../../../contexts/propertyContext';
+import { sampleProperties } from '../helpers/sampleProperties';
 
 function PropertyDetails() {
-  // Dummy data for Collage & Carousel
-  const imglist = [
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1607154818od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3497275450od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3180059059od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1194456964od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2512788875od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2935903856od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m210456744od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1069665804od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2999610083od-w1024_h768_x2.webp',
-    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m876342709od-w1024_h768_x2.webp'
-  ]
+  const [propertyDetail, setPropertyDetail] = useState({})
+  const dispatch = usePropertiesDispatch()
+  let { id } = useParams();
+  
+  useEffect(() => {
+    // actions.fetchPropertyDetails(dispatch, id)
+  const propertyData = sampleProperties?.filter((item)=>item?.id===id);
+  setPropertyDetail(propertyData[0])
+}, [])
+
+// Dummy data for Collage & Carousel
+const imglist = propertyDetail?.images;
+
 
   const property = {
-    fields: "hello"
+    fields: "Property detail"
   }
 
   const tabs = [
@@ -45,13 +49,13 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      children: <ReviewTab />,
+      children: <ReviewTab  />,
     },
   ];
 
   return (
     <>
-      <Col span={16} style={{ margin: 'auto' }}>
+      <Col span={16} style={{ margin: 'auto', marginBottom: '100px' }}>
         <ImageCollage images={imglist} />
         <Row justify={"center"} align="top"
           style={{ marginTop: 50 }} >
@@ -69,14 +73,14 @@ function PropertyDetails() {
                 style={{ marginTop: 0, marginRight: 10 }}
                 level={4}
               >
-                $ 3000
+                $ {propertyDetail?.listPrice}
               </Typography.Title>
             </Row>
 
             <Row>
               <Typography.Title style={{ marginTop: 2 }} level={4}>
-                Brooklyn, NewYork{" "}
-                11203
+                {propertyDetail?.postalCity}, {propertyDetail?.stateOrProvince}{" "}
+                {propertyDetail?.postalCode}
               </Typography.Title>
             </Row>
             <Row>

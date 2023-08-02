@@ -37,6 +37,7 @@ import LoginRedirect from "./components/LoginRedirect";
 import PropertyListings from "./components/PropertiesComponents/components/PropertyListings";
 import PropertyLayout from "./components/PropertiesComponents/components/PropertyLayout";
 import PropertyDetails from "./components/PropertiesComponents/components/PropertyDetails";
+import { PropertyProvider } from "./contexts/propertyContext";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -404,9 +405,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={`${routes.Properties.url}/:id`}
         element={
           <UsersProvider>
-            <PropertyLayout tab='details'>
-              <PropertyDetails user={user} />
-            </PropertyLayout>
+            <PropertyProvider>
+              <PropertyLayout tab='details'>
+                <PropertyDetails user={user} />
+              </PropertyLayout>
+            </PropertyProvider>
           </UsersProvider>
         }
       />

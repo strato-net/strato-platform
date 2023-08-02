@@ -12,8 +12,6 @@ function PropertyHeaderBtns({ tab }) {
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
-  console.log(tab)
-
   return (
     <>
     {/* Modals for creating property listings */}

@@ -1,46 +1,48 @@
 import React, { createContext, useContext, useReducer } from "react";
 import reducer from "./reducer";
 
-const PropertiesStateContext = createContext();
-const PropertiesDispatchContext = createContext();
+const PropertyStateContext = createContext();
+const PropertyDispatchContext = createContext();
 
-const PropertiessProvider = ({ children }) => {
+const PropertyProvider = ({ children }) => {
   const initialState = {
     property: null,
-    isCreateProductSubmitting: false,
+    isCreatePropertySubmitting: false,
     properties: [],
     isPropertiesLoading: false,
     error: undefined,
     success: false,
     message: null,
+    propertyDetails: null,
+    isPropertyDetailsLoading: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);
 
   return (
-    <PropertiesStateContext.Provider value={state}>
-      <PropertiesDispatchContext.Provider value={dispatch}>
+    <PropertyStateContext.Provider value={state}>
+      <PropertyDispatchContext.Provider value={dispatch}>
         {children}
-      </PropertiesDispatchContext.Provider>
-    </PropertiesStateContext.Provider>
+      </PropertyDispatchContext.Provider>
+    </PropertyStateContext.Provider>
   );
 };
 
 const usePropertiesState = () => {
-  const context = useContext(PropertiesStateContext);
+  const context = useContext(PropertyStateContext);
   if (context === undefined) {
     throw new Error(
-      `'usePropertiesState' must be used within a ProductsProvider`
+      `'usePropertiesState' must be used within a PropertyProvider`
     );
   }
   return context;
 };
 
 const usePropertiesDispatch = () => {
-  const context = useContext(PropertiesDispatchContext);
+  const context = useContext(PropertyDispatchContext);
   if (context === undefined) {
     throw new Error(
-      `'usePropertiesDispatch' must be used within a ProductsProvider`
+      `'usePropertiesDispatch' must be used within a PropertyProvider`
     );
   }
   return context;
@@ -54,5 +56,5 @@ export {
   usePropertiesDispatch,
   usePropertiesState,
   usePropertiesUnit,
-  PropertiessProvider,
+  PropertyProvider,
 };
