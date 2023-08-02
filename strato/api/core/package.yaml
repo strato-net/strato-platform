@@ -12,6 +12,7 @@ library:
   dependencies:
   - aeson
   - aeson-casing
+  - async
   - base64-bytestring
   - binary
   - blockapps-data
@@ -58,3 +59,4 @@ library:
   - identity-monad
   - blockapps-vault-wrapper-server
   - strato-redis-blockdb
+  - evm-solidity
