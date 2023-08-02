@@ -73,7 +73,6 @@ const SoldOrderDetails = ({ user, users }) => {
     message,
     issellerDetailsUpdating,
     success,
-    isCreateOrderLineItem,
   } = useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
@@ -219,19 +218,19 @@ const SoldOrderDetails = ({ user, users }) => {
 
       // Here we are skipping the createOrderLineItem if the serial number is already uploaded. 
       // If the serial number is uploaded an orderLineItem is already created.
-      if (details.orderLines[i].containsSerialNumber === true) {
-        continue;
-      } else {
-        body = {
-          orderId: details.orderId,
-          orderAddress: details.address,
-          orderLineId: details.orderLines[i].address,
-          serialNumber: [],
-          quantity: details.orderLines[i].quantity,
-        };
+      // if (details.orderLines[i].containsSerialNumber === true) {
+      //   continue;
+      // } else {
+      //   body = {
+      //     orderId: details.orderId,
+      //     orderAddress: details.address,
+      //     orderLineId: details.orderLines[i].address,
+      //     serialNumber: [],
+      //     quantity: details.orderLines[i].quantity,
+      //   };
 
-        promises.push(actions.createOrderLineItem(dispatch, body));
-      }
+      //   promises.push(actions.createOrderLineItem(dispatch, body));
+      // }
     }
     if (promises.length > 0) {
       await Promise.all(promises);
@@ -650,7 +649,7 @@ const SoldOrderDetails = ({ user, users }) => {
           orderAddress={details.address}
           dispatch={dispatch}
           actions={actions}
-          isLoading={isCreateOrderLineItem}
+          isLoading={false}
           Id={Id}
         />
       )}

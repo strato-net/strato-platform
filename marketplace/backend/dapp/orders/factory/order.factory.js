@@ -41,24 +41,14 @@ const factory = {
 
     getOrderLineArgs(uid) {
         const args = {
-            createdDate: new Date().getTime(), 
-            inventoryId: constants.zeroAddress, 
-            orderAddress: constants.zeroAddress, 
-            pricePerUnit: uid, 
-            productId: constants.zeroAddress, 
-            quantity: uid, 
-            shippingCharges: uid, 
-            tax: uid,
-        };
-        return args;
-    },
-
-    getOrderLineItemArgs(uid) {
-        const args = {
-            orderLineId: constants.zeroAddress,
-            itemId: `itemId_${uid}`,
-            itemSerialNumber: `itemSerialNumber_${uid}`,
             createdDate: new Date().getTime(),
+            inventoryId: constants.zeroAddress,
+            orderAddress: constants.zeroAddress,
+            pricePerUnit: uid,
+            productId: constants.zeroAddress,
+            quantity: uid,
+            shippingCharges: uid,
+            tax: uid,
         };
         return args;
     },

@@ -8,7 +8,6 @@ import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
 import order from './Order'
-import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
 import event from './Event'
 import authentication from './authentication'
@@ -26,7 +25,6 @@ import {
   Inventory,
   Item,
   Order,
-  OrderLineItem,
   EventType,
   Event,
   Image,
@@ -45,7 +43,6 @@ router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Order.prefix, order)
-router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)
 router.use(Event.prefix, event)
 router.use(Image.prefix, image)

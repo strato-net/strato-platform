@@ -62,11 +62,11 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   
   }, [routeMatch]);
 
-  useEffect(() => {
-    if (Id !== undefined) {
-      actions.fetchOrderLineItemDetails(dispatch, Id);    
-    }
-  }, [Id, dispatch]);
+  // useEffect(() => {
+  //   if (Id !== undefined) {
+  //     actions.fetchOrderLineItemDetails(dispatch, Id);    
+  //   }
+  // }, [Id, dispatch]);
 
 
   const navigate = useNavigate();

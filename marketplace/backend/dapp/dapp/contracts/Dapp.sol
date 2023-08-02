@@ -6,7 +6,6 @@ import "/dapp/orders/contracts/Order.sol";
 import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
-import "/dapp/orders/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
 import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";

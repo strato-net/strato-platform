@@ -8,9 +8,6 @@ const actionDescriptors = {
   createPayment: "create_payment",
   createPaymentSuccessful: "create_payment_successful",
   createPaymentFailed: "create_payment_failed",
-  createOrderLineItem: "create_order_line_item",
-  createOrderLineItemSuccessful: "create_order_line_item_successful",
-  createOrderLineItemFailed: "create_order_line_item_failed",
   fetchOrder: "fetch_orders",
   fetchOrderSuccessful: "fetch_order_successful",
   fetchOrderFailed: "fetch_order_failed",
@@ -20,9 +17,6 @@ const actionDescriptors = {
   fetchOrderDetails: "fetch_order_details",
   fetchOrderDetailsSuccessful: "fetch_order_details_successful",
   fetchOrderDetailsFailed: "fetch_order_details_failed",
-  fetchOrderLineItemDetails: "fetch_order_line_item_details",
-  fetchOrderLineItemDetailsSuccessful: "fetch_order_line_item_details_successful",
-  fetchOrderLineItemDetailsFailed: "fetch_order_line_item_details_failed",
   updateBuyerDetails: "update_buyer_details",
   updateBuyerDetailsSuccessful: "update_buyer_details_successful",
   updateBuyerDetailsFailed: "update_buyer_details_failed",
@@ -122,46 +116,6 @@ const actions = {
     }
   },
 
-  createOrderLineItem: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.createOrderLineItem });
-
-    try {
-      const response = await fetch(`${apiUrl}/orderLineItem`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.createOrderLineItemSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Item created successfully", true);
-        return true;
-      }
-
-      dispatch({
-        type: actionDescriptors.createOrderLineItemFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.createOrderLineItemFailed,
-        error: "Error while creating Item",
-      });
-      actions.setMessage(dispatch, "Error while creating Item");
-    }
-  },
-
   fetchOrderDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchOrderDetails });
 
@@ -190,38 +144,6 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchOrderDetailsFailed,
         error: "Error while fetching Order",
-      });
-    }
-  },
-
-  fetchOrderLineItemDetails: async (dispatch, id) => {
-    dispatch({ type: actionDescriptors.fetchOrderLineItemDetails });
-
-    try {
-      const response = await fetch(`${apiUrl}/orderLine/${id}`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchOrderLineItemDetailsSuccessful,
-          payload: body.data,
-        });
-
-        return true;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchOrderLineItemDetailsFailed,
-        error: body.error,
-      });
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchOrderLineItemDetailsFailed,
-        error: "Error while fetching Item",
       });
     }
   },

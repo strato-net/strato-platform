@@ -81,7 +81,8 @@ const UploadSerialNumberModal = ({
       orderLineId: product.address,
       serialNumber: serialNumbers,
     };
-    let isDone = await actions.createOrderLineItem(dispatch, body);
+    // let isDone = await actions.createOrderLineItem(dispatch, body);
+    let isDone;
     if (isDone) {
       toggleUploadSerialNumberModal(false);
       actions.fetchOrderDetails(dispatch, Id);

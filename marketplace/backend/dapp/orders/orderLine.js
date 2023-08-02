@@ -120,7 +120,6 @@ function bind(user, _contract, options) {
     contract.get = async (args = { address: contract.address, }) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
-    contract.addOrderLineItems = async (args) => addOrderLineItems(user, contract, args, options);
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -146,21 +145,18 @@ function bindAddress(user, address, options) {
 
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
- * @param args Lookup with an address or uniqueOrderLineID.
+ * @param args Lookup with an address.
  * @returns Contract state in cirrus
  */
 
 
 
 async function get(user, args, options) {
-    const { uniqueOrderLineID, address, ...restArgs } = args;
+    const { address, ...restArgs } = args;
     let orderLine;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        orderLine = await searchOne(contractName, searchArgs, options, user);
-    } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueOrderLineID', value: uniqueOrderLineID });
         orderLine = await searchOne(contractName, searchArgs, options, user);
     }
     if (!orderLine) {
@@ -176,26 +172,6 @@ async function get(user, args, options) {
 async function getAll(admin, args = {}, options) {
     const orderLines = await searchAllWithQueryArgs(contractName, args, options, admin)
     return orderLines.map((orderLine) => marshalOut(orderLine))
-}
-
-async function addOrderLineItems(admin, contract, _args, baseOptions) {
-    const callArgs = {
-        contract,
-        method: 'addOrderLineItems',
-        args: util.usc({
-            ..._args
-        }),
-    }
-    const options = {
-        ...baseOptions,
-        history: [contractName],
-    }
-
-    const [restStatus, orderLineItemAddress] = await rest.call(admin, callArgs, options)
-
-    if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
-
-    return [restStatus, orderLineItemAddress];
 }
 
 /**
@@ -214,7 +190,6 @@ export default {
     bindAddress,
     get,
     getAll,
-    addOrderLineItems,
     marshalIn,
     marshalOut,
     getHistory

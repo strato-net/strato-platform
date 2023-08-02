@@ -48,23 +48,6 @@ const reducer = (state, action) => {
         error: action.error,
         isCreatePaymentSubmitting: false,
       };
-    case actionDescriptors.createOrderLineItem:
-      return {
-        ...state,
-        isCreateOrderLineItem: true,
-      };
-    case actionDescriptors.createOrderLineItemSuccessful:
-      return {
-        ...state,
-        item: action.payload,
-        isCreateOrderLineItem: false,
-      };
-    case actionDescriptors.createOrderLineItemFailed:
-      return {
-        ...state,
-        error: action.error,
-        isCreateOrderLineItem: false,
-      };
     case actionDescriptors.fetchOrder:
       return {
         ...state,
@@ -115,23 +98,6 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isorderDetailsLoading: false,
-      };
-    case actionDescriptors.fetchOrderLineItemDetails:
-      return {
-        ...state,
-        isOrderLineDetailsLoading: true,
-      };
-    case actionDescriptors.fetchOrderLineItemDetailsSuccessful:
-      return {
-        ...state,
-        orderLineDetails: action.payload,
-        isOrderLineDetailsLoading: false,
-      };
-    case actionDescriptors.fetchOrderLineItemDetailsFailed:
-      return {
-        ...state,
-        error: action.error,
-        isOrderLineDetailsLoading: false,
       };
     case actionDescriptors.updateBuyerDetails:
       return {

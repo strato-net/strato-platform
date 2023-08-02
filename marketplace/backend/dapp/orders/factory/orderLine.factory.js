@@ -16,13 +16,5 @@ const factory = {
         };
         return args;
     },
-    getOrderLineItemsArgs(uid) {
-        const args = {
-            orderLineId: constants.zeroAddress,
-            items: Array(4).fill(`${constants.zeroAddress}`),
-            createdDate: new Date().getTime(),
-        };
-        return args;
-    },
 };
 export default factory;

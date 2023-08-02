@@ -1,16 +1,12 @@
- 
-
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
-import "./OrderLineItem.sol";
 import "./Order.sol";
 import "./OrderStatus.sol";
 import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_2 is ItemStatus,OrderStatus{
-
+contract OrderLine_2 is ItemStatus, OrderStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -27,15 +23,16 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
     bool public isSerialUploaded;
 
     address[] public itemsAddresses;
+
     constructor(
-            address _orderAddress
-        ,   address _productId
-        ,   address _inventoryId
-        ,   uint _quantity
-        ,   uint _pricePerUnit
-        ,   uint _shippingCharges
-        ,   uint _tax
-        ,   uint _createdDate
+        address _orderAddress,
+        address _productId,
+        address _inventoryId,
+        uint _quantity,
+        uint _pricePerUnit,
+        uint _shippingCharges,
+        uint _tax,
+        uint _createdDate
     ) public {
         owner = tx.origin;
 
@@ -59,59 +56,6 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
         mapping(string => string) ownerCert = getUserCert(owner);
         string assetOwner = ownerCert["organization"];
         require(assetOwner == ownerOrganization, "You are not the owner.");
-    _;
+        _;
     }
-
-    // Add the orderLineItem of a order
-    function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate ) public  returns(uint256, string,string){
-      
-      mapping(string => string) ownerCert = getUserCert(tx.origin);
-      string assetOwnerOrganization = ownerCert["organization"];
-      string orderLineItems="";
-      string items="";
-      uint orderLineItemCounter = 0;
-
-      // getting the order chain's governance contract
-      Order order = Order(orderAddress);
-
-
-      // if(assetOwnerOrganization != ownerOrganization){
-      //   return (RestStatus.FORBIDDEN,address(0));
-      // }
-      for(uint i=0;i<_items.length;i++){
-        if(address(_items[i]) == address(0)){
-          return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
-        }
-
-        Item_3 item = Item_3(address(_items[i]));
-
-        // check published status of items
-        if(item.status() != ItemStatus.PUBLISHED){
-          return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
-        }
-
-        // check the item's owner
-        if(assetOwnerOrganization != item.ownerOrganization()){
-          return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
-        } 
-
-        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), "", _createdDate);   // temporary fix
-        orderLineItems += string(address(orderLineItem)) + ",";
-        items += string(address(item)) + ",";
-        itemsAddresses.push(address(item));
-        
-        if(address(orderLineItem) !=address(0)){
-          orderLineItemCounter += 1;
-        }
-      }
-      if(orderLineItemCounter != _items.length){
-        return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
-      }
-      isSerialUploaded=true;
-      order.updateOrderStatus(OrderStatus.AWAITING_SHIPMENT);
-      return (RestStatus.OK,orderLineItems,items);
-    }
-
 }
-
-

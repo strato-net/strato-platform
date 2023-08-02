@@ -23,7 +23,6 @@ import orderManagerJs from '/dapp/orders/orderManager';
 
 const allAssetNames = [
   orderJs.contractName,
-  // orderLineItemJs.contractName,
   eventTypeJs.contractName,
   eventTypeManagerJs.contractName,
 ];
@@ -982,12 +981,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         let newOwner = orderLines[0].owner
         let result = []
 
-        for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-          itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
-          result.push({ status, productId, inventoryId });
-        }
+        // for (let orderLineAddress of orderLinesAddresses) {
+        //   const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
+        //   itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+        //   const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
+        //   result.push({ status, productId, inventoryId });
+        // }
         return result;
       }
 
@@ -1080,78 +1079,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return orderJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
   };
 
-  contract.createOrderLineItem = async function (args, options = defaultOptions) {
-    try {
-      const { orderLineId, serialNumber } = args;
-      const quantity = args.quantity || 0;
-      const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-      const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
-      const { productId, inventoryId } = orderLine
-
-      // If no serial numbers are passed, a quantity is passed from the front end. 
-      // This will allow us to get the first n items from the inventory
-      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
-      let items;
-      if (quantity > 0) {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            offset: 0,
-            limit: quantity,
-            status: 1
-          },
-          chainOptions
-        );
-      } else {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            serialNumber: [...serialNumber]
-          },
-          chainOptions
-        );
-      }
-      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
-      }
-
-      const _contract = { name: orderLineJs.contractName, address: orderLineId };
-
-      const itemsAddresses = items.map(_item => _item.address);
-
-
-      const _args = {
-        orderLineId,
-        items: itemsAddresses,
-        createdDate: Math.floor(Date.now() / 1000),
-      };
-      // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
-      // See orderLine.sol 
-      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
-
-      const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
-      const result = orderLineItems.split(",");
-
-      const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: itemsAddresses,
-        status: ITEM_STATUS.SOLD,
-      });
-      if (soldStatus !== "200") {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
-      }
-
-      return result;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the Order Line Item");
-    }
-  };
-
   contract.getOrderLine = async function (args = {}, options = optionsNoChainIds) {
     try {
 
@@ -1160,9 +1087,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const orderLine = await managers.orderManager.getOrderLine({ ...args, }, getOptions);
 
       const inventory = await contract.getInventory({ address: orderLine.inventoryId, });
-      const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address, }, getOptions);
+      // const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address, }, getOptions);
 
-      return { ...inventory, items: orderLineItems, };
+      // return { ...inventory, items: orderLineItems, };
+      return { ...inventory, items: [], };
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -1171,29 +1099,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getOrderLineItem = async function (args, options = optionsNoChainIds) {
-    try {
-      return managers.orderManager.getOrderLineItem(args, { ...options, org: managers.cirrusOrg, app: contractName });
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the OrderLineItem");
-    }
-  };
-
-
-  contract.getOrderLineItems = async function (args = {}, options = optionsNoChainIds) {
-    try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-      return managers.orderManager.getOrderLineItems({ ...args, }, getOptions);
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching the OrderLineItems");
-    }
-  };
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
       const createdDate = Math.floor(Date.now() / 1000);
@@ -1222,7 +1127,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching the OrderLineItems");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating Event Type");
     }
   };
 

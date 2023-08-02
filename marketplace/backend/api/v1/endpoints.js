@@ -72,16 +72,6 @@ export const OrderLine = {
   get: '/:address'
 }
 
-export const OrderLineItem = {
-  prefix: '/orderLineItem',
-  get: '/:orderLineId',
-  getAll: '/',
-  create: '/',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-}
-
 export const EventType = {
   prefix: '/eventType',
   getAll: '/',

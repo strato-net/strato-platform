@@ -12,16 +12,6 @@ const factory={
     }
     return args
   },
-
-  getCreateOrderLineItemsArgs(orderId,orderAddress,orderLineId="",serialNumber=[]){
-    const args={
-      orderId,
-      orderAddress,
-      orderLineId,
-      serialNumber
-    }
-    return args
-  }
 }
 
 
