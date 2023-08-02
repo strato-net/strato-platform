@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Modal, Form, Divider, Input, InputNumber, Upload, Button, Select } from 'antd'
+import { Modal, Form, Divider, Input, InputNumber, Upload, Button, Select, Collapse, DatePicker } from 'antd'
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { StateData } from '../helpers/constants'
+import { StateData, HomeTypeData } from '../helpers/constants'
+import { getStringDate } from '../helpers/utils'
 import PropertyCreateConfirmModal from './PropertyCreateConfirmModal';
 
 const getBase64 = (file) =>
@@ -265,42 +266,82 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
                 name="homeType"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <Select
+                  label="homeType"
+                  defaultValue={homeType}
+                  onSelect={(e) => setHomeType(e)}
+                  options={HomeTypeData}
+                  showSearch
+                />
               </Form.Item>
               <Form.Item
                 label="Bedrooms*"
                 name="bedrooms"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <InputNumber
+                  precision={0}
+                  label="bedrooms"
+                  min={0}
+                  defaultValue={bedrooms}
+                  onChange={(e) => setBedrooms(e)}
+                />
               </Form.Item>
               <Form.Item
                 label="Bathrooms*"
                 name="bathrooms"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <InputNumber
+                  precision={0}
+                  label="bathrooms"
+                  min={0}
+                  defaultValue={bathrooms}
+                  onChange={(e) => setBathrooms(e)}
+                />
               </Form.Item>
               <Form.Item
                 label="Square Ft*"
                 name="squareFeet"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <InputNumber
+                  precision={0}
+                  label="squareFeet"
+                  min={0}
+                  defaultValue={squareFeet}
+                  onChange={(e) => setSquareFeet(e)}
+                />
               </Form.Item>
               <Form.Item
                 label="Year Built*"
                 name="yearBuilt"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <DatePicker picker="year" 
+                onChange={(e) => setYearBuilt(e)} 
+                />
               </Form.Item>
               <Form.Item
                 label="Lot Size*"
                 name="lotSize"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <InputNumber
+                  precision={0}
+                  label="lotSize"
+                  min={0}
+                  defaultValue={lotSize}
+                  onChange={(e) => setLotSize(e)}
+                />
               </Form.Item>
               <Form.Item
                 label="Room Details"
                 name="lotSize"
                 rules={[{ message: 'Please input an asking price.' }]}
               >
+                <Collapse>
+                </Collapse>
               </Form.Item>
 
               <Form.Item

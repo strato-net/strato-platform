@@ -1,7 +1,7 @@
 export const sampleProperties = [
   {
-    title: 'A very fancy house',
-    description: 'This is a very very veryfancy house',
+    title: 'A very fancy house', /* title for product */
+    description: 'This is a very very veryfancy house', /* description for product */
 
     parcelNumber: "1234567890",
     propertyType: 'Residential',

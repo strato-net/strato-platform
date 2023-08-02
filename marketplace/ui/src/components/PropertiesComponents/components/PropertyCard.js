@@ -24,11 +24,11 @@ function PropertyCard(props) {
       }
     >
       <Meta
-        title={`${property?.PostalCity}, ${property?.StateOrProvince} ${property?.PostalCode}`}
-        description={`${property?.BedroomsTotal} br | 
-        ${property?.BathroomsTotalInteger} ba | 
-        ${property?.LotSizeArea} sqft | 
-        $${property.ListPrice?.toLocaleString()}`}
+        title={`${property?.postalCity}, ${property?.stateOrProvince} ${property?.postalCode}`}
+        description={`${property?.bedroomsTotal} br | 
+        ${property?.bathroomsTotalInteger} ba | 
+        ${property?.lotSizeArea} sqft | 
+        $${property.listPrice?.toLocaleString()}`}
       />
     </Card>
   );

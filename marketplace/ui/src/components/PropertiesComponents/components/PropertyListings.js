@@ -17,7 +17,7 @@ function PropertyListings() {
       <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
         {sampleProperties &&
           sampleProperties.map((property, index) => (
-            property?.ListPrice && (
+            property?.listPrice && (
               <Col key={index}>
                 <Link to={`/properties/${property.id}`}>
                   <PropertyCard property={property} />

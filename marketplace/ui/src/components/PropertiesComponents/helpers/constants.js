@@ -1,3 +1,15 @@
+export const HomeTypeData = [
+  { value: 'apartment', label: 'Apartment' },
+  { value: 'condo', label: 'Condo' },
+  { value: 'coopUnit', label: 'Coop Unit' },
+  { value: 'mobileManufactured', label: 'Mobile / Manufactured' },
+  { value: 'multiFamily', label: 'Multi Family' },
+  { value: 'singleFamily', label: 'Single Family' },
+  { value: 'townhome', label: 'Townhome' },
+  { value: 'vacantLand', label: 'Vacant Land' },
+  { value: 'other', label: 'Other' },
+];
+
 export const StateData = [
   { value: 'AL', label: 'AL' },
   { value: 'AK', label: 'AK' },
