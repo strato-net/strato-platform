@@ -81,7 +81,7 @@ class AuthHandler {
         rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
         return next()
       }
-      
+
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
