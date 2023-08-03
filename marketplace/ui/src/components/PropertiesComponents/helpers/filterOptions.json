@@ -1,238 +1,322 @@
-{"ParkingType":[
-  {
-    "value": "Alley",
-    "label": "Alley"
-  },
-  {
-    "value": "Assigned",
-    "label": "Assigned"
-  },
-  {
-    "value": "Boat",
-    "label": "Boat"
-  },
-  {
-    "value": "BuiltIn",
-    "label": "BuiltIn"
-  },
-  {
-    "value": "Carport",
-    "label": "Carport"
-  },
-  {
-    "value": "Commercial",
-    "label": "Commercial"
-  },
-  {
-    "value": "Covered",
-    "label": "Covered"
-  },
-  {
-    "value": "Driveway",
-    "label": "Driveway"
-  },
-  {
-    "value": "Fee",
-    "label": "Fee"
-  },
-  {
-    "value": "Fenced",
-    "label": "Fenced"
-  },
-  {
-    "value": "Garage",
-    "label": "Garage"
-  },
-  {
-    "value": "GarageAttached",
-    "label": "GarageAttached"
-  },
-  {
-    "value": "GarageDetached",
-    "label": "GarageDetached"
-  },
-  {
-    "value": "Gated",
-    "label": "Gated"
-  },
-  {
-    "value": "GolfCart",
-    "label": "GolfCart"
-  },
-  {
-    "value": "Guest",
-    "label": "Guest"
-  },
-  {
-    "value": "Heated",
-    "label": "Heated"
-  },
-  {
-    "value": "Leased",
-    "label": "Leased"
-  },
-  {
-    "value": "Mechanics",
-    "label": "Mechanics"
-  },
-  {
-    "value": "Meter",
-    "label": "Meter"
-  },
-  {
-    "value": "Mixed",
-    "label": "Mixed"
-  },
-  {
-    "value": "None",
-    "label": "None"
-  },
-  {
-    "value": "OffAlley",
-    "label": "OffAlley"
-  },
-  {
-    "value": "OffStreet",
-    "label": "OffStreet"
-  },
-  {
-    "value": "OffSite",
-    "label": "OffSite"
-  },
-  {
-    "value": "OnStreet",
-    "label": "OnStreet"
-  },
-  {
-    "value": "Open",
-    "label": "Open"
-  },
-  {
-    "value": "Other",
-    "label": "Other"
-  },
-  {
-    "value": "Oversized",
-    "label": "Oversized"
-  },
-  {
-    "value": "Owned",
-    "label": "Owned"
-  },
-  {
-    "value": "ParkingLot",
-    "label": "ParkingLot"
-  },
-  {
-    "value": "ParkingStructure",
-    "label": "ParkingStructure"
-  },
-  {
-    "value": "PavedOrSurfaced",
-    "label": "PavedOrSurfaced"
-  },
-  {
-    "value": "Pole",
-    "label": "Pole"
-  },
-  {
-    "value": "PorteCochere",
-    "label": "PorteCochere"
-  },
-  {
-    "value": "PullThrough",
-    "label": "PullThrough"
-  },
-  {
-    "value": "Ramp",
-    "label": "Ramp"
-  },
-  {
-    "value": "RV",
-    "label": "RV"
-  },
-  {
-    "value": "Secured",
-    "label": "Secured"
-  },
-  {
-    "value": "SideApron",
-    "label": "SideApron"
-  },
-  {
-    "value": "SideBySide",
-    "label": "SideBySide"
-  },
-  {
-    "value": "SpecialNeeds",
-    "label": "SpecialNeeds"
-  },
-  {
-    "value": "Stacked",
-    "label": "Stacked"
-  },
-  {
-    "value": "Tandem",
-    "label": "Tandem"
-  },
-  {
-    "value": "TuckUnder",
-    "label": "TuckUnder"
-  },
-  {
-    "value": "Unassigned",
-    "label": "Unassigned"
-  },
-  {
-    "value": "UndergroundBasement",
-    "label": "UndergroundBasement"
-  },
-  {
-    "value": "Unimproved",
-    "label": "Unimproved"
-  },
-  {
-    "value": "Unknown",
-    "label": "Unknown"
-  },
-  {
-    "value": "Valet",
-    "label": "Valet"
-  },
-  {
-    "value": "Workshop",
-    "label": "Workshop"
-  },
-  {
-    "value": "ZonedPermit",
-    "label": "ZonedPermit"
-  }
-],
-"PropertyTypes":[
-  { "value": "BusinessOpportunity", "label": "BusinessOpportunity" },
-  { "value": "CommercialLease", "label": "CommercialLease" },
-  { "value": "CommercialSale", "label": "CommercialSale" },
-  { "value": "Farm", "label": "Farm" },
-  { "value": "Land", "label": "Land" },
-  { "value": "ManufacturedInPark", "label": "ManufacturedInPark" },
-  { "value": "Residential", "label": "Residential" },
-  { "value": "ResidentialIncome", "label": "ResidentialIncome" },
-  { "value": "ResidentialLease", "label": "ResidentialLease" },
-  { "value": "ResidentialCommonInterest", "label": "ResidentialCommonInterest" },
-  { "value": "ResidentialMultiFamily", "label": "ResidentialMultiFamily" },
-  { "value": "Other", "label": "Other" }
-],
-"States":[
-  { "value": "AL", "label": "AL" },
-  { "value": "AK", "label": "AK" },
-  { "value": "AZ", "label": "AZ" },
-  { "value": "AR", "label": "AR" },
-  { "value": "CA", "label": "CA" },
-  { "value": "CO", "label": "CO" },
-  { "value": "CT", "label": "CT" },
-  { "value": "DE", "label": "DE" },
-  { "value": "FL", "label": "FL" },
-  { "value": "GA", "label": "GA" }
-]
-
+{
+  "parkingType": [
+    {
+      "value": "Alley",
+      "label": "Alley"
+    },
+    {
+      "value": "Assigned",
+      "label": "Assigned"
+    },
+    {
+      "value": "Boat",
+      "label": "Boat"
+    },
+    {
+      "value": "BuiltIn",
+      "label": "BuiltIn"
+    },
+    {
+      "value": "Carport",
+      "label": "Carport"
+    },
+    {
+      "value": "Commercial",
+      "label": "Commercial"
+    },
+    {
+      "value": "Covered",
+      "label": "Covered"
+    },
+    {
+      "value": "Driveway",
+      "label": "Driveway"
+    },
+    {
+      "value": "Fee",
+      "label": "Fee"
+    },
+    {
+      "value": "Fenced",
+      "label": "Fenced"
+    },
+    {
+      "value": "Garage",
+      "label": "Garage"
+    },
+    {
+      "value": "GarageAttached",
+      "label": "GarageAttached"
+    },
+    {
+      "value": "GarageDetached",
+      "label": "GarageDetached"
+    },
+    {
+      "value": "Gated",
+      "label": "Gated"
+    },
+    {
+      "value": "GolfCart",
+      "label": "GolfCart"
+    },
+    {
+      "value": "Guest",
+      "label": "Guest"
+    },
+    {
+      "value": "Heated",
+      "label": "Heated"
+    },
+    {
+      "value": "Leased",
+      "label": "Leased"
+    },
+    {
+      "value": "Mechanics",
+      "label": "Mechanics"
+    },
+    {
+      "value": "Meter",
+      "label": "Meter"
+    },
+    {
+      "value": "Mixed",
+      "label": "Mixed"
+    },
+    {
+      "value": "None",
+      "label": "None"
+    },
+    {
+      "value": "OffAlley",
+      "label": "OffAlley"
+    },
+    {
+      "value": "OffStreet",
+      "label": "OffStreet"
+    },
+    {
+      "value": "OffSite",
+      "label": "OffSite"
+    },
+    {
+      "value": "OnStreet",
+      "label": "OnStreet"
+    },
+    {
+      "value": "Open",
+      "label": "Open"
+    },
+    {
+      "value": "Other",
+      "label": "Other"
+    },
+    {
+      "value": "Oversized",
+      "label": "Oversized"
+    },
+    {
+      "value": "Owned",
+      "label": "Owned"
+    },
+    {
+      "value": "ParkingLot",
+      "label": "ParkingLot"
+    },
+    {
+      "value": "ParkingStructure",
+      "label": "ParkingStructure"
+    },
+    {
+      "value": "PavedOrSurfaced",
+      "label": "PavedOrSurfaced"
+    },
+    {
+      "value": "Pole",
+      "label": "Pole"
+    },
+    {
+      "value": "PorteCochere",
+      "label": "PorteCochere"
+    },
+    {
+      "value": "PullThrough",
+      "label": "PullThrough"
+    },
+    {
+      "value": "Ramp",
+      "label": "Ramp"
+    },
+    {
+      "value": "RV",
+      "label": "RV"
+    },
+    {
+      "value": "Secured",
+      "label": "Secured"
+    },
+    {
+      "value": "SideApron",
+      "label": "SideApron"
+    },
+    {
+      "value": "SideBySide",
+      "label": "SideBySide"
+    },
+    {
+      "value": "SpecialNeeds",
+      "label": "SpecialNeeds"
+    },
+    {
+      "value": "Stacked",
+      "label": "Stacked"
+    },
+    {
+      "value": "Tandem",
+      "label": "Tandem"
+    },
+    {
+      "value": "TuckUnder",
+      "label": "TuckUnder"
+    },
+    {
+      "value": "Unassigned",
+      "label": "Unassigned"
+    },
+    {
+      "value": "UndergroundBasement",
+      "label": "UndergroundBasement"
+    },
+    {
+      "value": "Unimproved",
+      "label": "Unimproved"
+    },
+    {
+      "value": "Unknown",
+      "label": "Unknown"
+    },
+    {
+      "value": "Valet",
+      "label": "Valet"
+    },
+    {
+      "value": "Workshop",
+      "label": "Workshop"
+    },
+    {
+      "value": "ZonedPermit",
+      "label": "ZonedPermit"
+    }
+  ],
+  "propertyTypes": [
+    {
+      "value": "BusinessOpportunity",
+      "label": "BusinessOpportunity"
+    },
+    {
+      "value": "CommercialLease",
+      "label": "CommercialLease"
+    },
+    {
+      "value": "CommercialSale",
+      "label": "CommercialSale"
+    },
+    {
+      "value": "Farm",
+      "label": "Farm"
+    },
+    {
+      "value": "Land",
+      "label": "Land"
+    },
+    {
+      "value": "ManufacturedInPark",
+      "label": "ManufacturedInPark"
+    },
+    {
+      "value": "Residential",
+      "label": "Residential"
+    },
+    {
+      "value": "ResidentialIncome",
+      "label": "ResidentialIncome"
+    },
+    {
+      "value": "ResidentialLease",
+      "label": "ResidentialLease"
+    },
+    {
+      "value": "ResidentialCommonInterest",
+      "label": "ResidentialCommonInterest"
+    },
+    {
+      "value": "ResidentialMultiFamily",
+      "label": "ResidentialMultiFamily"
+    },
+    {
+      "value": "Other",
+      "label": "Other"
+    }
+  ],
+  "states": [
+    {
+      "value": "AL",
+      "label": "AL"
+    },
+    {
+      "value": "AK",
+      "label": "AK"
+    },
+    {
+      "value": "AZ",
+      "label": "AZ"
+    },
+    {
+      "value": "AR",
+      "label": "AR"
+    },
+    {
+      "value": "CA",
+      "label": "CA"
+    },
+    {
+      "value": "CO",
+      "label": "CO"
+    },
+    {
+      "value": "CT",
+      "label": "CT"
+    },
+    {
+      "value": "DE",
+      "label": "DE"
+    },
+    {
+      "value": "FL",
+      "label": "FL"
+    },
+    {
+      "value": "GA",
+      "label": "GA"
+    }
+  ],
+  "amenities": [
+    {
+      "label": "Yard",
+      "value": "Yard"
+    },
+    {
+      "label": "AC",
+      "value": "AC"
+    },
+    {
+      "label": "Pool",
+      "value": "Pool"
+    },
+    {
+      "label": "Parking",
+      "value": "Parking"
+    }
+  ]
 }
