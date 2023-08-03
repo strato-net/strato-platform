@@ -55,13 +55,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         { label: <div id="Events">Events</div>, key: '4' },
         { label: <div id="Property">Property</div>, key: '5' },
       ]
-    },
-    {
-      role: 1,
-      items: [
-        { label: <div id="Marketplace"></div>, key: '0' },
-      ]
-    },
+    }
   ];
 
   const navUrls = [

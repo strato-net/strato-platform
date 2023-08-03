@@ -394,9 +394,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.Properties.url}
         element={
           <UsersProvider>
-            <PropertyLayout tab='home'>
-              <PropertyListings user={user} />
-            </PropertyLayout>
+            <PropertyProvider>
+              <PropertyLayout tab='home'>
+                <PropertyListings user={user} />
+              </PropertyLayout>
+            </PropertyProvider>
           </UsersProvider>
         }
       />

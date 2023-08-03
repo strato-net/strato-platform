@@ -1,9 +1,22 @@
-import React, { useState } from 'react'
-import { Modal, Form, Divider, Input, InputNumber, Upload, Button, Select, Collapse, DatePicker } from 'antd'
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { StateData, HomeTypeData } from '../helpers/constants'
-import { getStringDate } from '../helpers/utils'
-import PropertyCreateConfirmModal from './PropertyCreateConfirmModal';
+import React, { useState } from "react";
+import {
+  Modal,
+  Form,
+  Divider,
+  Input,
+  InputNumber,
+  Upload,
+  Button,
+  Select,
+  Collapse,
+  DatePicker,
+} from "antd";
+import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { StateData, HomeTypeData } from "../helpers/constants";
+import { getStringDate } from "../helpers/utils";
+import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
+import { actions } from "../../../contexts/propertyContext/actions";
+import { usePropertiesDispatch } from "../../../contexts/propertyContext";
 
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -13,45 +26,76 @@ const getBase64 = (file) =>
     reader.onerror = (error) => reject(error);
   });
 
-function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, setModalView, isCreateConfirmModalOpen, toggleCreateConfirmModal }) {
-  const [name, setname] = useState('')
-  const [description, setdescription] = useState('')
-  const [lotNumber, setLotNumber] = useState('')
-  const [addressLine1, setAddressLine1] = useState('')
-  const [addressLine2, setAddressLine2] = useState('')
-  const [city, setCity] = useState('')
-  const [state, setState] = useState('')
-  const [zipCode, setZipCode] = useState('')
-  const [askingPrice, setaskingPrice] = useState('')
-
-  const [homeType, setHomeType] = useState('')
-  const [bedrooms, setBedrooms] = useState('')
-  const [bathrooms, setBathrooms] = useState('')
-  const [squareFeet, setSquareFeet] = useState('')
-  const [yearBuilt, setYearBuilt] = useState('')
-  const [lotSize, setLotSize] = useState('')
-
+function PropertyCreateModal({
+  isCreateModalOpen,
+  toggleCreateModal,
+  modalView,
+  setModalView,
+  isCreateConfirmModalOpen,
+  toggleCreateConfirmModal,
+}) {
+  const dispatch = usePropertiesDispatch();
+  
+  const [propertyData, setPropertyData] = useState({});
+  const [homeType, setHomeType] = useState("");
+  const [bedrooms, setBedrooms] = useState("");
+  const [bathrooms, setBathrooms] = useState("");
+  const [squareFeet, setSquareFeet] = useState("");
+  const [yearBuilt, setYearBuilt] = useState("");
+  const [lotSize, setLotSize] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewImage, setPreviewImage] = useState('');
-  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewImage, setPreviewImage] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
   const [fileList, setFileList] = useState([]);
 
-  const isDisabledCreateView = (!name || !description || !lotNumber || !addressLine1 || !addressLine2 || !city || !state || !description || !zipCode || !askingPrice);
-  const isDisabledFactsView = (!homeType || !bedrooms || !bathrooms || !squareFeet || !yearBuilt || !lotSize);
+  const {
+    name,
+    description,
+    lotNumber,
+    addressLine1,
+    addressLine2,
+    city,
+    state,
+    zipCode,
+    askingPrice,
+  } = propertyData;
+
+  const isDisabledCreateView =
+    !name ||
+    !description ||
+    !lotNumber ||
+    !addressLine1 ||
+    !addressLine2 ||
+    !city ||
+    !state ||
+    !zipCode ||
+    !askingPrice;
+
+  const isDisabledFactsView =
+    !homeType ||
+    !bedrooms ||
+    !bathrooms ||
+    !squareFeet ||
+    !yearBuilt ||
+    !lotSize;
 
   const handleModalToggle = () => {
-    setModalView(!modalView)
-  }
+    setModalView(!modalView);
+  };
 
   const showConfirmationModal = () => {
-    toggleCreateConfirmModal(!isCreateConfirmModalOpen)
-  }
+    toggleCreateConfirmModal(!isCreateConfirmModalOpen);
+  };
+
+  const handleChange = (key, value) => {
+    let data = { ...propertyData };
+    data[key] = value;
+    setPropertyData(data);
+  };
 
   //creates the listing for property
   const handleSubmitCreateProperty = () => {
-    const body = {
-
-    }
+    const body = {};
     // let [isDone, projectAddress] = await actions.createProject(dispatch, body);
 
     // if (isDone) {
@@ -75,8 +119,7 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
 
     //   // await actions.fetchProject(dispatch, 10, 0, debouncedSearchTerm);
     // }
-
-  }
+  };
 
   const handleCancel = () => setPreviewOpen(false);
 
@@ -86,10 +129,13 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
     }
     setPreviewImage(file.url || file.preview);
     setPreviewOpen(true);
-    setPreviewTitle(file.name || file.url.substring(file.url.lastIndexOf('/') + 1));
+    setPreviewTitle(
+      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+    );
   };
 
-  const handleChange = ({ fileList: newFileList }) => setFileList(newFileList);
+  const handleFileChange = ({ fileList: newFileList }) =>
+    setFileList(newFileList);
 
   const uploadButton = (
     <div>
@@ -99,15 +145,22 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
   );
 
   const primaryAction = {
-    content: modalView ? "Create a Property Listing" : "Property Listing - House Facts",
+    content: modalView
+      ? "Create a Property Listing"
+      : "Property Listing - House Facts",
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal,
+  };
+  const layout = {
+    labelCol: { span: 8 },
+    wrapperCol: { span: 16 },
   };
 
   return (
     <>
       <Modal
+        {...layout}
         open={isCreateModalOpen}
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
@@ -116,155 +169,235 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
         // uncomment later******
         // okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
-          toggleCreateModal(false)
-          setModalView(true)
+          toggleCreateModal(false);
+          setModalView(true);
         }}
         // confirmLoading={primaryAction.loading}
         width={850}
       >
         <Divider />
         {modalView ? (
-          <Form labelCol={{ span: 8 }} labelAlign='left'>
+          <Form labelCol={{ span: 8 }} labelAlign="left">
             <Form.Item
-              label="Listing Title*"
+              label="Listing Title"
               name="name"
-              rules={[{ message: 'Please input project name.' }]}
+              rules={[
+                { required: true, message: "Please input project name." },
+              ]}
             >
               <Input
                 label="name"
-                defaultValue={name}
+                defaultValue={propertyData?.name}
+                value={propertyData?.name}
                 maxLength={100}
                 showCount
-                onChange={(e) => setname(e.target.value)}
+                onChange={(e) => {
+                  handleChange("name", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="Project Description*"
+              label="Project Description"
               name="description"
-              rules={[{ message: 'Please input project description.' }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Please input project description.",
+                },
+              ]}
             >
               <Input.TextArea
                 label="Project Description"
-                defaultValue={description}
+                defaultValue={propertyData?.projectDescription}
+                value={propertyData?.projectDescription}
                 maxLength={500}
                 showCount
-                onChange={(e) => setdescription(e.target.value)}
+                onChange={(e) => {
+                  handleChange("projectDescription", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="Asking Price*"
+              label="Asking Price"
               name="askingPrice"
-              rules={[{ message: 'Please input an asking price.' }]}
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <InputNumber
                 precision={0}
                 label="Asking Price"
+                type="Number"
                 min={0}
+                controls={false}
                 addonBefore="$"
-                defaultValue={askingPrice}
-                onChange={(e) => setaskingPrice(e)}
+                defaultValue={propertyData?.askingPrice}
+                value={propertyData?.askingPrice}
+                onChange={(e) => {
+                  handleChange("askingPrice", e);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="Lot Number*"
+              label="Lot Number"
               name="lotNumber"
-              rules={[{ message: 'Please input an asking price.' }]}
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <InputNumber
                 precision={0}
                 label="Lot Number"
+                type="Number"
                 min={0}
-                defaultValue={lotNumber}
-                onChange={(e) => setLotNumber(e)}
+                controls={false}
+                defaultValue={propertyData?.lotNumber}
+                value={propertyData?.lotNumber}
+                onChange={(e) => {
+                  handleChange("lotNumber", e);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="Address Line 1*"
-              name="street"
-              rules={[{ message: 'Please input an asking price.' }]}
+              label="Address Line 1"
+              name="addressLine1"
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <Input
-                label="Street"
-                defaultValue={addressLine1}
-                onChange={(e) => setAddressLine1(e.target.value)}
+                label="Address Line 1"
+                id="addressLine1"
+                defaultValue={propertyData?.addressLine1}
+                value={propertyData?.addressLine1}
+                onChange={(e) => {
+                  handleChange("addressLine1", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="Address Line 2*"
-              name="street"
-              rules={[{ message: 'Please input an asking price.' }]}
+              label="Address Line 2"
+              name="addressLine2"
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <Input
-                label="Street"
-                defaultValue={addressLine2}
-                onChange={(e) => setAddressLine2(e.target.value)}
+                label="Address Line 2"
+                id="addressLine2"
+                defaultValue={propertyData?.addressLine2}
+                value={propertyData?.addressLine2}
+                onChange={(e) => {
+                  handleChange("addressLine2", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="City*"
+              label="City"
               name="city"
-              rules={[{ message: 'Please input an asking price.' }]}
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <Input
                 label="City"
-                defaultValue={city}
-                onChange={(e) => setCity(e.target.value)}
+                id="city"
+                defaultValue={propertyData?.city}
+                value={propertyData?.city}
+                onChange={(e) => {
+                  handleChange("city", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="State*"
+              label="State"
               name="state"
-              rules={[{ message: 'Please input an asking price.' }]}
+              rules={[
+                { required: true, message: "Please input an asking price." },
+              ]}
             >
               <Select
                 label="State"
-                defaultValue={state}
-                onSelect={(e) => setState(e)}
+                defaultValue={propertyData?.state}
+                value={propertyData?.state}
+                onSelect={(e) => {
+                  handleChange("state", e);
+                }}
                 options={StateData}
                 showSearch
               />
             </Form.Item>
             <Form.Item
-              label="Zip Code*"
+              label="Zip Code"
               name="zipCode"
-              rules={[{ message: 'Please input a zip code.' }]}
+              rules={[{ required: true, message: "Please input a zip code." }]}
             >
               <InputNumber
                 precision={0}
                 label="Zip Code"
+                type="Number"
                 min={0}
                 max={99999}
-                defaultValue={zipCode}
-                onChange={(e) => setZipCode(e)}
+                controls={false}
+                defaultValue={propertyData?.zipCode}
+                value={propertyData?.zipCode}
+                onChange={(value) => {
+                  handleChange("zipCode", value);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
+                }}
               />
             </Form.Item>
 
             <Form.Item
               label="Images"
               name="images"
-              rules={[{ message: 'Please property upload images if avaliable.' }]}
+              rules={[
+                { message: "Please property upload images if avaliable." },
+              ]}
             >
               <Upload
                 action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
                 listType="picture-card"
                 fileList={fileList}
                 onPreview={handlePreview}
-                onChange={handleChange}
-              >{uploadButton}</Upload>
-              <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
-                <img alt="example" style={{ width: '100%' }} src={previewImage} />
+                onChange={handleFileChange}
+              >
+                {uploadButton}
+              </Upload>
+              <Modal
+                open={previewOpen}
+                title={previewTitle}
+                footer={null}
+                onCancel={handleCancel}
+              >
+                <img
+                  alt="example"
+                  style={{ width: "100%" }}
+                  src={previewImage}
+                />
               </Modal>
             </Form.Item>
-
-          </Form>)
-          :
-          (<div>
-            <Button type="link" onClick={handleModalToggle}><ArrowLeftOutlined /></Button>
-            <Form labelCol={{ span: 8 }} labelAlign='left'>
+          </Form>
+        ) : (
+          <div>
+            <Button type="link" onClick={handleModalToggle}>
+              <ArrowLeftOutlined />
+            </Button>
+            <Form labelCol={{ span: 8 }} labelAlign="left">
               <Form.Item
-                label="Home Type*"
+                label="Home Type"
                 name="homeType"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
                 <Select
                   label="homeType"
@@ -275,91 +408,117 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
                 />
               </Form.Item>
               <Form.Item
-                label="Bedrooms*"
+                label="Bedrooms"
                 name="bedrooms"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
                 <InputNumber
                   precision={0}
                   label="bedrooms"
+                  type="Number"
+                  controls={false}
                   min={0}
+                  value={bedrooms}
                   defaultValue={bedrooms}
                   onChange={(e) => setBedrooms(e)}
+                  onWheel={(e) => {
+                    e.target.blur();
+                  }}
                 />
               </Form.Item>
               <Form.Item
-                label="Bathrooms*"
+                label="Bathrooms"
                 name="bathrooms"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
                 <InputNumber
                   precision={0}
                   label="bathrooms"
+                  type="Number"
+                  controls={false}
                   min={0}
                   defaultValue={bathrooms}
                   onChange={(e) => setBathrooms(e)}
+                  onWheel={(e) => {
+                    e.target.blur();
+                  }}
                 />
               </Form.Item>
               <Form.Item
-                label="Square Ft*"
+                label="Square Ft"
                 name="squareFeet"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
                 <InputNumber
                   precision={0}
                   label="squareFeet"
+                  type="Number"
+                  controls={false}
                   min={0}
                   defaultValue={squareFeet}
                   onChange={(e) => setSquareFeet(e)}
+                  onWheel={(e) => {
+                    e.target.blur();
+                  }}
                 />
               </Form.Item>
               <Form.Item
-                label="Year Built*"
+                label="Year Built"
                 name="yearBuilt"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
-                <DatePicker picker="year" 
-                onChange={(e) => setYearBuilt(e)} 
-                />
+                <DatePicker picker="year" onChange={(e) => setYearBuilt(e)} />
               </Form.Item>
               <Form.Item
-                label="Lot Size*"
+                label="Lot Size"
                 name="lotSize"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[
+                  { required: true, message: "Please input an asking price." },
+                ]}
               >
                 <InputNumber
                   precision={0}
                   label="lotSize"
+                  type="Number"
+                  controls={false}
                   min={0}
                   defaultValue={lotSize}
                   onChange={(e) => setLotSize(e)}
+                  onWheel={(e) => {
+                    e.target.blur();
+                  }}
                 />
               </Form.Item>
               <Form.Item
                 label="Room Details"
                 name="lotSize"
-                rules={[{ message: 'Please input an asking price.' }]}
+                rules={[{ message: "Please input an asking price." }]}
               >
-                <Collapse>
-                </Collapse>
+                <Collapse></Collapse>
               </Form.Item>
 
               <Form.Item
                 label="Building Details"
                 name="lotSize"
-                rules={[{ message: 'Please input an asking price.' }]}
-              >
-              </Form.Item>
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
 
               <Form.Item
                 label="Utilities*"
                 name="lotSize"
-                rules={[{ message: 'Please input an asking price.' }]}
-              >
-              </Form.Item>
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
             </Form>
-          </div>)
-        }
+          </div>
+        )}
       </Modal>
       <PropertyCreateConfirmModal
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
@@ -367,7 +526,7 @@ function PropertyCreateModal({ isCreateModalOpen, toggleCreateModal, modalView, 
         handleSubmitCreateProperty={handleSubmitCreateProperty}
       />
     </>
-  )
+  );
 }
 
-export default PropertyCreateModal
+export default PropertyCreateModal;
