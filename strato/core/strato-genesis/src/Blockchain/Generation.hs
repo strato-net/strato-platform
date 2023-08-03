@@ -841,17 +841,19 @@ contract UserRegistry {
         owner = msg.sender;
     }
 
-    function createUser(string _commonName, address _certificateAddress) public returns (address) { 
+    function createUser(string _commonName, string _userAddress, address _certificateAddress) public returns (address) { 
         // require((msg.sender == owner), "You don't have permission to use this function!");
 
-        User newUser = new User{salt: _commonName}(_commonName, _certificateAddress);
+        User newUser = new User{salt: _userAddress}();
+        newUser.initializeUser(_commonName, address(_userAddress), _certificateAddress);
         return address(newUser);
     }
 
     function addCertificateToUser(address _userContractAddress, address _certificateAddress) public {
         require((msg.sender == owner), "You don't have permission to use this function!");
 
-        _userContractAddress.addCertificate(_certificateAddress);
+        User targetUser = User(_userContractAddress);
+        targetUser.addCertificate(_certificateAddress);
     }
 }
 
@@ -860,10 +862,18 @@ contract User {
 
     address[] userCertificates;
     string public commonName;
+    address public userAddress;
 
-    constructor(string _commonName, address _certificateAddress) {
+    constructor() {
         owner = msg.sender;
+    }
+
+    function initializeUser(string _commonName, address _userAddress, address _certificateAddress) {
+        // Only UserRegistry can add new certificates.
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
         commonName = _commonName;
+        userAddress = _userAddress;
         userCertificates.push(_certificateAddress);
     }
 
@@ -875,11 +885,8 @@ contract User {
     }
 
     function callContract(address contractToCall, string functionName, uint arg) public {
-        address certificateAddress = userCertificates[0];
-        Certificate certificate = CertificateRegistry(address(0x509)).getCertByAddress(certificateAddress);
-        address certUserAddress = address(certificate.userAddress());
-        
-        require((msg.sender == certUserAddress), "You don't have permission to use this function!");
+        // Only the user that this contract is associated with, can use this function.
+        require((msg.sender == userAddress), "You don't have permission to use this function!");
 
         contractToCall.call("set(uint)", arg);
     }
@@ -889,7 +896,7 @@ contract User {
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct, testAcct],
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
     where 
         initialAccounts = genesisInfoAccountInfo gi
@@ -906,7 +913,16 @@ insertUserRegistryContract gi =
             (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
                 (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".userAddress", rootAddress),
                 (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "1337") MainChain))
+            ]
+
+        testAcct = SolidVMContractWithStorage 0x5516eb4e821a23b38f6a2be92ae7a0086ecaac9d 123
+            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
+                (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
+                (".userAddress", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a13bf5afbd9e23e92568b546880b55d8ee0d54a5") UnspecifiedChain)),
+                (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a5540deed8550b8846b56825e9239ebdaff53ba1") MainChain))
             ]
 
         registryAcct = SolidVMContractWithStorage 0x720 720

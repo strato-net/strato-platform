@@ -705,7 +705,7 @@ getNewAddressWithSalt account salt hsh args = do
           (SString s) -> s
           _ -> invalidArguments "big major bad" salt
   let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) saltAsString (keccak256ToByteString hsh) args
-  $logDebugS "getNewAddressWithSalt" $ T.pack $ (show $ account ^. accountAddress) ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
+  $logInfoS "getNewAddressWithSalt" $ T.pack $ (show $ account ^. accountAddress) ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
   doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress (_accountChainId account)
   case doesAddressAlreadyExist of
     Just _ -> duplicateContract $ "The address " ++ (show newAddress) ++ " already exists. Try using a different salt or constructor arguments."

@@ -249,13 +249,14 @@ getNewAddressWithSalt_unsafe creator salt codeHash args =
   let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash, rlpEncode args]
   in decode $ BL.drop 12 $ encode theHash
 
+-- Default values are for the UserRegistry/User contract. Salt should be the userAddress.
 deriveAddressWithSalt :: Maybe Address -> String -> Maybe BC.ByteString -> String -> Address
 deriveAddressWithSalt sender salt src args = do
   let theAddress = fromMaybe (fromJust $ stringAddress "0000000000000000000000000000000000000720") sender -- UserRegistry address
       theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
                                                    , rlpEncode theAddress
                                                    , rlpEncode salt
-                                                   , rlpEncode $ maybe ("J\247\193hYG9\194\130\233\157\&9U>\"v\177\250\&7M%\214\199\133\144y\232\223-\244\SO\162" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
+                                                   , rlpEncode $ maybe ("\ETB\238\&5\SOP\228\213\200\NUL\186\246`\226\236\189F\ETX\238\151\154\166\SOH\255\186\172<\154\174=g%\DC3" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
                                                    , rlpEncode args
                                                    ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
