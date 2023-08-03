@@ -56,6 +56,44 @@ class PropertiesController {
     try {
       const { dapp, body } = req
 
+      const propertArgs = {
+        title: body.title,
+        description: body.description,
+        propertyType: body.propertyType,
+        // parcelNumber: 
+        listPrice: body.listPrice,
+        unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
+        streetNumber: body.streetNumber,
+        streetName: body.streetName,
+        unitNumber: body.unitNumber,
+        postalCity: state.postalCity,
+        stateOrProvince: body.stateOrProvince,
+        postalCode: body.postalCode,
+        bathroomsTotalInteger: body.bathroomsTotalInteger,
+        bedroomsTotal: body.bedroomsTotal,
+        standardStatus: "Active",
+        // lotSizeArea: 
+        // lotSizeAreaUnits: 
+        // livingArea: 
+        // livingAreaUnits: 
+        // latitude: 
+        // longitude: 
+        listAgentFullName: '',
+        listAgentEmail: '',
+        listAgentPreferredPhone: '', 
+        // appliances: 
+        // cooling: 
+        // heat: 
+        // numberOfUnitsTotal: 
+        // parkingFeatures: 
+        // interiorFeatures: 
+        // exteriorFeatures: 
+        // waterfrontFeatures: 
+        // utilities: 
+        // patioAndPorchFeatures: 
+        images: body.images
+      }
+
       PropertiesController.validateCreatePropertyArgs(body)
 
       const propertyResult = await dapp.createProperty(body)
