@@ -88,7 +88,6 @@ class PropertiesController {
         // parkingFeatures: 
         // interiorFeatures: 
         // exteriorFeatures: 
-        // utilities: 
         images: body.images
       }
 
@@ -155,7 +154,6 @@ class PropertiesController {
         parkingFeatures: Joi.array().items(Joi.string()),
         interiorFeatures: Joi.array().items(Joi.string()),
         exteriorFeatures: Joi.array().items(Joi.string()),
-        utilities: Joi.array().items(Joi.string()),
         images: Joi.array().items(Joi.string()),
       })
     });

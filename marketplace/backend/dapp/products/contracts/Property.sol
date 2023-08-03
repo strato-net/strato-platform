@@ -32,7 +32,6 @@ contract Properties {
   string[] public parkingFeatures;
   string[] public interiorFeatures;
   string[] public exteriorFeatures;
-  string[] public utilities;
   string[] public images;
   
   constructor(
@@ -66,7 +65,6 @@ contract Properties {
     string[] _parkingFeatures,
     string[] _interiorFeatures,
     string[] _exteriorFeatures,
-    string[] _utilities,
     string[] _images
   ) public {
     produdctId = _produdctId;
@@ -99,7 +97,6 @@ contract Properties {
     parkingFeatures = _parkingFeatures;
     interiorFeatures = _interiorFeatures;
     exteriorFeatures = _exteriorFeatures;
-    utilities = _utilities;
     images = _images;
   }
 }

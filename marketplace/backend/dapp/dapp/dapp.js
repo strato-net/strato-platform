@@ -665,7 +665,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         parkingFeatures: args.parkingFeatures,
         interiorFeatures: args.interiorFeatures,
         exteriorFeatures: args.exteriorFeatures,
-        utilities: args.utilities,
         images: args.images,
       }
       const propertyContract = await managers.productManager.createProperty(...propertyArgs);

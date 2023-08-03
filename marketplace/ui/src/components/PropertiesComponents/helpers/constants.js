@@ -100,9 +100,6 @@ export const exteriorFeaturesData = [
   { value: 'other', label: 'Other' },
 ]
 
-export const utilitiesData = [
-]
-
 export const StateData = [
   { value: 'AL', label: 'AL' },
   { value: 'AK', label: 'AK' },

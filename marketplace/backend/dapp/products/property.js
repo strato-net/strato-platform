@@ -82,7 +82,6 @@ function marshalIn(_args) {
         parkingFeatures: [],
         interiorFeatures: [],
         exteriorFeatures: [],
-        utilities: [],
         images: [],
     };
 
