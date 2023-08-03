@@ -26,7 +26,7 @@ main = do
     then error "You must provide client ids and secrets for both the current realm and master realm to have a functioning identity server"
     else do 
         putStrLn "parsing issuer cert and private key..."
-        certBS <- B.readFile "/identity-provider/rootCert.pem"
+        certBS <- B.readFile "/identity-provider/certs/rootCert.pem"
         crt <- case bsToCert certBS of
             Left err -> error $ "Error parsing issuer cert: " <> err
             Right crt -> do 
@@ -35,7 +35,7 @@ main = do
         iss <- case getCertIssuer crt of
             Nothing -> error "Could not deduce issuer from provided cert. Perhaps it is malformed?"
             Just iss -> return iss
-        privBS <- B.readFile "/identity-provider/rootPriv.pem"
+        privBS <- B.readFile "/identity-provider/certs/rootPriv.pem"
         privk <- case bsToPriv privBS of
             Left err -> error $ "Error parsing issuer private key: " <> err
             Right privk -> return privk
