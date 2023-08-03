@@ -190,6 +190,16 @@ function getNodeUrl(options:Options) {
   return nodeObject.url;
 }
 
+/*
+  get the external Server Api for the node by node id#
+*/
+// TODO: Chance URL
+function getExternalServerApi(options:Options) {
+  const nodeId = options.node || 0;
+  const nodeObject = options.config.nodes[nodeId];
+  return nodeObject.fileStorageHost;
+}
+
 async function post(url, endpoint, _body, options:Options) {
   function createBody(_body, options) {
     // array
@@ -240,6 +250,7 @@ export {
   Endpoint,
   get,
   getNodeUrl,
+  getExternalServerApi,
   put,
   post,
   postRaw,

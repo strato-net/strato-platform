@@ -24,7 +24,7 @@ class ImageController {
         .createHmac("sha256", req.file.buffer)
         .digest("hex");
 
-      const uploadResult = await uploadFileToS3(
+      const uploadResult = await rest.uploadFileToS3(
         `${fileKey}`,
         req.file.buffer,
         req.app.get(constants.s3ParamName)
@@ -55,7 +55,7 @@ class ImageController {
         .utc()
         .valueOf()}_${req.file.originalname}`;
       
-      const uploadResult = await uploadFileToS3(
+      const uploadResult = await rest.uploadFileToS3(
         `${fileKey}`,
         req.file.buffer,
         req.app.get(constants.s3ParamName)

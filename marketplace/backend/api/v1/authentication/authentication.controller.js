@@ -11,11 +11,12 @@ import constants from '/helpers/constants'
 import dappJs from '/dapp/dapp/dapp'
 import certificateJs from '/dapp/certificates/certificate'
 
-const oauth = oauthUtil.init(config.nodes[0].oauth)
+const _oauth = oauthUtil.init(config.nodes[0].oauth)
 const options = { config }
 const loadEnv = dotenv.config()
 class AuthenticationController {
   static async callback(req, res, next) {
+    const oauth = await _oauth
     const { code } = req.query
     const { app } = req
 
@@ -138,6 +139,7 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
+    const oauth = await _oauth
     let oauthSignOutUrl
     if (config.dockerized) {
       oauthSignOutUrl = '/auth/logout'
