@@ -209,7 +209,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
  */
  async function updateSellerDetails(admin, contract, _args, baseOptions) {
   const args = marshalInUpdateSeller(_args);
-  // console.log("===========================================",_args);
 
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;

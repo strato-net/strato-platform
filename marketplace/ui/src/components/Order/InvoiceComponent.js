@@ -134,7 +134,7 @@ const InvoiceComponent = ({ invoice }) => {
     });
    
     settotalTax(tax);
-    setSubtotal(invoice.orderTotal-tax-shipping);
+    setSubtotal(invoice.orderTotal-tax);
   }, [invoice])
 
 

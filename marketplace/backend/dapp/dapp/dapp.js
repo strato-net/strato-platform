@@ -809,7 +809,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.createOrder = async function (args, options = defaultOptions) {
-
     try {
       const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -880,7 +879,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const amountPaid = orderTotal;  // need to remove if no further use
 
         const orderArgs = {
-
           orderId: util.uid(),
           buyerOrganization,
           sellerOrganization: inventory.ownerOrganization,
@@ -897,14 +895,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
-
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
           await managers.orderManager.addOrderLine({
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
-            creditBatchSerialization: orderItem.creditBatchSerialization,
+            creditBatchSerialization: "Test123",
             quantity: inventoryObject.quantity,
             pricePerUnit: inventoryObject.pricePerUnit,
             tax,
@@ -924,13 +921,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
-      const { address, chainId, updates } = args;
+      const { address, updates } = args;
 
-      const contract = { name: orderJs.contractName, address: address };
-
-      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       if (updates.status == ORDER_STATUS.CANCELED) {
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
+        const [inventoryAddresses, quantitiesToUpdate] =
           await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
@@ -965,25 +959,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         return { status };
       } else if (updates.status == ORDER_STATUS.CLOSED) {
-
-
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
 
-        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: contractName }
-
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-        const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
-        let itemAddresses
         let newOwner = orderLines[0].owner
         let result = []
 
-        // for (let orderLineAddress of orderLinesAddresses) {
-        //   const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-        //   itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-        //   const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
-        //   result.push({ status, productId, inventoryId });
-        // }
+        for (let orderLine of orderLines) {
+          const orderLineProductId = orderLine.productId;
+          const orderLineInventoryId = orderLine.inventoryId;
+          const items = await managers.itemManager.getItems({ productId: orderLineProductId, inventoryId: orderLineInventoryId }, createOptions);
+          const itemsAddresses = items.map(_item => _item.address);
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemsAddresses, newOwner, dappAddress, newQuantity: orderLine.quantity });
+          result.push({ status, productId, inventoryId });
+        }
         return result;
       }
 

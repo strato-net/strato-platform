@@ -58,16 +58,65 @@ contract ItemManager is ItemStatus, InventoryStatus {
     function transferOwnership(
         address[] _itemsAddress,
         address _newOwner,
-        address _dappAddress
-    ) public returns (uint) {
+        address _dappAddress,
+        int _newQuantity
+    ) public returns (uint, address, address) {
         string itemAddresses = "";
-        // if(_itemsAddress.length <= 0){
-        //     return (RestStatus.BAD_REQUEST,address(0),address(0));
-        // }
+
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
         ProductManager productManager = dapp.productManager();
 
-        return (RestStatus.OK);
+        (address productId, address inventoryId) = getProductAndInventory(
+            productManager,
+            _itemsAddress,
+            _newOwner,
+            _newQuantity
+        );
+
+        return (RestStatus.OK, productId, inventoryId);
+    }
+
+    function getProductAndInventory(
+        ProductManager _productManager,
+        address[] _itemAddress,
+        address _newOwner,
+        int _newQuantity
+    ) public returns (address, address) {
+        Item_3 item = Item_3(_itemAddress[0]);
+        Product_3 product;
+        Inventory inventory;
+
+        Product_3 oldProduct = Product_3(item.productId());
+        product = new Product_3(
+            oldProduct.name(),
+            oldProduct.description(),
+            oldProduct.imageKey(),
+            oldProduct.isActive(),
+            oldProduct.category(),
+            block.timestamp,
+            _newOwner
+        );
+
+        Inventory oldInventory = Inventory(item.inventoryId());
+        (uint status, address inventory) = product.addInventory(
+            _newQuantity,
+            oldInventory.pricePerUnit(),
+            oldInventory.vintage(),
+            InventoryStatus.UNPUBLISHED,
+            block.timestamp,
+            _newOwner
+        );
+
+        for (uint i = 0; i < _itemAddress.length; i++) {
+            Item_3 _item = Item_3(_itemAddress[i]);
+            _item.transferOwnership(
+                _newOwner,
+                address(product),
+                address(inventory)
+            );
+        }
+
+        return (address(product), address(inventory));
     }
 }
