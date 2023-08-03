@@ -1867,10 +1867,11 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   salt <- saltTextToValue saltExpressionText
-  args' <- do
-        case args of
-                (CC.OrderedArgs oa) -> mapM (expToVar') oa
-                (CC.NamedArgs na) -> mapM (\(_, expr) -> (expToVar' expr)) na
+  $logInfoS "DEBUG'" $ T.pack $ show args
+  args' <- case args of
+            (CC.OrderedArgs oa) -> OrderedVals <$> mapM (getVar <=< expToVar) oa
+            (CC.NamedArgs na) -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) na
+  $logInfoS "DEBUG''" $ T.pack $ show args'
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
@@ -1906,7 +1907,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
           case (val1, name) of
             (SAccount addr _, "delegatecall") -> do
               let  (funcName, args') = (case args of
-                    (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
+                    (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one argument, none were given " args
                     (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first arguement to be a string" args
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
               fromAddress <- getCurrentAccount
