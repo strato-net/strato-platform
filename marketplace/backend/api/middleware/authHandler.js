@@ -5,7 +5,7 @@ import jwtDecode from 'jwt-decode'
 import config from '/load.config'
 
 const getTokenFromCookie = async (req, res) => {
-  let tokenName = await req.app.oauth.getCookieNameAccessToken()
+  const tokenName = req.app.oauth.getCookieNameAccessToken()
   if (req.cookies[tokenName]) {
     try {
       await req.app.oauth.validateAndGetNewToken(req, res)
@@ -81,6 +81,7 @@ class AuthHandler {
         rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
         return next()
       }
+      
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
