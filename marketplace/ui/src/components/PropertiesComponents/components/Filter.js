@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import filterData from "../helpers/filterOptions.json"
+import React, { useState } from "react";
 import {
   Row,
   Col,
@@ -14,13 +13,16 @@ import {
   Button,
 } from "antd";
 import { FilterFilled, CloseOutlined } from "@ant-design/icons";
-import { actions } from '../../../contexts/propertyContext/actions';
-import { usePropertiesDispatch } from '../../../contexts/propertyContext';
+// import { actions } from '../../../contexts/propertyContext/actions';
+import filterData from "../helpers/filterOptions.json";
+// import { usePropertiesDispatch } from '../../../contexts/propertyContext';
+
 const { Panel } = Collapse;
 
-
 const Filter = () => {
-  const dispatch = usePropertiesDispatch()
+  // const dispatch = usePropertiesDispatch()
+  // const { properties, isPropertiesLoading } = usePropertiesState();
+
   const MAX_PRICE_VALUE = 2000000;
   const filterSchema = {
     sortBy: "Select",
@@ -34,18 +36,16 @@ const Filter = () => {
     minSqFt: 0,
     parkingType: "Select",
     propertyType: "Select",
-  }
+  };
 
   const [filterOption, setFilterOption] = useState(filterSchema);
-
-  // const { properties, isPropertiesLoading } = usePropertiesState();
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   const handleChange = (key, value) => {
-    let filter = { ...filterOption }
+    let filter = { ...filterOption };
     filter[key] = value;
-    setFilterOption(filter)
-  }
+    setFilterOption(filter);
+  };
 
   const openDrawer = () => {
     setDrawerOpen(true);
@@ -57,13 +57,13 @@ const Filter = () => {
 
   const handleClear = () => {
     setDrawerOpen(false);
-    setFilterOption(filterSchema)
-  }
+    setFilterOption(filterSchema);
+  };
 
   const applyFilter = () => {
     setDrawerOpen(false);
     // actions.fetchProperties(dispatch, 12,1,filterOption)
-  }
+  };
 
   return (
     <>
@@ -73,19 +73,25 @@ const Filter = () => {
         onClose={closeDrawer}
         open={isDrawerOpen}
       >
-        <Row style={{ marginBottom: '20px' }}>
+        <Row style={{ marginBottom: "20px" }}>
           <Col offset={2} span={10}>
-            <Button onClick={handleClear} icon={<CloseOutlined />}>Clear Filter</Button>
+            <Button onClick={handleClear} icon={<CloseOutlined />}>
+              Clear Filter
+            </Button>
           </Col>
           <Col offset={2} span={10}>
-            <Button onClick={applyFilter} type='primary'>Apply Filter </Button>
+            <Button onClick={applyFilter} type="primary">
+              Apply Filter{" "}
+            </Button>
           </Col>
         </Row>
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
           value={filterOption?.sortBy}
           style={{ width: "100%" }}
-          onChange={(value) => { handleChange('sortBy', value) }}
+          onChange={(value) => {
+            handleChange("sortBy", value);
+          }}
           defaultValue={"Select"}
           options={[
             { value: "Select", label: "Select" },
@@ -96,7 +102,9 @@ const Filter = () => {
           ]}
         />
 
-        <Typography.Title level={5} style={{ marginTop: '15px' }}>Filter By</Typography.Title>
+        <Typography.Title level={5} style={{ marginTop: "15px" }}>
+          Filter By
+        </Typography.Title>
         <Collapse
           expandIconPosition={"end"}
           defaultActiveKey={["1", "2", "3", "4", "5"]}
@@ -113,21 +121,27 @@ const Filter = () => {
               step={50000}
               min={0}
               max={filterOption?.maxPriceValue}
-              type='number'
-              onChange={(value) => { handleChange('minPriceValue', value) }}
+              type="number"
+              onChange={(value) => {
+                handleChange("minPriceValue", value);
+              }}
               value={
-                typeof filterOption?.minPriceValue === "number" ? filterOption?.minPriceValue : 0
+                typeof filterOption?.minPriceValue === "number"
+                  ? filterOption?.minPriceValue
+                  : 0
               }
             />
             <InputNumber
               min={0}
               max={filterOption?.maxPriceValue}
-              type='number'
+              type="number"
               style={{ width: "100%" }}
               placeholder="Min Price"
               value={filterOption?.minPriceValue}
               controls={false}
-              onChange={(value) => { handleChange('minPriceValue', value) }}
+              onChange={(value) => {
+                handleChange("minPriceValue", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
@@ -141,21 +155,27 @@ const Filter = () => {
               step={50000}
               min={0}
               max={2000000}
-              type='number'
-              onChange={(value) => { handleChange('maxPriceValue', value) }}
+              type="number"
+              onChange={(value) => {
+                handleChange("maxPriceValue", value);
+              }}
               value={
-                typeof filterOption?.maxPriceValue === "number" ? filterOption?.maxPriceValue : 0
+                typeof filterOption?.maxPriceValue === "number"
+                  ? filterOption?.maxPriceValue
+                  : 0
               }
             />
             <InputNumber
               min={0}
               max={2000000}
-              type='number'
+              type="number"
               style={{ width: "100%" }}
               placeholder="Max Price"
               value={filterOption?.maxPriceValue}
               controls={false}
-              onChange={(value) => { handleChange('maxPriceValue', value) }}
+              onChange={(value) => {
+                handleChange("maxPriceValue", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
@@ -170,12 +190,14 @@ const Filter = () => {
             <InputNumber
               min={0}
               max={99999}
-              type='number'
+              type="number"
               value={filterOption?.zipcodeValue}
               style={{ width: "100%" }}
               placeholder="Enter Zipcode"
               controls={false}
-              onChange={(value) => { handleChange('zipcodeValue', value) }}
+              onChange={(value) => {
+                handleChange("zipcodeValue", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
@@ -188,7 +210,9 @@ const Filter = () => {
             <Select
               style={{ width: "100%" }}
               value={filterOption?.stateValue}
-              onChange={(value) => { handleChange('stateValue', value) }}
+              onChange={(value) => {
+                handleChange("stateValue", value);
+              }}
               defaultValue={"Select"}
               options={filterData?.states}
             />
@@ -210,20 +234,26 @@ const Filter = () => {
               step={1}
               min={0}
               max={7}
-              onChange={(value) => { handleChange('minBedrooms', value) }}
+              onChange={(value) => {
+                handleChange("minBedrooms", value);
+              }}
               value={
-                typeof filterOption?.minBedrooms === "number" ? filterOption?.minBedrooms : 0
+                typeof filterOption?.minBedrooms === "number"
+                  ? filterOption?.minBedrooms
+                  : 0
               }
             />
             <InputNumber
               min={0}
               max={7}
-              type='number'
+              type="number"
               style={{ width: "100%" }}
               placeholder="Min Bedrooms"
               value={filterOption?.minBedrooms}
               controls={false}
-              onChange={(value) => { handleChange('minBedrooms', value) }}
+              onChange={(value) => {
+                handleChange("minBedrooms", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
@@ -237,29 +267,39 @@ const Filter = () => {
               step={1}
               min={0}
               max={7}
-              onChange={(value) => { handleChange('minBathrooms', value) }}
+              onChange={(value) => {
+                handleChange("minBathrooms", value);
+              }}
               value={
-                typeof filterOption?.minBathrooms === "number" ? filterOption?.minBathrooms : 0
+                typeof filterOption?.minBathrooms === "number"
+                  ? filterOption?.minBathrooms
+                  : 0
               }
             />
             <InputNumber
               min={0}
               max={7}
-              type='number'
+              type="number"
               style={{ width: "100%" }}
               placeholder="Min Bathrooms"
               value={filterOption?.minBathrooms}
               controls={false}
-              onChange={(value) => { handleChange('minBathrooms', value) }}
+              onChange={(value) => {
+                handleChange("minBathrooms", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
 
           <Panel style={{ fontWeight: 700 }} header="Amenities" key="4">
             {/* <div style={{ display: "flex", flexDirection: "column" }}> */}
-            <Checkbox.Group style={{display:'grid', lineHeight:"30px"}} options={filterData?.amenities}
+            <Checkbox.Group
+              style={{ display: "grid", lineHeight: "30px" }}
+              options={filterData?.amenities}
               value={filterOption?.amenities}
-              onChange={(value) => { handleChange('amenities', value) }}
+              onChange={(value) => {
+                handleChange("amenities", value);
+              }}
             />
             {/* </div> */}
           </Panel>
@@ -274,16 +314,22 @@ const Filter = () => {
             </Typography.Title>
             <InputNumber
               min={0}
-              type='number'
+              type="number"
               style={{ width: "100%" }}
               placeholder="Min Sq Ft."
               value={filterOption?.minSqFt}
               controls={false}
-              onChange={(value) => { handleChange('minSqFt', value) }}
+              onChange={(value) => {
+                handleChange("minSqFt", value);
+              }}
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
-          <Panel style={{ fontWeight: 700 }} header="Property & Parking" key="6">
+          <Panel
+            style={{ fontWeight: 700 }}
+            header="Property & Parking"
+            key="6"
+          >
             <Typography.Title
               level={5}
               style={{ marginTop: 5 }}
@@ -294,7 +340,9 @@ const Filter = () => {
             <Select
               style={{ width: "100%" }}
               value={filterOption?.parkingType}
-              onChange={(value) => { handleChange('parkingType', value) }}
+              onChange={(value) => {
+                handleChange("parkingType", value);
+              }}
               defaultValue={"Select"}
               options={filterData?.parkingType}
             />
@@ -309,7 +357,9 @@ const Filter = () => {
             <Select
               style={{ width: "100%" }}
               value={filterOption?.propertyType}
-              onChange={(value) => { handleChange('propertyType', value) }}
+              onChange={(value) => {
+                handleChange("propertyType", value);
+              }}
               defaultValue={"Select"}
               options={filterData?.propertyTypes}
             />
@@ -317,14 +367,10 @@ const Filter = () => {
         </Collapse>
       </Drawer>
 
-
       <Row>
         <Col span={1}></Col>
         <Col span={22}>
-          <Typography.Title
-            level={4}
-            style={{ margin: "0px 18px" }}
-          >
+          <Typography.Title level={4} style={{ margin: "0px 18px" }}>
             {/* Properties for you */}
             <Space style={{ marginLeft: "15px" }}>
               <Button icon={<FilterFilled />} onClick={openDrawer}>
@@ -336,7 +382,7 @@ const Filter = () => {
         <Col span={1}></Col>
       </Row>
     </>
-  )
-}
+  );
+};
 
-export default Filter
+export default Filter;
