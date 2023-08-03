@@ -527,10 +527,11 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
   case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just jwtToken -> do
-      addr <- case mAddr of
-        Nothing -> fmap unAddress . blocVaultWrapper $  getKey (Just jwtToken) Nothing
-        Just addr' -> return addr'
-      -- let userContractAddr = deriveAddressWithSalt Nothing "Common Name" Nothing "OrderedVals [SString \"CommonName\",SAccount UserAddress False]"
+      addr' <- case mAddr of
+        Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
+        Just addr'' -> return addr''
+      let addr = deriveAddressWithSalt Nothing (show addr') Nothing "OrderedVals []"
+      $logInfoS "DEBUG" $ Text.pack $ "Using " ++ (show addr) ++ " as address." 
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
