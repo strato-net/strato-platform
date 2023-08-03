@@ -123,15 +123,15 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.log(contract)
   let userOrganization
-  
+
   if (!serviceUser) {
     let userCertificate = await certificateJs.getCertificateMe(rawAdmin);
     console.log('dapp - userCertificate', userCertificate)
-    if (userCertificate === null || userCertificate === undefined) { 
+    if (userCertificate === null || userCertificate === undefined) {
       // delay for 6 seconds and check again if cert got created successfully
       console.log('user not found in first attempt, this may be a brand new registration, recheck in 9 secs')
       await new Promise(resolve => setTimeout(resolve, 9000));
@@ -143,7 +143,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
     console.log('dapp - userCertificate.organization', userCertificate.organization)
   }
-  
+
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
@@ -535,7 +535,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if(args.quantity === 0) {
+    if (args.quantity === 0) {
       return [
         createInventoryStatus,
         createdInventoryAddress,
@@ -599,6 +599,87 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
+
+  /* PROPERTIES DAPP */
+  contract.getProperty = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    //Get the property contract
+    const property = await managers.productManager.getProperty({ ...args, ownerOrganization: userOrganization }, getOptions);
+
+    managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
+  };
+  contract.getProperties = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    return managers.productManager.getProducts({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+  };
+
+  contract.createProperty = async function (args, options = optionsNoChainIds) {
+    //create the product contract
+    const createdDate = Math.floor(Date.now() / 1000);
+    const productArgs = {
+      name: args.title,
+      description: args.description,
+      manufacturer: "",
+      unitOfMeasurement: 1,
+      userUniqueProductCode: "",
+      leastSellableUnit: 1,
+      imageKey: "",
+      isActive: true,
+      category: "Real Estate",
+      subCategory: args.propertyType,
+    }
+
+    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...productArgs }
+    const productContract = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
+
+    //create the property contract that matches product id with the property id
+    if (productContract[0] === 200) {
+      const propertyArgs = {
+        produdctId: productContract[1],
+        parcelNumber: args.parcelNumber,
+        listPrice: args.listPrice,
+        unparsedAddress: args.unparsedAddress,
+        streetNumber: args.streetNumber,
+        streetName: args.streetName,
+        unitNumber: args.unitNumber,
+        postalCity: args.postalCity,
+        stateOrProvince: args.stateOrProvince,
+        postalcode: args.postalcode,
+        bathroomsTotalInteger: args.bathroomsTotalInteger,
+        bedroomsTotal: args.bedroomsTotal,
+        standardStatus: args.standardStatus,
+        lotSizeArea: args.lotSizeArea,
+        lotSizeUnits: args.lotSizeUnits,
+        livingArea: args.livingArea,
+        livingAreaUnits: args.livingAreaUnits,
+        latitude: args.latitude,
+        longitude: args.longitude,
+        listAgentsFullName: args.listAgentsFullName,
+        listAgentsEmail: args.listAgentsEmail,
+        listAgentsPreferredPhone: args.listAgentsPreferredPhone,
+        appliances: args.appliances,
+        cooling: args.cooling,
+        flooring: args.flooring,
+        heating: args.heating,
+        numberOfUnitsTotal: args.numberOfUnitsTotal,
+        parkingFeatures: args.parkingFeatures,
+        interiorFeatures: args.interiorFeatures,
+        exteriorFeatures: args.exteriorFeatures,
+        waterfrontFeatures: args.waterfrontFeatures,
+        utilities: args.utilities,
+        patioAndPorchFeatures: args.patioAndPorchFeatures,
+        images: args.images,
+      }
+      const propertyContract = await managers.productManager.createProperty(...propertyArgs);
+      return {
+        productContractRest: productContract[0],
+        productContractAddress: productContract[1],
+        propertyContractRest: propertyContract[0],
+        propertyContractAddress: propertyContract[1],
+      }
+    }
+  }
+
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
@@ -1081,14 +1162,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);    
+      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
 
-      for(let i = 0; i < result.orderLines.length; i++) {
-        const {productId, inventoryId } = result.orderLines[i];
+      for (let i = 0; i < result.orderLines.length; i++) {
+        const { productId, inventoryId } = result.orderLines[i];
         const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
 
         if (items === null || items === undefined || items.length === 0) {

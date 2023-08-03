@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Modal, Form, Divider, Input, InputNumber, Upload, Button, Select, Collapse, DatePicker } from 'antd'
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { StateData, HomeTypeData } from '../helpers/constants'
-import { getStringDate } from '../helpers/utils'
 import PropertyCreateConfirmModal from './PropertyCreateConfirmModal';
 
 const getBase64 = (file) =>
