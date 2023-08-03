@@ -41,7 +41,7 @@ function PropertyCreateModal({
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
-  const [yearBuilt, setYearBuilt] = useState("");
+  // const [yearBuilt, setYearBuilt] = useState("");
   const [lotSize, setLotSize] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -76,7 +76,7 @@ function PropertyCreateModal({
     !bedrooms ||
     !bathrooms ||
     !squareFeet ||
-    !yearBuilt ||
+    // !yearBuilt ||
     !lotSize;
 
   const handleModalToggle = () => {
@@ -468,7 +468,7 @@ function PropertyCreateModal({
                   }}
                 />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Year Built"
                 name="yearBuilt"
                 rules={[
@@ -476,7 +476,7 @@ function PropertyCreateModal({
                 ]}
               >
                 <DatePicker picker="year" onChange={(e) => setYearBuilt(e)} />
-              </Form.Item>
+              </Form.Item> */}
               <Form.Item
                 label="Lot Size"
                 name="lotSize"

@@ -259,9 +259,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
             _parkingFeatures,
             _interiorFeatures,
             _exteriorFeatures,
-            _waterfrontFeatures,
             _utilities,
-            _patioAndPorchFeatures,
             _images
         );
         return (RestStatus.OK, address(property));

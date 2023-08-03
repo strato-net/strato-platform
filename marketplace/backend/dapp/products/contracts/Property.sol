@@ -32,9 +32,7 @@ contract Properties {
   string[] public parkingFeatures;
   string[] public interiorFeatures;
   string[] public exteriorFeatures;
-  string[] public waterfrontFeatures;
   string[] public utilities;
-  string[] public patioAndPorchFeatures;
   string[] public images;
   
   constructor(
@@ -68,9 +66,7 @@ contract Properties {
     string[] _parkingFeatures,
     string[] _interiorFeatures,
     string[] _exteriorFeatures,
-    string[] _waterfrontFeatures,
     string[] _utilities,
-    string[] _patioAndPorchFeatures,
     string[] _images
   ) public {
     produdctId = _produdctId;
@@ -103,9 +99,7 @@ contract Properties {
     parkingFeatures = _parkingFeatures;
     interiorFeatures = _interiorFeatures;
     exteriorFeatures = _exteriorFeatures;
-    waterfrontFeatures = _waterfrontFeatures;
     utilities = _utilities;
-    patioAndPorchFeatures = _patioAndPorchFeatures;
     images = _images;
   }
 }

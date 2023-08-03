@@ -10,6 +10,18 @@ export const HomeTypeData = [
   { value: 'other', label: 'Other' },
 ];
 
+export const appliancesData = [
+  { value: 'dishwasher', label: 'Dishwasher' },
+  { value: 'dryer', label: 'Dryer' },
+  { value: 'freezer', label: 'Freezer' },
+  { value: 'garbageDisposal', label: 'Garbage Disposal' },
+  { value: 'microwave', label: 'Microwave' },
+  { value: 'ovenRange', label: 'Oven / Range' },
+  { value: 'trashCompactor', label: 'Trash Compactor' },
+  { value: 'refrigerator', label: 'Refrigerator' },
+  { value: 'washer', label: 'Washer' },
+  { value: 'other', label: 'Other' },
+]
 
 export const coolingData = [
   { value: 'central', label: 'Central' },
@@ -19,7 +31,6 @@ export const coolingData = [
   { value: 'solar', label: 'Solar' },
   { value: 'wall', label: 'Wall' },
   { value: 'other', label: 'Other' },
-  { value: 'none', label: 'None' },
 ]
 
 export const flooringData = [
@@ -55,18 +66,41 @@ export const parkingFeaturesData = [
 ]
 
 export const interiorFeaturesData = [
+  { value: 'attic', label: 'Attic' },
+  { value: 'cableReady', label: 'Cable Ready' },
+  { value: 'ceilingFan', label: 'Ceiling Fan' },
+  { value: 'doublePaneWindows', label: 'Double Pane / Storm Windows' },
+  { value: 'fireplace', label: 'Fireplace' },
+  { value: 'flooring', label: 'Flooring' },
+  { value: 'furnished', label: 'Furnished' },
+  { value: 'jettedTub', label: 'Jetted Tub' },
+  { value: 'securitySystem', label: 'Security System' },
+  { value: 'vaultedCeiling', label: 'Vaulted Ceiling' },
+  { value: 'wetBar', label: 'Wet Bar' },
+  { value: 'wired', label: 'Wired' },
+  { value: 'other', label: 'Other' },
 ]
 
 export const exteriorFeaturesData = [
-]
-
-export const waterfrontFeaturesData = [
+  { value: 'barbecueArea', label: 'Barbecue Area' },
+  { value: 'deck', label: 'Deck' },
+  { value: 'dock', label: 'Dock' },
+  { value: 'fencedYard', label: 'Fenced Yard' },
+  { value: 'garden', label: 'Garden' },
+  { value: 'hotTubSpa', label: 'Hot Tub / Spa' },
+  { value: 'lawn', label: 'Lawn' },
+  { value: 'patio', label: 'Patio' },
+  { value: 'pond', label: 'Pond' },
+  { value: 'pool', label: 'Pool' },
+  { value: 'porch', label: 'Porch' },
+  { value: 'rvParking', label: 'RV Parking' },
+  { value: 'sauna', label: 'Sauna' },
+  { value: 'sprinklerSystem', label: 'Sprinkler System' },
+  { value: 'waterfront', label: 'Waterfront' },
+  { value: 'other', label: 'Other' },
 ]
 
 export const utilitiesData = [
-]
-
-export const patioAndPorchFeaturesData = [
 ]
 
 export const StateData = [
