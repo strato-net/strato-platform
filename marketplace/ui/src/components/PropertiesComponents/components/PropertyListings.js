@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Space, Spin } from 'antd'
+import { Row, Col, Typography, Space, Spin, Pagination } from 'antd'
 import PropertyCard from './PropertyCard'
 import { sampleProperties } from '../helpers/sampleProperties'
 import Filter from './Filter'
@@ -44,6 +44,7 @@ function PropertyListings() {
                 ))}
             </Row>
           }
+          <Pagination style={{width:'500px', margin:'auto', marginTop:"200px"}} onChange={(e)=>{console.log("pagee",e);}} showSizeChanger={false} defaultCurrent={6} total={500} />
         </Col>
       </Row>
     </>
