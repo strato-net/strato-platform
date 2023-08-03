@@ -530,6 +530,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $  getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
+      -- let userContractAddr = deriveAddressWithSalt Nothing "Common Name" Nothing "OrderedVals [SString \"CommonName\",SAccount UserAddress False]"
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0

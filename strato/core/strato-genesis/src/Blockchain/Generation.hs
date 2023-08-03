@@ -841,15 +841,22 @@ contract UserRegistry {
         owner = msg.sender;
     }
 
-    function createUser(string _commonName, address _userAddress, address _certificateAddress) public returns (address) { 
-        require((msg.sender == owner), "You don't have permission to use this function!");
+    function createUser(string _commonName, address _certificateAddress) public returns (address) { 
+        // require((msg.sender == owner), "You don't have permission to use this function!");
+
         User newUser = new User{salt: _commonName}(_commonName, _certificateAddress);
         return address(newUser);
+    }
+
+    function addCertificateToUser(address _userContractAddress, address _certificateAddress) public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        _userContractAddress.addCertificate(_certificateAddress);
     }
 }
 
 contract User {
-    address public owner; // UserRegistry Contract
+    address public owner;
 
     address[] userCertificates;
     string public commonName;
@@ -860,21 +867,21 @@ contract User {
         userCertificates.push(_certificateAddress);
     }
 
-    function addCertificate(address _userAddress, address _certificateAddress) public {
+    function addCertificate(address _certificateAddress) public {
         // Only UserRegistry can add new certificates.
         require((msg.sender == owner), "You don't have permission to use this function!");
         
         userCertificates.push(_certificateAddress);
     }
 
-    function callContract(address contractToCall, string functionName, string args) public {
+    function callContract(address contractToCall, string functionName, uint arg) public {
         address certificateAddress = userCertificates[0];
         Certificate certificate = CertificateRegistry(address(0x509)).getCertByAddress(certificateAddress);
         address certUserAddress = address(certificate.userAddress());
         
         require((msg.sender == certUserAddress), "You don't have permission to use this function!");
 
-        // contractToCall.call(functionName, args);
+        contractToCall.call("set(uint)", arg);
     }
 } 
 |]

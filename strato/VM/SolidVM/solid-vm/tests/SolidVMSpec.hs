@@ -5707,7 +5707,7 @@ contract qq {
 }|]
     getFields ["t2a", "t2x"] `shouldReturn` [BInteger 2022, BInteger 2022]
 
-  fit "can deterministically create multiple salted contracts with no args" . runTest $ do
+  it "can deterministically create multiple salted contracts with no args" . runTest $ do
     let src = [r|
 
 contract X {
@@ -5732,11 +5732,11 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "OrderedVals []"
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (BC.pack src) "OrderedVals []"
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals []"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) "OrderedVals []"
       ]
 
-  fit "can deterministically create multiple salted contract with args" . runTest $ do
+  it "can deterministically create multiple salted contract with args" . runTest $ do
     let src = [r|
 
 contract X {
@@ -5767,8 +5767,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "OrderedVals [SString \"xNum\"]"
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (BC.pack src) "OrderedVals [SInteger 100]"
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals [SString \"xNum\"]"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals [SInteger 100]"
       ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -5776,7 +5776,7 @@ contract qq {
     getSolidStorageKeyVal' (namedAccountToAccount Nothing y) (singleton "yNum") `shouldReturn` BInteger 100
   
 
-  fit "can deterministically create salted contract with multiple args" . runTest $ do
+  it "can deterministically create salted contract with multiple args" . runTest $ do
     let src = [r|
 contract User {
   string commonName;
@@ -5794,7 +5794,7 @@ contract qq {
   }
 }|] 
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (BC.pack src) "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]"]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just $ BC.pack src) "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]"]
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"

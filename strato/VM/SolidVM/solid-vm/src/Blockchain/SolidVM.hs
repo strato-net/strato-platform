@@ -1867,11 +1867,9 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   salt <- saltTextToValue saltExpressionText
-  $logInfoS "DEBUG'" $ T.pack $ show args
   args' <- case args of
             (CC.OrderedArgs oa) -> OrderedVals <$> mapM (getVar <=< expToVar) oa
             (CC.NamedArgs na) -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) na
-  $logInfoS "DEBUG''" $ T.pack $ show args'
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
