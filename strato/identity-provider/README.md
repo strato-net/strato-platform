@@ -33,4 +33,4 @@ Like all our getting-started scripts, this should be run within the same directo
 The below is important!
 
 3. An important step is setting th URL to you ID-server for your strato node. As of this writing, you can pass the arguement in you strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, the network flag is used to map to a hardcoded ID server url. 
-4.  The `strato-getting-started` directory, needs a `rootPriv.pem` and `rootCert.pem`. These files are not included in the docker image. Instead, they are mounted onto the identity server's docker container when it is first created. 
+4.  The `strato-getting-started` directory has an `identity-provider-certs` subdirectory, which needs a `rootPriv.pem` and `rootCert.pem`. These files are not included in the docker image. Instead, they are mounted onto the identity server's docker container when it is first created. If you do not provide these files within `identity-provider-certs`, the identity docker images will not build.
