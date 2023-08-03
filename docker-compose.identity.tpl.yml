@@ -23,8 +23,7 @@ services:
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
     volumes: 
-      - ./rootCert.pem:/identity-provider/rootCert.pem:ro
-      - ./rootPriv.pem:/identity-provider/rootPriv.pem:ro
+      - ./identity-provider-certs:/identity-provider/certs:ro
     logging:
       driver: "json-file"
       options:
