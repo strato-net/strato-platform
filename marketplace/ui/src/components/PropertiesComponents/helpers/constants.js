@@ -10,6 +10,65 @@ export const HomeTypeData = [
   { value: 'other', label: 'Other' },
 ];
 
+
+export const coolingData = [
+  { value: 'central', label: 'Central' },
+  { value: 'evaporative', label: 'Evaporative' },
+  { value: 'geothermal', label: 'Geothermal' },
+  { value: 'refrigeration', label: 'Refrigeration' },
+  { value: 'solar', label: 'Solar' },
+  { value: 'wall', label: 'Wall' },
+  { value: 'other', label: 'Other' },
+  { value: 'none', label: 'None' },
+]
+
+export const flooringData = [
+  { value: 'carpet', label: 'Carpet' },
+  { value: 'concrete', label: 'Concrete' },
+  { value: 'hardwood', label: 'Hardwood' },
+  { value: 'laminate', label: 'Laminate' },
+  { value: 'linoleumVinyl', label: 'Linoleum / Vinyl' },
+  { value: 'slate', label: 'Slate' },
+  { value: 'softwood', label: 'Softwood' },
+  { value: 'tile', label: 'Tile' },
+  { value: 'other', label: 'Other' },
+]
+
+export const heatingData = [
+  { value: 'baseboard', label: 'Baseboard' },
+  { value: 'forcedAir', label: 'Forced Air' },
+  { value: 'geothermal', label: 'Geothermal' },
+  { value: 'heatPump', label: 'Heat Pump' },
+  { value: 'radiant', label: 'Radiant' },
+  { value: 'stove', label: 'Stove' },
+  { value: 'wall', label: 'Wall' },
+  { value: 'other', label: 'Other' },
+]
+
+export const parkingFeaturesData = [
+  { value: 'carport', label: 'Carport' },
+  { value: 'attachedGarage', label: 'Garage - Attached' },
+  { value: 'detachedGarage', label: 'Garage - Detached' },
+  { value: 'offStreet', label: 'Off-Street' },
+  { value: 'onStreet', label: 'On-Street' },
+  { value: 'other', label: 'Other' },
+]
+
+export const interiorFeaturesData = [
+]
+
+export const exteriorFeaturesData = [
+]
+
+export const waterfrontFeaturesData = [
+]
+
+export const utilitiesData = [
+]
+
+export const patioAndPorchFeaturesData = [
+]
+
 export const StateData = [
   { value: 'AL', label: 'AL' },
   { value: 'AK', label: 'AK' },
