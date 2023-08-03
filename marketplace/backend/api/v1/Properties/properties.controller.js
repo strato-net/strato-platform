@@ -56,7 +56,7 @@ class PropertiesController {
     try {
       const { dapp, body } = req
 
-      const propertArgs = {
+      const propertyArgs = {
         title: body.title,
         description: body.description,
         propertyType: body.propertyType,
@@ -94,7 +94,7 @@ class PropertiesController {
         images: body.images
       }
 
-      PropertiesController.validateCreatePropertyArgs(body)
+      PropertiesController.validateCreatePropertyArgs(propertyArgs)
 
       const propertyResult = await dapp.createProperty(body)
 
