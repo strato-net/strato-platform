@@ -13,7 +13,7 @@ import {
   Space,
   Button,
 } from "antd";
-import { FilterFilled } from "@ant-design/icons";
+import { FilterFilled, CloseOutlined } from "@ant-design/icons";
 const { Panel } = Collapse;
 
 
@@ -94,6 +94,13 @@ const Filter = () => {
     setDrawerOpen(false);
   };
 
+  const handleClear = () => {
+    setDrawerOpen(false);
+  }
+
+  const applyFilter = () => {
+    setDrawerOpen(false);
+  }
 
   return (
     <>
@@ -103,6 +110,14 @@ const Filter = () => {
         onClose={closeDrawer}
         open={isDrawerOpen}
       >
+        <Row style={{ marginBottom: '20px' }}>
+          <Col offset={2} span={10}>
+            <Button onClick={handleClear} icon={<CloseOutlined />}>Clear Filter</Button>
+          </Col>
+          <Col offset={2} span={10}>
+            <Button onClick={applyFilter} type='primary'>Apply Filter </Button>
+          </Col>
+        </Row>
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
           value={inputSortBy}
@@ -134,7 +149,7 @@ const Filter = () => {
             <Slider
               step={50000}
               min={0}
-              max={2000000}
+              max={inputMaxPriceValue}
               type='number'
               onChange={onChangeMinPrice}
               value={
@@ -143,12 +158,14 @@ const Filter = () => {
             />
             <InputNumber
               min={0}
-              max={2000000}
+              max={inputMaxPriceValue}
               type='number'
               style={{ width: "100%" }}
-              placeholder="input min price"
+              placeholder="Min Price"
               value={inputMinPriceValue}
+              controls={false}
               onChange={onChangeMinPrice}
+              onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
               level={5}
@@ -172,9 +189,11 @@ const Filter = () => {
               max={2000000}
               type='number'
               style={{ width: "100%" }}
-              placeholder="input max price"
+              placeholder="Max Price"
               value={inputMaxPriceValue}
+              controls={false}
               onChange={onChangeMaxPrice}
+              onWheel={(e) => e.target.blur()}
             />
           </Panel>
           <Panel style={{ fontWeight: 700 }} header="Location" key="2">
@@ -192,7 +211,9 @@ const Filter = () => {
               value={inputZipcodeValue}
               style={{ width: "100%" }}
               placeholder="Enter Zipcode"
+              controls={false}
               onChange={onChangeZipcodeValidation}
+              onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
               level={5}
@@ -236,9 +257,11 @@ const Filter = () => {
               max={7}
               type='number'
               style={{ width: "100%" }}
-              placeholder="input min bedrooms"
+              placeholder="Min Bedrooms"
               value={inputMinBedrooms}
+              controls={false}
               onChange={onChangeMinBedrooms}
+              onWheel={(e) => e.target.blur()}
             />
             <Typography.Title
               level={5}
@@ -261,9 +284,11 @@ const Filter = () => {
               max={7}
               type='number'
               style={{ width: "100%" }}
-              placeholder="input min bathrooms"
+              placeholder="Min Bathrooms"
               value={inputMinBathrooms}
+              controls={false}
               onChange={onChangeMinBathrooms}
+              onWheel={(e) => e.target.blur()}
             />
           </Panel>
 
@@ -308,9 +333,11 @@ const Filter = () => {
               min={0}
               type='number'
               style={{ width: "100%" }}
-              placeholder="input min sq ft."
+              placeholder="Min Sq Ft."
               value={inputMinSqFt}
+              controls={false}
               onChange={onChangeMinSqFt}
+              onWheel={(e) => e.target.blur()}
             />
           </Panel>
           <Panel style={{ fontWeight: 700 }} header="Property & Parking" key="6">
