@@ -538,7 +538,6 @@ async function uploadFileToS3(fileKey, fileBuffer, s3Options) {
 }
 
 async function getSignedUrlFromS3 (fileKey, s3Options) {
-  console.log('getSignedUrlFromS3')
   const s3 = new aws.S3(s3Options)
   const signedUrl = s3.getSignedUrl('getObject', {
     Bucket: s3Options.bucket.Bucket,

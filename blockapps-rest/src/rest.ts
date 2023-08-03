@@ -1549,7 +1549,6 @@ async function uploadFileToS3(fileKey, fileBuffer, s3Options) {
 }
 
 async function getSignedUrlFromS3(fileKey, s3Options) {
-  console.log('getSignedUrlFromS3 rest')
   const uploadResult = await api.getSignedUrlFromS3(
     fileKey,
     s3Options
