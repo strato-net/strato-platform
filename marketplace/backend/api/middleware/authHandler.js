@@ -5,11 +5,10 @@ import jwtDecode from 'jwt-decode'
 import config from '/load.config'
 
 const getTokenFromCookie = async (req, res) => {
-  let temp = await req.app.oauth
-  const tokenName = temp.getCookieNameAccessToken()
+  let tokenName = await req.app.oauth.getCookieNameAccessToken()
   if (req.cookies[tokenName]) {
     try {
-      await temp.validateAndGetNewToken(req, res)
+      await req.app.oauth.validateAndGetNewToken(req, res)
       return req.cookies[tokenName] // the cookie may have the updated value here after validateAndGetNewToken()
     } catch (err) {
       console.log(
@@ -32,12 +31,7 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
-// const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
-const getLoginUrl = async (req) => {
-  let temp = await req.app.oauth
-  return config.dockerized ? '/marketplace/login/' : temp.getSigninURL()
-};
-
+const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
 
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
@@ -84,22 +78,20 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        console.error('Error authorizing request', err)
-        return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, err)
-        // return next()
+        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
+        return next()
       }
-      return rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: await getLoginUrl(req),
+      rest.response.status(RestStatus.UNAUTHORIZED, res, {
+        loginUrl: getLoginUrl(req),
       })
-      // return next()
+      return next()
     }
   }
 
-  static async initOauth() {
+  static initOauth() {
     let oauth
     try {
-      oauth = await oauthUtil.init(config.nodes[0].oauth)
-      console.log('help!: ', oauth.getSigninURL())
+      oauth = oauthUtil.init(config.nodes[0].oauth)
     } catch (err) {
       console.log('Error initializing oauth handlers')
       process.exit(1)
