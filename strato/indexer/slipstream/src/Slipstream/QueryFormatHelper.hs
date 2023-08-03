@@ -3,6 +3,9 @@
 module Slipstream.QueryFormatHelper where
 
 import qualified Data.Text as T
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as AesonKey
+import qualified Data.Map as Map
 import           Slipstream.Data.Globals (TableName(..))
 
 tshow :: Show a => a -> T.Text
@@ -77,6 +80,13 @@ tableNameToText (EventTableName o a c e) =
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
+tableNameToText (AssetTableRowName o a c) =
+  let prefix
+        | T.null o = ""
+        | T.null a = o <> tableSeparator
+        | otherwise = o <> tableSeparator <> a <> tableSeparator
+  in prefix <> c
+
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
@@ -87,3 +97,17 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 
+removeSingleQuotes :: T.Text -> T.Text
+removeSingleQuotes inputText =
+    let str = T.unpack inputText
+        -- Remove the single quotes from the string
+        cleanedStr = filter (/= '\'') str
+    in T.pack cleanedStr
+
+aesonHelper :: Map.Map T.Text T.Text -> Map.Map Aeson.Key Aeson.Value
+aesonHelper m = Map.fromList $ map (\(x,y) -> (AesonKey.fromText x, Aeson.toJSON $ removeSingleQuotes y)) (Map.toList m)
+
+newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Aeson.Value)
+
+instance Aeson.ToJSON MapWrapper where
+  toJSON (MapWrapper m) = Aeson.object (map (\(k, v) -> k Aeson..= v) (Map.toList m))

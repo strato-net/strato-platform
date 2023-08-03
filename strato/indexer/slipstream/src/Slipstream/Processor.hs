@@ -20,6 +20,7 @@
 module Slipstream.Processor
   ( processTheMessages
   , parseActions
+  , generateAssetTable
   ) where
 
 import Prelude hiding (lookup)
@@ -138,6 +139,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
+  , assetInsert     :: Maybe ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -292,6 +294,11 @@ getCodeCollection cp ccString = do
     EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
+getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = Map.lookup parent cc
+  in mapMaybe getContractForParent parents'
+
 processTheMessages :: (MonadLogger m, HasSQL m) =>
                       BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env conn g messages = do
@@ -312,6 +319,7 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
+
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
     case cc' of
@@ -336,6 +344,10 @@ processTheMessages env conn g messages = do
                     listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
                     listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
                     mapNames = map fst listOfMappingsWithRecords
+                    parents' = c ^. parents
+                    parentContracts = getContractsForParents parents' (cc^.contracts)
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
@@ -352,6 +364,9 @@ processTheMessages env conn g messages = do
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn $ createExpandEventTables g c nameParts
+
+                when (length parentAbstractContracts >= 1) $ do
+                  outputData conn $ insertContractInAssetTableQuery g nameParts 
 
                 return deferredForeignKeys
 
@@ -391,11 +406,15 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          assets <- getAssetTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          pure . Right $ BatchedInserts indexContract hs pMappings
+          if (AssetTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` assets
+            then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
+          else
+            pure . Right $ BatchedInserts indexContract Nothing hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -410,6 +429,7 @@ processTheMessages env conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    unless (null ins) $ outputData conn . insertAssetTable $ map assetInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -427,4 +447,8 @@ processTheMessages env conn g messages = do
 
   flushPendingWrites g
 
+generateAssetTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateAssetTable conn g = do
+  outputData conn $ createAssetTable g
 
