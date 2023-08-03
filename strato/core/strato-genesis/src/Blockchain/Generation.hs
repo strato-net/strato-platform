@@ -917,13 +917,13 @@ insertUserRegistryContract gi =
                 (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "1337") MainChain))
             ]
 
-        testAcct = SolidVMContractWithStorage 0x5516eb4e821a23b38f6a2be92ae7a0086ecaac9d 123
-            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
-                (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a13bf5afbd9e23e92568b546880b55d8ee0d54a5") UnspecifiedChain)),
-                (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a5540deed8550b8846b56825e9239ebdaff53ba1") MainChain))
-            ]
+        -- testAcct = SolidVMContractWithStorage 0x5516eb4e821a23b38f6a2be92ae7a0086ecaac9d 123
+        --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
+        --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
+        --         (".userAddress", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a13bf5afbd9e23e92568b546880b55d8ee0d54a5") UnspecifiedChain)),
+        --         (".userCertificates[0]", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "a5540deed8550b8846b56825e9239ebdaff53ba1") MainChain))
+        --     ]
 
         registryAcct = SolidVMContractWithStorage 0x720 720
             (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
