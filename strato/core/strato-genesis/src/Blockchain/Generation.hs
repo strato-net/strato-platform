@@ -896,7 +896,7 @@ contract User {
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct, testAcct],
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
     where 
         initialAccounts = genesisInfoAccountInfo gi
