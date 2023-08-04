@@ -110,11 +110,37 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         for (uint i = 0; i < _itemAddress.length; i++) {
             Item_3 _item = Item_3(_itemAddress[i]);
-            _item.transferOwnership(
-                _newOwner,
-                address(product),
-                address(inventory)
-            );
+            if (oldInventory.availableQuantity() == _newQuantity) {
+                _item.transferOwnership(
+                    _newOwner,
+                    address(product),
+                    address(inventory)
+                );
+            } else {
+                Item_3 itemAddr = new Item_3(
+                    _item.productId(),
+                    _item.inventoryId(),
+                    _item.creditBatchSerialization(),
+                    _item.quantity(),
+                    _item.status(),
+                    block.timestamp
+                );
+                address itemContractAddress = address(itemAddr);
+                itemAddr.generateOwnershipHistory(
+                    "",
+                    _item.ownerOrganization(),
+                    block.timestamp,
+                    itemContractAddress
+                );
+                itemProductIdMapping[itemContractAddress] = _item.productId();
+                itemInventoryIdMapping[itemContractAddress] = _item.inventoryId();
+
+                _item.transferOwnership(
+                    _newOwner,
+                    address(product),
+                    address(inventory)
+                );
+            }
         }
 
         return (address(product), address(inventory));
