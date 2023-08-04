@@ -318,5 +318,27 @@
       "label": "Parking",
       "value": "Parking"
     }
+  ],
+  "sortBy": [
+    {
+      "value": "Select",
+      "label": "Select"
+    },
+    {
+      "value": "minPrice",
+      "label": "Sort By Lowest Price"
+    },
+    {
+      "value": "maxPrice",
+      "label": "Sort By Highest Price"
+    },
+    {
+      "value": "minSqFt",
+      "label": "Sort By Lowest Sq Ft."
+    },
+    {
+      "value": "maxSqFt",
+      "label": "Sort By Highest Sq Ft."
+    }
   ]
 }
