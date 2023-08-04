@@ -35,7 +35,7 @@ function PropertyCreateModal({
   toggleCreateConfirmModal,
 }) {
   const dispatch = usePropertiesDispatch();
-  
+
   const [propertyData, setPropertyData] = useState({});
   const [homeType, setHomeType] = useState("");
   const [bedrooms, setBedrooms] = useState("");
@@ -498,22 +498,38 @@ function PropertyCreateModal({
                 />
               </Form.Item>
               <Form.Item
-                label="Room Details"
-                name="lotSize"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Collapse></Collapse>
-              </Form.Item>
-
-              <Form.Item
-                label="Building Details"
-                name="lotSize"
+                label="Appliances"
+                name="appliances"
                 rules={[{ message: "Please input an asking price." }]}
               ></Form.Item>
-
               <Form.Item
-                label="Utilities*"
-                name="lotSize"
+                label="Flooring"
+                name="flooring"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Cooling"
+                name="cooling"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Heating"
+                name="heating"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Parking"
+                name="parking"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Interior Features"
+                name="interiorFeatures"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Exterior Features"
+                name="exteriorFeatures"
                 rules={[{ message: "Please input an asking price." }]}
               ></Form.Item>
             </Form>

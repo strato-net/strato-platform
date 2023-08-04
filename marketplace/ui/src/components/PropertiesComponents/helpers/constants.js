@@ -23,16 +23,6 @@ export const appliancesData = [
   { value: 'other', label: 'Other' },
 ]
 
-export const coolingData = [
-  { value: 'central', label: 'Central' },
-  { value: 'evaporative', label: 'Evaporative' },
-  { value: 'geothermal', label: 'Geothermal' },
-  { value: 'refrigeration', label: 'Refrigeration' },
-  { value: 'solar', label: 'Solar' },
-  { value: 'wall', label: 'Wall' },
-  { value: 'other', label: 'Other' },
-]
-
 export const flooringData = [
   { value: 'carpet', label: 'Carpet' },
   { value: 'concrete', label: 'Concrete' },
@@ -42,6 +32,32 @@ export const flooringData = [
   { value: 'slate', label: 'Slate' },
   { value: 'softwood', label: 'Softwood' },
   { value: 'tile', label: 'Tile' },
+  { value: 'other', label: 'Other' },
+]
+
+export const interiorFeaturesData = [
+  { value: 'attic', label: 'Attic' },
+  { value: 'cableReady', label: 'Cable Ready' },
+  { value: 'ceilingFan', label: 'Ceiling Fan' },
+  { value: 'doublePaneWindows', label: 'Double Pane / Storm Windows' },
+  { value: 'fireplace', label: 'Fireplace' },
+  { value: 'flooring', label: 'Flooring' },
+  { value: 'furnished', label: 'Furnished' },
+  { value: 'jettedTub', label: 'Jetted Tub' },
+  { value: 'securitySystem', label: 'Security System' },
+  { value: 'vaultedCeiling', label: 'Vaulted Ceiling' },
+  { value: 'wetBar', label: 'Wet Bar' },
+  { value: 'wired', label: 'Wired' },
+  { value: 'other', label: 'Other' },
+]
+
+export const coolingData = [
+  { value: 'central', label: 'Central' },
+  { value: 'evaporative', label: 'Evaporative' },
+  { value: 'geothermal', label: 'Geothermal' },
+  { value: 'refrigeration', label: 'Refrigeration' },
+  { value: 'solar', label: 'Solar' },
+  { value: 'wall', label: 'Wall' },
   { value: 'other', label: 'Other' },
 ]
 
@@ -62,22 +78,6 @@ export const parkingFeaturesData = [
   { value: 'detachedGarage', label: 'Garage - Detached' },
   { value: 'offStreet', label: 'Off-Street' },
   { value: 'onStreet', label: 'On-Street' },
-  { value: 'other', label: 'Other' },
-]
-
-export const interiorFeaturesData = [
-  { value: 'attic', label: 'Attic' },
-  { value: 'cableReady', label: 'Cable Ready' },
-  { value: 'ceilingFan', label: 'Ceiling Fan' },
-  { value: 'doublePaneWindows', label: 'Double Pane / Storm Windows' },
-  { value: 'fireplace', label: 'Fireplace' },
-  { value: 'flooring', label: 'Flooring' },
-  { value: 'furnished', label: 'Furnished' },
-  { value: 'jettedTub', label: 'Jetted Tub' },
-  { value: 'securitySystem', label: 'Security System' },
-  { value: 'vaultedCeiling', label: 'Vaulted Ceiling' },
-  { value: 'wetBar', label: 'Wet Bar' },
-  { value: 'wired', label: 'Wired' },
   { value: 'other', label: 'Other' },
 ]
 
