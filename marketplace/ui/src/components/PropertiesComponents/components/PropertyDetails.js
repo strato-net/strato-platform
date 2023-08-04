@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Spin, Typography, Tabs, Col, Row } from "antd";
+import { Spin, Typography, Tabs, Col, Row, notification } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
@@ -14,7 +14,7 @@ import { sampleProperties } from '../helpers/sampleProperties';
 function PropertyDetails() {
   const [propertyDetail, setPropertyDetail] = useState({})
   const dispatch = usePropertiesDispatch()
-  const { isPropertyDetailsLoading } = usePropertiesState()
+  const { isPropertyDetailsLoading, message, success } = usePropertiesState()
   let { id } = useParams();
 
   useEffect(() => {
@@ -23,9 +23,29 @@ function PropertyDetails() {
     setPropertyDetail(propertyData[0])
   }, [])
 
-  // Dummy data for Collage & Carousel
-  const imglist = propertyDetail?.images;
+  const [api, contextHolder] = notification.useNotification();
 
+  const openToast = (placement) => {
+
+    if (success) {
+      api.success({
+        message: "message-success",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: "message-failed",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  // Dummy data for Collage & Carousel
+  const { images, reviews } = propertyDetail
 
   const property = {
     fields: "Property detail"
@@ -50,18 +70,19 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      children: <ReviewTab />,
+      children: <ReviewTab reviews={reviews} />,
     },
   ];
 
   return (
     <>
+      {contextHolder}
       {isPropertyDetailsLoading
         ? <div className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
         </div>
         : <Col span={16} style={{ margin: 'auto', marginBottom: '100px' }}>
-          <ImageCollage images={imglist} />
+          <ImageCollage images={images} />
           <Row justify={"center"} align="top"
             style={{ marginTop: 50 }} >
             <Col
