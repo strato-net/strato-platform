@@ -70,15 +70,16 @@ function PropertyListings() {
             :
             <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
               {sampleProperties &&
-                sampleProperties?.map((property, index) => (
-                  property?.listPrice && (
+                sampleProperties.map((property, index) => {
+                  const { listPrice, id } = property
+                  return listPrice && (
                     <Col key={index} style={{ padding: '10px' }}>
-                      <Link to={`/properties/${property?.id}`}>
+                      <Link to={`/properties/${id}`}>
                         <PropertyCard property={property} />
                       </Link>
                     </Col>
                   )
-                ))}
+                })}
             </Row>
           }
           <Pagination style={{ width: '500px', margin: 'auto', marginTop: "200px" }}

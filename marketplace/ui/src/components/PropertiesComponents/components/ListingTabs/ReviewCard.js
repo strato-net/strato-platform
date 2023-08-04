@@ -4,7 +4,7 @@ import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
 
 
 const ReviewCard = (props) => {
-  const { review, index } = props
+  const { review: { name, title, date, comments, readmore }, index } = props
 
   return (
     <>
@@ -18,7 +18,7 @@ const ReviewCard = (props) => {
           <Typography.Text type="secondary">
             <Avatar size="small" icon={<UserOutlined />} />
             <Typography.Text type="secondary" style={{ padding: "8px" }}>
-              {review.name}
+              {name}
             </Typography.Text>
           </Typography.Text>
           {/* edit & delete buttons, that we have to use after login functionality */}
@@ -35,16 +35,16 @@ const ReviewCard = (props) => {
                 />
               </div> */}
         </div>
-        <Typography.Text type="secondary">Reviewed on {review?.date}</Typography.Text>
-        <Typography.Text style={{ position: "relative", top: '10px' }} strong>{review?.title}</Typography.Text>
+        <Typography.Text type="secondary">Reviewed on {date}</Typography.Text>
+        <Typography.Text style={{ position: "relative", top: '10px' }} strong>{title}</Typography.Text>
         <Typography.Text>
-          {review.readmore
-            ? review?.comments
-            : review?.comments.slice(0, 100)}
+          {readmore
+            ? comments
+            : comments.slice(0, 100)}
         </Typography.Text>
         {
-          review.comments?.length > 100 ?
-            review.readmore
+          comments?.length > 100 ?
+            readmore
               ? <Button block className="read-btn" onClick={() => { props.handleRead() }}><UpOutlined /> Hide full review</Button>
               : <Button block className="read-btn" onClick={() => { props.handleRead() }}> <DownOutlined /> See full review</Button>
             : ''}
