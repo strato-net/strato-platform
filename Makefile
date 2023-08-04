@@ -19,6 +19,7 @@ STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$
 FAKEROOT=$(shell pwd)/.docker-work
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
+IDENTITYDIR=${FAKEROOT}/identity-provider
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -35,9 +36,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx
+build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -80,6 +81,7 @@ build_common: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
+	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -88,6 +90,7 @@ build_common_profiled: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
+	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -109,6 +112,16 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
+identity-provider: build_common
+	@echo Now building Identity Server...
+	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
+	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
+
+identity-nginx:
+	@echo Now building identity-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}identity-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}identity-nginx:${VERSION} make --directory=identity-nginx/
+
 docker-compose:
 	@echo Now generating docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml...
@@ -116,12 +129,16 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.identity.push.yml > docker-compose.identity.yml
+	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
 
 docker-build:
 	cp -fr strato/licenses ${STRATODIR}
