@@ -41,6 +41,8 @@ const Filter = () => {
   const [filterOption, setFilterOption] = useState(filterSchema);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
+  const { sortBy, states, amenities, parkingType ,propertyTypes} = filterData;
+
   const handleChange = (key, value) => {
     let filter = { ...filterOption };
     filter[key] = value;
@@ -93,13 +95,7 @@ const Filter = () => {
             handleChange("sortBy", value);
           }}
           defaultValue={"Select"}
-          options={[
-            { value: "Select", label: "Select" },
-            { value: "minPrice", label: "Sort By Lowest Price" },
-            { value: "maxPrice", label: "Sort By Highest Price" },
-            { value: "minSqFt", label: "Sort By Lowest Sq Ft." },
-            { value: "maxSqFt", label: "Sort By Highest Sq Ft." },
-          ]}
+          options={sortBy}
         />
 
         <Typography.Title level={5} style={{ marginTop: "15px" }}>
@@ -214,7 +210,7 @@ const Filter = () => {
                 handleChange("stateValue", value);
               }}
               defaultValue={"Select"}
-              options={filterData?.states}
+              options={states}
             />
           </Panel>
 
@@ -295,7 +291,7 @@ const Filter = () => {
             {/* <div style={{ display: "flex", flexDirection: "column" }}> */}
             <Checkbox.Group
               style={{ display: "grid", lineHeight: "30px" }}
-              options={filterData?.amenities}
+              options={amenities}
               value={filterOption?.amenities}
               onChange={(value) => {
                 handleChange("amenities", value);
@@ -344,7 +340,7 @@ const Filter = () => {
                 handleChange("parkingType", value);
               }}
               defaultValue={"Select"}
-              options={filterData?.parkingType}
+              options={parkingType}
             />
 
             <Typography.Title
@@ -361,7 +357,7 @@ const Filter = () => {
                 handleChange("propertyType", value);
               }}
               defaultValue={"Select"}
-              options={filterData?.propertyTypes}
+              options={propertyTypes}
             />
           </Panel>
         </Collapse>

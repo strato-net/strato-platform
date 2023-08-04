@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Spin, Typography, Tabs, Col, Row } from "antd";
+import { Spin, Typography, Tabs, Col, Row, notification } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
@@ -14,7 +14,7 @@ import { sampleProperties } from '../helpers/sampleProperties';
 function PropertyDetails() {
   const [propertyDetail, setPropertyDetail] = useState({})
   const dispatch = usePropertiesDispatch()
-  const { isPropertyDetailsLoading } = usePropertiesState()
+  const { isPropertyDetailsLoading, message, success } = usePropertiesState()
   let { id } = useParams();
 
   useEffect(() => {
@@ -23,6 +23,28 @@ function PropertyDetails() {
     setPropertyDetail(propertyData[0])
   }, [])
 
+  const [api, contextHolder] = notification.useNotification();
+
+  const openToast = (placement) => {
+
+    if (success) {
+      api.success({
+        message: "message-success",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: "message-failed",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+  // openToast("bottom")
+  
   // Dummy data for Collage & Carousel
   const imglist = propertyDetail?.images;
 
@@ -56,6 +78,7 @@ function PropertyDetails() {
 
   return (
     <>
+      {contextHolder}
       {isPropertyDetailsLoading
         ? <div className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
