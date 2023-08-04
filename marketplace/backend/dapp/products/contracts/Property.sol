@@ -1,6 +1,6 @@
 
 /// @title A representation of Property assets
-contract Properties {
+contract Property {
 
   address public produdctId;
   int public parcelNumber;

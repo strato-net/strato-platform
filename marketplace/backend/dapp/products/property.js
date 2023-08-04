@@ -4,8 +4,8 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Properties';
-const contractFilename = `${util.cwd}/dapp/products/contracts/Properties.sol`;
+const contractName = 'Property';
+const contractFilename = `${util.cwd}/dapp/products/contracts/Property.sol`;
 /** 
  * Upload a new Product 
  * @param user User token (typically an admin)
