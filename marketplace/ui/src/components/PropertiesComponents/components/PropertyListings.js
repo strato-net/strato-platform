@@ -9,12 +9,13 @@ import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/pro
 
 function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
+  const [limit, setLimit] = useState(12)
 
   useEffect(() => {
     // TODO: will be used when API is ready
     // actions.fetchProperties(dispatch)
   }, [])
-  
+
   const dispatch = usePropertiesDispatch()
   const { isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
@@ -42,6 +43,15 @@ function PropertyListings() {
     setCurrentPage(e)
   }
 
+  const applyFilter = (options) => {
+    // actions.fetchProperties(dispatch, limit,currentPage,options)
+  }
+
+  const clearFilter = () => {
+    setCurrentPage(1)
+    // actions.fetchProperties(dispatch, limit,1,options)
+  }
+
   return (
     <>
       {contextHolder}
@@ -51,7 +61,7 @@ function PropertyListings() {
             <Typography.Title level={4} style={{ padding: "0px 16px" }}>
               Recommended Properties
             </Typography.Title>
-            <Filter />
+            <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
           </Row>
           {isPropertiesLoading
             ? <div className="h-96 flex justify-center items-center">

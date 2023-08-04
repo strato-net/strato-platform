@@ -43,11 +43,9 @@ function PropertyDetails() {
       });
     }
   };
-  // openToast("bottom")
-  
-  // Dummy data for Collage & Carousel
-  const imglist = propertyDetail?.images;
 
+  // Dummy data for Collage & Carousel
+  const { images, reviews } = propertyDetail
 
   const property = {
     fields: "Property detail"
@@ -72,7 +70,7 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      children: <ReviewTab />,
+      children: <ReviewTab reviews={reviews} />,
     },
   ];
 
@@ -84,7 +82,7 @@ function PropertyDetails() {
           <Spin spinning={isPropertyDetailsLoading} size="large" />
         </div>
         : <Col span={16} style={{ margin: 'auto', marginBottom: '100px' }}>
-          <ImageCollage images={imglist} />
+          <ImageCollage images={images} />
           <Row justify={"center"} align="top"
             style={{ marginTop: 50 }} >
             <Col

@@ -1,9 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button, Modal, Col, Row, Input, Form } from "antd";
 const { TextArea } = Input;
 
 const WriteReviewModal = (props) => {
+  const [reviewData, setReviewData] = useState({})
   const { open, handleCancel, isReviewSubmitting, handleSubmit, form } = props;
+
+  const handleChange = (key, value) => {
+    let data = { ...reviewData }
+    data[key] = value;
+    setReviewData(data)
+  }
+
   return (
     <Modal
       open={open}
@@ -42,7 +50,7 @@ const WriteReviewModal = (props) => {
                 },
               ]}
             >
-              <Input />
+              <Input onChange={(e) => { handleChange("firstName", e.target.value) }} />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -56,7 +64,7 @@ const WriteReviewModal = (props) => {
                 },
               ]}
             >
-              <Input />
+              <Input onChange={(e) => { handleChange("lastName", e.target.value) }} />
             </Form.Item>
           </Col>
         </Row>
@@ -74,7 +82,7 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <Input />
+          <Input onChange={(e) => { handleChange("email", e.target.value) }} />
         </Form.Item>
         <Form.Item
           label="What do you think of the property?"
@@ -86,7 +94,7 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <TextArea rows={4} />
+          <TextArea rows={4} onChange={(e) => { handleChange("comments", e.target.value) }} />
         </Form.Item>
       </Form>
     </Modal>

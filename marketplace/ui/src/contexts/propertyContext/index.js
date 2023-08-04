@@ -9,12 +9,17 @@ const PropertyProvider = ({ children }) => {
     property: null,
     isCreatePropertySubmitting: false,
     properties: [],
+    filter: null,
     isPropertiesLoading: false,
     error: undefined,
     success: false,
     message: null,
     propertyDetails: null,
     isPropertyDetailsLoading: false,
+    isReviewAdding: false,
+    isReviewUpdating: false,
+    isReviewDeleting: false,
+    review: [],
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

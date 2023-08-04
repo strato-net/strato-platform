@@ -65,6 +65,58 @@ const reducer = (state, action) => {
         isPropertyDetailsLoading: false,
         propertyDetails: action.payload
       };
+    // review cases:-
+    case actionDescriptors.addReview:
+      return {
+        ...state,
+        isReviewAdding: true,
+      };
+    case actionDescriptors.addReviewSuccessful:
+      return {
+        ...state,
+        review: action.payload,
+        isReviewAdding: false,
+      };
+    case actionDescriptors.addReviewFailed:
+      return {
+        ...state,
+        error: action.error,
+        isReviewAdding: false,
+      };
+    case actionDescriptors.updateReview:
+      return {
+        ...state,
+        isReviewUpdating: true,
+      };
+    case actionDescriptors.updateReviewSuccessful:
+      return {
+        ...state,
+        review: action.payload,
+        isReviewUpdating: false,
+      };
+    case actionDescriptors.updateReviewfailed:
+      return {
+        ...state,
+        error: action.error,
+        isReviewUpdating: false,
+      };
+    case actionDescriptors.deleteReview:
+      return {
+        ...state,
+        isReviewDeleting: true,
+      };
+    case actionDescriptors.deleteReviewSuccessful:
+      return {
+        ...state,
+        review: action.payload,
+        isReviewDeleting: false,
+      };
+    case actionDescriptors.deleteReviewFailed:
+      return {
+        ...state,
+        error: action.error,
+        isReviewDeleting: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

@@ -35,12 +35,12 @@ const ReviewCard = (props) => {
                 />
               </div> */}
         </div>
-        <Typography.Text type="secondary">Reviewed on July 19th, 2023</Typography.Text>
-        <Typography.Text style={{ position: "relative", top: '10px' }} strong>{review.title}</Typography.Text>
+        <Typography.Text type="secondary">Reviewed on {review?.date}</Typography.Text>
+        <Typography.Text style={{ position: "relative", top: '10px' }} strong>{review?.title}</Typography.Text>
         <Typography.Text>
           {review.readmore
-            ? review.comments
-            : review.comments.slice(0, 100)}
+            ? review?.comments
+            : review?.comments.slice(0, 100)}
         </Typography.Text>
         {
           review.comments?.length > 100 ?

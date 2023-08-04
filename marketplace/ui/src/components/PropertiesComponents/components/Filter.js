@@ -13,15 +13,11 @@ import {
   Button,
 } from "antd";
 import { FilterFilled, CloseOutlined } from "@ant-design/icons";
-// import { actions } from '../../../contexts/propertyContext/actions';
 import filterData from "../helpers/filterOptions.json";
-// import { usePropertiesDispatch } from '../../../contexts/propertyContext';
 
 const { Panel } = Collapse;
 
-const Filter = () => {
-  // const dispatch = usePropertiesDispatch()
-  // const { properties, isPropertiesLoading } = usePropertiesState();
+const Filter = (props) => {
 
   const MAX_PRICE_VALUE = 2000000;
   const filterSchema = {
@@ -41,7 +37,8 @@ const Filter = () => {
   const [filterOption, setFilterOption] = useState(filterSchema);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
-  const { sortBy, states, amenities, parkingType ,propertyTypes} = filterData;
+  const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
+  const { maxPriceValue, zipcodeValue, minPriceValue, stateValue, minBedrooms, minBathrooms, minSqFt, } = filterOption;
 
   const handleChange = (key, value) => {
     let filter = { ...filterOption };
@@ -60,11 +57,12 @@ const Filter = () => {
   const handleClear = () => {
     setDrawerOpen(false);
     setFilterOption(filterSchema);
+    props.clearFilter()
   };
 
   const applyFilter = () => {
     setDrawerOpen(false);
-    // actions.fetchProperties(dispatch, 12,1,filterOption)
+    props.applyFilter(filterOption)
   };
 
   return (
@@ -116,24 +114,24 @@ const Filter = () => {
             <Slider
               step={50000}
               min={0}
-              max={filterOption?.maxPriceValue}
+              max={maxPriceValue}
               type="number"
               onChange={(value) => {
                 handleChange("minPriceValue", value);
               }}
               value={
-                typeof filterOption?.minPriceValue === "number"
-                  ? filterOption?.minPriceValue
+                typeof minPriceValue === "number"
+                  ? minPriceValue
                   : 0
               }
             />
             <InputNumber
               min={0}
-              max={filterOption?.maxPriceValue}
+              max={maxPriceValue}
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Price"
-              value={filterOption?.minPriceValue}
+              value={minPriceValue}
               controls={false}
               onChange={(value) => {
                 handleChange("minPriceValue", value);
@@ -156,8 +154,8 @@ const Filter = () => {
                 handleChange("maxPriceValue", value);
               }}
               value={
-                typeof filterOption?.maxPriceValue === "number"
-                  ? filterOption?.maxPriceValue
+                typeof maxPriceValue === "number"
+                  ? maxPriceValue
                   : 0
               }
             />
@@ -167,7 +165,7 @@ const Filter = () => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Max Price"
-              value={filterOption?.maxPriceValue}
+              value={maxPriceValue}
               controls={false}
               onChange={(value) => {
                 handleChange("maxPriceValue", value);
@@ -187,7 +185,7 @@ const Filter = () => {
               min={0}
               max={99999}
               type="number"
-              value={filterOption?.zipcodeValue}
+              value={zipcodeValue}
               style={{ width: "100%" }}
               placeholder="Enter Zipcode"
               controls={false}
@@ -205,7 +203,7 @@ const Filter = () => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
-              value={filterOption?.stateValue}
+              value={stateValue}
               onChange={(value) => {
                 handleChange("stateValue", value);
               }}
@@ -234,8 +232,8 @@ const Filter = () => {
                 handleChange("minBedrooms", value);
               }}
               value={
-                typeof filterOption?.minBedrooms === "number"
-                  ? filterOption?.minBedrooms
+                typeof minBedrooms === "number"
+                  ? minBedrooms
                   : 0
               }
             />
@@ -245,7 +243,7 @@ const Filter = () => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bedrooms"
-              value={filterOption?.minBedrooms}
+              value={minBedrooms}
               controls={false}
               onChange={(value) => {
                 handleChange("minBedrooms", value);
@@ -267,8 +265,8 @@ const Filter = () => {
                 handleChange("minBathrooms", value);
               }}
               value={
-                typeof filterOption?.minBathrooms === "number"
-                  ? filterOption?.minBathrooms
+                typeof minBathrooms === "number"
+                  ? minBathrooms
                   : 0
               }
             />
@@ -278,7 +276,7 @@ const Filter = () => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bathrooms"
-              value={filterOption?.minBathrooms}
+              value={minBathrooms}
               controls={false}
               onChange={(value) => {
                 handleChange("minBathrooms", value);
@@ -313,7 +311,7 @@ const Filter = () => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Sq Ft."
-              value={filterOption?.minSqFt}
+              value={minSqFt}
               controls={false}
               onChange={(value) => {
                 handleChange("minSqFt", value);
