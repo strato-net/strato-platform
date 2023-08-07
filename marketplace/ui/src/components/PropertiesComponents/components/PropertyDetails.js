@@ -113,27 +113,30 @@ function PropertyDetails() {
         </div>
         : <Col span={22} style={{ margin: 'auto', marginBottom: '100px' }}>
           <Row>
-            <Col sm={24} lg={12} style={{ backgroundColor: "" }}>
+            <Col sm={24} lg={14} style={{ backgroundColor: "" }}>
               <ImageCollage images={images} />
             </Col>
-            <Col sm={24} lg={12} style={{ backgroundColor: "" }}>
+            <Col sm={24} lg={10} style={{ backgroundColor: "" }}>
               <Row justify={"center"} align="top"
                 style={{ marginTop: 20 }} >
                 <Col
                   sm={24} md={20}
                 >
-                  <Row justify={"space-between"} align="top"  >
-                    <Title
-                      style={{ marginTop: 0, marginRight: 10 }}
-                      level={4}
-                    >
-                      $ {listPrice}
-                    </Title>
+                  <Row align="top"  >
+                    <Col span={8}>
+                      <Title
+                        style={{ marginTop: 0, marginRight: 10 }}
+                        level={4}
+                      >
+                        $ {listPrice}
+                      </Title>
+                    </Col>
                     <Col span={12} style={{ display: "flex", justifyContent: "space-around" }}>
                       <Text>{bedroomsTotal} Bed</Text>
                       <Text>{bathroomsTotalInteger} Bath</Text>
                       <Text>{livingArea} {livingAreaUnits}</Text>
                     </Col>
+                    <Col span={4}></Col>
                   </Row>
                   <Row>
                     <Text style={{ marginTop: 2 }} level={4}>
@@ -141,8 +144,11 @@ function PropertyDetails() {
                       {postalCode}
                     </Text>
                   </Row>
-                  <Text strong>Active</Text>
                   <Row>
+                    <span style={{ width: '10px', height: "10px", borderRadius: "50%", backgroundColor: "green", margin: '5px' }}></span>
+                    <Text strong>Active</Text>
+                  </Row>
+                  <Row style={{ marginTop: "15px" }}>
                     <Col>
                       <Paragraph>
                         <b>
@@ -206,12 +212,8 @@ function PropertyDetails() {
               <Tabs defaultActiveKey="Overview" items={tabs} />
             </Col>
             <Col sm={24} lg={12} style={{ marginTop: "20px" }}>
-              <div style={{ width: '300px', background: 'grey', margin: 'auto' }}>
-                <div class="mapouter"><div class="gmap_canvas">
-                  <iframe width="100%" height="100%" id="gmap_canvas"
-                    src="https://maps.google.com/maps?q=california&t=&z=10&ie=UTF8&iwloc=&output=embed"
-                    frameborder="0" scrolling="no" marginheight="0" marginwidth="0">
-                  </iframe></div></div>
+              <div style={{ width: '300px', height: "200px", background: 'grey', margin: 'auto', textAlign: "center" }}>
+                MAP
               </div>
             </Col>
           </Row>
