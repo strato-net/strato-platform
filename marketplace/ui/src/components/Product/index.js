@@ -26,12 +26,16 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import UploadPhotosModal from "./UploadPhotosModal";
+import CarouselComponent from "./Carousel";
+import ImageCollage from "./ImageCollage";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Product = () => {
   const [open, setOpen] = useState(false);
+  const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const dispatch = useProductDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [queryValue, setQueryValue] = useState("");
@@ -41,6 +45,18 @@ const Product = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
+  const imglist = [
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1607154818od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3497275450od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m3180059059od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1194456964od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2512788875od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2935903856od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m210456744od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m1069665804od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m2999610083od-w1024_h768_x2.webp',
+    'https://ap.rdcpix.com/48c9911bf74a48c6734b9f3fbdf677abl-m876342709od-w1024_h768_x2.webp'
+  ]
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
@@ -144,68 +160,74 @@ const Product = () => {
               </Button>
             </div>
           ) : (
-            <>
-              <div className="flex justify-between">
-                <Breadcrumb>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.Marketplace.url}>
-                      Home
-                    </ClickableCell>
-                  </Breadcrumb.Item>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <p className="text-primary">
-                      Products
-                    </p>
-                  </Breadcrumb.Item>
-                </Breadcrumb>
-                <div className="flex">
-                  <Search
-                    placeholder="Search"
-                    className="w-80 mr-6"
-                    allowClear
-                    onChange={queryHandle}
-                    value={queryValue}
-                  />
-                  <Button id="add-product-button" type="primary" className="w-48"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        showModal()
-                      }
-                    }}
-                  >
-                    Add Product
-                  </Button>
-                </div>
-              </div>
-              <>
-                {products.length !== 0 ? (
-                  <div className="my-4">
-                    {products.map((product, index) => {
-                      return (
-                        <ProductCard
-                          product={product}
-                          categorys={categorys}
-                          subCategorys={subCategorys}
-                          key={index}
-                          debouncedSearchTerm={debouncedSearchTerm}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="flex justify-center my-10"> No data found</p>
-                )}
-                <Pagination
-                  current={page}
-                  onChange={onPageChange}
-                  total={total}
-                  className="flex justify-center my-5 "
+          <>
+            <div className="flex justify-between">
+              <Breadcrumb>
+                <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                  <ClickableCell href={routes.Marketplace.url}>
+                    Home
+                  </ClickableCell>
+                </Breadcrumb.Item>
+                <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                  <p className="text-primary">
+                    Products
+                  </p>
+                </Breadcrumb.Item>
+              </Breadcrumb>
+              <div className="flex">
+                <Search
+                  placeholder="Search"
+                  className="w-80 mr-6"
+                  allowClear
+                  onChange={queryHandle}
+                  value={queryValue}
                 />
-                <div className="pb-12"></div>
-              </>
+                <Button id="add-product-button" type="primary" className="w-48"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      showModal()
+                    }
+                  }}
+                >
+                  Add Product
+                </Button>
+                <Button type="primary" className="w-48"
+                  onClick={() => setUploadPhotosModal(true)}
+                >
+                  Upload Photos
+                </Button>
+              </div>
+            </div>
+            <>
+              <ImageCollage images={imglist}/>
+              {products.length !== 0 ? (
+                <div className="my-4">
+                  {products.map((product, index) => {
+                    return (
+                      <ProductCard
+                        product={product}
+                        categorys={categorys}
+                        subCategorys={subCategorys}
+                        key={index}
+                        debouncedSearchTerm={debouncedSearchTerm}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="flex justify-center my-10"> No data found</p>
+              )}
+              <Pagination
+                current={page}
+                onChange={onPageChange}
+                total={total}
+                className="flex justify-center my-5 "
+              />
+              <div className="pb-12"></div>
             </>
+          </>
           )}
         </div>
       )}
@@ -217,6 +239,12 @@ const Product = () => {
           resetPage={onPageChange}
           page={page}
           debouncedSearchTerm={debouncedSearchTerm}
+        />
+      )}
+      {isUploadPhotosModalOpen && (
+        <UploadPhotosModal
+          isOpen={isUploadPhotosModalOpen}
+          handleModal={setUploadPhotosModal}
         />
       )}
       {message && openToast("bottom")}
