@@ -34,6 +34,10 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
+import PropertyListings from "./components/PropertiesComponents/components/PropertyListings";
+import PropertyLayout from "./components/PropertiesComponents/components/PropertyLayout";
+import PropertyDetails from "./components/PropertiesComponents/components/PropertyDetails";
+import { PropertyProvider } from "./contexts/propertyContext";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -53,7 +57,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         exact
         path={routes.LoginRedirect.url}
         element={
-          <LoginRedirect/>
+          <LoginRedirect />
         }
       />
       <Route
@@ -382,6 +386,32 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <EventsProvider>
               <EventSerialNumberList user={user} users={users} />
             </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.Properties.url}
+        element={
+          <UsersProvider>
+            <PropertyProvider>
+              <PropertyLayout tab='home'>
+                <PropertyListings user={user} />
+              </PropertyLayout>
+            </PropertyProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={`${routes.Properties.url}/:id`}
+        element={
+          <UsersProvider>
+            <PropertyProvider>
+              <PropertyLayout tab='details'>
+                <PropertyDetails user={user} />
+              </PropertyLayout>
+            </PropertyProvider>
           </UsersProvider>
         }
       />

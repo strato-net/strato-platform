@@ -21,6 +21,8 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
+
 
 const { Header } = Layout;
 
@@ -51,14 +53,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
         { label: <div id="Inventory">Inventory</div>, key: '2' },
         { label: <div id="Products">Products</div>, key: '3' },
         { label: <div id="Events">Events</div>, key: '4' },
+        { label: <div id="Property">Property</div>, key: '5' },
       ]
-    },
-    {
-      role: 1,
-      items: [
-        { label: <div id="Marketplace"></div>, key: '0' },
-      ]
-    },
+    }
   ];
 
   const navUrls = [
@@ -67,9 +64,15 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
+    routes.Properties.url
   ];
 
   const logout = () => {
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'logout',
+      },
+    });
     userActions.logout(userDispatch);
   };
 
@@ -86,6 +89,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
+    } else if (pathName.includes("/properties") || pathName === "/properties") {
+      setSelectedTab("5");
     }
     else{
       setSelectedTab("0");
@@ -165,7 +170,37 @@ const HeaderComponent = ({ user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "4") navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          if (item.key === "0") {    
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_marketplace_page',
+            },
+          });}
+          if (item.key === "1") {  
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_orders_page',
+            },
+          });}
+          if (item.key === "2") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_inventory_page',
+            },
+          });}
+          if (item.key === "3") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_products_page',
+            },
+          });}
+          if (item.key === "4") {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_events_page',
+              },
+            });
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
           else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}
@@ -174,7 +209,14 @@ const HeaderComponent = ({ user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
-          onClick={() => navigate("/checkout")}
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_shopping_cart',
+              },
+            });
+            navigate("/checkout");
+          }}
         >
           <Avatar
             style={{
