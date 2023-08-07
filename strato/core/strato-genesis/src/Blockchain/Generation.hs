@@ -844,7 +844,7 @@ contract UserRegistry {
     function createUser(string _commonName, string _userAddress, address _certificateAddress) public returns (address) { 
         // require((msg.sender == owner), "You don't have permission to use this function!");
 
-        User newUser = new User{salt: _userAddress}();
+        User newUser = new User{salt: _commonName}();
         newUser.initializeUser(_commonName, address(_userAddress), _certificateAddress);
         return address(newUser);
     }

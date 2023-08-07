@@ -50,7 +50,6 @@ library:
 executables:
   generate-genesis:
     source-dirs: exec_src/
-    ghc-options: -dynamic
     main: Main.hs
     other-modules: []
     dependencies:
