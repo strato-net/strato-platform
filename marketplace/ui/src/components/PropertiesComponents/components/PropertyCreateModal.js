@@ -8,8 +8,6 @@ import {
   Upload,
   Button,
   Select,
-  Collapse,
-  DatePicker,
   notification
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
@@ -84,10 +82,7 @@ function PropertyCreateModal({
     !lotSize;
 
   const handleModalToggle = () => {
-    if (isDisabledCreateView) {
-    } else {
       setModalView(!modalView);
-    }
   };
 
   const showConfirmationModal = () => {
@@ -113,9 +108,40 @@ function PropertyCreateModal({
   }
 
   //creates the listing for property
-  const handleSubmitCreateProperty = () => {
-    const body = {};
-    // let [isDone, projectAddress] = await actions.createProject(dispatch, body);
+  const handleSubmitCreateProperty = async () => {
+
+    const body = {
+      title: 'body.title',
+      description: 'body.description',
+      propertyType: 'body.propertyType',
+      listPrice: 100000,
+      unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
+      streetNumber: 8,
+      streetName: 'body.streetName',
+      unitNumber: 'body.unitNumber',
+      postalCity: 'state.postalCity',
+      stateOrProvince: 'body.stateOrProvince',
+      postalcode: 12345,
+      bathroomsTotalInteger: 5,
+      bedroomsTotal: 7,
+      standardStatus: "Active",
+      lotSizeArea: 1000,
+      lotSizeUnits: 'sqft',
+      livingArea: 100,
+      livingAreaUnits: 'sqft', 
+      latitude: '40.4456',
+      longitude: '-41.665',
+      appliances: ['fridge', 'stove'],
+      cooling: ['central', 'window'],
+      heating: ['electric', 'gas'],
+      flooring: ['carpet', 'tile'],
+      numberOfUnitsTotal: 3,
+      parkingFeatures: ['garage', 'driveway'],
+      interiorFeatures: ['fireplace', 'hardwood'],
+      exteriorFeatures: ['pool', 'fence'],
+      images: ['image1', 'image2']
+    };
+    let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
     // if (isDone) {
 

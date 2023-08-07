@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Property';
+const contractName = 'Property_0_2';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Property.sol`;
 /** 
  * Upload a new Product 
@@ -52,11 +52,10 @@ async function uploadContract(user, _constructorArgs, options) {
 function marshalIn(_args) {
     const defaultArgs = {
         produdctId: '',
-        parcelNumber: 0,
         propertType: '',
         listPrice: 0,
         unparsedAddress: '',
-        streetNumber: '',
+        streetNumber: 0,
         streetName: '',
         unitNumber: '',
         postalCity: '',
@@ -71,9 +70,6 @@ function marshalIn(_args) {
         livingAreaUnits: '',
         latitude: '',
         longitude: '',
-        listAgentsFullName: '',
-        listAgentsEmail: '',
-        listAgentsPreferredPhone: 0,
         appliances: [],
         cooling: [],
         flooring: [],

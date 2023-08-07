@@ -1,12 +1,11 @@
 
 /// @title A representation of Property assets
-contract Property {
+contract Property_0_2 {
 
   address public produdctId;
-  int public parcelNumber;
   int public listPrice;
   string public unparsedAddress;
-  string public streetNumber;
+  int public streetNumber;
   string public streetName;
   string public unitNumber;
   string public postalCity;
@@ -21,13 +20,10 @@ contract Property {
   string public livingAreaUnits;
   string public latitude;
   string public longitude;
-  string public listAgentsFullName;
-  string public listAgentsEmail;
-  int public listAgentsPreferredPhone;
   string[] public appliances;
   string[] public cooling;
-  string[] public flooring;
   string[] public heating;
+  string[] public flooring;
   int public numberOfUnitsTotal;
   string[] public parkingFeatures;
   string[] public interiorFeatures;
@@ -36,10 +32,9 @@ contract Property {
   
   constructor(
     address _produdctId,
-    int _parcelNumber,
     int _listPrice,
     string _unparsedAddress,
-    string _streetNumber,
+    int _streetNumber,
     string _streetName,
     string _unitNumber,
     string _postalCity,
@@ -54,13 +49,10 @@ contract Property {
     string _livingAreaUnits,
     string _latitude,
     string _longitude,
-    string _listAgentsFullName,
-    string _listAgentsEmail,
-    int _listAgentsPreferredPhone,
     string[] _appliances,
     string[] _cooling,
-    string[] _flooring,
     string[] _heating,
+    string[] _flooring,
     int _numberOfUnitsTotal,
     string[] _parkingFeatures,
     string[] _interiorFeatures,
@@ -68,7 +60,6 @@ contract Property {
     string[] _images
   ) public {
     produdctId = _produdctId;
-    parcelNumber = _parcelNumber;
     listPrice = _listPrice;
     unparsedAddress = _unparsedAddress;
     streetNumber = _streetNumber;
@@ -86,13 +77,10 @@ contract Property {
     livingAreaUnits = _livingAreaUnits;
     latitude = _latitude;
     longitude = _longitude;
-    listAgentsFullName = _listAgentsFullName;
-    listAgentsEmail = _listAgentsEmail;
-    listAgentsPreferredPhone = _listAgentsPreferredPhone;
     appliances = _appliances;
     cooling = _cooling;
-    flooring = _flooring;
     heating = _heating;
+    flooring = _flooring;
     numberOfUnitsTotal = _numberOfUnitsTotal;
     parkingFeatures = _parkingFeatures;
     interiorFeatures = _interiorFeatures;

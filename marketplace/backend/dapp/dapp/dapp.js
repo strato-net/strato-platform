@@ -631,12 +631,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...productArgs }
     const productContract = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
+    console.log('productContract DAPP', productContract)
 
     //create the property contract that matches product id with the property id
-    if (productContract[0] === 200) {
+    if (productContract[0] == 200) {
+      console.log('productCOntractWorking')
       const propertyArgs = {
         produdctId: productContract[1],
-        parcelNumber: args.parcelNumber,
         listPrice: args.listPrice,
         unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
@@ -654,20 +655,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         livingAreaUnits: args.livingAreaUnits,
         latitude: args.latitude,
         longitude: args.longitude,
-        listAgentsFullName: args.listAgentsFullName,
-        listAgentsEmail: args.listAgentsEmail,
-        listAgentsPreferredPhone: args.listAgentsPreferredPhone,
         appliances: args.appliances,
         cooling: args.cooling,
-        flooring: args.flooring,
         heating: args.heating,
+        flooring: args.flooring,
         numberOfUnitsTotal: args.numberOfUnitsTotal,
         parkingFeatures: args.parkingFeatures,
         interiorFeatures: args.interiorFeatures,
         exteriorFeatures: args.exteriorFeatures,
         images: args.images,
       }
-      const propertyContract = await managers.productManager.createProperty(...propertyArgs);
+      console.log('propertyArgs DAPP', propertyArgs)
+      const propertyContract = await managers.productManager.createProperty(propertyArgs);
+      console.log('propertyContract DAPP', propertyContract)
       return {
         productContractRest: productContract[0],
         productContractAddress: productContract[1],

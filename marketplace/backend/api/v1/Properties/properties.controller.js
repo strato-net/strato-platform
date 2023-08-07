@@ -56,56 +56,58 @@ class PropertiesController {
     try {
       const { dapp, body } = req
 
-      const propertyArgs = {
-        title: body.title,
-        description: body.description,
-        propertyType: body.propertyType,
-        // parcelNumber: 
-        listPrice: body.listPrice,
-        unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
-        streetNumber: body.streetNumber,
-        streetName: body.streetName,
-        unitNumber: body.unitNumber,
-        postalCity: state.postalCity,
-        stateOrProvince: body.stateOrProvince,
-        postalCode: body.postalCode,
-        bathroomsTotalInteger: body.bathroomsTotalInteger,
-        bedroomsTotal: body.bedroomsTotal,
-        standardStatus: "Active",
-        // lotSizeArea: 
-        // lotSizeAreaUnits: 
-        // livingArea: 
-        // livingAreaUnits: 
-        // latitude: 
-        // longitude: 
-        listAgentFullName: '',
-        listAgentEmail: '',
-        listAgentPreferredPhone: '', 
-        // appliances: 
-        // cooling: 
-        // heat: 
-        // numberOfUnitsTotal: 
-        // parkingFeatures: 
-        // interiorFeatures: 
-        // exteriorFeatures: 
-        images: body.images
-      }
+      // const propertyArgs = {
+      //   title: body.title,
+      //   description: body.description,
+      //   propertyType: body.propertyType,
+      //   // parcelNumber: 
+      //   listPrice: body.listPrice,
+      //   unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
+      //   streetNumber: body.streetNumber,
+      //   streetName: body.streetName,
+      //   unitNumber: body.unitNumber,
+      //   postalCity: state.postalCity,
+      //   stateOrProvince: body.stateOrProvince,
+      //   postalcode: body.postalCode,
+      //   bathroomsTotalInteger: body.bathroomsTotalInteger,
+      //   bedroomsTotal: body.bedroomsTotal,
+      //   standardStatus: "Active",
+      //   // lotSizeArea: 
+      //   // lotSizeUnits: 
+      //   // livingArea: 
+      //   // livingAreaUnits: 
+      //   // latitude: 
+      //   // longitude: 
+      //   listAgentFullName: '',
+      //   listAgentEmail: '',
+      //   listAgentPreferredPhone: '', 
+      //   // appliances: 
+      //   // cooling: 
+      //   // heat: 
+      //   // numberOfUnitsTotal: 
+      //   // parkingFeatures: 
+      //   // interiorFeatures: 
+      //   // exteriorFeatures: 
+      //   images: body.images
+      // }
 
-      PropertiesController.validateCreatePropertyArgs(propertyArgs)
+      console.log('controller body', body)
+      PropertiesController.validateCreatePropertyArgs(body)
 
       const propertyResult = await dapp.createProperty(body)
-
+      console.log('propertyResult controller', propertyResult)
       if (propertyResult) {
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
           pricePerUnit: body.listPrice,
-          batchId: 1,
+          batchId: '1',
           status: 1,
           serialNumber: [],
         }
-
+        console.log(inventoryBody)
         const inventoryResult = await dapp.createInventory(inventoryBody)
+        console.log('inventoryResult controller', inventoryResult)
         if (inventoryResult) {
           rest.response.status200(res, propertyResult)
         }
@@ -122,40 +124,35 @@ class PropertiesController {
 
   static validateCreatePropertyArgs(args) {
     const createPropertySchema = Joi.object({
-      propertyArgs: Joi.object({
         title: Joi.string().required(),
         description: Joi.string().required(),
         propertyType: Joi.string().required(),
-        parcelNumber: Joi.number().required(),
         listPrice: Joi.number().required(),
         unparsedAddress: Joi.string().required(),
-        streetNumber: Joi.string().required(),
+        streetNumber: Joi.number().required(),
         streetName: Joi.string().required(),
         unitNumber: Joi.string().allow("").required(),
         postalCity: Joi.string().required(),
         stateOrProvince: Joi.string().required(),
-        postalCode: Joi.number().required(),
+        postalcode: Joi.number().required(),
         bathroomsTotalInteger: Joi.number().required(),
         bedroomsTotal: Joi.number().required(),
         standardStatus: Joi.string().required(),
         lotSizeArea: Joi.number().required(),
-        lotSizeAreaUnits: Joi.string().required(),
+        lotSizeUnits: Joi.string().required(),
         livingArea: Joi.number().required(),
         livingAreaUnits: Joi.string().required(),
         latitude: Joi.string(),
         longitude: Joi.string(),
-        listAgentFullName: Joi.string(),
-        listAgentEmail: Joi.string(),
-        listAgentPreferredPhone: Joi.number(),
         appliances: Joi.array().items(Joi.string()),
         cooling: Joi.array().items(Joi.string()),
-        heat: Joi.array().items(Joi.string()),
+        heating: Joi.array().items(Joi.string()),
+        flooring: Joi.array().items(Joi.string()),
         numberOfUnitsTotal: Joi.number().required(),
         parkingFeatures: Joi.array().items(Joi.string()),
         interiorFeatures: Joi.array().items(Joi.string()),
         exteriorFeatures: Joi.array().items(Joi.string()),
         images: Joi.array().items(Joi.string()),
-      })
     });
 
     const validation = createPropertySchema.validate(args);
