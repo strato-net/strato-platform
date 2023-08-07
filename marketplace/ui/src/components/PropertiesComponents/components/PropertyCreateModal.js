@@ -12,7 +12,7 @@ import {
   DatePicker,
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
-import { StateData, HomeTypeData } from "../helpers/constants";
+import { StateData, HomeTypeData, parkingFeaturesData, heatingData, coolingData, flooringData, appliancesData, interiorFeaturesData, exteriorFeaturesData } from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
@@ -49,35 +49,40 @@ function PropertyCreateModal({
   const [fileList, setFileList] = useState([]);
 
   const {
-    name,
+    title,
     description,
     lotNumber,
-    addressLine1,
-    addressLine2,
+    streetName,
+    streetNumber,
     city,
     state,
-    zipCode,
+    postalCode,
     askingPrice,
+    propertyType,
+    bedroomsTotal,
+    bathroomsTotalInteger,
+    livingArea,
+    lotSizeAreaUnits
   } = propertyData;
 
   const isDisabledCreateView =
-    !name ||
+    !title ||
     !description ||
     !lotNumber ||
-    !addressLine1 ||
-    !addressLine2 ||
+    !streetName ||
+    !streetNumber ||
     !city ||
     !state ||
-    !zipCode ||
+    !postalCode ||
     !askingPrice;
 
   const isDisabledFactsView =
-    !homeType ||
-    !bedrooms ||
-    !bathrooms ||
-    !squareFeet ||
+    !propertyType ||
+    !bedroomsTotal ||
+    !bathroomsTotalInteger ||
+    !livingArea ||
     // !yearBuilt ||
-    !lotSize;
+    !lotSizeAreaUnits;
 
   const handleModalToggle = () => {
     setModalView(!modalView);
@@ -180,19 +185,19 @@ function PropertyCreateModal({
           <Form labelCol={{ span: 8 }} labelAlign="left">
             <Form.Item
               label="Listing Title"
-              name="name"
+              name="title"
               rules={[
                 { required: true, message: "Please input project name." },
               ]}
             >
               <Input
-                label="name"
+                label="title"
                 defaultValue={propertyData?.name}
                 value={propertyData?.name}
                 maxLength={100}
                 showCount
                 onChange={(e) => {
-                  handleChange("name", e.target.value);
+                  handleChange("title", e.target.value);
                 }}
               />
             </Form.Item>
@@ -213,13 +218,13 @@ function PropertyCreateModal({
                 maxLength={500}
                 showCount
                 onChange={(e) => {
-                  handleChange("projectDescription", e.target.value);
+                  handleChange("description", e.target.value);
                 }}
               />
             </Form.Item>
             <Form.Item
               label="Asking Price"
-              name="askingPrice"
+              name="listPrice"
               rules={[
                 { required: true, message: "Please input an asking price." },
               ]}
@@ -234,7 +239,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.askingPrice}
                 value={propertyData?.askingPrice}
                 onChange={(e) => {
-                  handleChange("askingPrice", e);
+                  handleChange("listPrice", e);
                 }}
                 onWheel={(e) => {
                   e.target.blur();
@@ -257,7 +262,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.lotNumber}
                 value={propertyData?.lotNumber}
                 onChange={(e) => {
-                  handleChange("lotNumber", e);
+                  handleChange("lotSizeAreaUnits", e);
                 }}
                 onWheel={(e) => {
                   e.target.blur();
@@ -265,36 +270,36 @@ function PropertyCreateModal({
               />
             </Form.Item>
             <Form.Item
-              label="Address Line 1"
-              name="addressLine1"
+              label="Street Name"
+              name="streetName"
               rules={[
                 { required: true, message: "Please input an asking price." },
               ]}
             >
               <Input
-                label="Address Line 1"
+                label="Street Name"
                 id="addressLine1"
-                defaultValue={propertyData?.addressLine1}
-                value={propertyData?.addressLine1}
+                defaultValue={streetName}
+                value={streetName}
                 onChange={(e) => {
-                  handleChange("addressLine1", e.target.value);
+                  handleChange("streetName", e.target.value);
                 }}
               />
             </Form.Item>
             <Form.Item
-              label="Address Line 2"
-              name="addressLine2"
+              label="Street Number"
+              name="streetNumber"
               rules={[
                 { required: true, message: "Please input an asking price." },
               ]}
             >
-              <Input
-                label="Address Line 2"
-                id="addressLine2"
-                defaultValue={propertyData?.addressLine2}
-                value={propertyData?.addressLine2}
-                onChange={(e) => {
-                  handleChange("addressLine2", e.target.value);
+              <InputNumber
+                label="Street Number"
+                id="streetNumber"
+                defaultValue={streetNumber}
+                value={streetNumber}
+                onChange={(value) => {
+                  handleChange("streetNumber", value);
                 }}
               />
             </Form.Item>
@@ -327,7 +332,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.state}
                 value={propertyData?.state}
                 onSelect={(e) => {
-                  handleChange("state", e);
+                  handleChange("stateOrProvince", e);
                 }}
                 options={StateData}
                 showSearch
@@ -335,7 +340,7 @@ function PropertyCreateModal({
             </Form.Item>
             <Form.Item
               label="Zip Code"
-              name="zipCode"
+              name="postalCode"
               rules={[{ required: true, message: "Please input a zip code." }]}
             >
               <InputNumber
@@ -348,7 +353,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.zipCode}
                 value={propertyData?.zipCode}
                 onChange={(value) => {
-                  handleChange("zipCode", value);
+                  handleChange("postalCode", value);
                 }}
                 onWheel={(e) => {
                   e.target.blur();
@@ -402,7 +407,7 @@ function PropertyCreateModal({
                 <Select
                   label="homeType"
                   defaultValue={homeType}
-                  onSelect={(e) => setHomeType(e)}
+                  onSelect={(value) => { handleChange("propertyType", value) }}
                   options={HomeTypeData}
                   showSearch
                 />
@@ -422,7 +427,7 @@ function PropertyCreateModal({
                   min={0}
                   value={bedrooms}
                   defaultValue={bedrooms}
-                  onChange={(e) => setBedrooms(e)}
+                  onChange={(value) => { handleChange("bedroomsTotal", value) }}
                   onWheel={(e) => {
                     e.target.blur();
                   }}
@@ -442,7 +447,7 @@ function PropertyCreateModal({
                   controls={false}
                   min={0}
                   defaultValue={bathrooms}
-                  onChange={(e) => setBathrooms(e)}
+                  onChange={(value) => { handleChange("bathroomsTotalInteger", value) }}
                   onWheel={(e) => {
                     e.target.blur();
                   }}
@@ -462,7 +467,7 @@ function PropertyCreateModal({
                   controls={false}
                   min={0}
                   defaultValue={squareFeet}
-                  onChange={(e) => setSquareFeet(e)}
+                  onChange={(value) => { handleChange("livingArea", value) }}
                   onWheel={(e) => {
                     e.target.blur();
                   }}
@@ -491,7 +496,7 @@ function PropertyCreateModal({
                   controls={false}
                   min={0}
                   defaultValue={lotSize}
-                  onChange={(e) => setLotSize(e)}
+                  onChange={(value) => { handleChange("lotSizeArea", value) }}
                   onWheel={(e) => {
                     e.target.blur();
                   }}
@@ -501,37 +506,97 @@ function PropertyCreateModal({
                 label="Appliances"
                 name="appliances"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  mode="multiple"
+                  style={{ width: '100%' }}
+                  placeholder="Please select Applicances"
+                  defaultValue={[]}
+                  onChange={(value) => { handleChange("appliances", value) }}
+                  options={appliancesData}
+                />
+              </Form.Item>
               <Form.Item
                 label="Flooring"
                 name="flooring"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  label="Flooring"
+                  defaultValue={homeType}
+                  onSelect={(value) => { handleChange("flooring", value) }}
+                  options={flooringData}
+                  showSearch
+                />
+              </Form.Item>
               <Form.Item
                 label="Cooling"
                 name="cooling"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  label="Cooling"
+                  defaultValue={homeType}
+                  onSelect={(value) => { handleChange("cooling", value) }}
+                  options={coolingData}
+                  showSearch
+                />
+              </Form.Item>
               <Form.Item
                 label="Heating"
                 name="heating"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  label="Heating"
+                  defaultValue={homeType}
+                  onSelect={(value) => { handleChange("heating", value) }}
+                  options={heatingData}
+                  showSearch
+                />
+              </Form.Item>
               <Form.Item
                 label="Parking"
                 name="parking"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  label="ParkingType"
+                  defaultValue={homeType}
+                  onSelect={(value) => { handleChange("parkingFeatures", value) }}
+                  options={parkingFeaturesData}
+                  showSearch
+                  placeholder="Select a person"
+                />
+              </Form.Item>
               <Form.Item
                 label="Interior Features"
                 name="interiorFeatures"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  mode="multiple"
+                  style={{ width: '100%' }}
+                  placeholder="Please select Interior features"
+                  defaultValue={[]}
+                  onChange={(value) => { handleChange("interiorFeatures", value) }}
+                  options={interiorFeaturesData}
+                />
+              </Form.Item>
               <Form.Item
                 label="Exterior Features"
                 name="exteriorFeatures"
                 rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+              >
+                <Select
+                  mode="multiple"
+                  style={{ width: '100%' }}
+                  placeholder="Please select Exterior features"
+                  defaultValue={[]}
+                  onChange={(value) => { handleChange("exteriorFeatures", value) }}
+                  options={exteriorFeaturesData}
+                />
+              </Form.Item>
             </Form>
           </div>
         )}
