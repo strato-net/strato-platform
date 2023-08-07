@@ -395,9 +395,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <PropertyProvider>
-              <PropertyLayout tab='home'>
-                <PropertyListings user={user} />
-              </PropertyLayout>
+              <PropertyListings user={user} />
             </PropertyProvider>
           </UsersProvider>
         }
@@ -408,9 +406,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <PropertyProvider>
-              <PropertyLayout tab='details'>
-                <PropertyDetails user={user} />
-              </PropertyLayout>
+              <PropertyDetails user={user} />
             </PropertyProvider>
           </UsersProvider>
         }
