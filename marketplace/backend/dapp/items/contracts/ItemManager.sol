@@ -88,15 +88,26 @@ contract ItemManager is ItemStatus, InventoryStatus {
         Inventory inventory;
 
         Product_3 oldProduct = Product_3(item.productId());
-        product = new Product_3(
-            oldProduct.name(),
-            oldProduct.description(),
-            oldProduct.imageKey(),
-            oldProduct.isActive(),
-            oldProduct.category(),
-            block.timestamp,
+        address productAddress = _productManager.checkForProduct(
+            oldProduct.uniqueProductCode(),
             _newOwner
         );
+
+        if (productAddress == address(0)) {
+            address addr = _productManager.addProductForBuyer(
+                oldProduct.name(),
+                oldProduct.description(),
+                oldProduct.uniqueProductCode(),
+                oldProduct.imageKey(),
+                oldProduct.isActive(),
+                oldProduct.category(),
+                block.timestamp,
+                _newOwner
+            );
+            product = Product_3(addr);
+        } else {
+            product = Product_3(productAddress);
+        }
 
         Inventory oldInventory = Inventory(item.inventoryId());
         (uint status, address inventory) = product.addInventory(
@@ -133,7 +144,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     itemContractAddress
                 );
                 itemProductIdMapping[itemContractAddress] = _item.productId();
-                itemInventoryIdMapping[itemContractAddress] = _item.inventoryId();
+                itemInventoryIdMapping[itemContractAddress] = _item
+                    .inventoryId();
 
                 _item.transferOwnership(
                     _newOwner,

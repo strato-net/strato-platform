@@ -56,7 +56,8 @@ function marshalIn(_args) {
         imageKey: '',
         isActive: false,
         category: '',
-        createdDate: 0
+        createdDate: 0,
+        uniqueProductCode: ''
     };
 
     const args = {

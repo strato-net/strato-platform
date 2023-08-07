@@ -12,6 +12,7 @@ contract Product_3 is InventoryStatus {
 
     string public name;
     string public description;
+    uint public uniqueProductCode;
     string public imageKey;
     bool public isActive;
     string public category;
@@ -22,6 +23,7 @@ contract Product_3 is InventoryStatus {
     constructor(
         string _name,
         string _description,
+        uint _uniqueProductCode,
         string _imageKey,
         bool _isActive,
         string _category,
@@ -32,6 +34,7 @@ contract Product_3 is InventoryStatus {
 
         name = _name;
         description = _description;
+        uniqueProductCode = _uniqueProductCode;
         imageKey = _imageKey;
         isActive = _isActive;
         category = _category;

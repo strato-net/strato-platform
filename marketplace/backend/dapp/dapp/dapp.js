@@ -447,7 +447,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ PRODUCT MANAGER --------------------------------
   contract.createProduct = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { ...args.productArgs }
+    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs };
     return managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
   };
   contract.updateProduct = async function (args, options = defaultOptions) {
