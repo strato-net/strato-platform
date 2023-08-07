@@ -113,7 +113,6 @@ executables:
 
   genesis-builder:
     source-dirs: exec_src/
-    ghc-options: -dynamic
     main: GenesisBuilder.hs
     dependencies:
       - aeson
