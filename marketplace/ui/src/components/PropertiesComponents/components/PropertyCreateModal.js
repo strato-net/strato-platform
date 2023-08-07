@@ -43,7 +43,6 @@ function PropertyCreateModal({
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
-  // const [yearBuilt, setYearBuilt] = useState("");
   const [lotSize, setLotSize] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -78,7 +77,6 @@ function PropertyCreateModal({
     !bedrooms ||
     !bathrooms ||
     !squareFeet ||
-    // !yearBuilt ||
     !lotSize;
 
   const handleModalToggle = () => {
@@ -124,22 +122,88 @@ function PropertyCreateModal({
       postalcode: 12345,
       bathroomsTotalInteger: 5,
       bedroomsTotal: 7,
-      standardStatus: "Active",
       lotSizeArea: 1000,
       lotSizeUnits: 'sqft',
       livingArea: 100,
       livingAreaUnits: 'sqft', 
-      latitude: '40.4456',
-      longitude: '-41.665',
-      appliances: ['fridge', 'stove'],
-      cooling: ['central', 'window'],
-      heating: ['electric', 'gas'],
-      flooring: ['carpet', 'tile'],
       numberOfUnitsTotal: 3,
-      parkingFeatures: ['garage', 'driveway'],
-      interiorFeatures: ['fireplace', 'hardwood'],
-      exteriorFeatures: ['pool', 'fence'],
-      images: ['image1', 'image2']
+
+      // Appliances
+      dishwasher: true,
+      dryer: true,
+      freezer: true,
+      garbageDisposal: true,
+      microwave: true,
+      ovenOrRange: true,
+      refrigerator: true,
+      washer: true,
+      waterHeater: true,
+
+      // Cooling
+      centralAir: true,
+      evaporative: true,
+      geoThermal: true,
+      refrigeration: true,
+      solar: true,
+      wallUnit: true,
+
+      // Heating
+      baseboard: true,
+      forceAir: true,
+      geoThermalHeat: true,
+      heatPump: true,
+      hotWater: true,
+      radiant: true,
+      solarHeat: true,
+      steam: true,
+
+      // Flooring
+      carpet: true,
+      concrete: true,
+      hardwood: true,
+      laminate: true,
+      linoleumVinyl: true,
+      slate: true,
+      softwood: true,
+      tile: true,
+
+      // Parking
+      carport: true,
+      garage: true,
+      offStreet: true,
+      onStreet: true,
+
+      // Interior Features
+      attic: true,
+      cableReady: true,
+      ceilingFan: true,
+      doublePaneWindows: true,
+      elevator: true,
+      fireplace: true,
+      flooring: true,
+      furnished: true,
+      jettedTub: true,
+      securitySystem: true,
+      vaultedCeiling: true,
+      skylight: true,
+      wetBar: true,
+
+      // Exterior Features
+      barbecueArea: true,
+      deck: true,
+      dock: true,
+      fence: true,
+      garden: true,
+      hotTubOrSpa: true,
+      lawn: true,
+      patio: true,
+      pond: true,
+      pool: true,
+      porch: true,
+      rvParking: true,
+      sauna: true,
+      sprinklerSystem: true,
+      waterFront: true,
     };
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
@@ -553,15 +617,6 @@ function PropertyCreateModal({
                   }}
                 />
               </Form.Item>
-              {/* <Form.Item
-                label="Year Built"
-                name="yearBuilt"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <DatePicker picker="year" onChange={(e) => setYearBuilt(e)} />
-              </Form.Item> */}
               <Form.Item
                 label="Lot Size"
                 name="lotSize"

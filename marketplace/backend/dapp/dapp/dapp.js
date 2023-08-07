@@ -655,15 +655,84 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         livingAreaUnits: args.livingAreaUnits,
         latitude: args.latitude,
         longitude: args.longitude,
-        appliances: args.appliances,
-        cooling: args.cooling,
-        heating: args.heating,
-        flooring: args.flooring,
         numberOfUnitsTotal: args.numberOfUnitsTotal,
-        parkingFeatures: args.parkingFeatures,
-        interiorFeatures: args.interiorFeatures,
-        exteriorFeatures: args.exteriorFeatures,
-        images: args.images,
+        // Appliances
+        dishwasher: args.dishwasher,
+        dryer: args.dryer,
+        freezer: args.freezer,
+        garbageDisposal: args.garbageDisposal,
+        microwave: args.microwave,
+        ovenOrRange: args.ovenOrRange,
+        refrigerator: args.refrigerator,
+        washer: args.washer,
+        waterHeater: args.waterHeater,
+
+        // Cooling
+        centralAir: args.centralAir,
+        evaporative: args.evaporative,
+        geoThermal: args.geoThermal,
+        refrigeration: args.refrigeration,
+        solar: args.solar,
+        wallUnit: args.wallUnit,
+
+        // Heating
+        baseboard: args.baseboard,
+        forceAir: args.forceAir,
+        geoThermalHeat: args.geoThermal,
+        heatPump: args.heatPump,
+        hotWater: args.hotWater,
+        radiant: args.radiant,
+        solarHeat: args.solarHeat,
+        steam: args.steam,
+
+        // Flooring
+        carpet: args.carpet,
+        concrete: args.concrete,
+        hardwood: args.hardwood,
+        laminate: args.laminate,
+        linoleumVinyl: args.linoleumVinyl,
+        slate: args.slate,
+        softwood: args.softwood,
+        tile: args.tile,
+
+        // Parking
+        carport: args.carport,
+        garage: args.garage,
+        offStreet: args.offStreet,
+        onStreet: args.onStreet,
+
+        // Interior Features
+        attic: args.attic,
+        cableReady: args.cableReady,
+        ceilingFan: args.ceilingFan,
+        doublePaneWindows: args.doublePaneWindows,
+        elevator: args.elevator,
+        fireplace: args.fireplace,
+        flooring: args.flooring,
+        furnished: args.furnished,
+        jettedTub: args.jetteTub,
+        securitySystem: args.securitySystem,
+        vaultedCeiling: args.vaultedCeiling,
+        skylight: args.skylight,
+        wetBar: args.wetBar,
+
+        // Exterior Features
+        barbecueArea: args.barbecueArea,
+        deck: args.deck,
+        dock: args.dock,
+        fence: args.fence,
+        garden: args.garden,
+        hotTubOrSpa: args.hotTubOrSpa,
+        lawn: args.lawn,
+        patio: args.patio,
+        pond: args.pond,
+        pool: args.pool,
+        porch: args.porch,
+        rvParking: args.rvParking,
+        sauna: args.sauna,
+        sprinklerSystem: args.sprinklerSystem,
+        waterFront: args.waterFront,
+
       }
       console.log('propertyArgs DAPP', propertyArgs)
       const propertyContract = await managers.productManager.createProperty(propertyArgs);

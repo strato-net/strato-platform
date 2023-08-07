@@ -56,43 +56,17 @@ class PropertiesController {
     try {
       const { dapp, body } = req
 
-      // const propertyArgs = {
-      //   title: body.title,
-      //   description: body.description,
-      //   propertyType: body.propertyType,
-      //   // parcelNumber: 
-      //   listPrice: body.listPrice,
-      //   unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
-      //   streetNumber: body.streetNumber,
-      //   streetName: body.streetName,
-      //   unitNumber: body.unitNumber,
-      //   postalCity: state.postalCity,
-      //   stateOrProvince: body.stateOrProvince,
-      //   postalcode: body.postalCode,
-      //   bathroomsTotalInteger: body.bathroomsTotalInteger,
-      //   bedroomsTotal: body.bedroomsTotal,
-      //   standardStatus: "Active",
-      //   // lotSizeArea: 
-      //   // lotSizeUnits: 
-      //   // livingArea: 
-      //   // livingAreaUnits: 
-      //   // latitude: 
-      //   // longitude: 
-      //   listAgentFullName: '',
-      //   listAgentEmail: '',
-      //   listAgentPreferredPhone: '', 
-      //   // appliances: 
-      //   // cooling: 
-      //   // heat: 
-      //   // numberOfUnitsTotal: 
-      //   // parkingFeatures: 
-      //   // interiorFeatures: 
-      //   // exteriorFeatures: 
-      //   images: body.images
-      // }
+      const propertyArgs = {
+        ...body,
+        unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
+        standardStatus: "Active",
+        //use google maps api to get lat and long, then convert to string
+        latitude: '',
+        longitude: '',
+      }
 
       console.log('controller body', body)
-      PropertiesController.validateCreatePropertyArgs(body)
+      PropertiesController.validateCreatePropertyArgs(propertyArgs)
 
       const propertyResult = await dapp.createProperty(body)
       console.log('propertyResult controller', propertyResult)
@@ -100,7 +74,7 @@ class PropertiesController {
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
-          pricePerUnit: body.listPrice,
+          pricePerUnit: propertyArgs.listPrice,
           batchId: '1',
           status: 1,
           serialNumber: [],
@@ -144,15 +118,84 @@ class PropertiesController {
         livingAreaUnits: Joi.string().required(),
         latitude: Joi.string(),
         longitude: Joi.string(),
-        appliances: Joi.array().items(Joi.string()),
-        cooling: Joi.array().items(Joi.string()),
-        heating: Joi.array().items(Joi.string()),
-        flooring: Joi.array().items(Joi.string()),
         numberOfUnitsTotal: Joi.number().required(),
-        parkingFeatures: Joi.array().items(Joi.string()),
-        interiorFeatures: Joi.array().items(Joi.string()),
-        exteriorFeatures: Joi.array().items(Joi.string()),
-        images: Joi.array().items(Joi.string()),
+
+        // Appliances
+        dishwasher: Joi.boolean().required(),
+        dryer: Joi.boolean().required(),
+        freezer: Joi.boolean().required(),
+        garbageDisposal: Joi.boolean().required(),
+        microwave: Joi.boolean().required(),
+        ovenOrRange: Joi.boolean().required(),
+        refrigerator: Joi.boolean().required(),
+        washer: Joi.boolean().required(),
+        waterHeater: Joi.boolean().required(),
+
+        // Cooling
+        centralAir: Joi.boolean().required(),
+        evaporative: Joi.boolean().required(),
+        geoThermal: Joi.boolean().required(),
+        refrigeration: Joi.boolean().required(),
+        solar: Joi.boolean().required(),
+        wallUnit: Joi.boolean().required(),
+
+        // Heating
+        baseboard: Joi.boolean().required(),
+        forceAir: Joi.boolean().required(),
+        geoThermalHeat: Joi.boolean().required(),
+        heatPump: Joi.boolean().required(),
+        hotWater: Joi.boolean().required(),
+        radiant: Joi.boolean().required(),
+        solarHeat: Joi.boolean().required(),
+        steam: Joi.boolean().required(),
+
+        // Flooring
+        carpet: Joi.boolean().required(),
+        concrete: Joi.boolean().required(),
+        hardwood: Joi.boolean().required(),
+        laminate: Joi.boolean().required(),
+        linoleumVinyl: Joi.boolean().required(),
+        slate: Joi.boolean().required(),
+        softwood: Joi.boolean().required(),
+        tile: Joi.boolean().required(),
+
+        // Parking
+        carport: Joi.boolean().required(),
+        garage: Joi.boolean().required(),
+        offStreet: Joi.boolean().required(),
+        onStreet: Joi.boolean().required(),
+
+        // Interior Features
+        attic: Joi.boolean().required(),
+        cableReady: Joi.boolean().required(),
+        ceilingFan: Joi.boolean().required(),
+        doublePaneWindows: Joi.boolean().required(),
+        elevator: Joi.boolean().required(),
+        fireplace: Joi.boolean().required(),
+        flooring: Joi.boolean().required(),
+        furnished: Joi.boolean().required(),
+        jettedTub: Joi.boolean().required(),
+        securitySystem: Joi.boolean().required(),
+        vaultedCeiling: Joi.boolean().required(),
+        skylight: Joi.boolean().required(),
+        wetBar: Joi.boolean().required(),
+
+        // Exterior Features
+        barbecueArea: Joi.boolean().required(),
+        deck: Joi.boolean().required(),
+        dock: Joi.boolean().required(),
+        fence: Joi.boolean().required(),
+        garden: Joi.boolean().required(),
+        hotTubOrSpa: Joi.boolean().required(),
+        lawn: Joi.boolean().required(),
+        patio: Joi.boolean().required(),
+        pond: Joi.boolean().required(),
+        pool: Joi.boolean().required(),
+        porch: Joi.boolean().required(),
+        rvParking: Joi.boolean().required(),
+        sauna: Joi.boolean().required(),
+        sprinklerSystem: Joi.boolean().required(),
+        waterFront: Joi.boolean().required(),
     });
 
     const validation = createPropertySchema.validate(args);
