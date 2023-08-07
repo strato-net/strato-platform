@@ -10,13 +10,14 @@ import {
   Select,
   Collapse,
   DatePicker,
+  notification
 } from "antd";
-import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
 import { StateData, HomeTypeData } from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
-import { usePropertiesDispatch } from "../../../contexts/propertyContext";
+import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
 
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -35,7 +36,10 @@ function PropertyCreateModal({
   toggleCreateConfirmModal,
 }) {
   const dispatch = usePropertiesDispatch();
-  
+  const [api, contextHolder] = notification.useNotification();
+  const { message, success } = usePropertiesState()
+
+  const [selectedImage, setSelectedImage] = useState(null);
   const [propertyData, setPropertyData] = useState({});
   const [homeType, setHomeType] = useState("");
   const [bedrooms, setBedrooms] = useState("");
@@ -80,7 +84,10 @@ function PropertyCreateModal({
     !lotSize;
 
   const handleModalToggle = () => {
-    setModalView(!modalView);
+    if (isDisabledCreateView) {
+    } else {
+      setModalView(!modalView);
+    }
   };
 
   const showConfirmationModal = () => {
@@ -92,6 +99,18 @@ function PropertyCreateModal({
     data[key] = value;
     setPropertyData(data);
   };
+
+  function beforeUpload(file) {
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+    if (!isJpgOrPng) {
+      openToast("bottom", "Image must be of jpeg or png format");
+    }
+    const isLt1M = file.size / 1024 / 1024 < 1;
+    if (!isLt1M) {
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
+    }
+    return isJpgOrPng && isLt1M;
+  }
 
   //creates the listing for property
   const handleSubmitCreateProperty = () => {
@@ -157,8 +176,28 @@ function PropertyCreateModal({
     wrapperCol: { span: 16 },
   };
 
+  const openToast = (placement) => {
+
+    if (success) {
+      api.success({
+        message: "message-success",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: "message-failed",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
   return (
     <>
+      {contextHolder}
       <Modal
         {...layout}
         open={isCreateModalOpen}
@@ -190,6 +229,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.name}
                 value={propertyData?.name}
                 maxLength={100}
+                placeholder="Listing Title"
                 showCount
                 onChange={(e) => {
                   handleChange("name", e.target.value);
@@ -212,8 +252,9 @@ function PropertyCreateModal({
                 value={propertyData?.projectDescription}
                 maxLength={500}
                 showCount
+                placeholder="Project Description"
                 onChange={(e) => {
-                  handleChange("projectDescription", e.target.value);
+                  handleChange("description", e.target.value);
                 }}
               />
             </Form.Item>
@@ -229,6 +270,7 @@ function PropertyCreateModal({
                 label="Asking Price"
                 type="Number"
                 min={0}
+                placeholder="Asking Price"
                 controls={false}
                 addonBefore="$"
                 defaultValue={propertyData?.askingPrice}
@@ -249,10 +291,12 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
+                style={{ width: 150 }}
                 precision={0}
                 label="Lot Number"
                 type="Number"
                 min={0}
+                placeholder="Lot Number"
                 controls={false}
                 defaultValue={propertyData?.lotNumber}
                 value={propertyData?.lotNumber}
@@ -274,6 +318,7 @@ function PropertyCreateModal({
               <Input
                 label="Address Line 1"
                 id="addressLine1"
+                placeholder="Address Line 1"
                 defaultValue={propertyData?.addressLine1}
                 value={propertyData?.addressLine1}
                 onChange={(e) => {
@@ -291,6 +336,7 @@ function PropertyCreateModal({
               <Input
                 label="Address Line 2"
                 id="addressLine2"
+                placeholder="Address Line 2"
                 defaultValue={propertyData?.addressLine2}
                 value={propertyData?.addressLine2}
                 onChange={(e) => {
@@ -308,6 +354,7 @@ function PropertyCreateModal({
               <Input
                 label="City"
                 id="city"
+                placeholder="City"
                 defaultValue={propertyData?.city}
                 value={propertyData?.city}
                 onChange={(e) => {
@@ -326,6 +373,7 @@ function PropertyCreateModal({
                 label="State"
                 defaultValue={propertyData?.state}
                 value={propertyData?.state}
+                placeholder="Select State"
                 onSelect={(e) => {
                   handleChange("state", e);
                 }}
@@ -340,8 +388,10 @@ function PropertyCreateModal({
             >
               <InputNumber
                 precision={0}
+                style={{ width: 150 }}
                 label="Zip Code"
                 type="Number"
+                placeholder="ZipCode"
                 min={0}
                 max={99999}
                 controls={false}
@@ -356,34 +406,43 @@ function PropertyCreateModal({
               />
             </Form.Item>
 
-            <Form.Item
-              label="Images"
-              name="images"
-              rules={[
-                { message: "Please property upload images if avaliable." },
-              ]}
-            >
-              <Upload
-                action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
-                listType="picture-card"
-                fileList={fileList}
-                onPreview={handlePreview}
-                onChange={handleFileChange}
-              >
-                {uploadButton}
-              </Upload>
-              <Modal
-                open={previewOpen}
-                title={previewTitle}
-                footer={null}
-                onCancel={handleCancel}
-              >
-                <img
-                  alt="example"
-                  style={{ width: "100%" }}
-                  src={previewImage}
-                />
-              </Modal>
+            <Form.Item label="Upload Image" name="image">
+              <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
+                {selectedImage ? (
+                  <div className="h-20">
+                    <img
+                      alt="Product"
+                      src={selectedImage}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                    <br />
+                  </div>
+                ) : (
+                  <PictureOutlined className="text-7xl text-primary opacity-10" />
+                )}
+                <Upload
+                  onChange={(e) => {
+                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                  }}
+                  customRequest={() => { }}
+                  style={{ display: "none" }}
+                  accept="image/png, image/jpeg"
+                  maxCount={1}
+                  showUploadList={false}
+                  beforeUpload={beforeUpload}
+                >
+                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                    Browse
+                  </div>
+                </Upload>
+              </div>
+
+              <div className="flex items-start">
+                <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                <p className="mt-1 text-xs italic ml-1 mr-4">
+                  use jpg, png format of size less than 1mb
+                </p>
+              </div>
             </Form.Item>
           </Form>
         ) : (
