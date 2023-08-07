@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react'
-import { Spin, Typography, Tabs, Col, Row, notification } from "antd";
+import { Spin, Typography, Tabs, Col, Row, notification, Button } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
 import PriceHistoryTab from "./ListingTabs/PriceHistoryTab";
 import ReviewTab from "./ListingTabs/ReviewTab";
-import ListingContactCard from './ListingTabs/ListingContactCard';
 import { useParams } from 'react-router-dom';
 import { actions } from '../../../contexts/propertyContext/actions';
 import { usePropertiesDispatch, usePropertiesState } from '../../../contexts/propertyContext';
 import { sampleProperties } from '../helpers/sampleProperties';
+import UploadPhotosModal from '../../Product/UploadPhotosModal';
 
 function PropertyDetails() {
   const [propertyDetail, setPropertyDetail] = useState({})
+  const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const dispatch = usePropertiesDispatch()
   const { isPropertyDetailsLoading, message, success } = usePropertiesState()
   let { id } = useParams();
@@ -46,7 +47,24 @@ function PropertyDetails() {
   };
 
   // Dummy data for Collage & Carousel
-  const { images, reviews } = propertyDetail
+  const { images,
+    reviews,
+    postalCity,
+    postalCode,
+    stateOrProvince,
+    appliances,
+    cooling,
+    description,
+    lotSizeArea,
+    lotSizeUnits,
+    listPrice,
+    livingArea,
+    livingAreaUnits,
+    propertyType,
+    unitNumber,
+    bedroomsTotal,
+    bathroomsTotalInteger
+  } = propertyDetail
 
   const property = {
     fields: "Property detail"
@@ -78,6 +96,17 @@ function PropertyDetails() {
   return (
     <>
       {contextHolder}
+      <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
+        <Typography.Title level={4} style={{ padding: "0px 16px" }}>
+        </Typography.Title>
+        <Col style={{ marginRight: "50px" }}>
+          <Button type="primary"
+            onClick={() => {
+              setUploadPhotosModal(true)
+            }}
+          >Upload Images</Button>
+        </Col>
+      </Row>
       {isPropertyDetailsLoading
         ? <div className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
@@ -98,25 +127,21 @@ function PropertyDetails() {
                       style={{ marginTop: 0, marginRight: 10 }}
                       level={4}
                     >
-                      $ {propertyDetail?.listPrice}
+                      $ {listPrice}
                     </Title>
                     <Col span={12} style={{ display: "flex", justifyContent: "space-around" }}>
-                      <Text>4 Bed</Text>
-                      <Text>3 Bath</Text>
-                      <Text>2100 sqft</Text>
+                      <Text>{bedroomsTotal} Bed</Text>
+                      <Text>{bathroomsTotalInteger} Bath</Text>
+                      <Text>{livingArea} {livingAreaUnits}</Text>
                     </Col>
-
                   </Row>
-
                   <Row>
                     <Text style={{ marginTop: 2 }} level={4}>
-                      {propertyDetail?.postalCity}, {propertyDetail?.stateOrProvince}{" "}
-                      {propertyDetail?.postalCode}
+                      {postalCity}, {stateOrProvince}{" "}
+                      {postalCode}
                     </Text>
                   </Row>
-
                   <Text strong>Active</Text>
-
                   <Row>
                     <Col>
                       <Paragraph>
@@ -152,10 +177,10 @@ function PropertyDetails() {
                     </Col>
                     <Col offset={1}>
                       <Paragraph>
-                        Town House
+                        {propertyType}
                       </Paragraph>
                       <Paragraph>
-                        2400 sqft
+                        {lotSizeArea} {lotSizeUnits}
                       </Paragraph>
                       <Paragraph>
                         Refrigerator, Stove, Water heater
@@ -167,12 +192,13 @@ function PropertyDetails() {
                         Wall Heaters
                       </Paragraph>
                       <Paragraph>
-                        2
+                        {unitNumber}
                       </Paragraph>
                     </Col>
                   </Row>
                 </Col>
               </Row>
+              <Button type='primary' style={{ marginLeft: "50px" }}>Submit  Inquiry</Button>
             </Col>
           </Row>
           <Row >
@@ -189,8 +215,16 @@ function PropertyDetails() {
               </div>
             </Col>
           </Row>
+
         </Col>
       }
+
+      {isUploadPhotosModalOpen && (
+        <UploadPhotosModal
+          isOpen={isUploadPhotosModalOpen}
+          handleModal={setUploadPhotosModal}
+        />
+      )}
     </>
   )
 }
