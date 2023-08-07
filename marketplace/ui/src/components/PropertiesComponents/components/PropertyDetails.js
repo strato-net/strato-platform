@@ -22,6 +22,7 @@ function PropertyDetails() {
     const propertyData = sampleProperties?.filter((item) => item?.id === id);
     setPropertyDetail(propertyData[0])
   }, [])
+  const { Text, Title, Paragraph } = Typography
 
   const [api, contextHolder] = notification.useNotification();
 
@@ -81,81 +82,111 @@ function PropertyDetails() {
         ? <div className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
         </div>
-        : <Col span={16} style={{ margin: 'auto', marginBottom: '100px' }}>
-          <ImageCollage images={images} />
-          <Row justify={"center"} align="top"
-            style={{ marginTop: 50 }} >
-            <Col
-              sm={24} md={12}
-            >
-              <Row justify={"space-between"} align="top"  >
-                <Typography.Title
-                  style={{ marginBottom: 0, fontFamily: "Montserrat" }}
-                  level={3}
+        : <Col span={22} style={{ margin: 'auto', marginBottom: '100px' }}>
+          <Row>
+            <Col sm={24} lg={12} style={{ backgroundColor: "" }}>
+              <ImageCollage images={images} />
+            </Col>
+            <Col sm={24} lg={12} style={{ backgroundColor: "" }}>
+              <Row justify={"center"} align="top"
+                style={{ marginTop: 20 }} >
+                <Col
+                  sm={24} md={20}
                 >
-                  Price
-                </Typography.Title>
-                <Typography.Title
-                  style={{ marginTop: 0, marginRight: 10 }}
-                  level={4}
-                >
-                  $ {propertyDetail?.listPrice}
-                </Typography.Title>
-              </Row>
+                  <Row justify={"space-between"} align="top"  >
+                    <Title
+                      style={{ marginTop: 0, marginRight: 10 }}
+                      level={4}
+                    >
+                      $ {propertyDetail?.listPrice}
+                    </Title>
+                    <Col span={12} style={{ display: "flex", justifyContent: "space-around" }}>
+                      <Text>4 Bed</Text>
+                      <Text>3 Bath</Text>
+                      <Text>2100 sqft</Text>
+                    </Col>
 
-              <Row>
-                <Typography.Title style={{ marginTop: 2 }} level={4}>
-                  {propertyDetail?.postalCity}, {propertyDetail?.stateOrProvince}{" "}
-                  {propertyDetail?.postalCode}
-                </Typography.Title>
-              </Row>
-              <Row>
-                <Typography.Paragraph>
-                  <b>
-                    8 br | 4 ba |{" "}
-                    3706 sqft
-                  </b>
-                </Typography.Paragraph>
-              </Row>
+                  </Row>
 
-              <Row>
-                <Col>
-                  <Typography.Paragraph>
-                    Est. Fully Occupied Rent:{" "}
-                  </Typography.Paragraph>
-                  <Typography.Paragraph>
-                    Est. Capitalization Rate:{" "}
-                  </Typography.Paragraph>
-                  <Typography.Paragraph>
-                    Est. Property Insurance:{" "}
-                  </Typography.Paragraph>
+                  <Row>
+                    <Text style={{ marginTop: 2 }} level={4}>
+                      {propertyDetail?.postalCity}, {propertyDetail?.stateOrProvince}{" "}
+                      {propertyDetail?.postalCode}
+                    </Text>
+                  </Row>
+
+                  <Text strong>Active</Text>
+
+                  <Row>
+                    <Col>
+                      <Paragraph>
+                        <b>
+                          Property Type:{" "}
+                        </b>
+                      </Paragraph>
+                      <Paragraph>
+                        <b>
+                          Lot Size:{" "}
+                        </b>
+                      </Paragraph>
+                      <Paragraph>
+                        <b>
+                          Appliances:{" "}
+                        </b>
+                      </Paragraph>
+                      <Paragraph>
+                        <b>
+                          Cooling:{" "}
+                        </b>
+                      </Paragraph>
+                      <Paragraph>
+                        <b>
+                          Heating:{" "}
+                        </b>
+                      </Paragraph>
+                      <Paragraph>
+                        <b>
+                          Number of Units:{" "}
+                        </b>
+                      </Paragraph>
+                    </Col>
+                    <Col offset={1}>
+                      <Paragraph>
+                        Town House
+                      </Paragraph>
+                      <Paragraph>
+                        2400 sqft
+                      </Paragraph>
+                      <Paragraph>
+                        Refrigerator, Stove, Water heater
+                      </Paragraph>
+                      <Paragraph>
+                        Window Unit
+                      </Paragraph>
+                      <Paragraph>
+                        Wall Heaters
+                      </Paragraph>
+                      <Paragraph>
+                        2
+                      </Paragraph>
+                    </Col>
+                  </Row>
                 </Col>
-                <Col offset={1}>
-                  <Typography.Paragraph>
-                    <b>
-                      $4,800/month
-                    </b>
-                  </Typography.Paragraph>
-                  <Typography.Paragraph>
-                    <b>
-                      N/A
-                    </b>
-                  </Typography.Paragraph>
-                  <Typography.Paragraph>
-                    <b>
-                      N/A
-                    </b>
-                  </Typography.Paragraph>
-                </Col>
-              </Row>
-
-              <Row gutter={{ xs: 20, sm: 20, md: 20, lg: 24, xl: 24 }}>
-                <Tabs defaultActiveKey="Overview" items={tabs} />
               </Row>
             </Col>
-
-            <Col sm={{ span: 24, offset: 0 }} md={{ span: 10, offset: 2 }}>
-              <ListingContactCard />
+          </Row>
+          <Row >
+            <Col sm={24} lg={12} style={{ minHeight: "300px" }}>
+              <Tabs defaultActiveKey="Overview" items={tabs} />
+            </Col>
+            <Col sm={24} lg={12} style={{ marginTop: "20px" }}>
+              <div style={{ width: '300px', background: 'grey', margin: 'auto' }}>
+                <div class="mapouter"><div class="gmap_canvas">
+                  <iframe width="100%" height="100%" id="gmap_canvas"
+                    src="https://maps.google.com/maps?q=california&t=&z=10&ie=UTF8&iwloc=&output=embed"
+                    frameborder="0" scrolling="no" marginheight="0" marginwidth="0">
+                  </iframe></div></div>
+              </div>
             </Col>
           </Row>
         </Col>
