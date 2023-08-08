@@ -8,15 +8,31 @@ import {
   Upload,
   Button,
   Select,
-  notification
+  notification,
+  Typography,
+  Checkbox,
+  Collapse,
+  Row,
+  Col
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
-import { StateData, HomeTypeData, parkingFeaturesData, heatingData, coolingData, flooringData, appliancesData, interiorFeaturesData, exteriorFeaturesData } from "../helpers/constants";
+import {
+  StateData,
+  HomeTypeData,
+  parkingFeaturesData,
+  heatingData,
+  coolingData,
+  flooringData,
+  appliancesData,
+  interiorFeaturesData,
+  exteriorFeaturesData
+} from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
 import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
-
+const { Panel } = Collapse;
+const { Text } = Typography;
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -52,29 +68,38 @@ function PropertyCreateModal({
   const {
     title,
     description,
-    lotNumber,
+    propertyType,
+    listPrice,
     streetName,
     streetNumber,
-    city,
-    state,
-    postalCode,
+    lotNumber,
+    postalCity,
+    stateOrProvince,
+    postalcode,
     askingPrice,
-    propertyType,
     bedroomsTotal,
     bathroomsTotalInteger,
     livingArea,
-    lotSizeAreaUnits
+    lotSizeAreaUnits,
+    appliances,
+    heating,
+    cooling,
+    flooring,
+    parking,
+    interior,
+    exterior,
+    lotSizeArea
   } = propertyData;
-
+  
   const isDisabledCreateView =
     !title ||
     !description ||
     !lotNumber ||
     !streetName ||
     !streetNumber ||
-    !city ||
-    !state ||
-    !postalCode ||
+    !postalCity ||
+    !stateOrProvince ||
+    !postalcode ||
     !askingPrice;
 
   const isDisabledFactsView =
@@ -86,7 +111,7 @@ function PropertyCreateModal({
     !lotSizeAreaUnits;
 
   const handleModalToggle = () => {
-      setModalView(!modalView);
+    setModalView(!modalView);
   };
 
   const showConfirmationModal = () => {
@@ -115,101 +140,101 @@ function PropertyCreateModal({
   const handleSubmitCreateProperty = async () => {
 
     const body = {
-      title: 'body.title',
-      description: 'body.description',
-      propertyType: 'body.propertyType',
-      listPrice: 100000,
-      unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
-      streetNumber: 8,
-      streetName: 'body.streetName',
+      title: title,
+      description: description,
+      propertyType: propertyType,
+      listPrice: listPrice,
+      // unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
+      streetName: streetName,
+      streetNumber: streetNumber,
       unitNumber: 'body.unitNumber',
-      postalCity: 'state.postalCity',
-      stateOrProvince: 'body.stateOrProvince',
-      postalcode: 12345,
-      bathroomsTotalInteger: 5,
-      bedroomsTotal: 7,
-      lotSizeArea: 1000,
+      postalCity: postalCity,
+      stateOrProvince: stateOrProvince,
+      postalcode: postalcode,
+      bathroomsTotalInteger: bathroomsTotalInteger,
+      bedroomsTotal: bedroomsTotal,
+      lotSizeArea: lotSizeArea,
       lotSizeUnits: 'sqft',
       livingArea: 100,
-      livingAreaUnits: 'sqft', 
+      livingAreaUnits: 'sqft',
       numberOfUnitsTotal: 3,
 
       // Appliances
-      dishwasher: true,
-      dryer: true,
-      freezer: true,
-      garbageDisposal: true,
-      microwave: true,
-      ovenOrRange: true,
-      refrigerator: true,
-      washer: true,
-      waterHeater: true,
+      dishwasher: appliances.includes("dishwasher"),
+      dryer: appliances.includes("dryer"),
+      freezer: appliances.includes("freezer"),
+      garbageDisposal: appliances.includes("garbageDisposal"),
+      microwave: appliances.includes("microwave"),
+      ovenOrRange: appliances.includes("ovenOrRange"),
+      refrigerator: appliances.includes("refrigerator"),
+      washer: appliances.includes("washer"),
+      waterHeater: appliances.includes("waterHeater"),
 
       // Cooling
-      centralAir: true,
-      evaporative: true,
-      geoThermal: true,
-      refrigeration: true,
-      solar: true,
-      wallUnit: true,
+      centralAir: cooling.includes("centralAir"),
+      evaporative: cooling.includes("evaporative"),
+      geoThermal: cooling.includes("geoThermal"),
+      refrigeration: cooling.includes("refrigeration"),
+      solar: cooling.includes("solar"),
+      wallUnit: cooling.includes("wallUnit"),
 
       // Heating
-      baseboard: true,
-      forceAir: true,
-      geoThermalHeat: true,
-      heatPump: true,
-      hotWater: true,
-      radiant: true,
-      solarHeat: true,
-      steam: true,
+      baseboard: heating.includes("baseboard"),
+      forceAir: heating.includes("forceAir"),
+      geoThermalHeat: heating.includes("geoThermalHeat"),
+      heatPump: heating.includes("heatPump"),
+      hotWater: heating.includes("hotWater"),
+      radiant: heating.includes("radiant"),
+      solarHeat: heating.includes("solarHeat"),
+      steam: heating.includes("steam"),
 
       // Flooring
-      carpet: true,
-      concrete: true,
-      hardwood: true,
-      laminate: true,
-      linoleumVinyl: true,
-      slate: true,
-      softwood: true,
-      tile: true,
+      carpet: flooring.includes("carpet"),
+      concrete: flooring.includes("concrete"),
+      hardwood: flooring.includes("hardwood"),
+      laminate: flooring.includes("laminate"),
+      linoleumVinyl: flooring.includes("linoleumVinyl"),
+      slate: flooring.includes("slate"),
+      softwood: flooring.includes("softwood"),
+      tile: flooring.includes("tile"),
 
       // Parking
-      carport: true,
-      garage: true,
-      offStreet: true,
-      onStreet: true,
+      carport: parking.includes("carport"),
+      garage: parking.includes("garage"),
+      offStreet: parking.includes("offStreet"),
+      onStreet: parking.includes("onStreet"),
 
       // Interior Features
-      attic: true,
-      cableReady: true,
-      ceilingFan: true,
-      doublePaneWindows: true,
-      elevator: true,
-      fireplace: true,
-      flooring: true,
-      furnished: true,
-      jettedTub: true,
-      securitySystem: true,
-      vaultedCeiling: true,
-      skylight: true,
-      wetBar: true,
+      attic: interior.includes("attic"),
+      cableReady: interior.includes("cableReady"),
+      ceilingFan: interior.includes("ceilingFan"),
+      doublePaneWindows: interior.includes("doublePaneWindows"),
+      elevator: interior.includes("elevator"),
+      fireplace: interior.includes("fireplace"),
+      flooring: interior.includes("flooring"),
+      furnished: interior.includes("furnished"),
+      jettedTub: interior.includes("jettedTub"),
+      securitySystem: interior.includes("securitySystem"),
+      vaultedCeiling: interior.includes("vaultedCeiling"),
+      skylight: interior.includes("skylight"),
+      wetBar: interior.includes("wetBar"),
 
       // Exterior Features
-      barbecueArea: true,
-      deck: true,
-      dock: true,
-      fence: true,
-      garden: true,
-      hotTubOrSpa: true,
-      lawn: true,
-      patio: true,
-      pond: true,
-      pool: true,
-      porch: true,
-      rvParking: true,
-      sauna: true,
-      sprinklerSystem: true,
-      waterFront: true,
+      barbecueArea: exterior.includes("barbecueArea"),
+      deck: exterior.includes("deck"),
+      dock: exterior.includes("dock"),
+      fence: exterior.includes("fence"),
+      garden: exterior.includes("garden"),
+      hotTubOrSpa: exterior.includes("hotTubOrSpa"),
+      lawn: exterior.includes("lawn"),
+      patio: exterior.includes("patio"),
+      pond: exterior.includes("pond"),
+      pool: exterior.includes("pool"),
+      porch: exterior.includes("porch"),
+      rvParking: exterior.includes("rvParking"),
+      sauna: exterior.includes("sauna"),
+      sprinklerSystem: exterior.includes("sprinklerSystem"),
+      waterFront: exterior.includes("waterFront"),
     };
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
@@ -262,7 +287,12 @@ function PropertyCreateModal({
   const primaryAction = {
     content: modalView
       ? "Create a Property Listing"
-      : "Property Listing - House Facts",
+      : <>
+        <Button type="link" onClick={handleModalToggle}>
+          <ArrowLeftOutlined />
+        </Button>
+        <Text>Property Listing - House Facts</Text>
+      </>,
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal,
@@ -322,8 +352,8 @@ function PropertyCreateModal({
             >
               <Input
                 label="title"
-                defaultValue={propertyData?.name}
-                value={propertyData?.name}
+                defaultValue={title}
+                value={title}
                 maxLength={100}
                 placeholder="Listing Title"
                 showCount
@@ -344,8 +374,8 @@ function PropertyCreateModal({
             >
               <Input.TextArea
                 label="Project Description"
-                defaultValue={propertyData?.projectDescription}
-                value={propertyData?.projectDescription}
+                defaultValue={description}
+                value={description}
                 maxLength={500}
                 showCount
                 placeholder="Project Description"
@@ -369,8 +399,8 @@ function PropertyCreateModal({
                 placeholder="Asking Price"
                 controls={false}
                 addonBefore="$"
-                defaultValue={propertyData?.askingPrice}
-                value={propertyData?.askingPrice}
+                defaultValue={listPrice}
+                value={listPrice}
                 onChange={(e) => {
                   handleChange("listPrice", e);
                 }}
@@ -455,10 +485,10 @@ function PropertyCreateModal({
                 label="City"
                 id="city"
                 placeholder="City"
-                defaultValue={propertyData?.city}
-                value={propertyData?.city}
+                defaultValue={postalCity}
+                value={postalCity}
                 onChange={(e) => {
-                  handleChange("city", e.target.value);
+                  handleChange("postalCity", e.target.value);
                 }}
               />
             </Form.Item>
@@ -471,8 +501,8 @@ function PropertyCreateModal({
             >
               <Select
                 label="State"
-                defaultValue={propertyData?.state}
-                value={propertyData?.state}
+                defaultValue={stateOrProvince}
+                value={stateOrProvince}
                 placeholder="Select State"
                 onSelect={(e) => {
                   handleChange("stateOrProvince", e);
@@ -495,10 +525,10 @@ function PropertyCreateModal({
                 min={0}
                 max={99999}
                 controls={false}
-                defaultValue={propertyData?.zipCode}
-                value={propertyData?.zipCode}
+                defaultValue={postalcode}
+                value={postalcode}
                 onChange={(value) => {
-                  handleChange("postalCode", value);
+                  handleChange("postalcode", value);
                 }}
                 onWheel={(e) => {
                   e.target.blur();
@@ -547,19 +577,17 @@ function PropertyCreateModal({
           </Form>
         ) : (
           <div>
-            <Button type="link" onClick={handleModalToggle}>
-              <ArrowLeftOutlined />
-            </Button>
             <Form labelCol={{ span: 8 }} labelAlign="left">
               <Form.Item
                 label="Home Type"
                 name="homeType"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please Select Home Type." },
                 ]}
               >
                 <Select
                   label="homeType"
+                  placeholder="Property Type"
                   defaultValue={homeType}
                   onSelect={(value) => { handleChange("propertyType", value) }}
                   options={HomeTypeData}
@@ -570,12 +598,13 @@ function PropertyCreateModal({
                 label="Bedrooms"
                 name="bedrooms"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please Enter Number of Bedrooms." },
                 ]}
               >
                 <InputNumber
                   precision={0}
                   label="bedrooms"
+                  placeholder="Bedrooms"
                   type="Number"
                   controls={false}
                   min={0}
@@ -591,12 +620,13 @@ function PropertyCreateModal({
                 label="Bathrooms"
                 name="bathrooms"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please Enter Number of Bathrooms" },
                 ]}
               >
                 <InputNumber
                   precision={0}
                   label="bathrooms"
+                  placeholder="Bathrooms"
                   type="Number"
                   controls={false}
                   min={0}
@@ -611,12 +641,13 @@ function PropertyCreateModal({
                 label="Square Ft"
                 name="squareFeet"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please Enter Square Feet" },
                 ]}
               >
                 <InputNumber
                   precision={0}
                   label="squareFeet"
+                  placeholder="Square Feet"
                   type="Number"
                   controls={false}
                   min={0}
@@ -628,7 +659,7 @@ function PropertyCreateModal({
                 />
               </Form.Item>
               <Form.Item
-                label="Lot Size"
+                label="Lot Size Area"
                 name="lotSize"
                 rules={[
                   { required: true, message: "Please input an asking price." },
@@ -637,111 +668,102 @@ function PropertyCreateModal({
                 <InputNumber
                   precision={0}
                   label="lotSize"
+                  placeholder="Lot Size"
                   type="Number"
                   controls={false}
                   min={0}
-                  defaultValue={lotSize}
+                  defaultValue={lotSizeArea}
                   onChange={(value) => { handleChange("lotSizeArea", value) }}
                   onWheel={(e) => {
                     e.target.blur();
                   }}
                 />
               </Form.Item>
-              <Form.Item
-                label="Appliances"
-                name="appliances"
-                rules={[{ message: "Please input an asking price." }]}
+              <Collapse
+                expandIconPosition={"end"}
+                defaultActiveKey={[]}
               >
-                <Select
-                  mode="multiple"
-                  style={{ width: '100%' }}
-                  placeholder="Please select Applicances"
-                  defaultValue={[]}
-                  onChange={(value) => { handleChange("appliances", value) }}
-                  options={appliancesData}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Flooring"
-                name="flooring"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  label="Flooring"
-                  defaultValue={homeType}
-                  onSelect={(value) => { handleChange("flooring", value) }}
-                  options={flooringData}
-                  showSearch
-                />
-              </Form.Item>
-              <Form.Item
-                label="Cooling"
-                name="cooling"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  label="Cooling"
-                  defaultValue={homeType}
-                  onSelect={(value) => { handleChange("cooling", value) }}
-                  options={coolingData}
-                  showSearch
-                />
-              </Form.Item>
-              <Form.Item
-                label="Heating"
-                name="heating"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  label="Heating"
-                  defaultValue={homeType}
-                  onSelect={(value) => { handleChange("heating", value) }}
-                  options={heatingData}
-                  showSearch
-                />
-              </Form.Item>
-              <Form.Item
-                label="Parking"
-                name="parking"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  label="ParkingType"
-                  defaultValue={homeType}
-                  onSelect={(value) => { handleChange("parkingFeatures", value) }}
-                  options={parkingFeaturesData}
-                  showSearch
-                  placeholder="Select a person"
-                />
-              </Form.Item>
-              <Form.Item
-                label="Interior Features"
-                name="interiorFeatures"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  mode="multiple"
-                  style={{ width: '100%' }}
-                  placeholder="Please select Interior features"
-                  defaultValue={[]}
-                  onChange={(value) => { handleChange("interiorFeatures", value) }}
-                  options={interiorFeaturesData}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Exterior Features"
-                name="exteriorFeatures"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Select
-                  mode="multiple"
-                  style={{ width: '100%' }}
-                  placeholder="Please select Exterior features"
-                  defaultValue={[]}
-                  onChange={(value) => { handleChange("exteriorFeatures", value) }}
-                  options={exteriorFeaturesData}
-                />
-              </Form.Item>
+                <Panel style={{ fontWeight: 700 }} header="Appliances" key="1">
+                  <Row>
+                    <Col>
+                      <Checkbox.Group
+                        style={{ display: "block", lineHeight: "30px" }}
+                        options={appliancesData}
+                        value={appliances}
+                        onChange={(value) => {
+                          handleChange("appliances", value);
+                        }}
+                      />
+                    </Col>
+                  </Row>
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Cooling" key="2">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={coolingData}
+                    value={cooling}
+                    onChange={(value) => {
+                      handleChange("cooling", value);
+                    }}
+                  />
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Heating" key="3">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={heatingData}
+                    value={heating}
+                    onChange={(value) => {
+                      handleChange("heating", value);
+                    }}
+                  />
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Flooring" key="4">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={flooringData}
+                    value={flooring}
+                    onChange={(value) => {
+                      handleChange("flooring", value);
+                    }}
+                  />
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Parking" key="5">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={parkingFeaturesData}
+                    value={parking}
+                    onChange={(value) => {
+                      handleChange("parking", value);
+                    }}
+                  />
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Interior Features" key="6">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={interiorFeaturesData}
+                    value={interior}
+                    onChange={(value) => {
+                      handleChange("interior", value);
+                    }}
+                  />
+                </Panel>
+
+                <Panel style={{ fontWeight: 700 }} header="Exterior Features" key="7">
+                  <Checkbox.Group
+                    style={{ display: "block", lineHeight: "30px" }}
+                    options={exteriorFeaturesData}
+                    value={exterior}
+                    onChange={(value) => {
+                      handleChange("exterior", value);
+                    }}
+                  />
+                </Panel>
+              </Collapse>
             </Form>
           </div>
         )}
