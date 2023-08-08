@@ -9,7 +9,7 @@ import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/pro
 import PropertyCreateModal from './PropertyCreateModal'
 
 function PropertyListings() {
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(0)
   const [limit, setLimit] = useState(12)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [modalView, setModalView] = useState(true);
@@ -17,7 +17,7 @@ function PropertyListings() {
 
   useEffect(() => {
     // TODO: will be used when API is ready
-    actions.fetchProperties(dispatch, limit, currentPage)
+    // actions.fetchProperties(dispatch, limit, currentPage)
   }, [])
   
   const dispatch = usePropertiesDispatch()

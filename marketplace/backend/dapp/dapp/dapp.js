@@ -605,17 +605,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     //Get the property contract
     const property = await managers.productManager.getProperty({ ...args }, getOptions);
-    console.log('dapp.getProperty - property', property)
     //Get the product contract
-    const product = await managers.productManager.getProduct({ 
-      ...args,
-      uniqueProductID: property.productId,
+    const productData = await managers.productManager.getProduct({ 
+      address: property.productId,
       ownerOrganization: userOrganization }, getOptions);
-    console.log('dapp.getProperty - product', product)
-    const propertyData = { ...property, title: product.name, description: product.description, propertyType: product.subCategory }
-    console.log('dapp.getProperty - propertyData', propertyData)
+    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
     return propertyData
   };
+
   contract.getProperties = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     const allPropertiesData = await managers.productManager.getProperties({ ...args }, getOptions);
@@ -649,11 +646,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...productArgs }
     const productContract = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
-    console.log('productContract DAPP', productContract)
 
     //create the property contract that matches product id with the property id
     if (productContract[0] == 200) {
-      console.log('productCOntractWorking')
       const propertyArgs = {
         produdctId: productContract[1],
         listPrice: args.listPrice,
@@ -728,7 +723,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         fireplace: args.fireplace,
         flooring: args.flooring,
         furnished: args.furnished,
-        jettedTub: args.jetteTub,
+        jettedTub: args.jettedTub,
         securitySystem: args.securitySystem,
         vaultedCeiling: args.vaultedCeiling,
         skylight: args.skylight,
@@ -752,9 +747,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         waterFront: args.waterFront,
 
       }
-      console.log('propertyArgs DAPP', propertyArgs)
       const propertyContract = await managers.productManager.createProperty(propertyArgs);
-      console.log('propertyContract DAPP', propertyContract)
       return {
         productContractRest: productContract[0],
         productContractAddress: productContract[1],

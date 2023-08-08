@@ -61,15 +61,13 @@ class PropertiesController {
         unparsedAddress: `${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}`,
         standardStatus: "Active",
         //use google maps api to get lat and long, then convert to string
-        latitude: '',
-        longitude: '',
+        latitude: "",
+        longitude: "",
       }
 
-      console.log('controller body', body)
       PropertiesController.validateCreatePropertyArgs(propertyArgs)
 
-      const propertyResult = await dapp.createProperty(body)
-      console.log('propertyResult controller', propertyResult)
+      const propertyResult = await dapp.createProperty(propertyArgs)
       if (propertyResult) {
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
@@ -81,7 +79,6 @@ class PropertiesController {
         }
         console.log(inventoryBody)
         const inventoryResult = await dapp.createInventory(inventoryBody)
-        console.log('inventoryResult controller', inventoryResult)
         if (inventoryResult) {
           rest.response.status200(res, propertyResult)
         }
@@ -116,8 +113,8 @@ class PropertiesController {
         lotSizeUnits: Joi.string().required(),
         livingArea: Joi.number().required(),
         livingAreaUnits: Joi.string().required(),
-        latitude: Joi.string(),
-        longitude: Joi.string(),
+        latitude: Joi.string().allow("").required(),
+        longitude: Joi.string().allow("").required(),
         numberOfUnitsTotal: Joi.number().required(),
 
         // Appliances
