@@ -57,7 +57,7 @@ function marshalIn(_args) {
     const defaultArgs = {
         productId: '',
         inventoryId: '',
-        creditBatchSerialization: '',
+        batchSerializationNumber: '',
         quantity: 0,
         status: 1,
         createdDate: 0,

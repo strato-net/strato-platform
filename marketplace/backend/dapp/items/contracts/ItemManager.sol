@@ -13,7 +13,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     function addItem(
         address _productId,
         address _inventoryId,
-        string _creditBatchSerialization,
+        string _batchSerializationNumber,
         int _quantity,
         ItemStatus _status,
         uint _createdDate
@@ -23,7 +23,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         Item_3 itemAddr = new Item_3(
             _productId,
             _inventoryId,
-            _creditBatchSerialization,
+            _batchSerializationNumber,
             _quantity,
             _status,
             _createdDate
@@ -74,7 +74,11 @@ contract ItemManager is ItemStatus, InventoryStatus {
             _newQuantity
         );
 
-        return (RestStatus.OK, productId, inventoryId);
+        if (productId == address(0) || inventoryId == address(0)) {
+            return (RestStatus.BAD_REQUEST, productId, inventoryId);
+        } else {
+            return (RestStatus.OK, productId, inventoryId);
+        }
     }
 
     function getProductAndInventory(
@@ -110,6 +114,10 @@ contract ItemManager is ItemStatus, InventoryStatus {
         }
 
         Inventory oldInventory = Inventory(item.inventoryId());
+        if (oldInventory.availableQuantity() < _newQuantity) {
+            return (address(0), address(0));
+        }
+
         (uint status, address inventory) = product.addInventory(
             _newQuantity,
             oldInventory.pricePerUnit(),
@@ -131,7 +139,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 Item_3 itemAddr = new Item_3(
                     _item.productId(),
                     _item.inventoryId(),
-                    _item.creditBatchSerialization(),
+                    _item.batchSerializationNumber(),
                     _item.quantity(),
                     _item.status(),
                     block.timestamp

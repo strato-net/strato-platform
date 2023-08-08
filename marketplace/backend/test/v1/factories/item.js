@@ -4,7 +4,7 @@ export const itemArgs = (uid) => {
     itemArgs: {
       productId: '0000000000000000000000000000000000000100',
       inventoryId: '0000000000000000000000000000000000000100',
-      creditBatchSerialization: `serialNumber_${uid}`,
+      batchSerializationNumber: `serialNumber_${uid}`,
       quantity: 10,
       status: 1,
     }

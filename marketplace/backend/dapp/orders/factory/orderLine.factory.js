@@ -7,7 +7,7 @@ const factory = {
         const args = {
             productId: constants.zeroAddress,
             inventoryId: constants.zeroAddress,
-            creditBatchSerialization: "Test123",
+            batchSerializationNumber: "Test123",
             quantity: uid,
             pricePerUnit: uid,
             tax: uid,

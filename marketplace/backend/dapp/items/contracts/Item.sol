@@ -12,7 +12,7 @@ contract Item_3 is ItemStatus {
 
     address public productId;
     address public inventoryId;
-    string public creditBatchSerialization;
+    string public batchSerializationNumber;
     int public quantity;
     ItemStatus public status;
     uint public createdDate;
@@ -36,7 +36,7 @@ contract Item_3 is ItemStatus {
     constructor(
         address _productId,
         address _inventoryId,
-        string _creditBatchSerialization,
+        string _batchSerializationNumber,
         int _quantity,
         ItemStatus _status,
         uint _createdDate
@@ -45,7 +45,7 @@ contract Item_3 is ItemStatus {
 
         productId = _productId;
         inventoryId = _inventoryId;
-        creditBatchSerialization = _creditBatchSerialization;
+        batchSerializationNumber = _batchSerializationNumber;
         quantity = _quantity;
         status = _status;
         createdDate = _createdDate;

@@ -56,7 +56,7 @@ contract Order is OrderStatus {
         orderDate = _orderDate;
         orderTotal = _orderTotal;
         orderShippingCharges = _orderShippingCharges;
-        status = OrderStatus.AWAITING_FULFILLMENT;
+        status = OrderStatus.AWAITING_SHIPMENT;         // temporary fix
         amountPaid = _amountPaid;
         createdDate = _createdDate;
         paymentSessionId = _paymentSessionId;
@@ -145,7 +145,7 @@ contract Order is OrderStatus {
         address _orderAddress,
         address _productId,
         address _inventoryId,
-        string creditBatchSerialization,
+        string _batchSerializationNumber,
         uint _quantity,
         uint _pricePerUnit,
         uint _tax,
@@ -161,7 +161,7 @@ contract Order is OrderStatus {
             _orderAddress,
             _productId,
             _inventoryId,
-            creditBatchSerialization,
+            _batchSerializationNumber,
             _quantity,
             _pricePerUnit,
             _tax,

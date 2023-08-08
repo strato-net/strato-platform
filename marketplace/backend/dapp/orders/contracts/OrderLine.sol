@@ -15,7 +15,7 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
     address public orderAddress;
     address public productId;
     address public inventoryId;
-    string public creditBatchSerialization;
+    string public batchSerializationNumber;
     uint public quantity;
     uint public pricePerUnit;
     uint public tax;
@@ -27,7 +27,7 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
         address _orderAddress,
         address _productId,
         address _inventoryId,
-        string _creditBatchSerialization,
+        string _batchSerializationNumber,
         uint _quantity,
         uint _pricePerUnit,
         uint _tax,
@@ -38,7 +38,7 @@ contract OrderLine_2 is ItemStatus, OrderStatus {
         orderAddress = _orderAddress;
         productId = _productId;
         inventoryId = _inventoryId;
-        creditBatchSerialization = _creditBatchSerialization;
+        batchSerializationNumber = _batchSerializationNumber;
         quantity = _quantity;
         pricePerUnit = _pricePerUnit;
         tax = _tax;

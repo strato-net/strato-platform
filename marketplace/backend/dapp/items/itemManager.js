@@ -59,7 +59,7 @@ function marshalIn(_args) {
         status: 1,
         createdDate: 0,
         uniqueProductCode: '',
-        creditBatchSerialization: '',
+        batchSerializationNumber: '',
         quantity: 0
     };
 

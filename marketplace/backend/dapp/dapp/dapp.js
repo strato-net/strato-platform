@@ -458,7 +458,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   contract.createInventory = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const { creditBatchSerialization, ...restArgs } = args;
+    const { batchSerializationNumber, ...restArgs } = args;
     const quantity = args.quantity;
     const serialNumbers = []
 
@@ -474,7 +474,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const itemParams = {
       quantity,
-      creditBatchSerialization,
+      batchSerializationNumber,
       createdDate,
       productId: restArgs.productAddress,
       status: restArgs.status,
@@ -901,7 +901,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
-            creditBatchSerialization: "Test123",
+            batchSerializationNumber: inventoryObject.batchSerializationNumber,
             quantity: inventoryObject.quantity,
             pricePerUnit: inventoryObject.pricePerUnit,
             tax,

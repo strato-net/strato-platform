@@ -132,7 +132,7 @@ class ItemController {
       itemArgs: Joi.object({
         productId: Joi.string().required(),
         inventoryId: Joi.string().required(),
-        creditBatchSerialization: Joi.string().required(),
+        batchSerializationNumber: Joi.string().required(),
         status: Joi.number().integer().min(1).max(4).required(),
         quantity: Joi.number().integer().min(0).required()
       })
