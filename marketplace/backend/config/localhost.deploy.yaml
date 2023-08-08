@@ -1,5 +1,5 @@
-url: https://node1.mercata-testnet2.blockapps.net
+url: https://properties.mercata-testnet2.blockapps.net
 dapp:
   contract:
     name: Dapp
-    address: c93f9a422a4508a6501a63537291128122f7bcf2
+    address: f7da8a1305c62cb6451eb11b65a3e0b43c65dbd3

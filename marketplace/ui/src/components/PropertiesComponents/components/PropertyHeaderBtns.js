@@ -18,9 +18,9 @@ function PropertyHeaderBtns({ tab }) {
       {tab === 'home' &&
         <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
           onClick={() => {
-            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-              window.location.href = loginUrl
-            }
+            // if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+            //   window.location.href = loginUrl
+            // }
             toggleCreateModal(true)
           }}
         >List Property</Button>

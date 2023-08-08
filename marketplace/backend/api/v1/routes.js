@@ -18,6 +18,7 @@ import image from './Image'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
+import properties from "./Properties"
 
 import {
   Authentication,
@@ -35,6 +36,7 @@ import {
   Marketplace,
   OrderLine,
   PaymentService,
+  Properties,
 } from './endpoints'
 
 
@@ -55,7 +57,7 @@ router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)
-
+router.use(Properties.prefix, properties)
 
 router.get(`/health`, (req, res) => {
   const deployment = req.app.get(deployParamName);

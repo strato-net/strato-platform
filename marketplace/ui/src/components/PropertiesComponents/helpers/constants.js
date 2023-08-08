@@ -10,6 +10,96 @@ export const HomeTypeData = [
   { value: 'other', label: 'Other' },
 ];
 
+export const appliancesData = [
+  { value: 'dishwasher', label: 'Dishwasher' },
+  { value: 'dryer', label: 'Dryer' },
+  { value: 'freezer', label: 'Freezer' },
+  { value: 'garbageDisposal', label: 'Garbage Disposal' },
+  { value: 'microwave', label: 'Microwave' },
+  { value: 'ovenRange', label: 'Oven / Range' },
+  { value: 'trashCompactor', label: 'Trash Compactor' },
+  { value: 'refrigerator', label: 'Refrigerator' },
+  { value: 'washer', label: 'Washer' },
+  { value: 'waterHeater', label: 'Water Heater' },
+  { value: 'other', label: 'Other' },
+]
+
+export const flooringData = [
+  { value: 'carpet', label: 'Carpet' },
+  { value: 'concrete', label: 'Concrete' },
+  { value: 'hardwood', label: 'Hardwood' },
+  { value: 'laminate', label: 'Laminate' },
+  { value: 'linoleumVinyl', label: 'Linoleum / Vinyl' },
+  { value: 'slate', label: 'Slate' },
+  { value: 'softwood', label: 'Softwood' },
+  { value: 'tile', label: 'Tile' },
+  { value: 'other', label: 'Other' },
+]
+
+export const interiorFeaturesData = [
+  { value: 'attic', label: 'Attic' },
+  { value: 'cableReady', label: 'Cable Ready' },
+  { value: 'ceilingFan', label: 'Ceiling Fan' },
+  { value: 'doublePaneWindows', label: 'Double Pane / Storm Windows' },
+  { value: 'fireplace', label: 'Fireplace' },
+  { value: 'flooring', label: 'Flooring' },
+  { value: 'furnished', label: 'Furnished' },
+  { value: 'jettedTub', label: 'Jetted Tub' },
+  { value: 'securitySystem', label: 'Security System' },
+  { value: 'vaultedCeiling', label: 'Vaulted Ceiling' },
+  { value: 'wetBar', label: 'Wet Bar' },
+  { value: 'wired', label: 'Wired' },
+]
+
+export const coolingData = [
+  { value: 'central', label: 'Central' },
+  { value: 'evaporative', label: 'Evaporative' },
+  { value: 'geothermal', label: 'Geothermal' },
+  { value: 'refrigeration', label: 'Refrigeration' },
+  { value: 'solar', label: 'Solar' },
+  { value: 'wall', label: 'Wall' },
+  { value: 'other', label: 'Other' },
+]
+
+export const heatingData = [
+  { value: 'baseboard', label: 'Baseboard' },
+  { value: 'forcedAir', label: 'Forced Air' },
+  { value: 'geothermal', label: 'Geothermal' },
+  { value: 'heatPump', label: 'Heat Pump' },
+  { value: 'radiant', label: 'Radiant' },
+  { value: 'stove', label: 'Stove' },
+  { value: 'wall', label: 'Wall' },
+  { value: 'other', label: 'Other' },
+]
+
+export const parkingFeaturesData = [
+  { value: 'carport', label: 'Carport' },
+  { value: 'attachedGarage', label: 'Garage - Attached' },
+  { value: 'detachedGarage', label: 'Garage - Detached' },
+  { value: 'offStreet', label: 'Off-Street' },
+  { value: 'onStreet', label: 'On-Street' },
+  { value: 'other', label: 'Other' },
+]
+
+export const exteriorFeaturesData = [
+  { value: 'barbecueArea', label: 'Barbecue Area' },
+  { value: 'deck', label: 'Deck' },
+  { value: 'dock', label: 'Dock' },
+  { value: 'fencedYard', label: 'Fenced Yard' },
+  { value: 'garden', label: 'Garden' },
+  { value: 'hotTubSpa', label: 'Hot Tub / Spa' },
+  { value: 'lawn', label: 'Lawn' },
+  { value: 'patio', label: 'Patio' },
+  { value: 'pond', label: 'Pond' },
+  { value: 'pool', label: 'Pool' },
+  { value: 'porch', label: 'Porch' },
+  { value: 'rvParking', label: 'RV Parking' },
+  { value: 'sauna', label: 'Sauna' },
+  { value: 'sprinklerSystem', label: 'Sprinkler System' },
+  { value: 'waterfront', label: 'Waterfront' },
+  { value: 'other', label: 'Other' },
+]
+
 export const StateData = [
   { value: 'AL', label: 'AL' },
   { value: 'AK', label: 'AK' },

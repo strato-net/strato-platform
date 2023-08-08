@@ -8,8 +8,6 @@ import {
   Upload,
   Button,
   Select,
-  Collapse,
-  DatePicker,
   notification
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
@@ -45,7 +43,6 @@ function PropertyCreateModal({
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
-  const [yearBuilt, setYearBuilt] = useState("");
   const [lotSize, setLotSize] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -80,14 +77,10 @@ function PropertyCreateModal({
     !bedrooms ||
     !bathrooms ||
     !squareFeet ||
-    !yearBuilt ||
     !lotSize;
 
   const handleModalToggle = () => {
-    if (isDisabledCreateView) {
-    } else {
       setModalView(!modalView);
-    }
   };
 
   const showConfirmationModal = () => {
@@ -113,9 +106,106 @@ function PropertyCreateModal({
   }
 
   //creates the listing for property
-  const handleSubmitCreateProperty = () => {
-    const body = {};
-    // let [isDone, projectAddress] = await actions.createProject(dispatch, body);
+  const handleSubmitCreateProperty = async () => {
+
+    const body = {
+      title: 'body.title',
+      description: 'body.description',
+      propertyType: 'body.propertyType',
+      listPrice: 100000,
+      unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
+      streetNumber: 8,
+      streetName: 'body.streetName',
+      unitNumber: 'body.unitNumber',
+      postalCity: 'state.postalCity',
+      stateOrProvince: 'body.stateOrProvince',
+      postalcode: 12345,
+      bathroomsTotalInteger: 5,
+      bedroomsTotal: 7,
+      lotSizeArea: 1000,
+      lotSizeUnits: 'sqft',
+      livingArea: 100,
+      livingAreaUnits: 'sqft', 
+      numberOfUnitsTotal: 3,
+
+      // Appliances
+      dishwasher: true,
+      dryer: true,
+      freezer: true,
+      garbageDisposal: true,
+      microwave: true,
+      ovenOrRange: true,
+      refrigerator: true,
+      washer: true,
+      waterHeater: true,
+
+      // Cooling
+      centralAir: true,
+      evaporative: true,
+      geoThermal: true,
+      refrigeration: true,
+      solar: true,
+      wallUnit: true,
+
+      // Heating
+      baseboard: true,
+      forceAir: true,
+      geoThermalHeat: true,
+      heatPump: true,
+      hotWater: true,
+      radiant: true,
+      solarHeat: true,
+      steam: true,
+
+      // Flooring
+      carpet: true,
+      concrete: true,
+      hardwood: true,
+      laminate: true,
+      linoleumVinyl: true,
+      slate: true,
+      softwood: true,
+      tile: true,
+
+      // Parking
+      carport: true,
+      garage: true,
+      offStreet: true,
+      onStreet: true,
+
+      // Interior Features
+      attic: true,
+      cableReady: true,
+      ceilingFan: true,
+      doublePaneWindows: true,
+      elevator: true,
+      fireplace: true,
+      flooring: true,
+      furnished: true,
+      jettedTub: true,
+      securitySystem: true,
+      vaultedCeiling: true,
+      skylight: true,
+      wetBar: true,
+
+      // Exterior Features
+      barbecueArea: true,
+      deck: true,
+      dock: true,
+      fence: true,
+      garden: true,
+      hotTubOrSpa: true,
+      lawn: true,
+      patio: true,
+      pond: true,
+      pool: true,
+      porch: true,
+      rvParking: true,
+      sauna: true,
+      sprinklerSystem: true,
+      waterFront: true,
+    };
+    let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
     // if (isDone) {
 
@@ -528,15 +618,6 @@ function PropertyCreateModal({
                 />
               </Form.Item>
               <Form.Item
-                label="Year Built"
-                name="yearBuilt"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <DatePicker picker="year" onChange={(e) => setYearBuilt(e)} />
-              </Form.Item>
-              <Form.Item
                 label="Lot Size"
                 name="lotSize"
                 rules={[
@@ -557,22 +638,38 @@ function PropertyCreateModal({
                 />
               </Form.Item>
               <Form.Item
-                label="Room Details"
-                name="lotSize"
-                rules={[{ message: "Please input an asking price." }]}
-              >
-                <Collapse></Collapse>
-              </Form.Item>
-
-              <Form.Item
-                label="Building Details"
-                name="lotSize"
+                label="Appliances"
+                name="appliances"
                 rules={[{ message: "Please input an asking price." }]}
               ></Form.Item>
-
               <Form.Item
-                label="Utilities*"
-                name="lotSize"
+                label="Flooring"
+                name="flooring"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Cooling"
+                name="cooling"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Heating"
+                name="heating"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Parking"
+                name="parking"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Interior Features"
+                name="interiorFeatures"
+                rules={[{ message: "Please input an asking price." }]}
+              ></Form.Item>
+              <Form.Item
+                label="Exterior Features"
+                name="exteriorFeatures"
                 rules={[{ message: "Please input an asking price." }]}
               ></Form.Item>
             </Form>

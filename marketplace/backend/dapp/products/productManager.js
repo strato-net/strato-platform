@@ -11,6 +11,7 @@ import dayjs from "dayjs";
 
 import productJs from "./product";
 import inventoryJs from "./inventory";
+import propertyJs from "./property";
 
 const contractName = "ProductManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/ProductManager.sol`;
@@ -115,6 +116,13 @@ function bind(user, _contract, options) {
     deleteProduct(user, contract, args, options);
   contract.updateInventoriesQuantities = async (args) =>
     updateInventoriesQuantities(user, contract, args, options);
+  /* PROPERTY BINDINGS */
+  contract.getProperty = async (args, _options = defaultOptions) =>
+    getProperty(user, args, _options);
+  contract.getProperties = async (args, _options = defaultOptions) =>
+    getProperties(user, args, _options);
+  contract.createProperty = async (args) =>
+    createProperty(user, contract, args, options);
   return contract;
 }
 
@@ -392,6 +400,40 @@ async function updateInventoriesQuantities(admin, contract, _args, baseOptions) 
   return [restStatus];
 }
 
+/* PROPERTY FUNCTIONS */
+async function getProperty(user, args, options) {
+  return propertyJs.get(user, args, options);
+}
+
+async function getProperties(user, args, options) {
+  return propertyJs.getAll(user, args, options);
+}
+
+async function createProperty(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "addProperty",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, propertyAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, propertyAddress];
+}
+
 export default {
   bindAddress,
   uploadContract,
@@ -403,5 +445,8 @@ export default {
   deleteProduct,
   createInventory,
   updateInventory,
-  updateInventoriesQuantities
+  updateInventoriesQuantities,
+  getProperty,
+  getProperties,
+  createProperty,
 };

@@ -131,4 +131,10 @@ export const PaymentService = {
   stripeWebhookConnect: '/stripe/webhook/connect',
 }
 
-
+export const Properties = {
+  prefix: '/properties',
+  getAll: '/',
+  get: '/:address',
+  create: '/',
+  update: '/update',
+}
