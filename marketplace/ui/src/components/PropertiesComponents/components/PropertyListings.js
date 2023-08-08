@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Space, Spin, Pagination, notification } from 'antd'
+import { Row, Col, Typography, Space, Spin, Pagination, notification, Button } from 'antd'
 import PropertyCard from './PropertyCard'
 import { sampleProperties } from '../helpers/sampleProperties'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
+import PropertyCreateModal from './PropertyCreateModal'
 
 function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
   const [limit, setLimit] = useState(12)
+  const [isCreateModalOpen, toggleCreateModal] = useState(false);
+  const [modalView, setModalView] = useState(true);
+  const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
   useEffect(() => {
     // TODO: will be used when API is ready
@@ -61,7 +65,14 @@ function PropertyListings() {
             <Typography.Title level={4} style={{ padding: "0px 16px" }}>
               Recommended Properties
             </Typography.Title>
-            <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+            <Col style={{ display: "flex", justifyContent: "space-between" }}>
+              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+              <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
+                onClick={() => {
+                  toggleCreateModal(true)
+                }}
+              >List Property</Button>
+            </Col>
           </Row>
           {isPropertiesLoading
             ? <div className="h-96 flex justify-center items-center">
@@ -89,6 +100,14 @@ function PropertyListings() {
           />
         </Col>
       </Row>
+      <PropertyCreateModal
+        isCreateModalOpen={isCreateModalOpen}
+        toggleCreateModal={toggleCreateModal}
+        modalView={modalView}
+        setModalView={setModalView}
+        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
+        toggleCreateConfirmModal={toggleCreateConfirmModal}
+      />
     </>
   );
 }

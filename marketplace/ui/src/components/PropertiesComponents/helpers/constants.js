@@ -20,6 +20,7 @@ export const appliancesData = [
   { value: 'trashCompactor', label: 'Trash Compactor' },
   { value: 'refrigerator', label: 'Refrigerator' },
   { value: 'washer', label: 'Washer' },
+  { value: 'waterHeater', label: 'Water Heater' },
   { value: 'other', label: 'Other' },
 ]
 
@@ -48,7 +49,6 @@ export const interiorFeaturesData = [
   { value: 'vaultedCeiling', label: 'Vaulted Ceiling' },
   { value: 'wetBar', label: 'Wet Bar' },
   { value: 'wired', label: 'Wired' },
-  { value: 'other', label: 'Other' },
 ]
 
 export const coolingData = [

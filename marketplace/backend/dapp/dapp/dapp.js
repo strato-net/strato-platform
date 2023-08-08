@@ -631,12 +631,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...productArgs }
     const productContract = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
+    console.log('productContract DAPP', productContract)
 
     //create the property contract that matches product id with the property id
-    if (productContract[0] === 200) {
+    if (productContract[0] == 200) {
+      console.log('productCOntractWorking')
       const propertyArgs = {
         produdctId: productContract[1],
-        parcelNumber: args.parcelNumber,
         listPrice: args.listPrice,
         unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
@@ -654,20 +655,88 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         livingAreaUnits: args.livingAreaUnits,
         latitude: args.latitude,
         longitude: args.longitude,
-        listAgentsFullName: args.listAgentsFullName,
-        listAgentsEmail: args.listAgentsEmail,
-        listAgentsPreferredPhone: args.listAgentsPreferredPhone,
-        appliances: args.appliances,
-        cooling: args.cooling,
-        flooring: args.flooring,
-        heating: args.heating,
         numberOfUnitsTotal: args.numberOfUnitsTotal,
-        parkingFeatures: args.parkingFeatures,
-        interiorFeatures: args.interiorFeatures,
-        exteriorFeatures: args.exteriorFeatures,
-        images: args.images,
+        // Appliances
+        dishwasher: args.dishwasher,
+        dryer: args.dryer,
+        freezer: args.freezer,
+        garbageDisposal: args.garbageDisposal,
+        microwave: args.microwave,
+        ovenOrRange: args.ovenOrRange,
+        refrigerator: args.refrigerator,
+        washer: args.washer,
+        waterHeater: args.waterHeater,
+
+        // Cooling
+        centralAir: args.centralAir,
+        evaporative: args.evaporative,
+        geoThermal: args.geoThermal,
+        refrigeration: args.refrigeration,
+        solar: args.solar,
+        wallUnit: args.wallUnit,
+
+        // Heating
+        baseboard: args.baseboard,
+        forceAir: args.forceAir,
+        geoThermalHeat: args.geoThermal,
+        heatPump: args.heatPump,
+        hotWater: args.hotWater,
+        radiant: args.radiant,
+        solarHeat: args.solarHeat,
+        steam: args.steam,
+
+        // Flooring
+        carpet: args.carpet,
+        concrete: args.concrete,
+        hardwood: args.hardwood,
+        laminate: args.laminate,
+        linoleumVinyl: args.linoleumVinyl,
+        slate: args.slate,
+        softwood: args.softwood,
+        tile: args.tile,
+
+        // Parking
+        carport: args.carport,
+        garage: args.garage,
+        offStreet: args.offStreet,
+        onStreet: args.onStreet,
+
+        // Interior Features
+        attic: args.attic,
+        cableReady: args.cableReady,
+        ceilingFan: args.ceilingFan,
+        doublePaneWindows: args.doublePaneWindows,
+        elevator: args.elevator,
+        fireplace: args.fireplace,
+        flooring: args.flooring,
+        furnished: args.furnished,
+        jettedTub: args.jetteTub,
+        securitySystem: args.securitySystem,
+        vaultedCeiling: args.vaultedCeiling,
+        skylight: args.skylight,
+        wetBar: args.wetBar,
+
+        // Exterior Features
+        barbecueArea: args.barbecueArea,
+        deck: args.deck,
+        dock: args.dock,
+        fence: args.fence,
+        garden: args.garden,
+        hotTubOrSpa: args.hotTubOrSpa,
+        lawn: args.lawn,
+        patio: args.patio,
+        pond: args.pond,
+        pool: args.pool,
+        porch: args.porch,
+        rvParking: args.rvParking,
+        sauna: args.sauna,
+        sprinklerSystem: args.sprinklerSystem,
+        waterFront: args.waterFront,
+
       }
-      const propertyContract = await managers.productManager.createProperty(...propertyArgs);
+      console.log('propertyArgs DAPP', propertyArgs)
+      const propertyContract = await managers.productManager.createProperty(propertyArgs);
+      console.log('propertyContract DAPP', propertyContract)
       return {
         productContractRest: productContract[0],
         productContractAddress: productContract[1],

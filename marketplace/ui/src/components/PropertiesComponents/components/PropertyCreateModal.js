@@ -8,15 +8,14 @@ import {
   Upload,
   Button,
   Select,
-  Collapse,
-  DatePicker,
+  notification
 } from "antd";
-import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
 import { StateData, HomeTypeData, parkingFeaturesData, heatingData, coolingData, flooringData, appliancesData, interiorFeaturesData, exteriorFeaturesData } from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
-import { usePropertiesDispatch } from "../../../contexts/propertyContext";
+import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
 
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -35,13 +34,15 @@ function PropertyCreateModal({
   toggleCreateConfirmModal,
 }) {
   const dispatch = usePropertiesDispatch();
+  const [api, contextHolder] = notification.useNotification();
+  const { message, success } = usePropertiesState()
 
+  const [selectedImage, setSelectedImage] = useState(null);
   const [propertyData, setPropertyData] = useState({});
   const [homeType, setHomeType] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
-  // const [yearBuilt, setYearBuilt] = useState("");
   const [lotSize, setLotSize] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -85,7 +86,7 @@ function PropertyCreateModal({
     !lotSizeAreaUnits;
 
   const handleModalToggle = () => {
-    setModalView(!modalView);
+      setModalView(!modalView);
   };
 
   const showConfirmationModal = () => {
@@ -98,10 +99,119 @@ function PropertyCreateModal({
     setPropertyData(data);
   };
 
+  function beforeUpload(file) {
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+    if (!isJpgOrPng) {
+      openToast("bottom", "Image must be of jpeg or png format");
+    }
+    const isLt1M = file.size / 1024 / 1024 < 1;
+    if (!isLt1M) {
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
+    }
+    return isJpgOrPng && isLt1M;
+  }
+
   //creates the listing for property
-  const handleSubmitCreateProperty = () => {
-    const body = {};
-    // let [isDone, projectAddress] = await actions.createProject(dispatch, body);
+  const handleSubmitCreateProperty = async () => {
+
+    const body = {
+      title: 'body.title',
+      description: 'body.description',
+      propertyType: 'body.propertyType',
+      listPrice: 100000,
+      unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
+      streetNumber: 8,
+      streetName: 'body.streetName',
+      unitNumber: 'body.unitNumber',
+      postalCity: 'state.postalCity',
+      stateOrProvince: 'body.stateOrProvince',
+      postalcode: 12345,
+      bathroomsTotalInteger: 5,
+      bedroomsTotal: 7,
+      lotSizeArea: 1000,
+      lotSizeUnits: 'sqft',
+      livingArea: 100,
+      livingAreaUnits: 'sqft', 
+      numberOfUnitsTotal: 3,
+
+      // Appliances
+      dishwasher: true,
+      dryer: true,
+      freezer: true,
+      garbageDisposal: true,
+      microwave: true,
+      ovenOrRange: true,
+      refrigerator: true,
+      washer: true,
+      waterHeater: true,
+
+      // Cooling
+      centralAir: true,
+      evaporative: true,
+      geoThermal: true,
+      refrigeration: true,
+      solar: true,
+      wallUnit: true,
+
+      // Heating
+      baseboard: true,
+      forceAir: true,
+      geoThermalHeat: true,
+      heatPump: true,
+      hotWater: true,
+      radiant: true,
+      solarHeat: true,
+      steam: true,
+
+      // Flooring
+      carpet: true,
+      concrete: true,
+      hardwood: true,
+      laminate: true,
+      linoleumVinyl: true,
+      slate: true,
+      softwood: true,
+      tile: true,
+
+      // Parking
+      carport: true,
+      garage: true,
+      offStreet: true,
+      onStreet: true,
+
+      // Interior Features
+      attic: true,
+      cableReady: true,
+      ceilingFan: true,
+      doublePaneWindows: true,
+      elevator: true,
+      fireplace: true,
+      flooring: true,
+      furnished: true,
+      jettedTub: true,
+      securitySystem: true,
+      vaultedCeiling: true,
+      skylight: true,
+      wetBar: true,
+
+      // Exterior Features
+      barbecueArea: true,
+      deck: true,
+      dock: true,
+      fence: true,
+      garden: true,
+      hotTubOrSpa: true,
+      lawn: true,
+      patio: true,
+      pond: true,
+      pool: true,
+      porch: true,
+      rvParking: true,
+      sauna: true,
+      sprinklerSystem: true,
+      waterFront: true,
+    };
+    let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
     // if (isDone) {
 
@@ -162,8 +272,28 @@ function PropertyCreateModal({
     wrapperCol: { span: 16 },
   };
 
+  const openToast = (placement) => {
+
+    if (success) {
+      api.success({
+        message: "message-success",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: "message-failed",
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
   return (
     <>
+      {contextHolder}
       <Modal
         {...layout}
         open={isCreateModalOpen}
@@ -195,6 +325,7 @@ function PropertyCreateModal({
                 defaultValue={propertyData?.name}
                 value={propertyData?.name}
                 maxLength={100}
+                placeholder="Listing Title"
                 showCount
                 onChange={(e) => {
                   handleChange("title", e.target.value);
@@ -217,6 +348,7 @@ function PropertyCreateModal({
                 value={propertyData?.projectDescription}
                 maxLength={500}
                 showCount
+                placeholder="Project Description"
                 onChange={(e) => {
                   handleChange("description", e.target.value);
                 }}
@@ -234,6 +366,7 @@ function PropertyCreateModal({
                 label="Asking Price"
                 type="Number"
                 min={0}
+                placeholder="Asking Price"
                 controls={false}
                 addonBefore="$"
                 defaultValue={propertyData?.askingPrice}
@@ -254,10 +387,12 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
+                style={{ width: 150 }}
                 precision={0}
                 label="Lot Number"
                 type="Number"
                 min={0}
+                placeholder="Lot Number"
                 controls={false}
                 defaultValue={propertyData?.lotNumber}
                 value={propertyData?.lotNumber}
@@ -278,7 +413,8 @@ function PropertyCreateModal({
             >
               <Input
                 label="Street Name"
-                id="addressLine1"
+                id="streetname"
+                placeholder="Street Name"
                 defaultValue={streetName}
                 value={streetName}
                 onChange={(e) => {
@@ -295,11 +431,16 @@ function PropertyCreateModal({
             >
               <InputNumber
                 label="Street Number"
-                id="streetNumber"
+                id="streetnumber"
+                placeholder="Street Number"
+                controls={false}
                 defaultValue={streetNumber}
                 value={streetNumber}
                 onChange={(value) => {
                   handleChange("streetNumber", value);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
                 }}
               />
             </Form.Item>
@@ -313,6 +454,7 @@ function PropertyCreateModal({
               <Input
                 label="City"
                 id="city"
+                placeholder="City"
                 defaultValue={propertyData?.city}
                 value={propertyData?.city}
                 onChange={(e) => {
@@ -331,6 +473,7 @@ function PropertyCreateModal({
                 label="State"
                 defaultValue={propertyData?.state}
                 value={propertyData?.state}
+                placeholder="Select State"
                 onSelect={(e) => {
                   handleChange("stateOrProvince", e);
                 }}
@@ -345,8 +488,10 @@ function PropertyCreateModal({
             >
               <InputNumber
                 precision={0}
+                style={{ width: 150 }}
                 label="Zip Code"
                 type="Number"
+                placeholder="ZipCode"
                 min={0}
                 max={99999}
                 controls={false}
@@ -361,34 +506,43 @@ function PropertyCreateModal({
               />
             </Form.Item>
 
-            <Form.Item
-              label="Images"
-              name="images"
-              rules={[
-                { message: "Please property upload images if avaliable." },
-              ]}
-            >
-              <Upload
-                action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
-                listType="picture-card"
-                fileList={fileList}
-                onPreview={handlePreview}
-                onChange={handleFileChange}
-              >
-                {uploadButton}
-              </Upload>
-              <Modal
-                open={previewOpen}
-                title={previewTitle}
-                footer={null}
-                onCancel={handleCancel}
-              >
-                <img
-                  alt="example"
-                  style={{ width: "100%" }}
-                  src={previewImage}
-                />
-              </Modal>
+            <Form.Item label="Upload Image" name="image">
+              <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
+                {selectedImage ? (
+                  <div className="h-20">
+                    <img
+                      alt="Product"
+                      src={selectedImage}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                    <br />
+                  </div>
+                ) : (
+                  <PictureOutlined className="text-7xl text-primary opacity-10" />
+                )}
+                <Upload
+                  onChange={(e) => {
+                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                  }}
+                  customRequest={() => { }}
+                  style={{ display: "none" }}
+                  accept="image/png, image/jpeg"
+                  maxCount={1}
+                  showUploadList={false}
+                  beforeUpload={beforeUpload}
+                >
+                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                    Browse
+                  </div>
+                </Upload>
+              </div>
+
+              <div className="flex items-start">
+                <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                <p className="mt-1 text-xs italic ml-1 mr-4">
+                  use jpg, png format of size less than 1mb
+                </p>
+              </div>
             </Form.Item>
           </Form>
         ) : (
@@ -473,15 +627,6 @@ function PropertyCreateModal({
                   }}
                 />
               </Form.Item>
-              {/* <Form.Item
-                label="Year Built"
-                name="yearBuilt"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <DatePicker picker="year" onChange={(e) => setYearBuilt(e)} />
-              </Form.Item> */}
               <Form.Item
                 label="Lot Size"
                 name="lotSize"

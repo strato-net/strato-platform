@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Property';
+const contractName = 'Property_0_2';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Property.sol`;
 /** 
  * Upload a new Product 
@@ -52,11 +52,10 @@ async function uploadContract(user, _constructorArgs, options) {
 function marshalIn(_args) {
     const defaultArgs = {
         produdctId: '',
-        parcelNumber: 0,
         propertType: '',
         listPrice: 0,
         unparsedAddress: '',
-        streetNumber: '',
+        streetNumber: 0,
         streetName: '',
         unitNumber: '',
         postalCity: '',
@@ -71,18 +70,84 @@ function marshalIn(_args) {
         livingAreaUnits: '',
         latitude: '',
         longitude: '',
-        listAgentsFullName: '',
-        listAgentsEmail: '',
-        listAgentsPreferredPhone: 0,
-        appliances: [],
-        cooling: [],
-        flooring: [],
-        heating: [],
         numberOfUnitsTotal: 0,
-        parkingFeatures: [],
-        interiorFeatures: [],
-        exteriorFeatures: [],
-        images: [],
+        // Appliances
+        dishwasher: false,
+        dryer: false,
+        freezer: false,
+        garbageDisposal: false,
+        microwave: false,
+        ovenOrRange: false,
+        refrigerator: false,
+        washer: false,
+        waterHeater: false,
+
+        // Cooling
+        centralAir: false,
+        evaporative: false,
+        geoThermal: false,
+        refrigeration: false,
+        solar: false,
+        wallUnit: false,
+
+        // Heating
+        baseboard: false,
+        forceAir: false,
+        geoThermalHeat: false,
+        heatPump: false,
+        hotWater: false,
+        radiant: false,
+        solarHeat: false,
+        steam: false,
+
+        // Flooring
+        carpet: false,
+        concrete: false,
+        hardwood: false,
+        laminate: false,
+        linoleumVinyl: false,
+        slate: false,
+        softwood: false,
+        tile: false,
+
+        // Parking
+        carport: false,
+        garage: false,
+        offStreet: false,
+        onStreet: false,
+
+        // Interior Features
+        attic: false,
+        cableReady: false,
+        ceilingFan: false,
+        doublePaneWindows: false,
+        elevator: false,
+        fireplace: false,
+        flooring: false,
+        furnished: false,
+        jettedTub: false,
+        securitySystem: false,
+        vaultedCeiling: false,
+        skylight: false,
+        wetBar: false,
+
+        // Exterior Features
+        barbecueArea: false,
+        deck: false,
+        dock: false,
+        fence: false,
+        garden: false,
+        hotTubOrSpa: false,
+        lawn: false,
+        patio: false,
+        pond: false,
+        pool: false,
+        porch: false,
+        rvParking: false,
+        sauna: false,
+        sprinklerSystem: false,
+        waterFront: false,
+
     };
 
     const args = {
