@@ -18,9 +18,11 @@ module SolidVM.Model.CodeCollection (
   flEnums,
   flErrors,
   pragmas,  
+  imports,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
+  module SolidVM.Model.CodeCollection.Import,
   module SolidVM.Model.CodeCollection.Statement,
   module SolidVM.Model.CodeCollection.ConstantDecl,
   --module SolidVM.Model.CodeCollection.Type,
@@ -48,6 +50,7 @@ import           SolidVM.Model.CodeCollection.Contract
 --import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.Import
 import           SolidVM.Model.CodeCollection.Statement
 --import           SolidVM.Model.CodeCollection.Type
 import           SolidVM.Model.CodeCollection.VarDef
@@ -63,7 +66,8 @@ data CodeCollectionF a =
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)],
     _flErrors :: Map SolidString [(SolidString, IndexedType, a)],
-    _pragmas :: [(String, String)]
+    _pragmas :: [(String, String)],
+    _imports :: [FileImportF a]
   } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
@@ -95,4 +99,5 @@ instance Arbitrary CodeCollection where
     , _flEnums     = M.empty
     , _flStructs   = M.empty
     , _flErrors    = M.empty
-    , _pragmas     = []}]
+    , _pragmas     = []
+    , _imports     = []}]

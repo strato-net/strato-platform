@@ -61,7 +61,14 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def | Prag (String, String)
+data SUnitIntermediary = Con Contract
+                       | FLC ConstantDecl
+                       | FLS Def.Def
+                       | FLE Def.Def
+                       | FLF Func
+                       | FLER Def.Def
+                       | Prag (String, String)
+                       | Imp  FileImport
 
 -- | OTHER CACHE OPTIONS
 -- {-# NOINLINE unsafeCodeMapIORef #-}
@@ -117,6 +124,7 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just $ (textToLabel name, FLER args)
           Pragma _ n v -> do 
             pure $ Just $ (" ", Prag (n,v))
+          Import _ i -> pure . Just $ ("", Imp i)
           _ -> pure Nothing
 
       throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
@@ -137,10 +145,11 @@ compileSourceNoInheritance initCodeMap = do
         FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a)
         --not map type
         Prag a                -> fmap (\cList -> cc & pragmas .~ cList) $ pure (a : (cc ^. pragmas))
+        Imp  i                -> fmap (\cList -> cc & imports .~ cList) $ pure (i : (cc ^. imports))
         FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
         FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
         FLER z -> parseError  "FLER non Error should be impossible"  (show z)
-      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] -- the list of all the sUnits goes here
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] [] -- the list of all the sUnits goes here
 
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of

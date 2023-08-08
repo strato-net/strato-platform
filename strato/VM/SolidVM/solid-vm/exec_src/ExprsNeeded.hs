@@ -116,7 +116,7 @@ main = do
   contents <- readFile filename
   File parsedFile <- either (die . show) return $ runParser solidityFile (ParserState "" "" M.empty) "" contents
   let namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') M.empty xabi) | NamedXabi name (xabi, parents') <- parsedFile]
-      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) []
+      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) [] []
       typecheck = TC.detector cc
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)
