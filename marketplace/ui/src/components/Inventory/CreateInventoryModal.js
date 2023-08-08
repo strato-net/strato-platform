@@ -24,7 +24,6 @@ import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
 import { INVENTORY_STATUS, MAX_RAW_MATERIAL } from "../../helpers/constants";
-import { util } from "blockapps-rest";
 
 const { Option } = Select;
 
@@ -58,7 +57,7 @@ const CreateInventoryModal = ({
     quantity: null,
     pricePerUnit: "",
     vintage: 0,
-    batchSerializationNumber: "",
+    batchSerializationNumber: " ",
     status: true,
   };
 
@@ -97,7 +96,7 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      batchSerializationNumber: toString(util.uid()),
+      batchSerializationNumber: " ",
     };
 
     let isDone = await actions.createInventory(dispatch, body);
