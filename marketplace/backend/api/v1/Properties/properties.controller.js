@@ -25,7 +25,7 @@ class PropertiesController {
       const property = await dapp.getProperty(args, chainOptions)
       // const productImageUrl = getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
       // const result = { ...product, imageUrl: productImageUrl }
-      rest.response.status200(res, result)
+      rest.response.status200(res, property)
 
       return next()
     } catch (e) {
@@ -44,7 +44,7 @@ class PropertiesController {
       //   )
       // }))
 
-      rest.response.status200(res, productsWithImageUrl)
+      rest.response.status200(res, properties)
 
       return next()
     } catch (e) {

@@ -139,7 +139,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/properties?isDeleted=false&limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/properties?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }

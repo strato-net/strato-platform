@@ -604,13 +604,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     //Get the property contract
-    const property = await managers.productManager.getProperty({ ...args, ownerOrganization: userOrganization }, getOptions);
-
-    managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
+    const property = await managers.productManager.getProperty({ ...args }, getOptions);
+    console.log('dapp.getProperty - property', property)
+    //Get the product contract
+    const product = await managers.productManager.getProduct({ 
+      ...args,
+      uniqueProductID: property.productId,
+      ownerOrganization: userOrganization }, getOptions);
+    console.log('dapp.getProperty - product', product)
+    const propertyData = { ...property, title: product.name, description: product.description, propertyType: product.subCategory }
+    console.log('dapp.getProperty - propertyData', propertyData)
+    return propertyData
   };
   contract.getProperties = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    return managers.productManager.getProducts({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    const allPropertiesData = await managers.productManager.getProperties({ ...args }, getOptions);
+    const propertiesWProducts = []
+
+    for (const property of allPropertiesData) {
+      const productData = await managers.productManager.getProduct({ 
+        ...args,
+        uniqueProductID: property.productId,
+        ownerOrganization: userOrganization }, getOptions);
+      propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
+    }
+    return propertiesWProducts
   };
 
   contract.createProperty = async function (args, options = optionsNoChainIds) {
