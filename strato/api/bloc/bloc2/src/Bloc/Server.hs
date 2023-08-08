@@ -73,6 +73,7 @@ bloc = return gitInfo
   :<|> postBlocTransactionBody
   :<|> postBlocTransactionUnsigned
   :<|> postBlocTransaction
+  :<|> postBlocTransactionExternal
 
 --serveBloc :: BlocEnv -> Server BlocAPI
 --serveBloc env = hoistServer blocApi (enterBloc env) bloc

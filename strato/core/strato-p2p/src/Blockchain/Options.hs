@@ -2,12 +2,9 @@
 
 module Blockchain.Options where
 
-import           Data.ByteString.Internal
 import           HFlags
 
-import           Blockchain.VMOptions 
 import           Blockchain.Participation (ParticipationMode(..))
-import           Blockchain.Strato.Model.Util
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
@@ -32,18 +29,3 @@ defineFlag "useNodeCerts" (False :: Bool) "Use new node certificate checking pro
 
 defineEQFlag "participationMode" [| Full :: ParticipationMode |] "PARTICIPATIONMODE"
   "Whether to send all mesages to peers (Full), no messages to peers (None), or everything except PBFT (NoConsensus)"
-
-computeNetworkID :: Integer
-computeNetworkID =
-  case (flags_network, flags_networkID) of
-    ("", -1) ->
-      if flags_testnet
-      then 0
-      else 1
-    (network, -1) -> newtorkToID network
-    (_, networkID) -> networkID -- providing a networkID will ignore network name
-
-    where newtorkToID :: String -> Integer
-          newtorkToID network = case network of 
-            "mercata-hydrogen" -> 7596898649924658542 -- mercata-hydrogen networkID was manually changed
-            n -> bytes2Integer $ map c2w n

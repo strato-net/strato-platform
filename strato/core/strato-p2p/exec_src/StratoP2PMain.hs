@@ -10,6 +10,7 @@ import           Network.Wai.Middleware.Prometheus
 
 import           Blockchain.Context
 import           Blockchain.Options
+import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
