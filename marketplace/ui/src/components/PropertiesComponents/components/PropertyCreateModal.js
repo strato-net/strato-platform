@@ -33,6 +33,7 @@ import { actions } from "../../../contexts/propertyContext/actions";
 import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
 const { Panel } = Collapse;
 const { Text } = Typography;
+const { Option } = Select;
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -54,7 +55,17 @@ function PropertyCreateModal({
   const { message, success } = usePropertiesState()
 
   const [selectedImage, setSelectedImage] = useState(null);
-  const [propertyData, setPropertyData] = useState({});
+  const [propertyData, setPropertyData] = useState({
+    lotSizeUnits: "sqft",
+    livingAreaUnits: "sqft",
+    appliances: [],
+    cooling: [],
+    heating: [],
+    flooring: [],
+    parking: [],
+    interior: [],
+    exterior: [],
+  });
   const [homeType, setHomeType] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
@@ -68,50 +79,68 @@ function PropertyCreateModal({
   const {
     title,
     description,
-    propertyType,
     listPrice,
     streetName,
     streetNumber,
-    lotNumber,
+    unitNumber,
     postalCity,
     stateOrProvince,
     postalcode,
-    askingPrice,
+
+    propertyType,
     bedroomsTotal,
     bathroomsTotalInteger,
     livingArea,
-    lotSizeAreaUnits,
+    lotSizeArea,
+
     appliances,
-    heating,
     cooling,
+    heating,
     flooring,
     parking,
     interior,
     exterior,
-    lotSizeArea
+
+    lotSizeUnits,
+    livingAreaUnits,
+
   } = propertyData;
-  
+
   const isDisabledCreateView =
     !title ||
     !description ||
-    !lotNumber ||
+    !listPrice ||
     !streetName ||
     !streetNumber ||
+    !unitNumber ||
     !postalCity ||
     !stateOrProvince ||
-    !postalcode ||
-    !askingPrice;
+    !postalcode;
 
   const isDisabledFactsView =
     !propertyType ||
     !bedroomsTotal ||
     !bathroomsTotalInteger ||
     !livingArea ||
-    // !yearBuilt ||
-    !lotSizeAreaUnits;
+    !lotSizeArea;
+
+  const LivingAreaUnitElement = (
+    <Select defaultValue={livingAreaUnits}>
+      <Option value={livingAreaUnits}>{livingAreaUnits}</Option>
+    </Select>
+  );
+  const LotSizeAreaUnitElement = (
+    <Select defaultValue={lotSizeUnits}>
+      <Option value={lotSizeUnits}>{livingAreaUnits}</Option>
+    </Select>
+  );
 
   const handleModalToggle = () => {
-    setModalView(!modalView);
+    if (isDisabledCreateView) {
+    } else {
+      setModalView(!modalView);
+
+    }
   };
 
   const showConfirmationModal = () => {
@@ -147,16 +176,16 @@ function PropertyCreateModal({
       // unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
       streetName: streetName,
       streetNumber: streetNumber,
-      unitNumber: 'body.unitNumber',
+      unitNumber: unitNumber,
       postalCity: postalCity,
       stateOrProvince: stateOrProvince,
       postalcode: postalcode,
       bathroomsTotalInteger: bathroomsTotalInteger,
       bedroomsTotal: bedroomsTotal,
       lotSizeArea: lotSizeArea,
-      lotSizeUnits: 'sqft',
-      livingArea: 100,
       livingAreaUnits: 'sqft',
+      livingArea: livingArea,
+      lotSizeUnits: 'sqft',
       numberOfUnitsTotal: 3,
 
       // Appliances
@@ -236,6 +265,7 @@ function PropertyCreateModal({
       sprinklerSystem: exterior.includes("sprinklerSystem"),
       waterFront: exterior.includes("waterFront"),
     };
+
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
     // if (isDone) {
@@ -347,7 +377,7 @@ function PropertyCreateModal({
               label="Listing Title"
               name="title"
               rules={[
-                { required: true, message: "Please input project name." },
+                { required: true, message: "Please enter project title." },
               ]}
             >
               <Input
@@ -368,7 +398,7 @@ function PropertyCreateModal({
               rules={[
                 {
                   required: true,
-                  message: "Please input project description.",
+                  message: "Please enter project description.",
                 },
               ]}
             >
@@ -388,7 +418,7 @@ function PropertyCreateModal({
               label="Asking Price"
               name="listPrice"
               rules={[
-                { required: true, message: "Please input an asking price." },
+                { required: true, message: "Please enter asking price." },
               ]}
             >
               <InputNumber
@@ -410,35 +440,10 @@ function PropertyCreateModal({
               />
             </Form.Item>
             <Form.Item
-              label="Lot Number"
-              name="lotNumber"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
-            >
-              <InputNumber
-                style={{ width: 150 }}
-                precision={0}
-                label="Lot Number"
-                type="Number"
-                min={0}
-                placeholder="Lot Number"
-                controls={false}
-                defaultValue={propertyData?.lotNumber}
-                value={propertyData?.lotNumber}
-                onChange={(e) => {
-                  handleChange("lotSizeAreaUnits", e);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
               label="Street Name"
               name="streetName"
               rules={[
-                { required: true, message: "Please input an asking price." },
+                { required: true, message: "Please enter street name." },
               ]}
             >
               <Input
@@ -456,10 +461,11 @@ function PropertyCreateModal({
               label="Street Number"
               name="streetNumber"
               rules={[
-                { required: true, message: "Please input an asking price." },
+                { required: true, message: "Please enter street number." },
               ]}
             >
               <InputNumber
+                style={{ width: 150 }}
                 label="Street Number"
                 id="streetnumber"
                 placeholder="Street Number"
@@ -475,10 +481,33 @@ function PropertyCreateModal({
               />
             </Form.Item>
             <Form.Item
+              label="House Number"
+              name="houseNumber"
+              rules={[
+                { required: true, message: "Please enter house number." },
+              ]}
+            >
+              <Input
+                style={{ width: 150 }}
+                label="House Number"
+                id="housenumber"
+                placeholder="House Number"
+                controls={false}
+                defaultValue={unitNumber}
+                value={unitNumber}
+                onChange={(e) => {
+                  handleChange("unitNumber", e.target.value);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
+                }}
+              />
+            </Form.Item>
+            <Form.Item
               label="City"
               name="city"
               rules={[
-                { required: true, message: "Please input an asking price." },
+                { required: true, message: "Please enter a city." },
               ]}
             >
               <Input
@@ -496,7 +525,7 @@ function PropertyCreateModal({
               label="State"
               name="state"
               rules={[
-                { required: true, message: "Please input an asking price." },
+                { required: true, message: "Please select state" },
               ]}
             >
               <Select
@@ -514,7 +543,7 @@ function PropertyCreateModal({
             <Form.Item
               label="Zip Code"
               name="postalCode"
-              rules={[{ required: true, message: "Please input a zip code." }]}
+              rules={[{ required: true, message: "Please enter a zip code." }]}
             >
               <InputNumber
                 precision={0}
@@ -588,7 +617,8 @@ function PropertyCreateModal({
                 <Select
                   label="homeType"
                   placeholder="Property Type"
-                  defaultValue={homeType}
+                  defaultValue={propertyType}
+                  value={propertyType}
                   onSelect={(value) => { handleChange("propertyType", value) }}
                   options={HomeTypeData}
                   showSearch
@@ -598,18 +628,19 @@ function PropertyCreateModal({
                 label="Bedrooms"
                 name="bedrooms"
                 rules={[
-                  { required: true, message: "Please Enter Number of Bedrooms." },
+                  { required: true, message: "Please enter number of bedrooms." },
                 ]}
               >
                 <InputNumber
+                  style={{ width: 150 }}
                   precision={0}
                   label="bedrooms"
                   placeholder="Bedrooms"
                   type="Number"
                   controls={false}
                   min={0}
-                  value={bedrooms}
-                  defaultValue={bedrooms}
+                  value={bedroomsTotal}
+                  defaultValue={bedroomsTotal}
                   onChange={(value) => { handleChange("bedroomsTotal", value) }}
                   onWheel={(e) => {
                     e.target.blur();
@@ -620,17 +651,19 @@ function PropertyCreateModal({
                 label="Bathrooms"
                 name="bathrooms"
                 rules={[
-                  { required: true, message: "Please Enter Number of Bathrooms" },
+                  { required: true, message: "Please enter number of bathrooms" },
                 ]}
               >
                 <InputNumber
+                  style={{ width: 150 }}
                   precision={0}
                   label="bathrooms"
                   placeholder="Bathrooms"
                   type="Number"
                   controls={false}
                   min={0}
-                  defaultValue={bathrooms}
+                  defaultValue={bathroomsTotalInteger}
+                  value={bathroomsTotalInteger}
                   onChange={(value) => { handleChange("bathroomsTotalInteger", value) }}
                   onWheel={(e) => {
                     e.target.blur();
@@ -638,20 +671,22 @@ function PropertyCreateModal({
                 />
               </Form.Item>
               <Form.Item
-                label="Square Ft"
-                name="squareFeet"
+                label="Living Area"
+                name="livingArea"
                 rules={[
-                  { required: true, message: "Please Enter Square Feet" },
+                  { required: true, message: "Please enter square feet" },
                 ]}
               >
                 <InputNumber
                   precision={0}
-                  label="squareFeet"
-                  placeholder="Square Feet"
+                  label="Living Area"
+                  placeholder="Living Area"
                   type="Number"
                   controls={false}
+                  addonAfter={LivingAreaUnitElement}
                   min={0}
-                  defaultValue={squareFeet}
+                  defaultValue={livingArea}
+                  value={livingArea}
                   onChange={(value) => { handleChange("livingArea", value) }}
                   onWheel={(e) => {
                     e.target.blur();
@@ -662,17 +697,19 @@ function PropertyCreateModal({
                 label="Lot Size Area"
                 name="lotSize"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please enter an asking price." },
                 ]}
               >
                 <InputNumber
                   precision={0}
                   label="lotSize"
-                  placeholder="Lot Size"
+                  placeholder="Lot Size Area"
                   type="Number"
                   controls={false}
+                  addonAfter={LotSizeAreaUnitElement}
                   min={0}
                   defaultValue={lotSizeArea}
+                  value={lotSizeArea}
                   onChange={(value) => { handleChange("lotSizeArea", value) }}
                   onWheel={(e) => {
                     e.target.blur();
@@ -690,6 +727,7 @@ function PropertyCreateModal({
                         style={{ display: "block", lineHeight: "30px" }}
                         options={appliancesData}
                         value={appliances}
+                        defaultValue={appliances}
                         onChange={(value) => {
                           handleChange("appliances", value);
                         }}
@@ -703,6 +741,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={coolingData}
                     value={cooling}
+                    defaultValue={cooling}
                     onChange={(value) => {
                       handleChange("cooling", value);
                     }}
@@ -714,6 +753,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={heatingData}
                     value={heating}
+                    defaultValue={heating}
                     onChange={(value) => {
                       handleChange("heating", value);
                     }}
@@ -725,6 +765,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={flooringData}
                     value={flooring}
+                    defaultValue={flooring}
                     onChange={(value) => {
                       handleChange("flooring", value);
                     }}
@@ -736,6 +777,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={parkingFeaturesData}
                     value={parking}
+                    defaultValue={parking}
                     onChange={(value) => {
                       handleChange("parking", value);
                     }}
@@ -747,6 +789,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={interiorFeaturesData}
                     value={interior}
+                    defaultValue={interior}
                     onChange={(value) => {
                       handleChange("interior", value);
                     }}
@@ -758,6 +801,7 @@ function PropertyCreateModal({
                     style={{ display: "block", lineHeight: "30px" }}
                     options={exteriorFeaturesData}
                     value={exterior}
+                    defaultValue={exterior}
                     onChange={(value) => {
                       handleChange("exterior", value);
                     }}
